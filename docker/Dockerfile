@@ -18,8 +18,11 @@ COPY . .
 RUN pnpm turbo run build
 
 # ---- prune to production-only installs per app --------------------------
+# --legacy: pnpm v10 defaults to requiring inject-workspace-packages=true for
+# `deploy`; --legacy falls back to the pre-v10 copy-based behavior instead,
+# which needs no workspace-wide install-time config change.
 FROM build AS deploy
-RUN pnpm --filter @latestarr/server deploy --prod /prod/server
+RUN pnpm --filter @latestarr/server deploy --prod --legacy /prod/server
 
 # ---- final runtime image --------------------------------------------------
 FROM node:22-alpine AS runtime
