@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a problem with LatestArr
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! Please search existing issues first to avoid duplicates.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact steps to reproduce the behavior.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: LatestArr version / commit
+      placeholder: e.g. v0.1.0 or commit SHA
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment method
+      options:
+        - Docker / docker-compose
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: sources
+    attributes:
+      label: Connected sources involved (if relevant)
+      placeholder: e.g. Tautulli, Audiobookshelf, RomM
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Please redact any tokens, passwords, or other secrets before pasting.
+      render: shell
+    validations:
+      required: false

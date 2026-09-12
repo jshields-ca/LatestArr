@@ -1,0 +1,49 @@
+name: Adapter request
+description: Request support for connecting a new self-hosted service as a content source
+labels: ["adapter-request", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        LatestArr connects to source services (Plex/Tautulli, book/audiobook/game libraries, etc.) via a pluggable adapter interface.
+        Use this template to propose a new one. See the supported-sources table in the README for what's already planned.
+
+  - type: input
+    id: service-name
+    attributes:
+      label: Service name
+      placeholder: e.g. Kavita
+    validations:
+      required: true
+
+  - type: input
+    id: service-link
+    attributes:
+      label: Link to the service's project / homepage
+      placeholder: https://github.com/...
+    validations:
+      required: true
+
+  - type: input
+    id: content-type
+    attributes:
+      label: Content type it would provide
+      placeholder: e.g. comics/manga, movies, games
+    validations:
+      required: true
+
+  - type: textarea
+    id: api
+    attributes:
+      label: Does it have a documented API?
+      description: Link to API docs if available. Adapters need a way to (a) authenticate, (b) list libraries, and (c) list recently-added items with a timestamp.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would this be useful?
+      description: Tell us a bit about your use case.
+    validations:
+      required: false
