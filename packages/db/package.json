@@ -1,0 +1,27 @@
+{
+  "name": "@latestarr/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0",
+    "drizzle-orm": "^0.36.0"
+  },
+  "devDependencies": {
+    "@latestarr/config": "workspace:*",
+    "@types/better-sqlite3": "^7.6.11",
+    "drizzle-kit": "^0.28.0",
+    "eslint": "^9.15.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
