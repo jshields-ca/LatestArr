@@ -11,6 +11,7 @@ COPY apps/server/package.json apps/server/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/db/package.json packages/db/package.json
+COPY packages/crypto/package.json packages/crypto/package.json
 RUN pnpm install --frozen-lockfile
 
 # ---- build everything ---------------------------------------------------

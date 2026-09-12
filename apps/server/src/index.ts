@@ -1,12 +1,18 @@
-import Fastify from "fastify";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+import { createDb, runMigrations } from "@latestarr/db";
+import { buildApp } from "./app.js";
 
-const server = Fastify({ logger: true });
+const databasePath = process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "latestarr.db");
+mkdirSync(path.dirname(databasePath), { recursive: true });
+const db = createDb(databasePath);
+runMigrations(db);
 
-server.get("/health", async () => ({ status: "ok" }));
+const app = await buildApp(db);
 
 const port = Number(process.env.PORT ?? 3000);
 
-server.listen({ port, host: "0.0.0.0" }).catch((err) => {
-  server.log.error(err);
+app.listen({ port, host: "0.0.0.0" }).catch((err) => {
+  app.log.error(err);
   process.exit(1);
 });
