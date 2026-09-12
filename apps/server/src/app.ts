@@ -2,6 +2,7 @@ import cookie from "@fastify/cookie";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerAuthRoutes } from "./http/routes/auth.js";
+import { registerOidcRoutes } from "./http/routes/oidc.js";
 
 export async function buildApp(db: Db): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
@@ -11,6 +12,7 @@ export async function buildApp(db: Db): Promise<FastifyInstance> {
   app.get("/health", async () => ({ status: "ok" }));
 
   registerAuthRoutes(app, db);
+  registerOidcRoutes(app, db);
 
   return app;
 }
