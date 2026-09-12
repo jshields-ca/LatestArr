@@ -1,0 +1,20 @@
+{
+  "name": "@latestarr/crypto",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@latestarr/config": "workspace:*",
+    "eslint": "^9.15.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
