@@ -1,4 +1,4 @@
-import { getAdapter, type MediaKind, type NewItem } from "@latestarr/adapter-core";
+import { getAdapter, type MediaKind, type NewItem, type SourceAdapter } from "@latestarr/adapter-core";
 import { decrypt } from "@latestarr/crypto";
 import {
   type Db,
@@ -41,16 +41,24 @@ export class SendAlreadyRunningError extends Error {
 }
 
 type Newsletter = typeof newsletters.$inferSelect;
+type NewsletterSourceLink = typeof newsletterSources.$inferSelect;
+type SourceConnectionRow = typeof sourceConnections.$inferSelect;
 
-async function fetchItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<NewItem[]> {
+interface LinkedSource {
+  link: NewsletterSourceLink;
+  source: SourceConnectionRow;
+  adapter: SourceAdapter;
+  credentials: Record<string, string>;
+}
+
+async function resolveLinkedSources(db: Db, newsletter: Newsletter): Promise<LinkedSource[]> {
   const sourceLinks = await db
     .select()
     .from(newsletterSources)
     .where(eq(newsletterSources.newsletterId, newsletter.id));
 
-  const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
   const key = getEncryptionKey();
-  const allItems: NewItem[] = [];
+  const resolved: LinkedSource[] = [];
 
   for (const link of sourceLinks) {
     const [source] = await db
@@ -66,6 +74,18 @@ async function fetchItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<
       string,
       string
     >;
+    resolved.push({ link, source, adapter, credentials });
+  }
+
+  return resolved;
+}
+
+async function fetchItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<NewItem[]> {
+  const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
+  const linkedSources = await resolveLinkedSources(db, newsletter);
+  const allItems: NewItem[] = [];
+
+  for (const { link, source, adapter, credentials } of linkedSources) {
     const items = await adapter.fetchRecentItems(
       { baseUrl: source.baseUrl, credentials },
       {
@@ -73,6 +93,26 @@ async function fetchItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<
         mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
         libraryIds: link.libraryFilter ?? undefined,
       },
+    );
+    allItems.push(...items);
+  }
+
+  return allItems;
+}
+
+// Only called for a newsletter rendering through a custom compiled template
+// — a Media List block with sort="mostWatched" is the only consumer of this
+// pool, so the hardcoded-template fallback path never pays for it.
+async function fetchPopularItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<NewItem[]> {
+  const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
+  const linkedSources = await resolveLinkedSources(db, newsletter);
+  const allItems: NewItem[] = [];
+
+  for (const { link, source, adapter, credentials } of linkedSources) {
+    if (!adapter.fetchPopularItems) continue;
+    const items = await adapter.fetchPopularItems(
+      { baseUrl: source.baseUrl, credentials },
+      { since, mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined },
     );
     allItems.push(...items);
   }
@@ -89,9 +129,16 @@ async function renderNewsletterContent(
   if (newsletter.templateId) {
     const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
     if (template?.compiledMjml) {
+      // Fetching "most watched" data means extra adapter API calls, so only
+      // pay for it when the compiled template actually has a Media List
+      // block configured to use that pool.
+      const popularItems = template.compiledMjml.includes('sort="mostWatched"')
+        ? await fetchPopularItemsForNewsletter(db, newsletter)
+        : [];
       return await renderMjmlTemplate(template.compiledMjml, {
         newsletterName: newsletter.name,
         items,
+        popularItems,
         generatedAt,
       });
     }

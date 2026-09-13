@@ -72,6 +72,18 @@ describe("POST /templates", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json().template.designJson).toEqual(designJson);
   });
+
+  it("creates a template with compiled MJML", async () => {
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/templates",
+        payload: { name: "Weekly digest", compiledMjml: "<mjml></mjml>" },
+      }),
+    );
+    expect(response.statusCode).toBe(201);
+    expect(response.json().template.compiledMjml).toBe("<mjml></mjml>");
+  });
 });
 
 describe("template lifecycle", () => {
@@ -117,6 +129,19 @@ describe("template lifecycle", () => {
     );
     expect(redesigned.json().template.name).toBe("Renamed");
     expect(redesigned.json().template.designJson).toEqual(newDesign);
+  });
+
+  it("updates compiledMjml", async () => {
+    const id = await createTemplate();
+
+    const response = await app.inject(
+      authed({
+        method: "PATCH",
+        url: `/api/templates/${id}`,
+        payload: { compiledMjml: "<mjml><mj-body></mj-body></mjml>" },
+      }),
+    );
+    expect(response.json().template.compiledMjml).toBe("<mjml><mj-body></mj-body></mjml>");
   });
 
   it("deletes", async () => {
