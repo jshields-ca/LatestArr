@@ -1,0 +1,23 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(dirname, "src"),
+    },
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    // RTL registers its automatic post-test cleanup() by detecting a
+    // global `afterEach` at import time — without this, DOM from one
+    // test leaks into the next within the same file.
+    globals: true,
+  },
+});

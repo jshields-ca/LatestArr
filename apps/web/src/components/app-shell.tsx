@@ -1,14 +1,37 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 
+import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { navItems } from "@/lib/nav-items";
 import { cn } from "@/lib/utils";
+
+function UserFooter() {
+  const { user, logout } = useAuth();
+
+  return (
+    <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{user?.displayName}</p>
+        <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => void logout()}
+        aria-label="Log out"
+        title="Log out"
+      >
+        <LogOut />
+      </Button>
+    </div>
+  );
+}
 
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -55,6 +78,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </SheetTitle>
             </SheetHeader>
             <NavList onNavigate={() => setMobileNavOpen(false)} />
+            <div className="mt-auto">
+              <UserFooter />
+            </div>
           </SheetContent>
         </Sheet>
 
@@ -66,11 +92,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <div className="mx-auto flex w-full max-w-7xl">
-        <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 border-r border-border p-4 md:block">
-          <div className="mb-4 hidden md:block">
+        <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 flex-col border-r border-border p-4 md:flex">
+          <div className="mb-4">
             <Logo />
           </div>
           <NavList />
+          <div className="mt-auto">
+            <UserFooter />
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
