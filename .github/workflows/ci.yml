@@ -60,6 +60,25 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: false
+          load: true
           tags: latestarr:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Smoke test the built image
+        run: |
+          docker run -d --name latestarr-smoke -p 3000:3000 latestarr:ci
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Health check never succeeded; container logs:"
+          docker logs latestarr-smoke
+          exit 1
+
+      - name: Stop smoke test container
+        if: always()
+        run: docker rm -f latestarr-smoke || true
