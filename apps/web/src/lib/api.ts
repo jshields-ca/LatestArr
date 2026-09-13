@@ -81,3 +81,46 @@ export function bootstrap(
     body: JSON.stringify({ email, password, displayName }),
   });
 }
+
+export interface SourceConnection {
+  id: string;
+  name: string;
+  kind: string;
+  baseUrl: string;
+  status: "ok" | "error" | "unconfigured";
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSourceInput {
+  name: string;
+  kind: string;
+  baseUrl: string;
+  credentials: Record<string, string>;
+}
+
+export interface TestConnectionResult {
+  ok: boolean;
+  message?: string;
+}
+
+export function listSources(): Promise<{ sources: SourceConnection[] }> {
+  return apiFetch<{ sources: SourceConnection[] }>("/sources");
+}
+
+export function createSource(input: CreateSourceInput): Promise<{ source: SourceConnection }> {
+  return apiFetch<{ source: SourceConnection }>("/sources", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteSource(id: string): Promise<void> {
+  return apiFetch<void>(`/sources/${id}`, { method: "DELETE" });
+}
+
+export function testSourceConnection(id: string): Promise<TestConnectionResult> {
+  return apiFetch<TestConnectionResult>(`/sources/${id}/test`, { method: "POST" });
+}
