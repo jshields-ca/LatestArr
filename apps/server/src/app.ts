@@ -14,6 +14,7 @@ import { registerRecipientGroupRoutes } from "./http/routes/recipient-groups.js"
 import { registerRecipientRoutes } from "./http/routes/recipients.js";
 import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
+import { registerTemplateRoutes } from "./http/routes/templates.js";
 import type { SchedulerHandle } from "./scheduler/engine.js";
 
 registerAdapter(tautulliAdapter);
@@ -59,6 +60,7 @@ export async function buildApp(
       registerRecipientRoutes(api, db);
       registerRecipientGroupRoutes(api, db);
       registerNewsletterRoutes(api, db, scheduler);
+      registerTemplateRoutes(api, db);
     },
     { prefix: "/api" },
   );
