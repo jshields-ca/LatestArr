@@ -12,6 +12,8 @@ COPY apps/web/package.json apps/web/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/crypto/package.json packages/crypto/package.json
+COPY packages/adapters/core/package.json packages/adapters/core/package.json
+COPY packages/adapters/tautulli/package.json packages/adapters/tautulli/package.json
 RUN pnpm install --frozen-lockfile
 
 # ---- build everything ---------------------------------------------------
