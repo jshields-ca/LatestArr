@@ -10,11 +10,13 @@ import {
   createRecipient,
   createSmtpProfile,
   createSource,
+  createTemplate,
   deleteGroup,
   deleteNewsletter,
   deleteRecipient,
   deleteSmtpProfile,
   deleteSource,
+  deleteTemplate,
   getAuthProviders,
   getCurrentUser,
   getGroupMembers,
@@ -25,6 +27,7 @@ import {
   listSendRuns,
   listSmtpProfiles,
   listSources,
+  listTemplates,
   login,
   logout,
   removeGroupMember,
@@ -445,5 +448,34 @@ describe("newsletters", () => {
     };
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRuns: [run] }));
     await expect(listSendRuns("n1")).resolves.toEqual({ sendRuns: [run] });
+  });
+});
+
+const exampleTemplate = {
+  id: "t1",
+  name: "Weekly Digest",
+  designJson: null,
+  compiledMjml: null,
+  compiledHtml: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("templates", () => {
+  it("lists templates", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [exampleTemplate] }));
+    await expect(listTemplates()).resolves.toEqual({ templates: [exampleTemplate] });
+  });
+
+  it("creates a template", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { template: exampleTemplate }));
+    const result = await createTemplate({ name: "Weekly Digest" });
+    expect(result.template.id).toBe("t1");
+  });
+
+  it("deletes a template", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await deleteTemplate("t1");
+    expect(fetchMock).toHaveBeenCalledWith("/api/templates/t1", expect.objectContaining({ method: "DELETE" }));
   });
 });
