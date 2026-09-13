@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -117,5 +118,13 @@ describe("TemplateEditorPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Back to templates" }));
     expect(await screen.findByText("Templates list")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations in the page chrome around the editor", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { template: exampleTemplate }));
+    const { container } = renderPage();
+    await screen.findByText("Weekly Digest");
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
