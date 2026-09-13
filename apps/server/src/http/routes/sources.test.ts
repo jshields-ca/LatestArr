@@ -35,12 +35,12 @@ beforeEach(async () => {
 
   await app.inject({
     method: "POST",
-    url: "/auth/bootstrap",
+    url: "/api/auth/bootstrap",
     payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
   });
   const loginResponse = await app.inject({
     method: "POST",
-    url: "/auth/login",
+    url: "/api/auth/login",
     payload: { email: "admin@example.com", password: "a-very-long-password" },
   });
   sessionCookie = extractSessionCookie(loginResponse);
@@ -56,7 +56,7 @@ afterEach(async () => {
 
 describe("auth gating", () => {
   it("rejects unauthenticated requests", async () => {
-    const response = await app.inject({ method: "GET", url: "/sources" });
+    const response = await app.inject({ method: "GET", url: "/api/sources" });
     expect(response.statusCode).toBe(401);
   });
 });
@@ -65,7 +65,7 @@ describe("POST /sources", () => {
   it("rejects an unknown source kind", async () => {
     const response = await app.inject({
       method: "POST",
-      url: "/sources",
+      url: "/api/sources",
       cookies: { latestarr_session: sessionCookie },
       payload: { name: "x", kind: "not-a-real-adapter", baseUrl: "http://x", credentials: {} },
     });
@@ -75,7 +75,7 @@ describe("POST /sources", () => {
   it("rejects missing fields", async () => {
     const response = await app.inject({
       method: "POST",
-      url: "/sources",
+      url: "/api/sources",
       cookies: { latestarr_session: sessionCookie },
       payload: { name: "x" },
     });
@@ -85,7 +85,7 @@ describe("POST /sources", () => {
   it("creates a source and never returns the encrypted credentials", async () => {
     const response = await app.inject({
       method: "POST",
-      url: "/sources",
+      url: "/api/sources",
       cookies: { latestarr_session: sessionCookie },
       payload: {
         name: "Living Room Tautulli",
@@ -108,7 +108,7 @@ describe("full source lifecycle", () => {
   async function createSource() {
     const response = await app.inject({
       method: "POST",
-      url: "/sources",
+      url: "/api/sources",
       cookies: { latestarr_session: sessionCookie },
       payload: {
         name: "Living Room Tautulli",
@@ -125,14 +125,14 @@ describe("full source lifecycle", () => {
 
     const listResponse = await app.inject({
       method: "GET",
-      url: "/sources",
+      url: "/api/sources",
       cookies: { latestarr_session: sessionCookie },
     });
     expect(listResponse.json().sources).toHaveLength(1);
 
     const getResponse = await app.inject({
       method: "GET",
-      url: `/sources/${id}`,
+      url: `/api/sources/${id}`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(getResponse.statusCode).toBe(200);
@@ -142,7 +142,7 @@ describe("full source lifecycle", () => {
   it("returns 404 for an unknown id", async () => {
     const response = await app.inject({
       method: "GET",
-      url: "/sources/does-not-exist",
+      url: "/api/sources/does-not-exist",
       cookies: { latestarr_session: sessionCookie },
     });
     expect(response.statusCode).toBe(404);
@@ -157,7 +157,7 @@ describe("full source lifecycle", () => {
 
     const testResponse = await app.inject({
       method: "POST",
-      url: `/sources/${id}/test`,
+      url: `/api/sources/${id}/test`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(testResponse.statusCode).toBe(200);
@@ -169,7 +169,7 @@ describe("full source lifecycle", () => {
 
     const getResponse = await app.inject({
       method: "GET",
-      url: `/sources/${id}`,
+      url: `/api/sources/${id}`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(getResponse.json().source.status).toBe("ok");
@@ -184,14 +184,14 @@ describe("full source lifecycle", () => {
 
     const testResponse = await app.inject({
       method: "POST",
-      url: `/sources/${id}/test`,
+      url: `/api/sources/${id}/test`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(testResponse.json()).toEqual({ ok: false, message: "Invalid apikey" });
 
     const getResponse = await app.inject({
       method: "GET",
-      url: `/sources/${id}`,
+      url: `/api/sources/${id}`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(getResponse.json().source.status).toBe("error");
@@ -213,7 +213,7 @@ describe("full source lifecycle", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: `/sources/${id}/libraries`,
+      url: `/api/sources/${id}/libraries`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(response.json().libraries).toEqual([{ id: "1", name: "Movies", kind: "movie" }]);
@@ -224,14 +224,14 @@ describe("full source lifecycle", () => {
 
     const deleteResponse = await app.inject({
       method: "DELETE",
-      url: `/sources/${id}`,
+      url: `/api/sources/${id}`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(deleteResponse.statusCode).toBe(204);
 
     const getResponse = await app.inject({
       method: "GET",
-      url: `/sources/${id}`,
+      url: `/api/sources/${id}`,
       cookies: { latestarr_session: sessionCookie },
     });
     expect(getResponse.statusCode).toBe(404);

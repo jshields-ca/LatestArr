@@ -56,10 +56,10 @@ const everyoneGroup = {
 
 function baseRoutes(overrides: Record<string, unknown> = {}) {
   return {
-    "/newsletters": jsonResponse(200, { newsletters: [] }),
-    "/sources": jsonResponse(200, { sources: [] }),
-    "/recipient-groups": jsonResponse(200, { groups: [] }),
-    "/smtp-profiles": jsonResponse(200, { smtpProfiles: [] }),
+    "/api/newsletters": jsonResponse(200, { newsletters: [] }),
+    "/api/sources": jsonResponse(200, { sources: [] }),
+    "/api/recipient-groups": jsonResponse(200, { groups: [] }),
+    "/api/smtp-profiles": jsonResponse(200, { smtpProfiles: [] }),
     ...overrides,
   };
 }
@@ -79,7 +79,7 @@ describe("NewslettersPage", () => {
   });
 
   it("lists a newsletter with its schedule", async () => {
-    mockRoutes(baseRoutes({ "/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
+    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
     render(<NewslettersPage />);
 
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe("NewslettersPage", () => {
 
   it("toggles enabled via the switch", async () => {
     const user = userEvent.setup();
-    mockRoutes(baseRoutes({ "/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
+    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
     render(<NewslettersPage />);
     await screen.findByText("Weekly digest");
 
@@ -121,15 +121,15 @@ describe("NewslettersPage", () => {
     const user = userEvent.setup();
     mockRoutes(
       baseRoutes({
-        "/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
-        "/sources": jsonResponse(200, { sources: [tautulliSource] }),
-        "/recipient-groups": jsonResponse(200, { groups: [everyoneGroup] }),
-        "/newsletters/n1": jsonResponse(200, {
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/sources": jsonResponse(200, { sources: [tautulliSource] }),
+        "/api/recipient-groups": jsonResponse(200, { groups: [everyoneGroup] }),
+        "/api/newsletters/n1": jsonResponse(200, {
           newsletter: weeklyDigest,
           sources: [],
           recipientGroups: [],
         }),
-        "/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
       }),
     );
     render(<NewslettersPage />);
@@ -158,13 +158,13 @@ describe("NewslettersPage", () => {
     const user = userEvent.setup();
     mockRoutes(
       baseRoutes({
-        "/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
-        "/newsletters/n1": jsonResponse(200, {
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
           newsletter: weeklyDigest,
           sources: [],
           recipientGroups: [],
         }),
-        "/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
       }),
     );
     render(<NewslettersPage />);
@@ -182,7 +182,7 @@ describe("NewslettersPage", () => {
 
   it("deletes a newsletter after confirmation", async () => {
     const user = userEvent.setup();
-    mockRoutes(baseRoutes({ "/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
+    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
     render(<NewslettersPage />);
     await screen.findByText("Weekly digest");
 

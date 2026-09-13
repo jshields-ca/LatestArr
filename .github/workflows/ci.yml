@@ -68,16 +68,43 @@ jobs:
       - name: Smoke test the built image
         run: |
           docker run -d --name latestarr-smoke -p 3000:3000 latestarr:ci
+          healthy=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3000/health; then
+            if curl -sf http://localhost:3000/health > /dev/null; then
               echo "Health check passed"
-              exit 0
+              healthy=true
+              break
             fi
             sleep 1
           done
-          echo "Health check never succeeded; container logs:"
-          docker logs latestarr-smoke
-          exit 1
+          if [ "$healthy" != "true" ]; then
+            echo "Health check never succeeded; container logs:"
+            docker logs latestarr-smoke
+            exit 1
+          fi
+
+          # The admin WebUI must be served from this same container/origin,
+          # with every backend route living under /api so it never collides
+          # with a client-side route of the same name.
+          echo "Checking the admin WebUI is served..."
+          root_body="$(curl -sf http://localhost:3000/)"
+          echo "$root_body" | grep -q '<div id="root">' || {
+            echo "Root path did not return the SPA shell:"; echo "$root_body"; docker logs latestarr-smoke; exit 1;
+          }
+
+          echo "Checking a client-side route falls back to the SPA shell..."
+          sources_page_body="$(curl -sf http://localhost:3000/sources)"
+          echo "$sources_page_body" | grep -q '<div id="root">' || {
+            echo "/sources did not return the SPA shell:"; echo "$sources_page_body"; docker logs latestarr-smoke; exit 1;
+          }
+
+          echo "Checking the API is reachable under /api..."
+          providers_status="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/auth/providers)"
+          if [ "$providers_status" != "200" ]; then
+            echo "GET /api/auth/providers returned $providers_status, expected 200"; docker logs latestarr-smoke; exit 1;
+          fi
+
+          echo "All smoke checks passed"
 
       - name: Stop smoke test container
         if: always()

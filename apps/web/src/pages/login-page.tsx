@@ -122,7 +122,7 @@ export function LoginPage() {
                 <Separator className="flex-1" />
               </div>
               <Button variant="outline" className="w-full" asChild>
-                <a href="/auth/oidc/login">Continue with SSO</a>
+                <a href="/api/auth/oidc/login">Continue with SSO</a>
               </Button>
             </>
           ) : null}

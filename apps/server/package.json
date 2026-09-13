@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.0",
+    "@fastify/static": "^10.1.3",
     "@latestarr/adapter-core": "workspace:*",
     "@latestarr/adapter-tautulli": "workspace:*",
     "@latestarr/crypto": "workspace:*",

@@ -9,7 +9,11 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  // Every backend route lives under /api (see apps/server/src/app.ts) so it
+  // never collides with an SPA client-side route of the same name (e.g.
+  // "/sources" the page vs. "/sources" the endpoint) once both are served
+  // from the same origin in production.
+  const response = await fetch(`/api${path}`, {
     ...init,
     credentials: "include",
     headers: {

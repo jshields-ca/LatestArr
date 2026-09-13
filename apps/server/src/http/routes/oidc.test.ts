@@ -70,7 +70,7 @@ function extractCookie(
 
 describe("GET /auth/oidc/login", () => {
   it("redirects to the IdP with PKCE + state + nonce, and sets the flow cookie", async () => {
-    const response = await app.inject({ method: "GET", url: "/auth/oidc/login" });
+    const response = await app.inject({ method: "GET", url: "/api/auth/oidc/login" });
 
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe("https://idp.example.com/authorize?state=test-state");
@@ -96,7 +96,7 @@ describe("GET /auth/oidc/callback", () => {
   it("rejects a callback with no flow cookie", async () => {
     const response = await app.inject({
       method: "GET",
-      url: "/auth/oidc/callback?code=abc&state=test-state",
+      url: "/api/auth/oidc/callback?code=abc&state=test-state",
     });
     expect(response.statusCode).toBe(400);
   });
@@ -106,7 +106,7 @@ describe("GET /auth/oidc/callback", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/auth/oidc/callback?code=abc&state=test-state",
+      url: "/api/auth/oidc/callback?code=abc&state=test-state",
       cookies: { latestarr_oidc_flow: "test-state.test-nonce.test-code-verifier" },
     });
     expect(response.statusCode).toBe(400);
@@ -119,7 +119,7 @@ describe("GET /auth/oidc/callback", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/auth/oidc/callback?code=abc&state=test-state",
+      url: "/api/auth/oidc/callback?code=abc&state=test-state",
       cookies: { latestarr_oidc_flow: "test-state.test-nonce.test-code-verifier" },
     });
 
@@ -155,7 +155,7 @@ describe("GET /auth/oidc/callback", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/auth/oidc/callback?code=abc&state=test-state",
+      url: "/api/auth/oidc/callback?code=abc&state=test-state",
       cookies: { latestarr_oidc_flow: "test-state.test-nonce.test-code-verifier" },
     });
 

@@ -66,7 +66,7 @@ describe("login", () => {
     const result = await login("a@b.com", "password123456");
     expect(result.user.email).toBe("a@b.com");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/auth/login",
+      "/api/auth/login",
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
   });
@@ -135,7 +135,7 @@ describe("sources", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [exampleSource] }));
 
     await expect(listSources()).resolves.toEqual({ sources: [exampleSource] });
-    expect(fetchMock).toHaveBeenCalledWith("/sources", expect.objectContaining({ credentials: "include" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/sources", expect.objectContaining({ credentials: "include" }));
   });
 
   it("creates a source with a JSON body", async () => {
@@ -166,14 +166,14 @@ describe("sources", () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
 
     await deleteSource("1");
-    expect(fetchMock).toHaveBeenCalledWith("/sources/1", expect.objectContaining({ method: "DELETE" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/sources/1", expect.objectContaining({ method: "DELETE" }));
   });
 
   it("tests a source connection", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: false, message: "Invalid API key" }));
 
     await expect(testSourceConnection("1")).resolves.toEqual({ ok: false, message: "Invalid API key" });
-    expect(fetchMock).toHaveBeenCalledWith("/sources/1/test", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/sources/1/test", expect.objectContaining({ method: "POST" }));
   });
 });
 
@@ -229,7 +229,7 @@ describe("recipients", () => {
   it("deletes a recipient", async () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await deleteRecipient("r1");
-    expect(fetchMock).toHaveBeenCalledWith("/recipients/r1", expect.objectContaining({ method: "DELETE" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/recipients/r1", expect.objectContaining({ method: "DELETE" }));
   });
 });
 
@@ -248,7 +248,7 @@ describe("recipient groups", () => {
   it("deletes a group", async () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await deleteGroup("g1");
-    expect(fetchMock).toHaveBeenCalledWith("/recipient-groups/g1", expect.objectContaining({ method: "DELETE" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/recipient-groups/g1", expect.objectContaining({ method: "DELETE" }));
   });
 
   it("gets a group with its members", async () => {
@@ -260,7 +260,7 @@ describe("recipient groups", () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await addGroupMember("g1", "r1");
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/recipient-groups/g1/members");
+    expect(url).toBe("/api/recipient-groups/g1/members");
     expect(JSON.parse(init.body as string)).toEqual({ recipientId: "r1" });
   });
 
@@ -268,7 +268,7 @@ describe("recipient groups", () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await removeGroupMember("g1", "r1");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/recipient-groups/g1/members/r1",
+      "/api/recipient-groups/g1/members/r1",
       expect.objectContaining({ method: "DELETE" }),
     );
   });
@@ -317,13 +317,13 @@ describe("smtp profiles", () => {
   it("deletes a profile", async () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await deleteSmtpProfile("s1");
-    expect(fetchMock).toHaveBeenCalledWith("/smtp-profiles/s1", expect.objectContaining({ method: "DELETE" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/smtp-profiles/s1", expect.objectContaining({ method: "DELETE" }));
   });
 
   it("tests a profile's connection", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
     await expect(testSmtpProfile("s1")).resolves.toEqual({ ok: true });
-    expect(fetchMock).toHaveBeenCalledWith("/smtp-profiles/s1/test", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/smtp-profiles/s1/test", expect.objectContaining({ method: "POST" }));
   });
 
   it("sends a test email with a JSON body", async () => {
@@ -331,7 +331,7 @@ describe("smtp profiles", () => {
     const result = await sendTestEmail("s1", "someone@example.com");
     expect(result.messageId).toBe("abc123");
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/smtp-profiles/s1/send-test");
+    expect(url).toBe("/api/smtp-profiles/s1/send-test");
     expect(JSON.parse(init.body as string)).toEqual({ to: "someone@example.com" });
   });
 });
@@ -374,7 +374,7 @@ describe("newsletters", () => {
   it("deletes a newsletter", async () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await deleteNewsletter("n1");
-    expect(fetchMock).toHaveBeenCalledWith("/newsletters/n1", expect.objectContaining({ method: "DELETE" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/newsletters/n1", expect.objectContaining({ method: "DELETE" }));
   });
 
   it("gets newsletter detail with sources and groups", async () => {
@@ -392,13 +392,13 @@ describe("newsletters", () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await addNewsletterSource("n1", "src1");
     let [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/newsletters/n1/sources");
+    expect(url).toBe("/api/newsletters/n1/sources");
     expect(JSON.parse(init.body as string)).toEqual({ sourceConnectionId: "src1" });
 
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await removeNewsletterSource("n1", "src1");
     [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe("/newsletters/n1/sources/src1");
+    expect(url).toBe("/api/newsletters/n1/sources/src1");
     expect(init.method).toBe("DELETE");
   });
 
@@ -406,20 +406,20 @@ describe("newsletters", () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await addNewsletterGroup("n1", "g1");
     let [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/newsletters/n1/recipient-groups");
+    expect(url).toBe("/api/newsletters/n1/recipient-groups");
     expect(JSON.parse(init.body as string)).toEqual({ groupId: "g1" });
 
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await removeNewsletterGroup("n1", "g1");
     [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe("/newsletters/n1/recipient-groups/g1");
+    expect(url).toBe("/api/newsletters/n1/recipient-groups/g1");
     expect(init.method).toBe("DELETE");
   });
 
   it("triggers a manual send", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRunId: "run1" }));
     await expect(sendNewsletterNow("n1")).resolves.toEqual({ sendRunId: "run1" });
-    expect(fetchMock).toHaveBeenCalledWith("/newsletters/n1/send-now", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/newsletters/n1/send-now", expect.objectContaining({ method: "POST" }));
   });
 
   it("propagates a misconfigured-newsletter error from send-now", async () => {

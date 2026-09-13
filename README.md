@@ -8,7 +8,7 @@
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
 
-> **Status (v0.1.0, Phase 3 underway):** the backend engine is complete and functional end-to-end, and the admin WebUI can now drive all of it — sign in, connect a Tautulli server, add recipients and groups, configure SMTP, and build a newsletter (linked sources, recipient groups, schedule, manual send, send history), all from the browser. Still to come: the drag-and-drop template builder and an accessibility CI pass (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
+> **Status (v0.1.0, Phase 3 underway):** the backend engine is complete and functional end-to-end, and the admin WebUI can now drive all of it — sign in, connect a Tautulli server, add recipients and groups, configure SMTP, and build a newsletter (linked sources, recipient groups, schedule, manual send, send history), all from the browser. The production Docker image serves the WebUI too, not just the API. Still to come: the drag-and-drop template builder and an accessibility CI pass (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
 
 ## Why LatestArr?
 
@@ -47,7 +47,7 @@ Development is happening in phases. Versions follow [semver](https://semver.org/
 
 ## Getting started
 
-The backend and admin WebUI are both functional in local development (`pnpm turbo run dev` runs both), but the production Docker image doesn't serve the WebUI yet — that wiring (and the drag-and-drop template builder that replaces the current hardcoded starter template) is still in progress, so this isn't ready for non-technical end users yet. If you're comfortable calling a REST API directly, the server builds and runs via the Dockerfile in `docker/` today; a full self-hosting walkthrough will land here once both pieces ship.
+The backend and admin WebUI both run from a single container — build and run the Dockerfile in `docker/`, and the app is reachable on port 3000, WebUI included. It's not ready for non-technical end users yet: the drag-and-drop template builder (replacing the current hardcoded starter template) is still in progress, and there's no first-run setup guidance beyond the in-app "create the admin account" screen. A full self-hosting walkthrough (docker-compose, connecting a source, scheduling a newsletter) will land here once the builder ships.
 
 ## Contributing
 

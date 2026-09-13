@@ -39,8 +39,8 @@ const everyoneGroup = {
 describe("RecipientsPage", () => {
   it("shows empty states for both recipients and groups", async () => {
     fetchMock.mockImplementation((url: string) => {
-      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
-      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
       throw new Error(`Unexpected fetch to ${url}`);
     });
 
@@ -53,10 +53,10 @@ describe("RecipientsPage", () => {
   it("lists recipients and toggles active state", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url === "/recipients" && (!init || init.method === undefined))
+      if (url === "/api/recipients" && (!init || init.method === undefined))
         return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
-      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
-      if (url === "/recipients/r1" && init?.method === "PATCH")
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients/r1" && init?.method === "PATCH")
         return Promise.resolve(jsonResponse(200, { recipient: { ...alice, isActive: false } }));
       throw new Error(`Unexpected fetch to ${url}`);
     });
@@ -72,8 +72,8 @@ describe("RecipientsPage", () => {
   it("adds a recipient through the dialog", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {
-      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
-      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
       throw new Error(`Unexpected fetch to ${url}`);
     });
 
@@ -95,9 +95,9 @@ describe("RecipientsPage", () => {
   it("expands a group and adds an existing recipient as a member", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {
-      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
-      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
-      if (url === "/recipient-groups/g1")
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      if (url === "/api/recipient-groups/g1")
         return Promise.resolve(jsonResponse(200, { group: everyoneGroup, members: [] }));
       throw new Error(`Unexpected fetch to ${url}`);
     });
@@ -118,8 +118,8 @@ describe("RecipientsPage", () => {
   it("deletes a group after confirmation", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {
-      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
-      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
       throw new Error(`Unexpected fetch to ${url}`);
     });
 

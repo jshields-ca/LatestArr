@@ -30,8 +30,8 @@ function mockRoute(url: string, response: { status: number; ok: boolean; json: (
 
 function renderLoginPage(providers: { local: boolean; oidc: boolean; needsSetup: boolean }) {
   fetchMock.mockImplementation((input: string) => {
-    if (input === "/auth/me") return Promise.resolve(jsonResponse(401, { error: "Not authenticated" }));
-    if (input === "/auth/providers") return Promise.resolve(jsonResponse(200, providers));
+    if (input === "/api/auth/me") return Promise.resolve(jsonResponse(401, { error: "Not authenticated" }));
+    if (input === "/api/auth/providers") return Promise.resolve(jsonResponse(200, providers));
     throw new Error(`Unexpected fetch to ${input}`);
   });
 
@@ -56,7 +56,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText("Email"), "admin@example.com");
     await user.type(screen.getByLabelText("Password"), "wrong-password");
 
-    mockRoute("/auth/login", jsonResponse(401, { error: "Invalid email or password" }));
+    mockRoute("/api/auth/login", jsonResponse(401, { error: "Invalid email or password" }));
     await user.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
@@ -71,7 +71,7 @@ describe("LoginPage", () => {
     await user.type(screen.getByLabelText("Password"), "correct-password");
 
     mockRoute(
-      "/auth/login",
+      "/api/auth/login",
       jsonResponse(200, {
         user: { id: "1", email: "admin@example.com", displayName: "Admin", role: "admin", isActive: true },
       }),

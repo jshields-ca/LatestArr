@@ -33,7 +33,10 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deploy /prod/server ./
-# apps/server doesn't serve these yet; wiring lands with the static-file-serving work.
+# Served as static files with an SPA fallback (see apps/server/src/app.ts);
+# every backend API route lives under /api specifically so it can't collide
+# with a client-side route of the same name (e.g. "/sources" the page vs.
+# "/sources" the endpoint) now that both are served from this one origin.
 COPY --from=build /app/apps/web/dist ./public
 
 EXPOSE 3000

@@ -29,12 +29,12 @@ beforeEach(async () => {
 
   await app.inject({
     method: "POST",
-    url: "/auth/bootstrap",
+    url: "/api/auth/bootstrap",
     payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
   });
   const loginResponse = await app.inject({
     method: "POST",
-    url: "/auth/login",
+    url: "/api/auth/login",
     payload: { email: "admin@example.com", password: "a-very-long-password" },
   });
   sessionCookie = extractSessionCookie(loginResponse);
@@ -54,7 +54,7 @@ async function createSourceConnection() {
   const response = await app.inject(
     authed({
       method: "POST",
-      url: "/sources",
+      url: "/api/sources",
       payload: {
         name: "Tautulli",
         kind: "tautulli",
@@ -68,7 +68,7 @@ async function createSourceConnection() {
 
 async function createRecipientGroup() {
   const response = await app.inject(
-    authed({ method: "POST", url: "/recipient-groups", payload: { name: "Household" } }),
+    authed({ method: "POST", url: "/api/recipient-groups", payload: { name: "Household" } }),
   );
   return response.json().group.id as string;
 }
@@ -76,7 +76,7 @@ async function createRecipientGroup() {
 describe("POST /newsletters", () => {
   it("rejects missing required fields", async () => {
     const response = await app.inject(
-      authed({ method: "POST", url: "/newsletters", payload: { name: "x" } }),
+      authed({ method: "POST", url: "/api/newsletters", payload: { name: "x" } }),
     );
     expect(response.statusCode).toBe(400);
   });
@@ -85,7 +85,7 @@ describe("POST /newsletters", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: "/newsletters",
+        url: "/api/newsletters",
         payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1" },
       }),
     );
@@ -102,7 +102,7 @@ describe("newsletter lifecycle", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: "/newsletters",
+        url: "/api/newsletters",
         payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1" },
       }),
     );
@@ -112,22 +112,22 @@ describe("newsletter lifecycle", () => {
   it("lists, fetches (with empty sources/groups), updates, and deletes", async () => {
     const id = await createNewsletter();
 
-    const listResponse = await app.inject(authed({ method: "GET", url: "/newsletters" }));
+    const listResponse = await app.inject(authed({ method: "GET", url: "/api/newsletters" }));
     expect(listResponse.json().newsletters).toHaveLength(1);
 
-    const getResponse = await app.inject(authed({ method: "GET", url: `/newsletters/${id}` }));
+    const getResponse = await app.inject(authed({ method: "GET", url: `/api/newsletters/${id}` }));
     expect(getResponse.json().sources).toEqual([]);
     expect(getResponse.json().recipientGroups).toEqual([]);
 
     const patchResponse = await app.inject(
-      authed({ method: "PATCH", url: `/newsletters/${id}`, payload: { isEnabled: false } }),
+      authed({ method: "PATCH", url: `/api/newsletters/${id}`, payload: { isEnabled: false } }),
     );
     expect(patchResponse.json().newsletter.isEnabled).toBe(false);
 
-    const deleteResponse = await app.inject(authed({ method: "DELETE", url: `/newsletters/${id}` }));
+    const deleteResponse = await app.inject(authed({ method: "DELETE", url: `/api/newsletters/${id}` }));
     expect(deleteResponse.statusCode).toBe(204);
 
-    const afterDelete = await app.inject(authed({ method: "GET", url: `/newsletters/${id}` }));
+    const afterDelete = await app.inject(authed({ method: "GET", url: `/api/newsletters/${id}` }));
     expect(afterDelete.statusCode).toBe(404);
   });
 
@@ -139,7 +139,7 @@ describe("newsletter lifecycle", () => {
     const addSourceResponse = await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/sources`,
+        url: `/api/newsletters/${newsletterId}/sources`,
         payload: { sourceConnectionId: sourceId, mediaTypeFilter: ["movie"] },
       }),
     );
@@ -148,28 +148,28 @@ describe("newsletter lifecycle", () => {
     const addGroupResponse = await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/recipient-groups`,
+        url: `/api/newsletters/${newsletterId}/recipient-groups`,
         payload: { groupId },
       }),
     );
     expect(addGroupResponse.statusCode).toBe(204);
 
     const getResponse = await app.inject(
-      authed({ method: "GET", url: `/newsletters/${newsletterId}` }),
+      authed({ method: "GET", url: `/api/newsletters/${newsletterId}` }),
     );
     expect(getResponse.json().sources).toHaveLength(1);
     expect(getResponse.json().sources[0].mediaTypeFilter).toEqual(["movie"]);
     expect(getResponse.json().recipientGroups).toHaveLength(1);
 
     await app.inject(
-      authed({ method: "DELETE", url: `/newsletters/${newsletterId}/sources/${sourceId}` }),
+      authed({ method: "DELETE", url: `/api/newsletters/${newsletterId}/sources/${sourceId}` }),
     );
     await app.inject(
-      authed({ method: "DELETE", url: `/newsletters/${newsletterId}/recipient-groups/${groupId}` }),
+      authed({ method: "DELETE", url: `/api/newsletters/${newsletterId}/recipient-groups/${groupId}` }),
     );
 
     const afterUnlink = await app.inject(
-      authed({ method: "GET", url: `/newsletters/${newsletterId}` }),
+      authed({ method: "GET", url: `/api/newsletters/${newsletterId}` }),
     );
     expect(afterUnlink.json().sources).toEqual([]);
     expect(afterUnlink.json().recipientGroups).toEqual([]);
@@ -180,7 +180,7 @@ describe("newsletter lifecycle", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: "/newsletters/does-not-exist/sources",
+        url: "/api/newsletters/does-not-exist/sources",
         payload: { sourceConnectionId: sourceId },
       }),
     );
@@ -192,7 +192,7 @@ describe("newsletter lifecycle", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/sources`,
+        url: `/api/newsletters/${newsletterId}/sources`,
         payload: { sourceConnectionId: "does-not-exist" },
       }),
     );
@@ -206,14 +206,14 @@ describe("newsletter lifecycle", () => {
     await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/sources`,
+        url: `/api/newsletters/${newsletterId}/sources`,
         payload: { sourceConnectionId: sourceId },
       }),
     );
     const response = await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/sources`,
+        url: `/api/newsletters/${newsletterId}/sources`,
         payload: { sourceConnectionId: sourceId },
       }),
     );
@@ -223,7 +223,7 @@ describe("newsletter lifecycle", () => {
 
 describe("auth gating", () => {
   it("rejects unauthenticated requests", async () => {
-    const response = await app.inject({ method: "GET", url: "/newsletters" });
+    const response = await app.inject({ method: "GET", url: "/api/newsletters" });
     expect(response.statusCode).toBe(401);
   });
 });
