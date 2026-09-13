@@ -11,9 +11,11 @@ import {
   sendRuns,
   smtpProfiles,
   sourceConnections,
+  templates,
 } from "@latestarr/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { sendEmail, type SmtpCredentials } from "../mailer/send.js";
+import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { renderNewsletterHtml } from "../render/newsletter-template.js";
 import { getEncryptionKey } from "../secrets.js";
 
@@ -78,6 +80,26 @@ async function fetchItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<
   return allItems;
 }
 
+async function renderNewsletterContent(
+  db: Db,
+  newsletter: Newsletter,
+  items: NewItem[],
+  generatedAt: Date,
+): Promise<string> {
+  if (newsletter.templateId) {
+    const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
+    if (template?.compiledMjml) {
+      return await renderMjmlTemplate(template.compiledMjml, {
+        newsletterName: newsletter.name,
+        items,
+        generatedAt,
+      });
+    }
+  }
+
+  return renderNewsletterHtml({ newsletterName: newsletter.name, items, generatedAt });
+}
+
 async function resolveRecipients(db: Db, newsletterId: string) {
   const groupLinks = await db
     .select()
@@ -132,11 +154,7 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
 
   try {
     const items = await fetchItemsForNewsletter(db, newsletter);
-    const html = renderNewsletterHtml({
-      newsletterName: newsletter.name,
-      items,
-      generatedAt: new Date(),
-    });
+    const html = await renderNewsletterContent(db, newsletter, items, new Date());
     const subject = newsletter.subjectTemplate || newsletter.name;
 
     const recipientRows = await resolveRecipients(db, newsletterId);
