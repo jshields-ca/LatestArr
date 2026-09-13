@@ -15,6 +15,22 @@ export interface TautulliRecentlyAddedItem {
   genres?: string[];
 }
 
+export interface TautulliHomeStatRow {
+  rating_key: string;
+  title: string;
+  media_type: string;
+  total_plays: number;
+  users_watched?: number;
+  last_play?: string;
+  year?: number;
+  content_rating?: string;
+}
+
+interface TautulliHomeStat {
+  stat_id: string;
+  rows: TautulliHomeStatRow[];
+}
+
 interface TautulliEnvelope<T> {
   response: {
     result: "success" | "error";
@@ -63,6 +79,29 @@ async function callTautulli<T>(
 
 export async function getLibraries(baseUrl: string, apiKey: string): Promise<TautulliLibrary[]> {
   return callTautulli<TautulliLibrary[]>(baseUrl, apiKey, "get_libraries");
+}
+
+/**
+ * Wraps Tautulli's get_home_stats command for a single stat_id (e.g.
+ * "top_movies", "top_tv" — ranked by play count over time_range days).
+ * The API returns an array of stat blocks even when stat_id narrows the
+ * request to one; we pick the matching block defensively rather than
+ * assuming array[0].
+ */
+export async function getHomeStats(
+  baseUrl: string,
+  apiKey: string,
+  statId: string,
+  timeRangeDays: number,
+  count: number,
+): Promise<TautulliHomeStatRow[]> {
+  const data = await callTautulli<TautulliHomeStat[]>(baseUrl, apiKey, "get_home_stats", {
+    stat_id: statId,
+    time_range: String(timeRangeDays),
+    stats_type: "plays",
+    stats_count: String(count),
+  });
+  return data.find((stat) => stat.stat_id === statId)?.rows ?? [];
 }
 
 export async function getRecentlyAdded(

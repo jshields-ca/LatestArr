@@ -1,5 +1,6 @@
 import type {
   ConnectionTestResult,
+  FetchPopularItemsParams,
   FetchRecentItemsParams,
   MediaKind,
   NewItem,
@@ -7,9 +8,29 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { getLibraries, getRecentlyAdded } from "./tautulli-client.js";
+import { getHomeStats, getLibraries, getRecentlyAdded, type TautulliHomeStatRow } from "./tautulli-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
+
+// get_home_stats has no per-media-kind stat for "tv_season" — Tautulli
+// groups all TV watch stats (episode or season plays alike) under "top_tv".
+const POPULAR_STAT_IDS_BY_KIND: Partial<Record<MediaKind, string>> = {
+  movie: "top_movies",
+  tv_episode: "top_tv",
+  tv_season: "top_tv",
+};
+
+function mapHomeStatMediaType(mediaType: string): MediaKind | null {
+  switch (mediaType) {
+    case "movie":
+      return "movie";
+    case "episode":
+    case "show":
+      return "tv_episode";
+    default:
+      return null;
+  }
+}
 
 function mapMediaType(mediaType: string): MediaKind | null {
   switch (mediaType) {
@@ -28,6 +49,24 @@ function mapMediaType(mediaType: string): MediaKind | null {
 
 function mapLibraryType(sectionType: string): MediaKind {
   return sectionType === "show" ? "tv_episode" : "movie";
+}
+
+function mapHomeStatRow(row: TautulliHomeStatRow): NewItem | null {
+  const kind = mapHomeStatMediaType(row.media_type);
+  if (!kind) return null;
+
+  return {
+    id: row.rating_key,
+    externalId: row.rating_key,
+    kind,
+    title: row.title,
+    // get_home_stats rows have no "added" date — last_play is the closest
+    // meaningful timestamp available for a most-watched list.
+    addedAt: row.last_play ? new Date(Number(row.last_play) * 1000) : new Date(0),
+    playCount: row.total_plays,
+    uniqueViewerCount: row.users_watched,
+    raw: row,
+  };
 }
 
 export const tautulliAdapter: SourceAdapter = {
@@ -93,6 +132,40 @@ export const tautulliAdapter: SourceAdapter = {
           genres: item.genres,
           raw: item,
         });
+      }
+    }
+
+    return results;
+  },
+
+  async fetchPopularItems(
+    config: SourceConnectionConfig,
+    params: FetchPopularItemsParams,
+  ): Promise<NewItem[]> {
+    const apiKey = config.credentials.apiKey ?? "";
+    const limit = params.limit ?? DEFAULT_FETCH_COUNT;
+    const timeRangeDays = Math.max(
+      1,
+      Math.ceil((Date.now() - params.since.getTime()) / (24 * 60 * 60 * 1000)),
+    );
+
+    const requestedKinds = params.mediaKinds ?? (["movie", "tv_episode"] as MediaKind[]);
+    const statIds = [
+      ...new Set(
+        requestedKinds
+          .map((kind) => POPULAR_STAT_IDS_BY_KIND[kind])
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const results: NewItem[] = [];
+    for (const statId of statIds) {
+      const rows = await getHomeStats(config.baseUrl, apiKey, statId, timeRangeDays, limit);
+      for (const row of rows) {
+        const item = mapHomeStatRow(row);
+        if (!item) continue;
+        if (params.mediaKinds && !params.mediaKinds.includes(item.kind)) continue;
+        results.push(item);
       }
     }
 

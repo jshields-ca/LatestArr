@@ -191,3 +191,94 @@ describe("fetchRecentItems", () => {
     expect(items.map((item) => item.externalId).sort()).toEqual(["1", "2"]);
   });
 });
+
+describe("fetchPopularItems", () => {
+  it("maps top_movies rows and requests both movies and TV by default", async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          response: {
+            result: "success",
+            message: null,
+            data: [
+              {
+                stat_id: "top_movies",
+                rows: [
+                  {
+                    rating_key: "1",
+                    title: "A Movie",
+                    media_type: "movie",
+                    total_plays: 12,
+                    users_watched: 3,
+                    last_play: "1700000000",
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          response: { result: "success", message: null, data: [{ stat_id: "top_tv", rows: [] }] },
+        }),
+      );
+
+    const items = await tautulliAdapter.fetchPopularItems!(config, { since: new Date(0) });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      externalId: "1",
+      kind: "movie",
+      title: "A Movie",
+      playCount: 12,
+      uniqueViewerCount: 3,
+    });
+  });
+
+  it("only queries the stat matching the requested media kind", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [
+            {
+              stat_id: "top_tv",
+              rows: [
+                { rating_key: "2", title: "A Show", media_type: "episode", total_plays: 7 },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchPopularItems!(config, {
+      since: new Date(0),
+      mediaKinds: ["tv_episode"],
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.searchParams.get("stat_id")).toBe("top_tv");
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("tv_episode");
+  });
+
+  it("converts the since date into a whole number of days for time_range", async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ response: { result: "success", message: null, data: [] } }),
+    );
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    await tautulliAdapter.fetchPopularItems!(config, {
+      since: sevenDaysAgo,
+      mediaKinds: ["movie"],
+    });
+
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.searchParams.get("time_range")).toBe("7");
+  });
+});
