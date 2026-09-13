@@ -4,6 +4,7 @@ import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerAuthRoutes } from "./http/routes/auth.js";
+import { registerNewsletterRoutes } from "./http/routes/newsletters.js";
 import { registerOidcRoutes } from "./http/routes/oidc.js";
 import { registerRecipientGroupRoutes } from "./http/routes/recipient-groups.js";
 import { registerRecipientRoutes } from "./http/routes/recipients.js";
@@ -23,6 +24,7 @@ export async function buildApp(db: Db): Promise<FastifyInstance> {
   registerSourceRoutes(app, db);
   registerRecipientRoutes(app, db);
   registerRecipientGroupRoutes(app, db);
+  registerNewsletterRoutes(app, db);
 
   return app;
 }

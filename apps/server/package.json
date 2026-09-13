@@ -20,6 +20,7 @@
     "@node-rs/argon2": "^2.0.0",
     "drizzle-orm": "^0.36.0",
     "fastify": "^5.1.0",
+    "handlebars": "^4.7.0",
     "openid-client": "^6.1.0"
   },
   "devDependencies": {
