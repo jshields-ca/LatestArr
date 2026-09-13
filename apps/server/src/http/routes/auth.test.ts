@@ -30,6 +30,25 @@ function extractSessionCookie(response: { headers: Record<string, unknown> }): s
   return decodeURIComponent(match[1]!);
 }
 
+describe("GET /auth/providers", () => {
+  it("reports needsSetup true and oidc false before any user exists", async () => {
+    const response = await app.inject({ method: "GET", url: "/auth/providers" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ local: true, oidc: false, needsSetup: true });
+  });
+
+  it("reports needsSetup false once a user exists", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/auth/bootstrap",
+      payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
+    });
+
+    const response = await app.inject({ method: "GET", url: "/auth/providers" });
+    expect(response.json()).toEqual({ local: true, oidc: false, needsSetup: false });
+  });
+});
+
 describe("POST /auth/bootstrap", () => {
   it("rejects missing fields", async () => {
     const response = await app.inject({ method: "POST", url: "/auth/bootstrap", payload: {} });

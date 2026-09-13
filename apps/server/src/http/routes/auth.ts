@@ -28,7 +28,24 @@ interface LoginBody {
   password?: string;
 }
 
-export function registerAuthRoutes(app: FastifyInstance, db: Db): void {
+export interface AuthRouteOptions {
+  oidcEnabled: boolean;
+}
+
+export function registerAuthRoutes(
+  app: FastifyInstance,
+  db: Db,
+  options: AuthRouteOptions = { oidcEnabled: false },
+): void {
+  app.get("/auth/providers", async (_request, reply) => {
+    const existing = await db.select({ id: users.id }).from(users).limit(1);
+    return reply.send({
+      local: true,
+      oidc: options.oidcEnabled,
+      needsSetup: existing.length === 0,
+    });
+  });
+
   app.post<{ Body: BootstrapBody }>("/auth/bootstrap", async (request, reply) => {
     const existing = await db.select({ id: users.id }).from(users).limit(1);
     if (existing.length > 0) {

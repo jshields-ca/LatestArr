@@ -3,6 +3,7 @@ import { registerAdapter } from "@latestarr/adapter-core";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
+import { loadOidcConfigFromEnv } from "./auth/oidc-config.js";
 import { registerAuthRoutes } from "./http/routes/auth.js";
 import { registerNewsletterRoutes } from "./http/routes/newsletters.js";
 import { registerOidcRoutes } from "./http/routes/oidc.js";
@@ -25,7 +26,7 @@ export async function buildApp(db: Db, scheduler?: SchedulerHandle): Promise<Fas
 
   app.get("/health", async () => ({ status: "ok" }));
 
-  registerAuthRoutes(app, db);
+  registerAuthRoutes(app, db, { oidcEnabled: loadOidcConfigFromEnv() !== null });
   registerOidcRoutes(app, db);
   registerSourceRoutes(app, db);
   registerSmtpProfileRoutes(app, db);
