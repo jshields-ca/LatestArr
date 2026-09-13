@@ -1,10 +1,14 @@
 # LatestArr
 
+[![Version](https://img.shields.io/github/package-json/v/jshields-ca/latestarr?label=version)](https://github.com/jshields-ca/latestarr/releases)
+[![CI](https://github.com/jshields-ca/latestarr/actions/workflows/ci.yml/badge.svg)](https://github.com/jshields-ca/latestarr/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+
 **LatestArr** is a self-hosted, open-source "new content" newsletter tool for the self-hosted media ecosystem — the *arr stack and friends. It connects to your existing media servers, pulls in whatever movies, TV episodes, books, audiobooks, and games were recently added, and sends a fully custom-branded HTML digest to your users on a schedule you control.
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
 
-> **Status:** early planning/scaffolding stage. There is no working release yet — see the [Roadmap](#roadmap) below for what's coming and in what order.
+> **Status (v0.1.0):** the backend engine is complete and functional end-to-end — connect a Tautulli server, add recipients, configure SMTP, and build a newsletter via the API, and it will poll for new content and send a digest on schedule. There is no admin WebUI yet; that and the drag-and-drop builder are the current focus (Phase 3 in the [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
 
 ## Why LatestArr?
 
@@ -19,8 +23,8 @@ It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter featur
 
 | Source | Content type | Status |
 | --- | --- | --- |
+| [Tautulli](https://tautulli.com/) | Movies, TV | ✅ Implemented |
 | Plex (direct) | Movies, TV | Planned (v1) |
-| [Tautulli](https://tautulli.com/) | Movies, TV | Planned (v1) |
 | [BookLore](https://github.com/booklore-app/booklore) | Books | Planned (v1) |
 | [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | Planned (v1) |
 | [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | Planned (v1) |
@@ -32,22 +36,18 @@ New sources are added via a self-contained adapter interface — see [`CONTRIBUT
 
 ## Roadmap
 
-Development is happening in phases; see the tracked issues/milestones on this repo for current progress.
+Development is happening in phases. Versions follow [semver](https://semver.org/) starting at `0.1.0`; see [`CHANGELOG.md`](CHANGELOG.md) for release notes.
 
-1. **Repo hygiene & scaffolding** — this phase: docs, CI, monorepo skeleton.
-2. **Auth + data model + first adapter** — local/OIDC auth, core schema, Tautulli integration end-to-end.
-3. **Scheduler + email delivery MVP** — automated digest sends with a fixed starter template.
-4. **Drag-and-drop template builder** — the no-code visual editor and custom content blocks.
+1. ✅ **Repo hygiene & scaffolding** — docs, CI, monorepo skeleton. *(v0.1.0)*
+2. ✅ **Auth + data model + first adapter** — local/OIDC auth, core schema, Tautulli integration end-to-end. *(v0.1.0)*
+3. ✅ **Scheduler + email delivery MVP** — automated digest sends with a fixed starter template. *(v0.1.0)*
+4. 🚧 **Frontend WebUI + drag-and-drop template builder** *(current)* — an admin UI for everything above (Tailwind + Radix + Lucide, dark-mode-first, mobile-responsive), plus the no-code visual editor and custom content blocks replacing the hardcoded starter template.
 5. **Remaining v1 adapters** — direct Plex, BookLore-family, Audiobookshelf, RomM.
 6. **Hardening & polish** — security audit, accessibility audit, scale options, 1.0 release.
 
 ## Getting started
 
-There's nothing runnable yet. Once the initial scaffold lands, this section will cover:
-
-- Running via Docker/`docker-compose`
-- Configuring your first source connection
-- Building and scheduling your first newsletter
+The backend is functional and can be driven entirely through its API today, but there's no admin WebUI yet (that's the current phase of work) — so this isn't ready for non-technical end users. If you're comfortable calling a REST API directly, the server builds and runs via the Dockerfile in `docker/`, and a full walkthrough (running via `docker-compose`, configuring a source connection, and scheduling a newsletter) will land here once the WebUI ships.
 
 ## Contributing
 
