@@ -5,6 +5,8 @@ import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
 import { registerAuthRoutes } from "./http/routes/auth.js";
 import { registerOidcRoutes } from "./http/routes/oidc.js";
+import { registerRecipientGroupRoutes } from "./http/routes/recipient-groups.js";
+import { registerRecipientRoutes } from "./http/routes/recipients.js";
 import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
 
@@ -21,6 +23,8 @@ export async function buildApp(db: Db): Promise<FastifyInstance> {
   registerOidcRoutes(app, db);
   registerSourceRoutes(app, db);
   registerSmtpProfileRoutes(app, db);
+  registerRecipientRoutes(app, db);
+  registerRecipientGroupRoutes(app, db);
 
   return app;
 }
