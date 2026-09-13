@@ -5,19 +5,24 @@ import {
   addGroupMember,
   createGroup,
   createRecipient,
+  createSmtpProfile,
   createSource,
   deleteGroup,
   deleteRecipient,
+  deleteSmtpProfile,
   deleteSource,
   getAuthProviders,
   getCurrentUser,
   getGroupMembers,
   listGroups,
   listRecipients,
+  listSmtpProfiles,
   listSources,
   login,
   logout,
   removeGroupMember,
+  sendTestEmail,
+  testSmtpProfile,
   testSourceConnection,
   updateRecipient,
 } from "./api";
@@ -255,5 +260,67 @@ describe("recipient groups", () => {
       "/recipient-groups/g1/members/r1",
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+});
+
+const exampleSmtpProfile = {
+  id: "s1",
+  name: "Primary",
+  host: "smtp.example.com",
+  port: 587,
+  secure: true,
+  hasAuth: true,
+  defaultFromName: "LatestArr",
+  defaultFromEmail: "digest@example.com",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("smtp profiles", () => {
+  it("lists profiles", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [exampleSmtpProfile] }));
+    await expect(listSmtpProfiles()).resolves.toEqual({ smtpProfiles: [exampleSmtpProfile] });
+  });
+
+  it("creates a profile", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { smtpProfile: exampleSmtpProfile }));
+    const result = await createSmtpProfile({
+      name: "Primary",
+      host: "smtp.example.com",
+      port: 587,
+      defaultFromName: "LatestArr",
+      defaultFromEmail: "digest@example.com",
+    });
+    expect(result.smtpProfile.id).toBe("s1");
+  });
+
+  it("propagates the server's error message when required fields are missing", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(400, { error: "name, host, port, defaultFromName, and defaultFromEmail are required" }),
+    );
+    await expect(
+      createSmtpProfile({ name: "", host: "", port: 0, defaultFromName: "", defaultFromEmail: "" }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("deletes a profile", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await deleteSmtpProfile("s1");
+    expect(fetchMock).toHaveBeenCalledWith("/smtp-profiles/s1", expect.objectContaining({ method: "DELETE" }));
+  });
+
+  it("tests a profile's connection", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    await expect(testSmtpProfile("s1")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith("/smtp-profiles/s1/test", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("sends a test email with a JSON body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true, messageId: "abc123" }));
+    const result = await sendTestEmail("s1", "someone@example.com");
+    expect(result.messageId).toBe("abc123");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/smtp-profiles/s1/send-test");
+    expect(JSON.parse(init.body as string)).toEqual({ to: "someone@example.com" });
   });
 });
