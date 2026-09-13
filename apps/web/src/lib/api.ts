@@ -295,6 +295,7 @@ export interface CreateNewsletterInput {
   subjectTemplate?: string;
   lookbackDays?: number;
   smtpProfileId?: string;
+  templateId?: string;
   senderIdentity?: SenderIdentity;
 }
 
@@ -328,7 +329,10 @@ export function createNewsletter(input: CreateNewsletterInput): Promise<{ newsle
 
 export function updateNewsletter(
   id: string,
-  input: Partial<CreateNewsletterInput> & { isEnabled?: boolean },
+  input: Omit<Partial<CreateNewsletterInput>, "templateId"> & {
+    isEnabled?: boolean;
+    templateId?: string | null;
+  },
 ): Promise<{ newsletter: Newsletter }> {
   return apiFetch<{ newsletter: Newsletter }>(`/newsletters/${id}`, {
     method: "PATCH",

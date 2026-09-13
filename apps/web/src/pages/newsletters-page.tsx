@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { ChevronDown, ChevronRight, Loader2, Plus, Send, Trash2, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import {
   listSendRuns,
   listSmtpProfiles,
   listSources,
+  listTemplates,
   removeNewsletterGroup,
   removeNewsletterSource,
   sendNewsletterNow,
@@ -41,13 +43,16 @@ import {
   type SendRun,
   type SmtpProfile,
   type SourceConnection,
+  type Template,
 } from "@/lib/api";
 
 function AddNewsletterDialog({
   smtpProfiles,
+  templates,
   onCreated,
 }: {
   smtpProfiles: SmtpProfile[];
+  templates: Template[];
   onCreated: (newsletter: Newsletter) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -57,6 +62,7 @@ function AddNewsletterDialog({
   const [lookbackDays, setLookbackDays] = useState("7");
   const [subjectTemplate, setSubjectTemplate] = useState("");
   const [smtpProfileId, setSmtpProfileId] = useState("");
+  const [templateId, setTemplateId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +73,7 @@ function AddNewsletterDialog({
     setLookbackDays("7");
     setSubjectTemplate("");
     setSmtpProfileId("");
+    setTemplateId("");
     setError(null);
   }
 
@@ -82,6 +89,7 @@ function AddNewsletterDialog({
         lookbackDays: Number(lookbackDays),
         subjectTemplate: subjectTemplate || undefined,
         smtpProfileId: smtpProfileId || undefined,
+        templateId: templateId || undefined,
       });
       onCreated(newsletter);
       setOpen(false);
@@ -174,6 +182,22 @@ function AddNewsletterDialog({
                 ))}
               </Select>
             </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="newsletter-template">Template</Label>
+            <Select
+              id="newsletter-template"
+              value={templateId}
+              onChange={(e) => setTemplateId(e.target.value)}
+              disabled={submitting}
+            >
+              <option value="">Use the default layout</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="newsletter-subject">Subject template (optional)</Label>
@@ -404,6 +428,69 @@ function LinkedGroups({
   );
 }
 
+function TemplatePicker({
+  newsletter,
+  templates,
+  onChanged,
+}: {
+  newsletter: Newsletter;
+  templates: Template[];
+  onChanged: (newsletter: Newsletter) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(nextTemplateId: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      const { newsletter: updated } = await updateNewsletter(newsletter.id, {
+        templateId: nextTemplateId || null,
+      });
+      onChanged(updated);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to update template.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium">Template</p>
+      <div className="flex items-center gap-2">
+        <Select
+          aria-label="Template"
+          value={newsletter.templateId ?? ""}
+          onChange={(e) => void handleChange(e.target.value)}
+          disabled={saving}
+          className="max-w-xs"
+        >
+          <option value="">Use the default layout</option>
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.name}
+            </option>
+          ))}
+        </Select>
+        {newsletter.templateId ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/templates/${newsletter.templateId}/edit`}>
+              <Pencil />
+              Edit template
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 const SEND_RUN_STATUS_VARIANT = {
   success: "success",
   partial_failure: "destructive",
@@ -465,12 +552,14 @@ function NewsletterCard({
   newsletter,
   allSources,
   allGroups,
+  allTemplates,
   onChanged,
   onDeleted,
 }: {
   newsletter: Newsletter;
   allSources: SourceConnection[];
   allGroups: RecipientGroup[];
+  allTemplates: Template[];
   onChanged: (newsletter: Newsletter) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -600,6 +689,7 @@ function NewsletterCard({
 
             {detail ? (
               <>
+                <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
                 <LinkedSources
                   newsletterId={newsletter.id}
                   sources={detail.sources}
@@ -639,6 +729,7 @@ export function NewslettersPage() {
   const [allSources, setAllSources] = useState<SourceConnection[]>([]);
   const [allGroups, setAllGroups] = useState<RecipientGroup[]>([]);
   const [smtpProfiles, setSmtpProfiles] = useState<SmtpProfile[]>([]);
+  const [allTemplates, setAllTemplates] = useState<Template[]>([]);
 
   useEffect(() => {
     listNewsletters()
@@ -659,6 +750,11 @@ export function NewslettersPage() {
       .catch(() => {
         // The add-newsletter dialog just shows no SMTP options if this fails.
       });
+    listTemplates()
+      .then(({ templates: loaded }) => setAllTemplates(loaded))
+      .catch(() => {
+        // The template picker just shows the default-layout option if this fails.
+      });
   }, []);
 
   return (
@@ -673,6 +769,7 @@ export function NewslettersPage() {
         {newsletters ? (
           <AddNewsletterDialog
             smtpProfiles={smtpProfiles}
+            templates={allTemplates}
             onCreated={(newsletter) => setNewsletters((prev) => [...(prev ?? []), newsletter])}
           />
         ) : null}
@@ -708,6 +805,7 @@ export function NewslettersPage() {
               newsletter={newsletter}
               allSources={allSources}
               allGroups={allGroups}
+              allTemplates={allTemplates}
               onChanged={(updated) =>
                 setNewsletters((prev) => (prev ?? []).map((n) => (n.id === updated.id ? updated : n)))
               }

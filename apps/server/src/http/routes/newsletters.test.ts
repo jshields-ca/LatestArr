@@ -73,6 +73,13 @@ async function createRecipientGroup() {
   return response.json().group.id as string;
 }
 
+async function createTemplate() {
+  const response = await app.inject(
+    authed({ method: "POST", url: "/api/templates", payload: { name: "Weekly Layout" } }),
+  );
+  return response.json().template.id as string;
+}
+
 describe("POST /newsletters", () => {
   it("rejects missing required fields", async () => {
     const response = await app.inject(
@@ -218,6 +225,34 @@ describe("newsletter lifecycle", () => {
       }),
     );
     expect(response.statusCode).toBe(409);
+  });
+
+  it("links a template at creation, then swaps and unsets it via PATCH", async () => {
+    const templateId = await createTemplate();
+    const createResponse = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1", templateId },
+      }),
+    );
+    expect(createResponse.json().newsletter.templateId).toBe(templateId);
+    const newsletterId = createResponse.json().newsletter.id as string;
+
+    const otherTemplateId = await createTemplate();
+    const swapResponse = await app.inject(
+      authed({
+        method: "PATCH",
+        url: `/api/newsletters/${newsletterId}`,
+        payload: { templateId: otherTemplateId },
+      }),
+    );
+    expect(swapResponse.json().newsletter.templateId).toBe(otherTemplateId);
+
+    const unsetResponse = await app.inject(
+      authed({ method: "PATCH", url: `/api/newsletters/${newsletterId}`, payload: { templateId: null } }),
+    );
+    expect(unsetResponse.json().newsletter.templateId).toBeNull();
   });
 });
 

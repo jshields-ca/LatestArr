@@ -376,6 +376,22 @@ describe("newsletters", () => {
     expect(init.method).toBe("PATCH");
   });
 
+  it("creates a newsletter with a linked template", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: { ...exampleNewsletter, templateId: "t1" } }));
+    const result = await createNewsletter({ name: "Weekly digest", scheduleCron: "0 8 * * 1", templateId: "t1" });
+    expect(result.newsletter.templateId).toBe("t1");
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ templateId: "t1" });
+  });
+
+  it("unsets a newsletter's template with an explicit null", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...exampleNewsletter, templateId: null } }));
+    const result = await updateNewsletter("n1", { templateId: null });
+    expect(result.newsletter.templateId).toBeNull();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ templateId: null });
+  });
+
   it("deletes a newsletter", async () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await deleteNewsletter("n1");
