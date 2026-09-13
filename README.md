@@ -8,7 +8,7 @@
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
 
-> **Status (v0.1.0):** the backend engine is complete and functional end-to-end — connect a Tautulli server, add recipients, configure SMTP, and build a newsletter via the API, and it will poll for new content and send a digest on schedule. There is no admin WebUI yet; that and the drag-and-drop builder are the current focus (Phase 3 in the [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
+> **Status (v0.1.0, Phase 3 underway):** the backend engine is complete and functional end-to-end — connect a Tautulli server, add recipients, configure SMTP, and build a newsletter via the API, and it will poll for new content and send a digest on schedule. The admin WebUI's design system and responsive app shell (dark-mode-first theme, teal/cyan branding, sidebar/mobile nav) are now in place; the actual CRUD screens, auth, and drag-and-drop builder are still being built out (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
 
 ## Why LatestArr?
 
