@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { type Db, sessions, users } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 
+export const SESSION_COOKIE = "latestarr_session";
+
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function hashToken(token: string): string {

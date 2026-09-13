@@ -3,10 +3,9 @@ import type { FastifyInstance } from "fastify";
 import * as client from "openid-client";
 import { loadOidcConfigFromEnv, type OidcConfig } from "../../auth/oidc-config.js";
 import { OidcAccountNotLinkedError, resolveOidcUser } from "../../auth/oidc-user.js";
-import { createSession } from "../../auth/session.js";
+import { createSession, SESSION_COOKIE } from "../../auth/session.js";
 
 const FLOW_COOKIE = "latestarr_oidc_flow";
-const SESSION_COOKIE = "latestarr_session";
 const FLOW_TTL_SECONDS = 10 * 60;
 
 function stringHeader(value: string | string[] | undefined): string | undefined {

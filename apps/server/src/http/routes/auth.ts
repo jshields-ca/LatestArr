@@ -2,9 +2,8 @@ import { type Db, users } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { hashPassword, verifyPassword } from "../../auth/password.js";
-import { createSession, deleteSession, getSessionUser } from "../../auth/session.js";
+import { createSession, deleteSession, getSessionUser, SESSION_COOKIE } from "../../auth/session.js";
 
-const SESSION_COOKIE = "latestarr_session";
 const MIN_PASSWORD_LENGTH = 12;
 
 type SelectedUser = typeof users.$inferSelect;
