@@ -33,6 +33,7 @@ interface CreateNewsletterBody {
   subjectTemplate?: string;
   lookbackDays?: number;
   smtpProfileId?: string;
+  templateId?: string;
   senderIdentity?: SenderIdentity;
 }
 
@@ -44,6 +45,7 @@ interface UpdateNewsletterBody {
   lookbackDays?: number;
   isEnabled?: boolean;
   smtpProfileId?: string | null;
+  templateId?: string | null;
   senderIdentity?: SenderIdentity;
 }
 
@@ -82,8 +84,16 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
     scope.addHook("preHandler", requireAuth(db));
 
     scope.post<{ Body: CreateNewsletterBody }>("/newsletters", async (request, reply) => {
-      const { name, scheduleCron, timezone, subjectTemplate, lookbackDays, smtpProfileId, senderIdentity } =
-        request.body ?? {};
+      const {
+        name,
+        scheduleCron,
+        timezone,
+        subjectTemplate,
+        lookbackDays,
+        smtpProfileId,
+        templateId,
+        senderIdentity,
+      } = request.body ?? {};
       if (!name || !scheduleCron) {
         return reply.code(400).send({ error: "name and scheduleCron are required" });
       }
@@ -97,6 +107,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           ...(subjectTemplate !== undefined && { subjectTemplate }),
           ...(lookbackDays !== undefined && { lookbackDays }),
           ...(smtpProfileId !== undefined && { smtpProfileId }),
+          ...(templateId !== undefined && { templateId }),
           ...(senderIdentity !== undefined && { senderIdentity }),
         })
         .returning();
@@ -153,6 +164,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           lookbackDays,
           isEnabled,
           smtpProfileId,
+          templateId,
           senderIdentity,
         } = request.body ?? {};
 
@@ -166,6 +178,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
             ...(lookbackDays !== undefined && { lookbackDays }),
             ...(isEnabled !== undefined && { isEnabled }),
             ...(smtpProfileId !== undefined && { smtpProfileId }),
+            ...(templateId !== undefined && { templateId }),
             ...(senderIdentity !== undefined && { senderIdentity }),
             updatedAt: new Date(),
           })

@@ -1,8 +1,17 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NewslettersPage } from "./newsletters-page";
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <NewslettersPage />
+    </MemoryRouter>,
+  );
+}
 
 const fetchMock = vi.fn();
 
@@ -54,6 +63,16 @@ const everyoneGroup = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
+const weeklyLayoutTemplate = {
+  id: "t1",
+  name: "Weekly Layout",
+  designJson: null,
+  compiledMjml: null,
+  compiledHtml: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
 function baseRoutes(overrides: Record<string, unknown> = {}) {
   return {
     "/api/newsletters": jsonResponse(200, { newsletters: [] }),
@@ -74,13 +93,13 @@ function mockRoutes(routes: Record<string, unknown>) {
 describe("NewslettersPage", () => {
   it("shows the empty state", async () => {
     mockRoutes(baseRoutes());
-    render(<NewslettersPage />);
+    renderPage();
     expect(await screen.findByText("No newsletters yet")).toBeInTheDocument();
   });
 
   it("lists a newsletter with its schedule", async () => {
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
-    render(<NewslettersPage />);
+    renderPage();
 
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
     expect(screen.getByText(/0 8 \* \* 1 \(UTC\)/)).toBeInTheDocument();
@@ -89,7 +108,7 @@ describe("NewslettersPage", () => {
   it("adds a newsletter through the dialog", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes());
-    render(<NewslettersPage />);
+    renderPage();
     await screen.findByText("No newsletters yet");
 
     await user.click(screen.getByRole("button", { name: "Add newsletter" }));
@@ -106,7 +125,7 @@ describe("NewslettersPage", () => {
   it("toggles enabled via the switch", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
-    render(<NewslettersPage />);
+    renderPage();
     await screen.findByText("Weekly digest");
 
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, isEnabled: false } }));
@@ -132,7 +151,7 @@ describe("NewslettersPage", () => {
         "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
       }),
     );
-    render(<NewslettersPage />);
+    renderPage();
     await screen.findByText("Weekly digest");
 
     await user.click(screen.getByRole("button", { name: /Weekly digest/, expanded: false }));
@@ -167,7 +186,7 @@ describe("NewslettersPage", () => {
         "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
       }),
     );
-    render(<NewslettersPage />);
+    renderPage();
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest/, expanded: false }));
     await screen.findByText("No sends yet.");
@@ -180,10 +199,64 @@ describe("NewslettersPage", () => {
     expect(await screen.findByText("Newsletter has no SMTP profile configured")).toBeInTheDocument();
   });
 
+  it("creates a newsletter with a template selected in the dialog", async () => {
+    const user = userEvent.setup();
+    mockRoutes(baseRoutes({ "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }) }));
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Name"), "Weekly digest");
+    await user.selectOptions(within(dialog).getByLabelText("Template"), "t1");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
+    await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ templateId: "t1" });
+  });
+
+  it("changes and then unsets an existing newsletter's template", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest/, expanded: false }));
+    await screen.findByLabelText("Template");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
+    await user.selectOptions(screen.getByLabelText("Template"), "t1");
+    let [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ templateId: "t1" });
+    expect(await screen.findByRole("link", { name: "Edit template" })).toHaveAttribute(
+      "href",
+      "/templates/t1/edit",
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: null } }));
+    await user.selectOptions(screen.getByLabelText("Template"), "Use the default layout");
+    [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ templateId: null });
+    await waitFor(() => expect(screen.queryByRole("link", { name: "Edit template" })).not.toBeInTheDocument());
+  });
+
   it("deletes a newsletter after confirmation", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
-    render(<NewslettersPage />);
+    renderPage();
     await screen.findByText("Weekly digest");
 
     await user.click(screen.getByRole("button", { name: "Delete Weekly digest" }));
