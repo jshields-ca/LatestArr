@@ -1,0 +1,92 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/*
+ * Dark-mode-first theme: the app defaults to the dark palette (see
+ * index.html's `class="dark"` on <html>) to match the conventions of
+ * Sonarr/Radarr/Tautulli/Overseerr, with a light palette available via
+ * the theme toggle. Brand accent is teal/cyan, chosen to be distinct
+ * from Plex's orange and the purple/blue already common in this space.
+ */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222 47% 11%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 47% 11%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 47% 11%);
+  --primary: hsl(189 94% 34%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(210 40% 96%);
+  --secondary-foreground: hsl(222 47% 11%);
+  --muted: hsl(210 40% 96%);
+  --muted-foreground: hsl(215 16% 47%);
+  --accent: hsl(189 80% 92%);
+  --accent-foreground: hsl(189 94% 20%);
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(214 32% 91%);
+  --input: hsl(214 32% 91%);
+  --ring: hsl(189 94% 43%);
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: hsl(222 47% 7%);
+  --foreground: hsl(210 40% 96%);
+  --card: hsl(222 39% 11%);
+  --card-foreground: hsl(210 40% 96%);
+  --popover: hsl(222 39% 11%);
+  --popover-foreground: hsl(210 40% 96%);
+  --primary: hsl(189 94% 43%);
+  --primary-foreground: hsl(222 47% 7%);
+  --secondary: hsl(217 33% 17%);
+  --secondary-foreground: hsl(210 40% 96%);
+  --muted: hsl(217 33% 17%);
+  --muted-foreground: hsl(215 20% 65%);
+  --accent: hsl(189 60% 20%);
+  --accent-foreground: hsl(189 94% 85%);
+  --destructive: hsl(0 63% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(217 33% 20%);
+  --input: hsl(217 33% 20%);
+  --ring: hsl(189 94% 43%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
