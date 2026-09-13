@@ -32,6 +32,9 @@ importers:
       '@node-rs/argon2':
         specifier: ^2.0.0
         version: 2.2.1
+      croner:
+        specifier: ^9.0.0
+        version: 9.1.0
       drizzle-orm:
         specifier: ^0.36.0
         version: 0.36.4(@types/better-sqlite3@7.6.13)(@types/react@18.3.31)(better-sqlite3@11.10.0)(react@18.3.1)
@@ -1532,6 +1535,10 @@ packages:
   cookie@2.0.1:
     resolution: {integrity: sha512-yuToqVvRrj6pfDXREyQAAv8SkAEk/8GS3jQRTiUMm66TVtBYmqQeoEjL2Lmq8Rpo6271vH76InTChTitEAm65w==}
     engines: {node: '>=22'}
+
+  croner@9.1.0:
+    resolution: {integrity: sha512-p9nwwR4qyT5W996vBZhdvBCnMhicY5ytZkR4D1Xj0wuTDEiMnjwR57Q3RXYY/s0EpX6Ay3vgIcfaR+ewGHsi+g==}
+    engines: {node: '>=18.0'}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -3857,6 +3864,8 @@ snapshots:
   cookie@1.1.1: {}
 
   cookie@2.0.1: {}
+
+  croner@9.1.0: {}
 
   cross-spawn@7.0.6:
     dependencies:
