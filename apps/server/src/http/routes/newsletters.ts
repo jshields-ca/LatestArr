@@ -9,14 +9,16 @@ import {
 } from "@latestarr/db";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { isUniqueConstraintError } from "../db-errors.js";
-import { requireAuth } from "../require-auth.js";
 import {
   NewsletterMisconfiguredError,
   NewsletterNotFoundError,
   runNewsletter,
   SendAlreadyRunningError,
 } from "../../pipeline/run-newsletter.js";
+import type { SchedulerHandle } from "../../scheduler/engine.js";
+import { refreshScheduler } from "../../scheduler/engine.js";
+import { isUniqueConstraintError } from "../db-errors.js";
+import { requireAuth } from "../require-auth.js";
 
 interface SenderIdentity {
   fromName?: string;
@@ -69,7 +71,13 @@ interface NewsletterGroupParams {
   groupId: string;
 }
 
-export function registerNewsletterRoutes(app: FastifyInstance, db: Db): void {
+export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler?: SchedulerHandle): void {
+  async function refreshSchedule(): Promise<void> {
+    if (scheduler) {
+      await refreshScheduler(scheduler, db);
+    }
+  }
+
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db));
 
@@ -93,6 +101,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db): void {
         })
         .returning();
 
+      await refreshSchedule();
       return reply.code(201).send({ newsletter });
     });
 
@@ -166,12 +175,14 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db): void {
         if (!newsletter) {
           return reply.code(404).send({ error: "Not found" });
         }
+        await refreshSchedule();
         return reply.send({ newsletter });
       },
     );
 
     scope.delete<{ Params: IdParams }>("/newsletters/:id", async (request, reply) => {
       await db.delete(newsletters).where(eq(newsletters.id, request.params.id));
+      await refreshSchedule();
       return reply.code(204).send();
     });
 
