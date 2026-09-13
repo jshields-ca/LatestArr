@@ -6,6 +6,7 @@ import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
 import { PlaceholderPage } from "@/pages/placeholder-page";
 import { SetupPage } from "@/pages/setup-page";
+import { SourcesPage } from "@/pages/sources-page";
 
 export default function App() {
   return (
@@ -19,15 +20,7 @@ export default function App() {
             <AppShell>
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
-                <Route
-                  path="/sources"
-                  element={
-                    <PlaceholderPage
-                      title="Sources"
-                      description="Connect and manage Tautulli, Plex, and other media source connections."
-                    />
-                  }
-                />
+                <Route path="/sources" element={<SourcesPage />} />
                 <Route
                   path="/recipients"
                   element={
