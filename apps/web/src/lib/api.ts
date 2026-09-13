@@ -204,3 +204,61 @@ export function removeGroupMember(groupId: string, recipientId: string): Promise
     method: "DELETE",
   });
 }
+
+export interface SmtpProfile {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  secure: boolean;
+  hasAuth: boolean;
+  defaultFromName: string;
+  defaultFromEmail: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSmtpProfileInput {
+  name: string;
+  host: string;
+  port: number;
+  secure?: boolean;
+  username?: string;
+  password?: string;
+  defaultFromName: string;
+  defaultFromEmail: string;
+}
+
+export interface SendResult {
+  ok: boolean;
+  message?: string;
+  messageId?: string;
+}
+
+export function listSmtpProfiles(): Promise<{ smtpProfiles: SmtpProfile[] }> {
+  return apiFetch<{ smtpProfiles: SmtpProfile[] }>("/smtp-profiles");
+}
+
+export function createSmtpProfile(
+  input: CreateSmtpProfileInput,
+): Promise<{ smtpProfile: SmtpProfile }> {
+  return apiFetch<{ smtpProfile: SmtpProfile }>("/smtp-profiles", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteSmtpProfile(id: string): Promise<void> {
+  return apiFetch<void>(`/smtp-profiles/${id}`, { method: "DELETE" });
+}
+
+export function testSmtpProfile(id: string): Promise<SendResult> {
+  return apiFetch<SendResult>(`/smtp-profiles/${id}/test`, { method: "POST" });
+}
+
+export function sendTestEmail(id: string, to: string): Promise<SendResult> {
+  return apiFetch<SendResult>(`/smtp-profiles/${id}/send-test`, {
+    method: "POST",
+    body: JSON.stringify({ to }),
+  });
+}

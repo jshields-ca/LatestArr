@@ -7,6 +7,7 @@ import { LoginPage } from "@/pages/login-page";
 import { PlaceholderPage } from "@/pages/placeholder-page";
 import { RecipientsPage } from "@/pages/recipients-page";
 import { SetupPage } from "@/pages/setup-page";
+import { SmtpProfilesPage } from "@/pages/smtp-profiles-page";
 import { SourcesPage } from "@/pages/sources-page";
 
 export default function App() {
@@ -23,15 +24,7 @@ export default function App() {
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/sources" element={<SourcesPage />} />
                 <Route path="/recipients" element={<RecipientsPage />} />
-                <Route
-                  path="/smtp"
-                  element={
-                    <PlaceholderPage
-                      title="SMTP profiles"
-                      description="Configure outgoing mail servers used to send newsletters."
-                    />
-                  }
-                />
+                <Route path="/smtp" element={<SmtpProfilesPage />} />
                 <Route
                   path="/newsletters"
                   element={
