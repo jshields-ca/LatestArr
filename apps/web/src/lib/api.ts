@@ -124,3 +124,83 @@ export function deleteSource(id: string): Promise<void> {
 export function testSourceConnection(id: string): Promise<TestConnectionResult> {
   return apiFetch<TestConnectionResult>(`/sources/${id}/test`, { method: "POST" });
 }
+
+export interface Recipient {
+  id: string;
+  email: string;
+  displayName: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecipientGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listRecipients(): Promise<{ recipients: Recipient[] }> {
+  return apiFetch<{ recipients: Recipient[] }>("/recipients");
+}
+
+export function createRecipient(input: {
+  email: string;
+  displayName?: string;
+}): Promise<{ recipient: Recipient }> {
+  return apiFetch<{ recipient: Recipient }>("/recipients", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateRecipient(
+  id: string,
+  input: { displayName?: string; isActive?: boolean },
+): Promise<{ recipient: Recipient }> {
+  return apiFetch<{ recipient: Recipient }>(`/recipients/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteRecipient(id: string): Promise<void> {
+  return apiFetch<void>(`/recipients/${id}`, { method: "DELETE" });
+}
+
+export function listGroups(): Promise<{ groups: RecipientGroup[] }> {
+  return apiFetch<{ groups: RecipientGroup[] }>("/recipient-groups");
+}
+
+export function createGroup(input: {
+  name: string;
+  description?: string;
+}): Promise<{ group: RecipientGroup }> {
+  return apiFetch<{ group: RecipientGroup }>("/recipient-groups", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteGroup(id: string): Promise<void> {
+  return apiFetch<void>(`/recipient-groups/${id}`, { method: "DELETE" });
+}
+
+export function getGroupMembers(id: string): Promise<{ group: RecipientGroup; members: Recipient[] }> {
+  return apiFetch<{ group: RecipientGroup; members: Recipient[] }>(`/recipient-groups/${id}`);
+}
+
+export function addGroupMember(groupId: string, recipientId: string): Promise<void> {
+  return apiFetch<void>(`/recipient-groups/${groupId}/members`, {
+    method: "POST",
+    body: JSON.stringify({ recipientId }),
+  });
+}
+
+export function removeGroupMember(groupId: string, recipientId: string): Promise<void> {
+  return apiFetch<void>(`/recipient-groups/${groupId}/members/${recipientId}`, {
+    method: "DELETE",
+  });
+}

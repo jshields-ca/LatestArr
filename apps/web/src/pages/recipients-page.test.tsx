@@ -1,0 +1,135 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { RecipientsPage } from "./recipients-page";
+
+const fetchMock = vi.fn();
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", fetchMock);
+});
+
+afterEach(() => {
+  fetchMock.mockReset();
+  vi.unstubAllGlobals();
+});
+
+function jsonResponse(status: number, body: unknown) {
+  return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve(body) };
+}
+
+const alice = {
+  id: "r1",
+  email: "alice@example.com",
+  displayName: "Alice",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+const everyoneGroup = {
+  id: "g1",
+  name: "Everyone",
+  description: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("RecipientsPage", () => {
+  it("shows empty states for both recipients and groups", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+
+    expect(await screen.findByText("No recipients yet")).toBeInTheDocument();
+    expect(await screen.findByText("No groups yet")).toBeInTheDocument();
+  });
+
+  it("lists recipients and toggles active state", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/recipients" && (!init || init.method === undefined))
+        return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/recipients/r1" && init?.method === "PATCH")
+        return Promise.resolve(jsonResponse(200, { recipient: { ...alice, isActive: false } }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("switch"));
+
+    await waitFor(() => expect(screen.getByText("Inactive")).toBeInTheDocument());
+  });
+
+  it("adds a recipient through the dialog", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("No recipients yet");
+
+    await user.click(screen.getByRole("button", { name: "Add recipient" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("Email"), "alice@example.com");
+    await user.type(within(dialog).getByLabelText("Name (optional)"), "Alice");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { recipient: alice }));
+    await user.click(within(dialog).getByRole("button", { name: "Add recipient" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+  });
+
+  it("expands a group and adds an existing recipient as a member", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      if (url === "/recipient-groups/g1")
+        return Promise.resolve(jsonResponse(200, { group: everyoneGroup, members: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Everyone");
+
+    await user.click(screen.getByRole("button", { name: "Everyone" }));
+    expect(await screen.findByText("No members yet.")).toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await user.selectOptions(screen.getByLabelText("Add a recipient to this group"), "r1");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();
+  });
+
+  it("deletes a group after confirmation", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Everyone");
+
+    await user.click(screen.getByRole("button", { name: "Delete Everyone" }));
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => expect(screen.queryByText("Everyone")).not.toBeInTheDocument());
+  });
+});
