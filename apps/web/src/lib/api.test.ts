@@ -3,27 +3,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   addGroupMember,
+  addNewsletterGroup,
+  addNewsletterSource,
   createGroup,
+  createNewsletter,
   createRecipient,
   createSmtpProfile,
   createSource,
   deleteGroup,
+  deleteNewsletter,
   deleteRecipient,
   deleteSmtpProfile,
   deleteSource,
   getAuthProviders,
   getCurrentUser,
   getGroupMembers,
+  getNewsletterDetail,
   listGroups,
+  listNewsletters,
   listRecipients,
+  listSendRuns,
   listSmtpProfiles,
   listSources,
   login,
   logout,
   removeGroupMember,
+  removeNewsletterGroup,
+  removeNewsletterSource,
+  sendNewsletterNow,
   sendTestEmail,
   testSmtpProfile,
   testSourceConnection,
+  updateNewsletter,
   updateRecipient,
 } from "./api";
 
@@ -322,5 +333,117 @@ describe("smtp profiles", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/smtp-profiles/s1/send-test");
     expect(JSON.parse(init.body as string)).toEqual({ to: "someone@example.com" });
+  });
+});
+
+const exampleNewsletter = {
+  id: "n1",
+  name: "Weekly digest",
+  templateId: null,
+  smtpProfileId: null,
+  senderIdentity: null,
+  subjectTemplate: "",
+  scheduleCron: "0 8 * * 1",
+  timezone: "UTC",
+  isEnabled: true,
+  lookbackDays: 7,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("newsletters", () => {
+  it("lists newsletters", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletters: [exampleNewsletter] }));
+    await expect(listNewsletters()).resolves.toEqual({ newsletters: [exampleNewsletter] });
+  });
+
+  it("creates a newsletter", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: exampleNewsletter }));
+    const result = await createNewsletter({ name: "Weekly digest", scheduleCron: "0 8 * * 1" });
+    expect(result.newsletter.id).toBe("n1");
+  });
+
+  it("updates a newsletter with a PATCH, e.g. to toggle isEnabled", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...exampleNewsletter, isEnabled: false } }));
+    const result = await updateNewsletter("n1", { isEnabled: false });
+    expect(result.newsletter.isEnabled).toBe(false);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("PATCH");
+  });
+
+  it("deletes a newsletter", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await deleteNewsletter("n1");
+    expect(fetchMock).toHaveBeenCalledWith("/newsletters/n1", expect.objectContaining({ method: "DELETE" }));
+  });
+
+  it("gets newsletter detail with sources and groups", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { newsletter: exampleNewsletter, sources: [], recipientGroups: [] }),
+    );
+    await expect(getNewsletterDetail("n1")).resolves.toEqual({
+      newsletter: exampleNewsletter,
+      sources: [],
+      recipientGroups: [],
+    });
+  });
+
+  it("adds and removes a linked source", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await addNewsletterSource("n1", "src1");
+    let [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/newsletters/n1/sources");
+    expect(JSON.parse(init.body as string)).toEqual({ sourceConnectionId: "src1" });
+
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await removeNewsletterSource("n1", "src1");
+    [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe("/newsletters/n1/sources/src1");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("adds and removes a linked recipient group", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await addNewsletterGroup("n1", "g1");
+    let [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/newsletters/n1/recipient-groups");
+    expect(JSON.parse(init.body as string)).toEqual({ groupId: "g1" });
+
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await removeNewsletterGroup("n1", "g1");
+    [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe("/newsletters/n1/recipient-groups/g1");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("triggers a manual send", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRunId: "run1" }));
+    await expect(sendNewsletterNow("n1")).resolves.toEqual({ sendRunId: "run1" });
+    expect(fetchMock).toHaveBeenCalledWith("/newsletters/n1/send-now", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("propagates a misconfigured-newsletter error from send-now", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(400, { error: "Newsletter has no SMTP profile configured" }),
+    );
+    await expect(sendNewsletterNow("n1")).rejects.toMatchObject({
+      status: 400,
+      message: "Newsletter has no SMTP profile configured",
+    });
+  });
+
+  it("lists send runs", async () => {
+    const run = {
+      id: "run1",
+      newsletterId: "n1",
+      status: "success" as const,
+      startedAt: "2026-01-01T00:00:00.000Z",
+      finishedAt: "2026-01-01T00:01:00.000Z",
+      itemCountIncluded: 5,
+      recipientCount: 2,
+      error: null,
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRuns: [run] }));
+    await expect(listSendRuns("n1")).resolves.toEqual({ sendRuns: [run] });
   });
 });
