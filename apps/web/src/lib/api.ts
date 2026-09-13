@@ -377,3 +377,28 @@ export function sendNewsletterNow(id: string): Promise<{ sendRunId: string }> {
 export function listSendRuns(newsletterId: string): Promise<{ sendRuns: SendRun[] }> {
   return apiFetch<{ sendRuns: SendRun[] }>(`/newsletters/${newsletterId}/send-runs`);
 }
+
+export interface Template {
+  id: string;
+  name: string;
+  designJson: Record<string, unknown> | null;
+  compiledMjml: string | null;
+  compiledHtml: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function listTemplates(): Promise<{ templates: Template[] }> {
+  return apiFetch<{ templates: Template[] }>("/templates");
+}
+
+export function createTemplate(input: { name: string }): Promise<{ template: Template }> {
+  return apiFetch<{ template: Template }>("/templates", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTemplate(id: string): Promise<void> {
+  return apiFetch<void>(`/templates/${id}`, { method: "DELETE" });
+}
