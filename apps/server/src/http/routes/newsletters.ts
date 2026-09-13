@@ -4,12 +4,19 @@ import {
   newsletterSources,
   newsletters,
   recipientGroups,
+  sendRuns,
   sourceConnections,
 } from "@latestarr/db";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { isUniqueConstraintError } from "../db-errors.js";
 import { requireAuth } from "../require-auth.js";
+import {
+  NewsletterMisconfiguredError,
+  NewsletterNotFoundError,
+  runNewsletter,
+  SendAlreadyRunningError,
+} from "../../pipeline/run-newsletter.js";
 
 interface SenderIdentity {
   fromName?: string;
@@ -276,5 +283,32 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db): void {
         return reply.code(204).send();
       },
     );
+
+    scope.post<{ Params: IdParams }>("/newsletters/:id/send-now", async (request, reply) => {
+      try {
+        const result = await runNewsletter(db, request.params.id);
+        return reply.send(result);
+      } catch (err) {
+        if (err instanceof NewsletterNotFoundError) {
+          return reply.code(404).send({ error: err.message });
+        }
+        if (err instanceof NewsletterMisconfiguredError) {
+          return reply.code(400).send({ error: err.message });
+        }
+        if (err instanceof SendAlreadyRunningError) {
+          return reply.code(409).send({ error: err.message });
+        }
+        throw err;
+      }
+    });
+
+    scope.get<{ Params: IdParams }>("/newsletters/:id/send-runs", async (request, reply) => {
+      const rows = await db
+        .select()
+        .from(sendRuns)
+        .where(eq(sendRuns.newsletterId, request.params.id))
+        .orderBy(desc(sendRuns.startedAt));
+      return reply.send({ sendRuns: rows });
+    });
   });
 }
