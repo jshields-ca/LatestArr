@@ -8,7 +8,7 @@
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
 
-> **Status (v0.1.0, Phase 3 underway):** the backend engine is complete and functional end-to-end — connect a Tautulli server, add recipients, configure SMTP, and build a newsletter via the API, and it will poll for new content and send a digest on schedule. The admin WebUI's design system and responsive app shell (dark-mode-first theme, teal/cyan branding, sidebar/mobile nav) are now in place; the actual CRUD screens, auth, and drag-and-drop builder are still being built out (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
+> **Status (v0.1.0, Phase 3 underway):** the backend engine is complete and functional end-to-end, and the admin WebUI can now drive all of it — sign in, connect a Tautulli server, add recipients and groups, configure SMTP, and build a newsletter (linked sources, recipient groups, schedule, manual send, send history), all from the browser. Still to come: the drag-and-drop template builder and an accessibility CI pass (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
 
 ## Why LatestArr?
 
@@ -47,7 +47,7 @@ Development is happening in phases. Versions follow [semver](https://semver.org/
 
 ## Getting started
 
-The backend is functional and can be driven entirely through its API today, but there's no admin WebUI yet (that's the current phase of work) — so this isn't ready for non-technical end users. If you're comfortable calling a REST API directly, the server builds and runs via the Dockerfile in `docker/`, and a full walkthrough (running via `docker-compose`, configuring a source connection, and scheduling a newsletter) will land here once the WebUI ships.
+The backend and admin WebUI are both functional in local development (`pnpm turbo run dev` runs both), but the production Docker image doesn't serve the WebUI yet — that wiring (and the drag-and-drop template builder that replaces the current hardcoded starter template) is still in progress, so this isn't ready for non-technical end users yet. If you're comfortable calling a REST API directly, the server builds and runs via the Dockerfile in `docker/` today; a full self-hosting walkthrough will land here once both pieces ship.
 
 ## Contributing
 

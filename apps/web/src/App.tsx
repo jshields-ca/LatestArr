@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
+import { NewslettersPage } from "@/pages/newsletters-page";
 import { PlaceholderPage } from "@/pages/placeholder-page";
 import { RecipientsPage } from "@/pages/recipients-page";
 import { SetupPage } from "@/pages/setup-page";
@@ -25,15 +26,7 @@ export default function App() {
                 <Route path="/sources" element={<SourcesPage />} />
                 <Route path="/recipients" element={<RecipientsPage />} />
                 <Route path="/smtp" element={<SmtpProfilesPage />} />
-                <Route
-                  path="/newsletters"
-                  element={
-                    <PlaceholderPage
-                      title="Newsletters"
-                      description="Build, schedule, and send digests from your connected sources."
-                    />
-                  }
-                />
+                <Route path="/newsletters" element={<NewslettersPage />} />
                 <Route
                   path="/templates"
                   element={

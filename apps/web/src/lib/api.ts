@@ -262,3 +262,114 @@ export function sendTestEmail(id: string, to: string): Promise<SendResult> {
     body: JSON.stringify({ to }),
   });
 }
+
+export interface SenderIdentity {
+  fromName?: string;
+  fromEmail?: string;
+  replyTo?: string;
+}
+
+export interface Newsletter {
+  id: string;
+  name: string;
+  templateId: string | null;
+  smtpProfileId: string | null;
+  senderIdentity: SenderIdentity | null;
+  subjectTemplate: string;
+  scheduleCron: string;
+  timezone: string;
+  isEnabled: boolean;
+  lookbackDays: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateNewsletterInput {
+  name: string;
+  scheduleCron: string;
+  timezone?: string;
+  subjectTemplate?: string;
+  lookbackDays?: number;
+  smtpProfileId?: string;
+  senderIdentity?: SenderIdentity;
+}
+
+export interface NewsletterDetail {
+  newsletter: Newsletter;
+  sources: (SourceConnection & { mediaTypeFilter: string[] | null; libraryFilter: string[] | null })[];
+  recipientGroups: RecipientGroup[];
+}
+
+export interface SendRun {
+  id: string;
+  newsletterId: string;
+  status: "pending" | "running" | "success" | "partial_failure" | "failed";
+  startedAt: string | null;
+  finishedAt: string | null;
+  itemCountIncluded: number;
+  recipientCount: number;
+  error: string | null;
+}
+
+export function listNewsletters(): Promise<{ newsletters: Newsletter[] }> {
+  return apiFetch<{ newsletters: Newsletter[] }>("/newsletters");
+}
+
+export function createNewsletter(input: CreateNewsletterInput): Promise<{ newsletter: Newsletter }> {
+  return apiFetch<{ newsletter: Newsletter }>("/newsletters", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateNewsletter(
+  id: string,
+  input: Partial<CreateNewsletterInput> & { isEnabled?: boolean },
+): Promise<{ newsletter: Newsletter }> {
+  return apiFetch<{ newsletter: Newsletter }>(`/newsletters/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteNewsletter(id: string): Promise<void> {
+  return apiFetch<void>(`/newsletters/${id}`, { method: "DELETE" });
+}
+
+export function getNewsletterDetail(id: string): Promise<NewsletterDetail> {
+  return apiFetch<NewsletterDetail>(`/newsletters/${id}`);
+}
+
+export function addNewsletterSource(newsletterId: string, sourceConnectionId: string): Promise<void> {
+  return apiFetch<void>(`/newsletters/${newsletterId}/sources`, {
+    method: "POST",
+    body: JSON.stringify({ sourceConnectionId }),
+  });
+}
+
+export function removeNewsletterSource(newsletterId: string, sourceConnectionId: string): Promise<void> {
+  return apiFetch<void>(`/newsletters/${newsletterId}/sources/${sourceConnectionId}`, {
+    method: "DELETE",
+  });
+}
+
+export function addNewsletterGroup(newsletterId: string, groupId: string): Promise<void> {
+  return apiFetch<void>(`/newsletters/${newsletterId}/recipient-groups`, {
+    method: "POST",
+    body: JSON.stringify({ groupId }),
+  });
+}
+
+export function removeNewsletterGroup(newsletterId: string, groupId: string): Promise<void> {
+  return apiFetch<void>(`/newsletters/${newsletterId}/recipient-groups/${groupId}`, {
+    method: "DELETE",
+  });
+}
+
+export function sendNewsletterNow(id: string): Promise<{ sendRunId: string }> {
+  return apiFetch<{ sendRunId: string }>(`/newsletters/${id}/send-now`, { method: "POST" });
+}
+
+export function listSendRuns(newsletterId: string): Promise<{ sendRuns: SendRun[] }> {
+  return apiFetch<{ sendRuns: SendRun[] }>(`/newsletters/${newsletterId}/send-runs`);
+}
