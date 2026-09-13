@@ -107,7 +107,7 @@ describe("SmtpProfilesPage", () => {
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenLastCalledWith(
-        "/smtp-profiles/s1/send-test",
+        "/api/smtp-profiles/s1/send-test",
         expect.objectContaining({ method: "POST" }),
       ),
     );

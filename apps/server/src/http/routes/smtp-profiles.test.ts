@@ -38,12 +38,12 @@ beforeEach(async () => {
 
   await app.inject({
     method: "POST",
-    url: "/auth/bootstrap",
+    url: "/api/auth/bootstrap",
     payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
   });
   const loginResponse = await app.inject({
     method: "POST",
-    url: "/auth/login",
+    url: "/api/auth/login",
     payload: { email: "admin@example.com", password: "a-very-long-password" },
   });
   sessionCookie = extractSessionCookie(loginResponse);
@@ -74,14 +74,14 @@ const validPayload = {
 describe("POST /smtp-profiles", () => {
   it("rejects missing required fields", async () => {
     const response = await app.inject(
-      authed({ method: "POST", url: "/smtp-profiles", payload: { name: "x" } }),
+      authed({ method: "POST", url: "/api/smtp-profiles", payload: { name: "x" } }),
     );
     expect(response.statusCode).toBe(400);
   });
 
   it("creates a profile and never returns the encrypted auth fields", async () => {
     const response = await app.inject(
-      authed({ method: "POST", url: "/smtp-profiles", payload: validPayload }),
+      authed({ method: "POST", url: "/api/smtp-profiles", payload: validPayload }),
     );
     expect(response.statusCode).toBe(201);
     const body = response.json();
@@ -96,7 +96,7 @@ describe("POST /smtp-profiles", () => {
 describe("smtp profile lifecycle", () => {
   async function createProfile() {
     const response = await app.inject(
-      authed({ method: "POST", url: "/smtp-profiles", payload: validPayload }),
+      authed({ method: "POST", url: "/api/smtp-profiles", payload: validPayload }),
     );
     return response.json().smtpProfile.id as string;
   }
@@ -104,20 +104,20 @@ describe("smtp profile lifecycle", () => {
   it("lists, fetches, updates, and deletes", async () => {
     const id = await createProfile();
 
-    const listResponse = await app.inject(authed({ method: "GET", url: "/smtp-profiles" }));
+    const listResponse = await app.inject(authed({ method: "GET", url: "/api/smtp-profiles" }));
     expect(listResponse.json().smtpProfiles).toHaveLength(1);
 
     const patchResponse = await app.inject(
-      authed({ method: "PATCH", url: `/smtp-profiles/${id}`, payload: { name: "Renamed" } }),
+      authed({ method: "PATCH", url: `/api/smtp-profiles/${id}`, payload: { name: "Renamed" } }),
     );
     expect(patchResponse.json().smtpProfile.name).toBe("Renamed");
 
     const deleteResponse = await app.inject(
-      authed({ method: "DELETE", url: `/smtp-profiles/${id}` }),
+      authed({ method: "DELETE", url: `/api/smtp-profiles/${id}` }),
     );
     expect(deleteResponse.statusCode).toBe(204);
 
-    const getResponse = await app.inject(authed({ method: "GET", url: `/smtp-profiles/${id}` }));
+    const getResponse = await app.inject(authed({ method: "GET", url: `/api/smtp-profiles/${id}` }));
     expect(getResponse.statusCode).toBe(404);
   });
 
@@ -125,7 +125,7 @@ describe("smtp profile lifecycle", () => {
     const id = await createProfile();
     mockVerify.mockResolvedValueOnce(true);
 
-    const response = await app.inject(authed({ method: "POST", url: `/smtp-profiles/${id}/test` }));
+    const response = await app.inject(authed({ method: "POST", url: `/api/smtp-profiles/${id}/test` }));
     expect(response.json()).toEqual({ ok: true });
 
     expect(mockCreateTransport).toHaveBeenCalledWith(
@@ -137,14 +137,14 @@ describe("smtp profile lifecycle", () => {
     const id = await createProfile();
     mockVerify.mockRejectedValueOnce(new Error("ECONNREFUSED"));
 
-    const response = await app.inject(authed({ method: "POST", url: `/smtp-profiles/${id}/test` }));
+    const response = await app.inject(authed({ method: "POST", url: `/api/smtp-profiles/${id}/test` }));
     expect(response.json()).toEqual({ ok: false, message: "ECONNREFUSED" });
   });
 
   it("send-test requires a recipient", async () => {
     const id = await createProfile();
     const response = await app.inject(
-      authed({ method: "POST", url: `/smtp-profiles/${id}/send-test`, payload: {} }),
+      authed({ method: "POST", url: `/api/smtp-profiles/${id}/send-test`, payload: {} }),
     );
     expect(response.statusCode).toBe(400);
   });
@@ -156,7 +156,7 @@ describe("smtp profile lifecycle", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: `/smtp-profiles/${id}/send-test`,
+        url: `/api/smtp-profiles/${id}/send-test`,
         payload: { to: "someone@example.com" },
       }),
     );
@@ -169,7 +169,7 @@ describe("smtp profile lifecycle", () => {
 
 describe("auth gating", () => {
   it("rejects unauthenticated requests", async () => {
-    const response = await app.inject({ method: "GET", url: "/smtp-profiles" });
+    const response = await app.inject({ method: "GET", url: "/api/smtp-profiles" });
     expect(response.statusCode).toBe(401);
   });
 });

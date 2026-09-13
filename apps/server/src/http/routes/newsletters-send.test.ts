@@ -44,12 +44,12 @@ beforeEach(async () => {
 
   await app.inject({
     method: "POST",
-    url: "/auth/bootstrap",
+    url: "/api/auth/bootstrap",
     payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
   });
   const loginResponse = await app.inject({
     method: "POST",
-    url: "/auth/login",
+    url: "/api/auth/login",
     payload: { email: "admin@example.com", password: "a-very-long-password" },
   });
   sessionCookie = extractSessionCookie(loginResponse);
@@ -73,7 +73,7 @@ async function createSmtpProfile() {
   const response = await app.inject(
     authed({
       method: "POST",
-      url: "/smtp-profiles",
+      url: "/api/smtp-profiles",
       payload: {
         name: "Primary",
         host: "smtp.example.com",
@@ -91,7 +91,7 @@ async function createSourceConnection() {
   const response = await app.inject(
     authed({
       method: "POST",
-      url: "/sources",
+      url: "/api/sources",
       payload: {
         name: "Tautulli",
         kind: "tautulli",
@@ -105,14 +105,14 @@ async function createSourceConnection() {
 
 async function createRecipientAndGroup(...emails: string[]) {
   const groupResponse = await app.inject(
-    authed({ method: "POST", url: "/recipient-groups", payload: { name: "Household" } }),
+    authed({ method: "POST", url: "/api/recipient-groups", payload: { name: "Household" } }),
   );
   const groupId = groupResponse.json().group.id as string;
 
   const recipientIds: string[] = [];
   for (const email of emails) {
     const recipientResponse = await app.inject(
-      authed({ method: "POST", url: "/recipients", payload: { email } }),
+      authed({ method: "POST", url: "/api/recipients", payload: { email } }),
     );
     const recipientId = recipientResponse.json().recipient.id as string;
     recipientIds.push(recipientId);
@@ -120,7 +120,7 @@ async function createRecipientAndGroup(...emails: string[]) {
     await app.inject(
       authed({
         method: "POST",
-        url: `/recipient-groups/${groupId}/members`,
+        url: `/api/recipient-groups/${groupId}/members`,
         payload: { recipientId },
       }),
     );
@@ -133,7 +133,7 @@ async function createNewsletter(smtpProfileId?: string) {
   const response = await app.inject(
     authed({
       method: "POST",
-      url: "/newsletters",
+      url: "/api/newsletters",
       payload: {
         name: "Weekly Digest",
         scheduleCron: "0 9 * * 1",
@@ -170,7 +170,7 @@ function mockRecentlyAdded() {
 describe("POST /newsletters/:id/send-now", () => {
   it("404s for an unknown newsletter", async () => {
     const response = await app.inject(
-      authed({ method: "POST", url: "/newsletters/does-not-exist/send-now" }),
+      authed({ method: "POST", url: "/api/newsletters/does-not-exist/send-now" }),
     );
     expect(response.statusCode).toBe(404);
   });
@@ -178,7 +178,7 @@ describe("POST /newsletters/:id/send-now", () => {
   it("400s when the newsletter has no SMTP profile configured", async () => {
     const newsletterId = await createNewsletter();
     const response = await app.inject(
-      authed({ method: "POST", url: `/newsletters/${newsletterId}/send-now` }),
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
     );
     expect(response.statusCode).toBe(400);
   });
@@ -189,7 +189,7 @@ describe("POST /newsletters/:id/send-now", () => {
     await db.insert(sendRuns).values({ newsletterId, status: "running", startedAt: new Date() });
 
     const response = await app.inject(
-      authed({ method: "POST", url: `/newsletters/${newsletterId}/send-now` }),
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
     );
     expect(response.statusCode).toBe(409);
   });
@@ -199,13 +199,13 @@ describe("POST /newsletters/:id/send-now", () => {
     const newsletterId = await createNewsletter(smtpProfileId);
 
     const response = await app.inject(
-      authed({ method: "POST", url: `/newsletters/${newsletterId}/send-now` }),
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
     );
     expect(response.statusCode).toBe(200);
     expect(mockSendMail).not.toHaveBeenCalled();
 
     const runsResponse = await app.inject(
-      authed({ method: "GET", url: `/newsletters/${newsletterId}/send-runs` }),
+      authed({ method: "GET", url: `/api/newsletters/${newsletterId}/send-runs` }),
     );
     const [run] = runsResponse.json().sendRuns;
     expect(run.status).toBe("success");
@@ -221,14 +221,14 @@ describe("POST /newsletters/:id/send-now", () => {
     await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/sources`,
+        url: `/api/newsletters/${newsletterId}/sources`,
         payload: { sourceConnectionId: sourceId },
       }),
     );
     await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/recipient-groups`,
+        url: `/api/newsletters/${newsletterId}/recipient-groups`,
         payload: { groupId },
       }),
     );
@@ -237,7 +237,7 @@ describe("POST /newsletters/:id/send-now", () => {
     mockSendMail.mockResolvedValueOnce({ messageId: "msg-1" });
 
     const response = await app.inject(
-      authed({ method: "POST", url: `/newsletters/${newsletterId}/send-now` }),
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
     );
     expect(response.statusCode).toBe(200);
     const { sendRunId } = response.json();
@@ -273,14 +273,14 @@ describe("POST /newsletters/:id/send-now", () => {
     await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/sources`,
+        url: `/api/newsletters/${newsletterId}/sources`,
         payload: { sourceConnectionId: sourceId },
       }),
     );
     await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/recipient-groups`,
+        url: `/api/newsletters/${newsletterId}/recipient-groups`,
         payload: { groupId },
       }),
     );
@@ -291,7 +291,7 @@ describe("POST /newsletters/:id/send-now", () => {
       .mockRejectedValueOnce(new Error("relay refused"));
 
     const response = await app.inject(
-      authed({ method: "POST", url: `/newsletters/${newsletterId}/send-now` }),
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
     );
     const { sendRunId } = response.json();
 
@@ -318,14 +318,14 @@ describe("POST /newsletters/:id/send-now", () => {
     await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/sources`,
+        url: `/api/newsletters/${newsletterId}/sources`,
         payload: { sourceConnectionId: sourceId },
       }),
     );
     await app.inject(
       authed({
         method: "POST",
-        url: `/newsletters/${newsletterId}/recipient-groups`,
+        url: `/api/newsletters/${newsletterId}/recipient-groups`,
         payload: { groupId },
       }),
     );
@@ -334,7 +334,7 @@ describe("POST /newsletters/:id/send-now", () => {
     mockSendMail.mockRejectedValueOnce(new Error("relay refused"));
 
     const response = await app.inject(
-      authed({ method: "POST", url: `/newsletters/${newsletterId}/send-now` }),
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
     );
     const { sendRunId } = response.json();
 

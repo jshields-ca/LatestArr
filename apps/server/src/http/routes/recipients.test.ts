@@ -27,12 +27,12 @@ beforeEach(async () => {
 
   await app.inject({
     method: "POST",
-    url: "/auth/bootstrap",
+    url: "/api/auth/bootstrap",
     payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
   });
   const loginResponse = await app.inject({
     method: "POST",
-    url: "/auth/login",
+    url: "/api/auth/login",
     payload: { email: "admin@example.com", password: "a-very-long-password" },
   });
   sessionCookie = extractSessionCookie(loginResponse);
@@ -50,7 +50,7 @@ function authed(overrides: Record<string, unknown>) {
 describe("POST /recipients", () => {
   it("rejects an invalid email", async () => {
     const response = await app.inject(
-      authed({ method: "POST", url: "/recipients", payload: { email: "not-an-email" } }),
+      authed({ method: "POST", url: "/api/recipients", payload: { email: "not-an-email" } }),
     );
     expect(response.statusCode).toBe(400);
   });
@@ -59,7 +59,7 @@ describe("POST /recipients", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: "/recipients",
+        url: "/api/recipients",
         payload: { email: "person@example.com", displayName: "Person" },
       }),
     );
@@ -70,10 +70,10 @@ describe("POST /recipients", () => {
 
   it("rejects a duplicate email with 409", async () => {
     await app.inject(
-      authed({ method: "POST", url: "/recipients", payload: { email: "dup@example.com" } }),
+      authed({ method: "POST", url: "/api/recipients", payload: { email: "dup@example.com" } }),
     );
     const response = await app.inject(
-      authed({ method: "POST", url: "/recipients", payload: { email: "dup@example.com" } }),
+      authed({ method: "POST", url: "/api/recipients", payload: { email: "dup@example.com" } }),
     );
     expect(response.statusCode).toBe(409);
   });
@@ -84,7 +84,7 @@ describe("recipient lifecycle", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: "/recipients",
+        url: "/api/recipients",
         payload: { email: "person@example.com", displayName: "Person" },
       }),
     );
@@ -94,19 +94,19 @@ describe("recipient lifecycle", () => {
   it("lists and fetches", async () => {
     const id = await createRecipient();
 
-    const listResponse = await app.inject(authed({ method: "GET", url: "/recipients" }));
+    const listResponse = await app.inject(authed({ method: "GET", url: "/api/recipients" }));
     expect(listResponse.json().recipients).toHaveLength(1);
 
-    const getResponse = await app.inject(authed({ method: "GET", url: `/recipients/${id}` }));
+    const getResponse = await app.inject(authed({ method: "GET", url: `/api/recipients/${id}` }));
     expect(getResponse.json().recipient.id).toBe(id);
   });
 
   it("returns 404 for an unknown id on get/update/", async () => {
-    const getResponse = await app.inject(authed({ method: "GET", url: "/recipients/nope" }));
+    const getResponse = await app.inject(authed({ method: "GET", url: "/api/recipients/nope" }));
     expect(getResponse.statusCode).toBe(404);
 
     const patchResponse = await app.inject(
-      authed({ method: "PATCH", url: "/recipients/nope", payload: { displayName: "x" } }),
+      authed({ method: "PATCH", url: "/api/recipients/nope", payload: { displayName: "x" } }),
     );
     expect(patchResponse.statusCode).toBe(404);
   });
@@ -116,7 +116,7 @@ describe("recipient lifecycle", () => {
     const response = await app.inject(
       authed({
         method: "PATCH",
-        url: `/recipients/${id}`,
+        url: `/api/recipients/${id}`,
         payload: { displayName: "New Name", isActive: false },
       }),
     );
@@ -126,17 +126,17 @@ describe("recipient lifecycle", () => {
 
   it("deletes", async () => {
     const id = await createRecipient();
-    const deleteResponse = await app.inject(authed({ method: "DELETE", url: `/recipients/${id}` }));
+    const deleteResponse = await app.inject(authed({ method: "DELETE", url: `/api/recipients/${id}` }));
     expect(deleteResponse.statusCode).toBe(204);
 
-    const getResponse = await app.inject(authed({ method: "GET", url: `/recipients/${id}` }));
+    const getResponse = await app.inject(authed({ method: "GET", url: `/api/recipients/${id}` }));
     expect(getResponse.statusCode).toBe(404);
   });
 });
 
 describe("auth gating", () => {
   it("rejects unauthenticated requests", async () => {
-    const response = await app.inject({ method: "GET", url: "/recipients" });
+    const response = await app.inject({ method: "GET", url: "/api/recipients" });
     expect(response.statusCode).toBe(401);
   });
 });

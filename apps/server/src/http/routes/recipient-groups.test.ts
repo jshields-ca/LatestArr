@@ -27,12 +27,12 @@ beforeEach(async () => {
 
   await app.inject({
     method: "POST",
-    url: "/auth/bootstrap",
+    url: "/api/auth/bootstrap",
     payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
   });
   const loginResponse = await app.inject({
     method: "POST",
-    url: "/auth/login",
+    url: "/api/auth/login",
     payload: { email: "admin@example.com", password: "a-very-long-password" },
   });
   sessionCookie = extractSessionCookie(loginResponse);
@@ -50,7 +50,7 @@ function authed(overrides: Record<string, unknown>) {
 async function createGroup(app: FastifyInstance, cookie: string) {
   const response = await app.inject({
     method: "POST",
-    url: "/recipient-groups",
+    url: "/api/recipient-groups",
     cookies: { latestarr_session: cookie },
     payload: { name: "Household" },
   });
@@ -60,7 +60,7 @@ async function createGroup(app: FastifyInstance, cookie: string) {
 async function createRecipient(app: FastifyInstance, cookie: string, email: string) {
   const response = await app.inject({
     method: "POST",
-    url: "/recipients",
+    url: "/api/recipients",
     cookies: { latestarr_session: cookie },
     payload: { email },
   });
@@ -70,7 +70,7 @@ async function createRecipient(app: FastifyInstance, cookie: string, email: stri
 describe("recipient group CRUD", () => {
   it("rejects a group with no name", async () => {
     const response = await app.inject(
-      authed({ method: "POST", url: "/recipient-groups", payload: {} }),
+      authed({ method: "POST", url: "/api/recipient-groups", payload: {} }),
     );
     expect(response.statusCode).toBe(400);
   });
@@ -78,24 +78,24 @@ describe("recipient group CRUD", () => {
   it("creates, lists, updates, and deletes a group", async () => {
     const id = await createGroup(app, sessionCookie);
 
-    const listResponse = await app.inject(authed({ method: "GET", url: "/recipient-groups" }));
+    const listResponse = await app.inject(authed({ method: "GET", url: "/api/recipient-groups" }));
     expect(listResponse.json().groups).toHaveLength(1);
 
     const patchResponse = await app.inject(
       authed({
         method: "PATCH",
-        url: `/recipient-groups/${id}`,
+        url: `/api/recipient-groups/${id}`,
         payload: { name: "Renamed" },
       }),
     );
     expect(patchResponse.json().group.name).toBe("Renamed");
 
     const deleteResponse = await app.inject(
-      authed({ method: "DELETE", url: `/recipient-groups/${id}` }),
+      authed({ method: "DELETE", url: `/api/recipient-groups/${id}` }),
     );
     expect(deleteResponse.statusCode).toBe(204);
 
-    const getResponse = await app.inject(authed({ method: "GET", url: `/recipient-groups/${id}` }));
+    const getResponse = await app.inject(authed({ method: "GET", url: `/api/recipient-groups/${id}` }));
     expect(getResponse.statusCode).toBe(404);
   });
 });
@@ -108,14 +108,14 @@ describe("group membership", () => {
     const addResponse = await app.inject(
       authed({
         method: "POST",
-        url: `/recipient-groups/${groupId}/members`,
+        url: `/api/recipient-groups/${groupId}/members`,
         payload: { recipientId },
       }),
     );
     expect(addResponse.statusCode).toBe(204);
 
     const getResponse = await app.inject(
-      authed({ method: "GET", url: `/recipient-groups/${groupId}` }),
+      authed({ method: "GET", url: `/api/recipient-groups/${groupId}` }),
     );
     expect(getResponse.json().members).toHaveLength(1);
     expect(getResponse.json().members[0].email).toBe("member@example.com");
@@ -123,13 +123,13 @@ describe("group membership", () => {
     const removeResponse = await app.inject(
       authed({
         method: "DELETE",
-        url: `/recipient-groups/${groupId}/members/${recipientId}`,
+        url: `/api/recipient-groups/${groupId}/members/${recipientId}`,
       }),
     );
     expect(removeResponse.statusCode).toBe(204);
 
     const afterRemove = await app.inject(
-      authed({ method: "GET", url: `/recipient-groups/${groupId}` }),
+      authed({ method: "GET", url: `/api/recipient-groups/${groupId}` }),
     );
     expect(afterRemove.json().members).toHaveLength(0);
   });
@@ -141,14 +141,14 @@ describe("group membership", () => {
     await app.inject(
       authed({
         method: "POST",
-        url: `/recipient-groups/${groupId}/members`,
+        url: `/api/recipient-groups/${groupId}/members`,
         payload: { recipientId },
       }),
     );
     const response = await app.inject(
       authed({
         method: "POST",
-        url: `/recipient-groups/${groupId}/members`,
+        url: `/api/recipient-groups/${groupId}/members`,
         payload: { recipientId },
       }),
     );
@@ -160,7 +160,7 @@ describe("group membership", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: "/recipient-groups/does-not-exist/members",
+        url: "/api/recipient-groups/does-not-exist/members",
         payload: { recipientId },
       }),
     );
@@ -172,7 +172,7 @@ describe("group membership", () => {
     const response = await app.inject(
       authed({
         method: "POST",
-        url: `/recipient-groups/${groupId}/members`,
+        url: `/api/recipient-groups/${groupId}/members`,
         payload: { recipientId: "does-not-exist" },
       }),
     );
