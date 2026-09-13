@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecipientsPage } from "./recipients-page";
@@ -131,5 +132,49 @@ describe("RecipientsPage", () => {
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => expect(screen.queryByText("Everyone")).not.toBeInTheDocument());
+  });
+
+  it("has no accessibility violations with both empty states shown", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    const { container } = render(<RecipientsPage />);
+    await screen.findByText("No recipients yet");
+    await screen.findByText("No groups yet");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with recipients and groups populated", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    const { container } = render(<RecipientsPage />);
+    await screen.findByText("Alice");
+    await screen.findByText("Everyone");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with the add-recipient dialog open", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("No recipients yet");
+    await user.click(screen.getByRole("button", { name: "Add recipient" }));
+    await screen.findByRole("dialog");
+
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 });

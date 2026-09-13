@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,5 +97,33 @@ describe("TemplatesPage", () => {
 
     await waitFor(() => expect(screen.queryByText("Weekly Digest")).not.toBeInTheDocument());
     expect(screen.getByText("No templates yet")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations in the empty state", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [] }));
+    const { container } = renderPage();
+    await screen.findByText("No templates yet");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with a populated list", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [exampleTemplate] }));
+    const { container } = renderPage();
+    await screen.findByText("Weekly Digest");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with the add-template dialog open", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [] }));
+    renderPage();
+    await screen.findByText("No templates yet");
+
+    await user.click(screen.getByRole("button", { name: "Add template" }));
+    await screen.findByRole("dialog");
+
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 });

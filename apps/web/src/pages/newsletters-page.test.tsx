@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -265,5 +266,47 @@ describe("NewslettersPage", () => {
 
     await waitFor(() => expect(screen.queryByText("Weekly digest")).not.toBeInTheDocument());
     expect(screen.getByText("No newsletters yet")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations in the empty state", async () => {
+    mockRoutes(baseRoutes());
+    const { container } = renderPage();
+    await screen.findByText("No newsletters yet");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with an expanded newsletter", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    const { container } = renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest/, expanded: false }));
+    await screen.findByLabelText("Template");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with the add-newsletter dialog open", async () => {
+    const user = userEvent.setup();
+    mockRoutes(baseRoutes());
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    await screen.findByRole("dialog");
+
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 });

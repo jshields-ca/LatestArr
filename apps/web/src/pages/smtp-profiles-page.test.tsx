@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SmtpProfilesPage } from "./smtp-profiles-page";
@@ -125,5 +126,33 @@ describe("SmtpProfilesPage", () => {
 
     await waitFor(() => expect(screen.queryByText("Primary")).not.toBeInTheDocument());
     expect(screen.getByText("No SMTP profiles yet")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations in the empty state", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
+    const { container } = render(<SmtpProfilesPage />);
+    await screen.findByText("No SMTP profiles yet");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with a populated list", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [exampleProfile] }));
+    const { container } = render(<SmtpProfilesPage />);
+    await screen.findByText("Primary");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with the add-profile dialog open", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
+    render(<SmtpProfilesPage />);
+    await screen.findByText("No SMTP profiles yet");
+
+    await user.click(screen.getByRole("button", { name: "Add SMTP profile" }));
+    await screen.findByRole("dialog");
+
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 });

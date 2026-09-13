@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SourcesPage } from "./sources-page";
@@ -104,5 +105,33 @@ describe("SourcesPage", () => {
 
     await waitFor(() => expect(screen.queryByText("Home Tautulli")).not.toBeInTheDocument());
     expect(screen.getByText("No sources yet")).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations in the empty state", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
+    const { container } = render(<SourcesPage />);
+    await screen.findByText("No sources yet");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with a populated list", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [exampleSource] }));
+    const { container } = render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations with the add-source dialog open", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
+    render(<SourcesPage />);
+    await screen.findByText("No sources yet");
+
+    await user.click(screen.getByRole("button", { name: "Add source" }));
+    await screen.findByRole("dialog");
+
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 });

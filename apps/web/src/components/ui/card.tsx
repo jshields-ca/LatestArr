@@ -29,13 +29,18 @@ CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, children, ...props }, ref) => (
-    <h3
+    // Every page in this app renders a Card directly under its own <h1>
+    // with no intervening <h2>, so <h3> here would skip a level (an
+    // axe-core heading-order violation). <h2> is correct for that
+    // shape; a page that nests a Card under its own <h2> section
+    // heading just ends up with sibling <h2>s, which is still valid.
+    <h2
       ref={ref}
       className={cn("text-base font-semibold leading-none tracking-tight", className)}
       {...props}
     >
       {children}
-    </h3>
+    </h2>
   ),
 );
 CardTitle.displayName = "CardTitle";

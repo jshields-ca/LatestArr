@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,5 +91,12 @@ describe("LoginPage", () => {
     renderLoginPage({ local: true, oidc: false, needsSetup: false });
     await screen.findByLabelText("Email");
     expect(screen.queryByRole("link", { name: "Continue with SSO" })).not.toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderLoginPage({ local: true, oidc: true, needsSetup: false });
+    await screen.findByLabelText("Email");
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
