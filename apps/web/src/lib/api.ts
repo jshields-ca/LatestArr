@@ -402,3 +402,17 @@ export function createTemplate(input: { name: string }): Promise<{ template: Tem
 export function deleteTemplate(id: string): Promise<void> {
   return apiFetch<void>(`/templates/${id}`, { method: "DELETE" });
 }
+
+export function getTemplate(id: string): Promise<{ template: Template }> {
+  return apiFetch<{ template: Template }>(`/templates/${id}`);
+}
+
+export function updateTemplate(
+  id: string,
+  input: { name?: string; designJson?: Record<string, unknown>; compiledMjml?: string },
+): Promise<{ template: Template }> {
+  return apiFetch<{ template: Template }>(`/templates/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}

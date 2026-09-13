@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -142,10 +143,18 @@ function TemplateRow({
             <Badge variant="neutral">{template.compiledMjml ? "Designed" : "Not yet designed"}</Badge>
           </div>
         </div>
-        <ConfirmDelete
-          label={`Delete ${template.name}`}
-          onConfirm={() => deleteTemplate(template.id).then(() => onDeleted(template.id))}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/templates/${template.id}/edit`}>
+              <Pencil />
+              Edit
+            </Link>
+          </Button>
+          <ConfirmDelete
+            label={`Delete ${template.name}`}
+            onConfirm={() => deleteTemplate(template.id).then(() => onDeleted(template.id))}
+          />
+        </div>
       </CardContent>
     </Card>
   );

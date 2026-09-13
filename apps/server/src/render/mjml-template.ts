@@ -10,6 +10,7 @@ import mjml2html from "mjml";
 // source can't inject markup into the compiled HTML.
 
 interface RenderableItem {
+  kind: string;
   title: string;
   subtitle?: string;
   overview?: string;
@@ -18,7 +19,11 @@ interface RenderableItem {
 
 export interface MjmlRenderContext {
   newsletterName: string;
+  /** The "latest added" pool, used by a Media List block with sort="added". */
   items: NewItem[];
+  /** The "most watched" pool, used by a Media List block with sort="mostWatched".
+   * Empty when no linked source supports fetchPopularItems. */
+  popularItems?: NewItem[];
   generatedAt: Date;
 }
 
@@ -26,20 +31,47 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
-export async function renderMjmlTemplate(
-  mjmlSource: string,
-  context: MjmlRenderContext,
-): Promise<string> {
-  const items: RenderableItem[] = context.items.map((item) => ({
+function toRenderable(item: NewItem): RenderableItem {
+  return {
+    kind: item.kind,
     title: item.title,
     subtitle: item.subtitle,
     overview: item.overview,
     addedAtFormatted: formatDate(item.addedAt),
-  }));
+  };
+}
 
+// The GrapesJS "Media List" block exports its trait values (content type,
+// sort, count) as hash arguments on this block helper rather than as a
+// second templating mechanism — {{#mediaList contentType="movie"
+// sort="added" count="5"}}...{{/mediaList}}. The block body is rendered
+// once per matching item, exactly like a filtered/sorted/sliced {{#each}}.
+Handlebars.registerHelper("mediaList", function mediaList(
+  this: { items?: RenderableItem[]; popularItems?: RenderableItem[] },
+  options: Handlebars.HelperOptions,
+) {
+  const { contentType, sort, count } = options.hash as {
+    contentType?: string;
+    sort?: string;
+    count?: number | string;
+  };
+
+  const pool = sort === "mostWatched" ? (this.popularItems ?? []) : (this.items ?? []);
+  const filtered = contentType ? pool.filter((item) => item.kind === contentType) : pool;
+  const limit = Number(count);
+  const sliced = filtered.slice(0, Number.isFinite(limit) && limit > 0 ? limit : filtered.length);
+
+  return sliced.map((item) => options.fn(item)).join("");
+});
+
+export async function renderMjmlTemplate(
+  mjmlSource: string,
+  context: MjmlRenderContext,
+): Promise<string> {
   const substitutedMjml = Handlebars.compile(mjmlSource)({
     newsletterName: context.newsletterName,
-    items,
+    items: context.items.map(toRenderable),
+    popularItems: (context.popularItems ?? []).map(toRenderable),
     generatedAtFormatted: formatDate(context.generatedAt),
   });
 

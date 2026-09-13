@@ -6,11 +6,13 @@ import { requireAuth } from "../require-auth.js";
 interface CreateTemplateBody {
   name?: string;
   designJson?: Record<string, unknown>;
+  compiledMjml?: string;
 }
 
 interface UpdateTemplateBody {
   name?: string;
   designJson?: Record<string, unknown>;
+  compiledMjml?: string;
 }
 
 interface IdParams {
@@ -22,14 +24,14 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     scope.addHook("preHandler", requireAuth(db));
 
     scope.post<{ Body: CreateTemplateBody }>("/templates", async (request, reply) => {
-      const { name, designJson } = request.body ?? {};
+      const { name, designJson, compiledMjml } = request.body ?? {};
       if (!name) {
         return reply.code(400).send({ error: "name is required" });
       }
 
       const [template] = await db
         .insert(templates)
-        .values({ name, designJson: designJson ?? null })
+        .values({ name, designJson: designJson ?? null, compiledMjml: compiledMjml ?? null })
         .returning();
 
       return reply.code(201).send({ template });
@@ -51,12 +53,13 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     scope.patch<{ Params: IdParams; Body: UpdateTemplateBody }>(
       "/templates/:id",
       async (request, reply) => {
-        const { name, designJson } = request.body ?? {};
+        const { name, designJson, compiledMjml } = request.body ?? {};
         const [template] = await db
           .update(templates)
           .set({
             ...(name !== undefined && { name }),
             ...(designJson !== undefined && { designJson }),
+            ...(compiledMjml !== undefined && { compiledMjml }),
             updatedAt: new Date(),
           })
           .where(eq(templates.id, request.params.id))

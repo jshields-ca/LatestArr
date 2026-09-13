@@ -1,8 +1,17 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TemplatesPage } from "./templates-page";
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <TemplatesPage />
+    </MemoryRouter>,
+  );
+}
 
 const fetchMock = vi.fn();
 
@@ -32,23 +41,24 @@ const exampleTemplate = {
 describe("TemplatesPage", () => {
   it("renders the empty state", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [] }));
-    render(<TemplatesPage />);
+    renderPage();
     expect(await screen.findByText("No templates yet")).toBeInTheDocument();
   });
 
   it("lists existing templates", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [exampleTemplate] }));
-    render(<TemplatesPage />);
+    renderPage();
 
     expect(await screen.findByText("Weekly Digest")).toBeInTheDocument();
     expect(screen.getByText("Not yet designed")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute("href", "/templates/t1/edit");
   });
 
   it("shows a Designed badge once a template has compiled MJML", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, { templates: [{ ...exampleTemplate, compiledMjml: "<mjml></mjml>" }] }),
     );
-    render(<TemplatesPage />);
+    renderPage();
 
     expect(await screen.findByText("Designed")).toBeInTheDocument();
   });
@@ -56,7 +66,7 @@ describe("TemplatesPage", () => {
   it("adds a template through the dialog", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [] }));
-    render(<TemplatesPage />);
+    renderPage();
     await screen.findByText("No templates yet");
 
     await user.click(screen.getByRole("button", { name: "Add template" }));
@@ -77,7 +87,7 @@ describe("TemplatesPage", () => {
   it("deletes a template after confirmation", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [exampleTemplate] }));
-    render(<TemplatesPage />);
+    renderPage();
     await screen.findByText("Weekly Digest");
 
     await user.click(screen.getByRole("button", { name: "Delete Weekly Digest" }));

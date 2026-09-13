@@ -21,6 +21,7 @@ import {
   getCurrentUser,
   getGroupMembers,
   getNewsletterDetail,
+  getTemplate,
   listGroups,
   listNewsletters,
   listRecipients,
@@ -39,6 +40,7 @@ import {
   testSourceConnection,
   updateNewsletter,
   updateRecipient,
+  updateTemplate,
 } from "./api";
 
 const fetchMock = vi.fn();
@@ -477,5 +479,21 @@ describe("templates", () => {
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
     await deleteTemplate("t1");
     expect(fetchMock).toHaveBeenCalledWith("/api/templates/t1", expect.objectContaining({ method: "DELETE" }));
+  });
+
+  it("fetches a single template", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { template: exampleTemplate }));
+    await expect(getTemplate("t1")).resolves.toEqual({ template: exampleTemplate });
+    expect(fetchMock).toHaveBeenCalledWith("/api/templates/t1", expect.anything());
+  });
+
+  it("updates a template's designJson and compiledMjml", async () => {
+    const updated = { ...exampleTemplate, compiledMjml: "<mjml></mjml>" };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { template: updated }));
+    const result = await updateTemplate("t1", { compiledMjml: "<mjml></mjml>" });
+    expect(result.template.compiledMjml).toBe("<mjml></mjml>");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/templates/t1");
+    expect(init.method).toBe("PATCH");
   });
 });
