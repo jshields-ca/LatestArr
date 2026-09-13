@@ -21,6 +21,11 @@ export interface NewItem {
   platform?: string;
   libraryName?: string;
   externalUrl?: string;
+  /** Play count over the window a "most watched" query was made for —
+   * only present on items returned by fetchPopularItems. */
+  playCount?: number;
+  /** Distinct viewer/user count over that same window — same caveat. */
+  uniqueViewerCount?: number;
   raw?: unknown;
 }
 
@@ -54,6 +59,13 @@ export interface FetchRecentItemsParams {
   limit?: number;
 }
 
+export interface FetchPopularItemsParams {
+  /** Start of the window to rank plays over (e.g. "the last 7 days"). */
+  since: Date;
+  mediaKinds?: MediaKind[];
+  limit?: number;
+}
+
 export interface SourceAdapter {
   readonly kind: string;
   readonly capabilities: SourceCapabilities;
@@ -63,6 +75,15 @@ export interface SourceAdapter {
   listLibraries(config: SourceConnectionConfig): Promise<SourceLibrary[]>;
 
   fetchRecentItems(config: SourceConnectionConfig, params: FetchRecentItemsParams): Promise<NewItem[]>;
+
+  /** Ranks by watch activity rather than recency ("most watched this
+   * week"). Optional — a source only implements this if its API actually
+   * exposes play/watch statistics; callers must check for its presence
+   * before calling, the same way they do for resolveImageUrl. */
+  fetchPopularItems?(
+    config: SourceConnectionConfig,
+    params: FetchPopularItemsParams,
+  ): Promise<NewItem[]>;
 
   resolveImageUrl?(
     config: SourceConnectionConfig,

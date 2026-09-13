@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getLibraries, getRecentlyAdded } from "./tautulli-client.js";
+import { getHomeStats, getLibraries, getRecentlyAdded } from "./tautulli-client.js";
 
 const mockFetch = vi.fn();
 
@@ -88,5 +88,60 @@ describe("getRecentlyAdded", () => {
 
     const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
     expect(calledUrl.searchParams.has("section_id")).toBe(false);
+  });
+});
+
+describe("getHomeStats", () => {
+  it("passes stat_id, time_range, and stats_count through as query params", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [{ stat_id: "top_movies", rows: [] }],
+        },
+      }),
+    );
+
+    await getHomeStats("http://tautulli.local:8181", "key123", "top_movies", 7, 10);
+
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.searchParams.get("cmd")).toBe("get_home_stats");
+    expect(calledUrl.searchParams.get("stat_id")).toBe("top_movies");
+    expect(calledUrl.searchParams.get("time_range")).toBe("7");
+    expect(calledUrl.searchParams.get("stats_type")).toBe("plays");
+    expect(calledUrl.searchParams.get("stats_count")).toBe("10");
+  });
+
+  it("returns the rows for the matching stat_id out of the response array", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [
+            { stat_id: "top_users", rows: [] },
+            {
+              stat_id: "top_tv",
+              rows: [{ rating_key: "1", title: "A Show", media_type: "episode", total_plays: 5 }],
+            },
+          ],
+        },
+      }),
+    );
+
+    const rows = await getHomeStats("http://tautulli.local:8181", "key123", "top_tv", 7, 10);
+    expect(rows).toEqual([
+      { rating_key: "1", title: "A Show", media_type: "episode", total_plays: 5 },
+    ]);
+  });
+
+  it("returns an empty array when the stat_id isn't present in the response", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "success", message: null, data: [] } }),
+    );
+
+    const rows = await getHomeStats("http://tautulli.local:8181", "key123", "top_movies", 7, 10);
+    expect(rows).toEqual([]);
   });
 });
