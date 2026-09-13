@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
 import { PlaceholderPage } from "@/pages/placeholder-page";
+import { RecipientsPage } from "@/pages/recipients-page";
 import { SetupPage } from "@/pages/setup-page";
 import { SourcesPage } from "@/pages/sources-page";
 
@@ -21,15 +22,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/sources" element={<SourcesPage />} />
-                <Route
-                  path="/recipients"
-                  element={
-                    <PlaceholderPage
-                      title="Recipients"
-                      description="Manage recipients and the groups newsletters send to."
-                    />
-                  }
-                />
+                <Route path="/recipients" element={<RecipientsPage />} />
                 <Route
                   path="/smtp"
                   element={

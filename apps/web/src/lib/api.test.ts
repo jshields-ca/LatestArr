@@ -2,14 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ApiError,
+  addGroupMember,
+  createGroup,
+  createRecipient,
   createSource,
+  deleteGroup,
+  deleteRecipient,
   deleteSource,
   getAuthProviders,
   getCurrentUser,
+  getGroupMembers,
+  listGroups,
+  listRecipients,
   listSources,
   login,
   logout,
+  removeGroupMember,
   testSourceConnection,
+  updateRecipient,
 } from "./api";
 
 const fetchMock = vi.fn();
@@ -148,5 +158,102 @@ describe("sources", () => {
 
     await expect(testSourceConnection("1")).resolves.toEqual({ ok: false, message: "Invalid API key" });
     expect(fetchMock).toHaveBeenCalledWith("/sources/1/test", expect.objectContaining({ method: "POST" }));
+  });
+});
+
+const exampleRecipient = {
+  id: "r1",
+  email: "person@example.com",
+  displayName: "Person",
+  isActive: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+const exampleGroup = {
+  id: "g1",
+  name: "Everyone",
+  description: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("recipients", () => {
+  it("lists recipients", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [exampleRecipient] }));
+    await expect(listRecipients()).resolves.toEqual({ recipients: [exampleRecipient] });
+  });
+
+  it("creates a recipient", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { recipient: exampleRecipient }));
+    const result = await createRecipient({ email: "person@example.com", displayName: "Person" });
+    expect(result.recipient.id).toBe("r1");
+  });
+
+  it("rejects a duplicate email with the server's message", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(409, { error: "A recipient with this email already exists" }),
+    );
+    await expect(createRecipient({ email: "dupe@example.com" })).rejects.toMatchObject({
+      status: 409,
+      message: "A recipient with this email already exists",
+    });
+  });
+
+  it("updates a recipient with a PATCH", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { recipient: { ...exampleRecipient, isActive: false } }),
+    );
+    const result = await updateRecipient("r1", { isActive: false });
+    expect(result.recipient.isActive).toBe(false);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("PATCH");
+  });
+
+  it("deletes a recipient", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await deleteRecipient("r1");
+    expect(fetchMock).toHaveBeenCalledWith("/recipients/r1", expect.objectContaining({ method: "DELETE" }));
+  });
+});
+
+describe("recipient groups", () => {
+  it("lists groups", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [exampleGroup] }));
+    await expect(listGroups()).resolves.toEqual({ groups: [exampleGroup] });
+  });
+
+  it("creates a group", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { group: exampleGroup }));
+    const result = await createGroup({ name: "Everyone" });
+    expect(result.group.id).toBe("g1");
+  });
+
+  it("deletes a group", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await deleteGroup("g1");
+    expect(fetchMock).toHaveBeenCalledWith("/recipient-groups/g1", expect.objectContaining({ method: "DELETE" }));
+  });
+
+  it("gets a group with its members", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { group: exampleGroup, members: [exampleRecipient] }));
+    await expect(getGroupMembers("g1")).resolves.toEqual({ group: exampleGroup, members: [exampleRecipient] });
+  });
+
+  it("adds a member with a JSON body", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await addGroupMember("g1", "r1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/recipient-groups/g1/members");
+    expect(JSON.parse(init.body as string)).toEqual({ recipientId: "r1" });
+  });
+
+  it("removes a member", async () => {
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await removeGroupMember("g1", "r1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/recipient-groups/g1/members/r1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 });
