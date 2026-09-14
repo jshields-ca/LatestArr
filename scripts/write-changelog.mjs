@@ -1,12 +1,14 @@
-// Changesets' own per-package changelog generation (one CHANGELOG.md per
+// Changesets also writes its own per-package CHANGELOG.md files (one per
 // workspace package, cross-referencing internal "Updated dependencies"
-// bumps) makes sense for a library monorepo published to npm, but this is
-// a single self-hosted app that ships as one Docker image — a self-hoster
-// doesn't care that `@latestarr/adapter-plex` bumped internally. So
-// `.changeset/config.json` sets `"changelog": false` (no per-package
-// files) and this script writes ONE consolidated entry to the root
-// CHANGELOG.md instead, run *before* `changeset version` deletes the
-// pending changeset files.
+// bumps) — `changesets/action` reads those to build the "Version
+// Packages" PR's own description, so they have to keep existing even
+// though this is a single self-hosted app, not a set of independently-
+// consumed libraries. This script instead gives *people* a single
+// source of truth: one consolidated entry in the root CHANGELOG.md,
+// written from the pending changeset files *before* `changeset version`
+// deletes them. That's what the release workflow pulls from for actual
+// release notes — the scattered per-package files are internal
+// bookkeeping a self-hoster never needs to look at.
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
