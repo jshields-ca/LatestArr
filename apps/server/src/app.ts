@@ -3,6 +3,7 @@ import path from "node:path";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import { registerAdapter } from "@latestarr/adapter-core";
+import { plexAdapter } from "@latestarr/adapter-plex";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -18,6 +19,7 @@ import { registerTemplateRoutes } from "./http/routes/templates.js";
 import type { SchedulerHandle } from "./scheduler/engine.js";
 
 registerAdapter(tautulliAdapter);
+registerAdapter(plexAdapter);
 
 export interface BuildAppOptions {
   // Directory containing the built admin WebUI (apps/web's `dist`), served

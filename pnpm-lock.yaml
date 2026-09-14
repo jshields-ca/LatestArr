@@ -26,6 +26,9 @@ importers:
       '@latestarr/adapter-core':
         specifier: workspace:*
         version: link:../../packages/adapters/core
+      '@latestarr/adapter-plex':
+        specifier: workspace:*
+        version: link:../../packages/adapters/plex
       '@latestarr/adapter-tautulli':
         specifier: workspace:*
         version: link:../../packages/adapters/tautulli
@@ -186,6 +189,25 @@ importers:
         version: 2.1.9(@types/node@22.20.2)(jsdom@25.0.1)(lightningcss@1.32.0)
 
   packages/adapters/core:
+    devDependencies:
+      '@latestarr/config':
+        specifier: workspace:*
+        version: link:../../config
+      eslint:
+        specifier: ^9.15.0
+        version: 9.39.5(jiti@2.7.0)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.2)(jsdom@30.0.1)(lightningcss@1.32.0)
+
+  packages/adapters/plex:
+    dependencies:
+      '@latestarr/adapter-core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@latestarr/config':
         specifier: workspace:*
