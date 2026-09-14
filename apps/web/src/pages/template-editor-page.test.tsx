@@ -19,7 +19,10 @@ const mockInit = vi.fn(() => mockEditor);
 
 vi.mock("grapesjs", () => ({ default: { init: mockInit } }));
 vi.mock("grapesjs-mjml", () => ({ default: vi.fn() }));
-vi.mock("@/lib/grapesjs-blocks", () => ({ registerCustomBlocks: vi.fn() }));
+vi.mock("@/lib/grapesjs-blocks", () => ({
+  registerCustomBlocks: vi.fn(),
+  applyClickToAddFallback: vi.fn(),
+}));
 
 const { TemplateEditorPage } = await import("./template-editor-page");
 
