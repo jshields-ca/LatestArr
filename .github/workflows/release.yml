@@ -1,0 +1,80 @@
+name: Release
+
+# Automates the two-step flow CONTRIBUTING.md already describes: keep a
+# "Version Packages" PR up to date while changesets are pending on main,
+# then — once a maintainer merges it — cut the actual GitHub Release.
+# This app isn't published to npm (every workspace package is private),
+# so there's no `publish` step here; "release" means a git tag + a
+# GitHub Release with notes pulled straight from CHANGELOG.md.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create/update Version Packages PR
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm version-packages
+          commit: "chore: version packages"
+          title: "chore: version packages"
+
+      # changesets/action opens or updates a PR whenever changesets are
+      # pending, and sets pullRequestNumber when it does. The one push
+      # where it does *not* — no pending changesets, nothing to open —
+      # is the push that just merged that same PR, which is exactly the
+      # push that should become a release.
+      - name: Check whether this push cut a new, untagged version
+        id: check_version
+        if: steps.changesets.outputs.pullRequestNumber == ''
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "is_new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_new=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract this version's release notes from CHANGELOG.md
+        if: steps.check_version.outputs.is_new == 'true'
+        run: |
+          node scripts/extract-changelog-section.mjs "${{ steps.check_version.outputs.version }}" > /tmp/release-notes.md
+
+      - name: Create the tag and GitHub release
+        if: steps.check_version.outputs.is_new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.check_version.outputs.version }}" \
+            --title "v${{ steps.check_version.outputs.version }}" \
+            --notes-file /tmp/release-notes.md
