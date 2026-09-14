@@ -4,11 +4,13 @@
 [![CI](https://github.com/jshields-ca/latestarr/actions/workflows/ci.yml/badge.svg)](https://github.com/jshields-ca/latestarr/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
+<img src="docs/assets/social-preview.png" alt="LatestArr — self-hosted digest newsletters for Plex, books, audiobooks & games" width="100%" />
+
 **LatestArr** is a self-hosted, open-source "new content" newsletter tool for the self-hosted media ecosystem — the *arr stack and friends. It connects to your existing media servers, pulls in whatever movies, TV episodes, books, audiobooks, and games were recently added, and sends a fully custom-branded HTML digest to your users on a schedule you control.
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
 
-> **Status (v0.1.0, Phase 3 underway):** the backend engine is complete and functional end-to-end, and the admin WebUI can now drive all of it — sign in, connect a Tautulli server, add recipients and groups, configure SMTP, and build a newsletter (linked sources, recipient groups, schedule, manual send, send history), all from the browser. The production Docker image serves the WebUI too, not just the API. Still to come: the drag-and-drop template builder and an accessibility CI pass (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
+> **Status (v0.2.0, Phase 5 underway):** the backend engine, admin WebUI, and drag-and-drop template builder are all complete and wired end-to-end — connect sources, manage recipients/SMTP/newsletters, design templates visually, and send on schedule, all from the browser. All planned v1 source adapters (Tautulli, direct Plex, BookLore-family, Audiobookshelf, RomM) are implemented. Currently working through security/accessibility hardening and polish ahead of a 1.0 release (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
 
 ## Why LatestArr?
 
@@ -24,12 +26,12 @@ It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter featur
 | Source | Content type | Status |
 | --- | --- | --- |
 | [Tautulli](https://tautulli.com/) | Movies, TV | ✅ Implemented |
-| Plex (direct) | Movies, TV | Planned (v1) |
-| [BookLore](https://github.com/booklore-app/booklore) | Books | Planned (v1) |
-| [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | Planned (v1) |
-| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | Planned (v1) |
-| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks | Planned (v1) |
-| [RomM](https://github.com/rommapp/romm) | Games | Planned (v1) |
+| Plex (direct) | Movies, TV | ✅ Implemented |
+| [BookLore](https://github.com/booklore-app/booklore) | Books | ✅ Implemented |
+| [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | ✅ Implemented |
+| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | ✅ Implemented |
+| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks | ✅ Implemented |
+| [RomM](https://github.com/rommapp/romm) | Games | ✅ Implemented |
 | Kavita, Komga, Calibre-Web, Jellyfin/Emby, Immich, ... | Various | Under consideration, post-v1 |
 
 New sources are added via a self-contained adapter interface — see [`CONTRIBUTING.md`](CONTRIBUTING.md) if you'd like to add support for something not listed here.
@@ -41,13 +43,17 @@ Development is happening in phases. Versions follow [semver](https://semver.org/
 1. ✅ **Repo hygiene & scaffolding** — docs, CI, monorepo skeleton. *(v0.1.0)*
 2. ✅ **Auth + data model + first adapter** — local/OIDC auth, core schema, Tautulli integration end-to-end. *(v0.1.0)*
 3. ✅ **Scheduler + email delivery MVP** — automated digest sends with a fixed starter template. *(v0.1.0)*
-4. 🚧 **Frontend WebUI + drag-and-drop template builder** *(current)* — an admin UI for everything above (Tailwind + Radix + Lucide, dark-mode-first, mobile-responsive), plus the no-code visual editor and custom content blocks replacing the hardcoded starter template.
-5. **Remaining v1 adapters** — direct Plex, BookLore-family, Audiobookshelf, RomM.
-6. **Hardening & polish** — security audit, accessibility audit, scale options, 1.0 release.
+4. ✅ **Frontend WebUI + drag-and-drop template builder** — the full admin UI (Tailwind + Radix + Lucide, dark-mode-first, mobile-responsive), the no-code visual editor, and the "Bloom" brand refresh. *(v0.2.0)*
+5. ✅ **Remaining v1 adapters** — direct Plex, BookLore-family, Audiobookshelf, RomM. *(v0.2.0)*
+6. 🚧 **Hardening & polish** *(current)* — security audit, accessibility audit, scale options, 1.0 release.
+
+### Releasing
+
+Releases are fully automated with [Changesets](https://github.com/changesets/changesets): a merged PR with a pending changeset queues a "Version Packages" PR, and merging that cuts a tagged GitHub Release with consolidated notes — no manual version bumps or tagging. See [`CONTRIBUTING.md`](CONTRIBUTING.md#versioning--releases) for the full mechanics, including how to add a changeset to your own PR.
 
 ## Getting started
 
-The backend and admin WebUI both run from a single container — build and run the Dockerfile in `docker/`, and the app is reachable on port 3000, WebUI included. It's not ready for non-technical end users yet: the drag-and-drop template builder (replacing the current hardcoded starter template) is still in progress, and there's no first-run setup guidance beyond the in-app "create the admin account" screen. A full self-hosting walkthrough (docker-compose, connecting a source, scheduling a newsletter) will land here once the builder ships.
+The backend and admin WebUI both run from a single container — build and run the Dockerfile in `docker/`, and the app is reachable on port 3000, WebUI included. It's not ready for non-technical end users yet: there's no first-run setup guidance beyond the in-app "create the admin account" screen, and the security/accessibility hardening pass (Phase 5) is still underway. A full self-hosting walkthrough (docker-compose, connecting a source, building a template, scheduling a newsletter) will land here ahead of the 1.0 release.
 
 ## Contributing
 
