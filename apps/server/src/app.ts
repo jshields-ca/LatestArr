@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import cookie from "@fastify/cookie";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import fastifyStatic from "@fastify/static";
 import { audiobookshelfAdapter } from "@latestarr/adapter-audiobookshelf";
 import { bookOrbitAdapter, bookloreAdapter, grimmoryAdapter } from "@latestarr/adapter-booklore-family";
@@ -11,6 +13,7 @@ import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
 import { loadOidcConfigFromEnv } from "./auth/oidc-config.js";
+import { requireSameOrigin } from "./http/require-same-origin.js";
 import { registerAuthRoutes } from "./http/routes/auth.js";
 import { registerNewsletterRoutes } from "./http/routes/newsletters.js";
 import { registerOidcRoutes } from "./http/routes/oidc.js";
@@ -50,6 +53,45 @@ export async function buildApp(
   const app = Fastify({ logger: true });
 
   await app.register(cookie);
+
+  // CSP allows what the admin WebUI actually needs: 'unsafe-inline' on
+  // style-src for Radix's inline positioning styles and the GrapesJS
+  // template builder, which injects <style> tags into its own same-origin
+  // canvas iframe as a user edits — there's no way to do live style
+  // editing under a strict style-src. cdnjs.cloudflare.com is GrapesJS's
+  // own hardcoded Font Awesome stylesheet (its default panel/block icons
+  // depend on it, confirmed by loading the builder in a browser and
+  // watching for CSP violations — GrapesJS injects that <link> itself,
+  // not something this app can avoid short of replacing its default UI
+  // icon set). crossOriginEmbedderPolicy is off because it would otherwise
+  // block the Google Fonts stylesheet (no CORP header) used for the
+  // "LatestArr" wordmark.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+        imgSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  });
+
+  // Generous global default (this is a low-traffic admin tool, not a
+  // public API, so the limit exists to blunt abuse/bugs, not to throttle
+  // normal use); auth routes get a much stricter per-route override below
+  // since they're the realistic brute-force target.
+  await app.register(rateLimit, { max: 300, timeWindow: "1 minute" });
+
+  // Same-origin check on every mutating request (see require-same-origin.ts
+  // for why this is the CSRF defense here instead of a token).
+  app.addHook("preHandler", requireSameOrigin());
 
   app.get("/health", async () => ({ status: "ok" }));
 
