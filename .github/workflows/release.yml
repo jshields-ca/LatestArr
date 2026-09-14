@@ -42,20 +42,21 @@ jobs:
 
       - name: Create/update Version Packages PR
         id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
-          version: pnpm version-packages
-          commit: "chore: version packages"
-          title: "chore: version packages"
+          version-script: pnpm version-packages
+          commit-message: "chore: version packages"
+          pr-title: "chore: version packages"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # changesets/action opens or updates a PR whenever changesets are
-      # pending, and sets pullRequestNumber when it does. The one push
-      # where it does *not* — no pending changesets, nothing to open —
-      # is the push that just merged that same PR, which is exactly the
-      # push that should become a release.
+      # pending, and sets pr-number when it does. The one push where it
+      # does *not* — no pending changesets, nothing to open — is the
+      # push that just merged that same PR, which is exactly the push
+      # that should become a release.
       - name: Check whether this push cut a new, untagged version
         id: check_version
-        if: steps.changesets.outputs.pullRequestNumber == ''
+        if: steps.changesets.outputs.pr-number == ''
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
