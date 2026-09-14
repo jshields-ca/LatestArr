@@ -10,7 +10,7 @@
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
 
-> **Status (v0.2.0):** the backend engine, admin WebUI, and drag-and-drop template builder are all complete and wired end-to-end — connect sources, manage recipients/SMTP/newsletters, design templates visually, and send on schedule, all from the browser. All planned v1 source adapters (Tautulli, direct Plex, BookLore-family, Audiobookshelf, RomM) are implemented. Currently building out first-run onboarding (a real setup dashboard, a docker-compose quick start) ahead of a `0.9.x` beta-testing cycle and a security/accessibility hardening pass before 1.0 (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
+> **Status (v0.3.0):** the backend engine, admin WebUI, drag-and-drop template builder, and first-run onboarding are all complete and wired end-to-end — connect sources, manage recipients/SMTP/newsletters, design templates visually, and send on schedule, all from the browser. All planned v1 source adapters (Tautulli, direct Plex, BookLore-family, Audiobookshelf, RomM) are implemented. Currently in the hardening & polish phase ahead of `1.0`: security headers/rate limiting/CSRF, zod input validation, missed-schedule catch-up, and an accessibility pass are done; deliverability docs are done (see [`docs/deliverability.md`](docs/deliverability.md)); scale options (optional Postgres/Redis) remain (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
 
 ## Why LatestArr?
 
@@ -45,8 +45,8 @@ Development is happening in phases. Versions follow [semver](https://semver.org/
 3. ✅ **Scheduler + email delivery MVP** — automated digest sends with a fixed starter template. *(v0.1.0)*
 4. ✅ **Frontend WebUI + drag-and-drop template builder** — the full admin UI (Tailwind + Radix + Lucide, dark-mode-first, mobile-responsive), the no-code visual editor, and the "Bloom" brand refresh. *(v0.2.0)*
 5. ✅ **Remaining v1 adapters** — direct Plex, BookLore-family, Audiobookshelf, RomM. *(v0.2.0)*
-6. 🚧 **Onboarding & first-run experience** *(current)* — a docker-compose quick start, a real dashboard with a setup checklist and recent-send activity, and guided empty states across the admin screens, so a new self-hoster can go from a fresh install to a first sent newsletter without reading source code.
-7. **Hardening & polish** — security audit, accessibility audit, scale options, 1.0 release.
+6. ✅ **Onboarding & first-run experience** — a docker-compose quick start, a real dashboard with a setup checklist and recent-send activity, and guided empty states across the admin screens, so a new self-hoster can go from a fresh install to a first sent newsletter without reading source code. *(v0.3.0)*
+7. 🚧 **Hardening & polish** *(current)* — security headers, rate limiting, and CSRF protection; zod input validation on every route; missed-schedule catch-up for the scheduler; an accessibility pass (keyboard-operable template builder, a WCAG AA contrast audit); self-hosting and deliverability docs. Scale options (optional Postgres/Redis) remain before `1.0`.
 
 ### Releasing
 
@@ -64,7 +64,7 @@ docker compose up -d
 
 Then visit `http://localhost:3000`, create the admin account, and the dashboard's setup checklist walks you through connecting a source, adding recipients, configuring SMTP, and creating your first newsletter — no separate wizard, just the admin screens themselves in a sensible order.
 
-This is still pre-1.0: OIDC/SSO setup, SMTP-provider-specific guidance (Gmail app passwords, etc.), and a full security/accessibility hardening pass are ahead of a `1.0` release. See [`.env.example`](.env.example) for every supported environment variable.
+See [`.env.example`](.env.example) for every supported environment variable, [`docs/self-hosting.md`](docs/self-hosting.md) for the full walkthrough (reverse proxy setup, OIDC/SSO, backups, upgrades), and [`docs/deliverability.md`](docs/deliverability.md) for why digest emails land in spam without SPF/DKIM/DMARC and how to set them up.
 
 ## Contributing
 
