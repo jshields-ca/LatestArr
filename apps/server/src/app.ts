@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
+import { audiobookshelfAdapter } from "@latestarr/adapter-audiobookshelf";
 import { bookOrbitAdapter, bookloreAdapter, grimmoryAdapter } from "@latestarr/adapter-booklore-family";
 import { registerAdapter } from "@latestarr/adapter-core";
 import { plexAdapter } from "@latestarr/adapter-plex";
@@ -24,6 +25,7 @@ registerAdapter(plexAdapter);
 registerAdapter(bookloreAdapter);
 registerAdapter(bookOrbitAdapter);
 registerAdapter(grimmoryAdapter);
+registerAdapter(audiobookshelfAdapter);
 
 export interface BuildAppOptions {
   // Directory containing the built admin WebUI (apps/web's `dist`), served

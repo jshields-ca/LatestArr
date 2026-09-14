@@ -14,6 +14,7 @@
   "dependencies": {
     "@fastify/cookie": "^11.0.0",
     "@fastify/static": "^10.1.3",
+    "@latestarr/adapter-audiobookshelf": "workspace:*",
     "@latestarr/adapter-booklore-family": "workspace:*",
     "@latestarr/adapter-core": "workspace:*",
     "@latestarr/adapter-plex": "workspace:*",
