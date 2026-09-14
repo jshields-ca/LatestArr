@@ -104,6 +104,31 @@ describe("POST /sources", () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it("rejects credentials of the wrong type instead of coercing them", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "x",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local",
+        credentials: { apiKey: 12345 },
+      },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects a baseUrl that isn't a valid URL", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: { name: "x", kind: "tautulli", baseUrl: "not-a-url", credentials: {} },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
   it("creates a source and never returns the encrypted credentials", async () => {
     const response = await app.inject({
       method: "POST",

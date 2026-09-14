@@ -6,18 +6,24 @@ import {
 } from "@latestarr/db";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
 import { requireAuth } from "../require-auth.js";
+import { parseBody } from "../validate.js";
 
-interface CreateGroupBody {
-  name?: string;
-  description?: string;
-}
+const createGroupSchema = z.object({
+  name: z.string().trim().min(1, "name is required"),
+  description: z.string().trim().min(1).optional(),
+});
 
-interface UpdateGroupBody {
-  name?: string;
-  description?: string;
-}
+const updateGroupSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).optional(),
+});
+
+const addMemberSchema = z.object({
+  recipientId: z.string().min(1, "recipientId is required"),
+});
 
 interface IdParams {
   id: string;
@@ -28,21 +34,18 @@ interface GroupMemberParams {
   recipientId: string;
 }
 
-interface AddMemberBody {
-  recipientId?: string;
-}
-
 export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db));
 
-    scope.post<{ Body: CreateGroupBody }>("/recipient-groups", async (request, reply) => {
-      const { name, description } = request.body ?? {};
-      if (!name) {
-        return reply.code(400).send({ error: "name is required" });
-      }
+    scope.post("/recipient-groups", async (request, reply) => {
+      const body = parseBody(createGroupSchema, request.body, reply);
+      if (!body) return reply;
 
-      const [group] = await db.insert(recipientGroups).values({ name, description }).returning();
+      const [group] = await db
+        .insert(recipientGroups)
+        .values({ name: body.name, description: body.description })
+        .returning();
       return reply.code(201).send({ group });
     });
 
@@ -69,38 +72,37 @@ export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void
       return reply.send({ group, members: members.map((row) => row.recipient) });
     });
 
-    scope.patch<{ Params: IdParams; Body: UpdateGroupBody }>(
-      "/recipient-groups/:id",
-      async (request, reply) => {
-        const { name, description } = request.body ?? {};
-        const [group] = await db
-          .update(recipientGroups)
-          .set({
-            ...(name !== undefined && { name }),
-            ...(description !== undefined && { description }),
-          })
-          .where(eq(recipientGroups.id, request.params.id))
-          .returning();
+    scope.patch<{ Params: IdParams }>("/recipient-groups/:id", async (request, reply) => {
+      const body = parseBody(updateGroupSchema, request.body, reply);
+      if (!body) return reply;
+      const { name, description } = body;
 
-        if (!group) {
-          return reply.code(404).send({ error: "Not found" });
-        }
-        return reply.send({ group });
-      },
-    );
+      const [group] = await db
+        .update(recipientGroups)
+        .set({
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+        })
+        .where(eq(recipientGroups.id, request.params.id))
+        .returning();
+
+      if (!group) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+      return reply.send({ group });
+    });
 
     scope.delete<{ Params: IdParams }>("/recipient-groups/:id", async (request, reply) => {
       await db.delete(recipientGroups).where(eq(recipientGroups.id, request.params.id));
       return reply.code(204).send();
     });
 
-    scope.post<{ Params: IdParams; Body: AddMemberBody }>(
+    scope.post<{ Params: IdParams }>(
       "/recipient-groups/:id/members",
       async (request, reply) => {
-        const { recipientId } = request.body ?? {};
-        if (!recipientId) {
-          return reply.code(400).send({ error: "recipientId is required" });
-        }
+        const body = parseBody(addMemberSchema, request.body, reply);
+        if (!body) return reply;
+        const { recipientId } = body;
 
         const [group] = await db
           .select()

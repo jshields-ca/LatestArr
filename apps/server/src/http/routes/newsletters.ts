@@ -9,6 +9,7 @@ import {
 } from "@latestarr/db";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import {
   NewsletterMisconfiguredError,
   NewsletterNotFoundError,
@@ -19,53 +20,54 @@ import type { SchedulerHandle } from "../../scheduler/engine.js";
 import { refreshScheduler } from "../../scheduler/engine.js";
 import { isUniqueConstraintError } from "../db-errors.js";
 import { requireAuth } from "../require-auth.js";
+import { parseBody } from "../validate.js";
 
-interface SenderIdentity {
-  fromName?: string;
-  fromEmail?: string;
-  replyTo?: string;
-}
+const senderIdentitySchema = z.object({
+  fromName: z.string().trim().min(1).optional(),
+  fromEmail: z.email().optional(),
+  replyTo: z.email().optional(),
+});
 
-interface CreateNewsletterBody {
-  name?: string;
-  scheduleCron?: string;
-  timezone?: string;
-  subjectTemplate?: string;
-  lookbackDays?: number;
-  smtpProfileId?: string;
-  templateId?: string;
-  senderIdentity?: SenderIdentity;
-}
+const createNewsletterSchema = z.object({
+  name: z.string().trim().min(1, "name and scheduleCron are required"),
+  scheduleCron: z.string().trim().min(1, "name and scheduleCron are required"),
+  timezone: z.string().trim().min(1).optional(),
+  subjectTemplate: z.string().optional(),
+  lookbackDays: z.number().int().positive().optional(),
+  smtpProfileId: z.string().min(1).optional(),
+  templateId: z.string().min(1).optional(),
+  senderIdentity: senderIdentitySchema.optional(),
+});
 
-interface UpdateNewsletterBody {
-  name?: string;
-  scheduleCron?: string;
-  timezone?: string;
-  subjectTemplate?: string;
-  lookbackDays?: number;
-  isEnabled?: boolean;
-  smtpProfileId?: string | null;
-  templateId?: string | null;
-  senderIdentity?: SenderIdentity;
-}
+const updateNewsletterSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  scheduleCron: z.string().trim().min(1).optional(),
+  timezone: z.string().trim().min(1).optional(),
+  subjectTemplate: z.string().optional(),
+  lookbackDays: z.number().int().positive().optional(),
+  isEnabled: z.boolean().optional(),
+  smtpProfileId: z.string().min(1).nullable().optional(),
+  templateId: z.string().min(1).nullable().optional(),
+  senderIdentity: senderIdentitySchema.optional(),
+});
+
+const addSourceSchema = z.object({
+  sourceConnectionId: z.string().min(1, "sourceConnectionId is required"),
+  mediaTypeFilter: z.array(z.string()).optional(),
+  libraryFilter: z.array(z.string()).optional(),
+});
+
+const addRecipientGroupSchema = z.object({
+  groupId: z.string().min(1, "groupId is required"),
+});
 
 interface IdParams {
   id: string;
 }
 
-interface AddSourceBody {
-  sourceConnectionId?: string;
-  mediaTypeFilter?: string[];
-  libraryFilter?: string[];
-}
-
 interface NewsletterSourceParams {
   id: string;
   sourceConnectionId: string;
-}
-
-interface AddRecipientGroupBody {
-  groupId?: string;
 }
 
 interface NewsletterGroupParams {
@@ -83,7 +85,9 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db));
 
-    scope.post<{ Body: CreateNewsletterBody }>("/newsletters", async (request, reply) => {
+    scope.post("/newsletters", async (request, reply) => {
+      const body = parseBody(createNewsletterSchema, request.body, reply);
+      if (!body) return reply;
       const {
         name,
         scheduleCron,
@@ -93,10 +97,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         smtpProfileId,
         templateId,
         senderIdentity,
-      } = request.body ?? {};
-      if (!name || !scheduleCron) {
-        return reply.code(400).send({ error: "name and scheduleCron are required" });
-      }
+      } = body;
 
       const [newsletter] = await db
         .insert(newsletters)
@@ -153,45 +154,44 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       });
     });
 
-    scope.patch<{ Params: IdParams; Body: UpdateNewsletterBody }>(
-      "/newsletters/:id",
-      async (request, reply) => {
-        const {
-          name,
-          scheduleCron,
-          timezone,
-          subjectTemplate,
-          lookbackDays,
-          isEnabled,
-          smtpProfileId,
-          templateId,
-          senderIdentity,
-        } = request.body ?? {};
+    scope.patch<{ Params: IdParams }>("/newsletters/:id", async (request, reply) => {
+      const body = parseBody(updateNewsletterSchema, request.body, reply);
+      if (!body) return reply;
+      const {
+        name,
+        scheduleCron,
+        timezone,
+        subjectTemplate,
+        lookbackDays,
+        isEnabled,
+        smtpProfileId,
+        templateId,
+        senderIdentity,
+      } = body;
 
-        const [newsletter] = await db
-          .update(newsletters)
-          .set({
-            ...(name !== undefined && { name }),
-            ...(scheduleCron !== undefined && { scheduleCron }),
-            ...(timezone !== undefined && { timezone }),
-            ...(subjectTemplate !== undefined && { subjectTemplate }),
-            ...(lookbackDays !== undefined && { lookbackDays }),
-            ...(isEnabled !== undefined && { isEnabled }),
-            ...(smtpProfileId !== undefined && { smtpProfileId }),
-            ...(templateId !== undefined && { templateId }),
-            ...(senderIdentity !== undefined && { senderIdentity }),
-            updatedAt: new Date(),
-          })
-          .where(eq(newsletters.id, request.params.id))
-          .returning();
+      const [newsletter] = await db
+        .update(newsletters)
+        .set({
+          ...(name !== undefined && { name }),
+          ...(scheduleCron !== undefined && { scheduleCron }),
+          ...(timezone !== undefined && { timezone }),
+          ...(subjectTemplate !== undefined && { subjectTemplate }),
+          ...(lookbackDays !== undefined && { lookbackDays }),
+          ...(isEnabled !== undefined && { isEnabled }),
+          ...(smtpProfileId !== undefined && { smtpProfileId }),
+          ...(templateId !== undefined && { templateId }),
+          ...(senderIdentity !== undefined && { senderIdentity }),
+          updatedAt: new Date(),
+        })
+        .where(eq(newsletters.id, request.params.id))
+        .returning();
 
-        if (!newsletter) {
-          return reply.code(404).send({ error: "Not found" });
-        }
-        await refreshSchedule();
-        return reply.send({ newsletter });
-      },
-    );
+      if (!newsletter) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+      await refreshSchedule();
+      return reply.send({ newsletter });
+    });
 
     scope.delete<{ Params: IdParams }>("/newsletters/:id", async (request, reply) => {
       await db.delete(newsletters).where(eq(newsletters.id, request.params.id));
@@ -199,13 +199,12 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       return reply.code(204).send();
     });
 
-    scope.post<{ Params: IdParams; Body: AddSourceBody }>(
+    scope.post<{ Params: IdParams }>(
       "/newsletters/:id/sources",
       async (request, reply) => {
-        const { sourceConnectionId, mediaTypeFilter, libraryFilter } = request.body ?? {};
-        if (!sourceConnectionId) {
-          return reply.code(400).send({ error: "sourceConnectionId is required" });
-        }
+        const body = parseBody(addSourceSchema, request.body, reply);
+        if (!body) return reply;
+        const { sourceConnectionId, mediaTypeFilter, libraryFilter } = body;
 
         const [newsletter] = await db
           .select()
@@ -256,13 +255,12 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       },
     );
 
-    scope.post<{ Params: IdParams; Body: AddRecipientGroupBody }>(
+    scope.post<{ Params: IdParams }>(
       "/newsletters/:id/recipient-groups",
       async (request, reply) => {
-        const { groupId } = request.body ?? {};
-        if (!groupId) {
-          return reply.code(400).send({ error: "groupId is required" });
-        }
+        const body = parseBody(addRecipientGroupSchema, request.body, reply);
+        if (!body) return reply;
+        const { groupId } = body;
 
         const [newsletter] = await db
           .select()

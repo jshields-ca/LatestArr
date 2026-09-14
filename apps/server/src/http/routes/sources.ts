@@ -3,8 +3,10 @@ import { decrypt, encrypt } from "@latestarr/crypto";
 import { type Db, sourceConnections } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { getEncryptionKey } from "../../secrets.js";
 import { requireAuth } from "../require-auth.js";
+import { parseBody } from "../validate.js";
 
 type SelectedSourceConnection = typeof sourceConnections.$inferSelect;
 
@@ -19,12 +21,12 @@ function decryptCredentials(row: SelectedSourceConnection): Record<string, strin
   ) as Record<string, string>;
 }
 
-interface CreateSourceBody {
-  name?: string;
-  kind?: string;
-  baseUrl?: string;
-  credentials?: Record<string, string>;
-}
+const createSourceSchema = z.object({
+  name: z.string().trim().min(1, "name is required"),
+  kind: z.string().trim().min(1, "kind is required"),
+  baseUrl: z.url("baseUrl must be a valid URL"),
+  credentials: z.record(z.string(), z.string()),
+});
 
 interface IdParams {
   id: string;
@@ -37,13 +39,11 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db));
 
-    scope.post<{ Body: CreateSourceBody }>("/sources", async (request, reply) => {
-      const { name, kind, baseUrl, credentials } = request.body ?? {};
-      if (!name || !kind || !baseUrl || !credentials) {
-        return reply
-          .code(400)
-          .send({ error: "name, kind, baseUrl, and credentials are required" });
-      }
+    scope.post("/sources", async (request, reply) => {
+      const body = parseBody(createSourceSchema, request.body, reply);
+      if (!body) return reply;
+      const { name, kind, baseUrl, credentials } = body;
+
       if (!getAdapter(kind)) {
         return reply.code(400).send({ error: `Unknown source kind: ${kind}` });
       }

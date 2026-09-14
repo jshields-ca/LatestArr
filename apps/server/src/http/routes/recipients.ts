@@ -1,34 +1,33 @@
 import { type Db, recipients } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
 import { requireAuth } from "../require-auth.js";
+import { parseBody } from "../validate.js";
 
-interface CreateRecipientBody {
-  email?: string;
-  displayName?: string;
-}
+const createRecipientSchema = z.object({
+  email: z.email("A valid email is required"),
+  displayName: z.string().trim().min(1).optional(),
+});
 
-interface UpdateRecipientBody {
-  displayName?: string;
-  isActive?: boolean;
-}
+const updateRecipientSchema = z.object({
+  displayName: z.string().trim().min(1).optional(),
+  isActive: z.boolean().optional(),
+});
 
 interface IdParams {
   id: string;
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db));
 
-    scope.post<{ Body: CreateRecipientBody }>("/recipients", async (request, reply) => {
-      const { email, displayName } = request.body ?? {};
-      if (!email || !EMAIL_PATTERN.test(email)) {
-        return reply.code(400).send({ error: "A valid email is required" });
-      }
+    scope.post("/recipients", async (request, reply) => {
+      const body = parseBody(createRecipientSchema, request.body, reply);
+      if (!body) return reply;
+      const { email, displayName } = body;
 
       try {
         const [recipient] = await db.insert(recipients).values({ email, displayName }).returning();
@@ -57,25 +56,25 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
       return reply.send({ recipient });
     });
 
-    scope.patch<{ Params: IdParams; Body: UpdateRecipientBody }>(
-      "/recipients/:id",
-      async (request, reply) => {
-        const { displayName, isActive } = request.body ?? {};
-        const [recipient] = await db
-          .update(recipients)
-          .set({
-            ...(displayName !== undefined && { displayName }),
-            ...(isActive !== undefined && { isActive }),
-          })
-          .where(eq(recipients.id, request.params.id))
-          .returning();
+    scope.patch<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {
+      const body = parseBody(updateRecipientSchema, request.body, reply);
+      if (!body) return reply;
+      const { displayName, isActive } = body;
 
-        if (!recipient) {
-          return reply.code(404).send({ error: "Not found" });
-        }
-        return reply.send({ recipient });
-      },
-    );
+      const [recipient] = await db
+        .update(recipients)
+        .set({
+          ...(displayName !== undefined && { displayName }),
+          ...(isActive !== undefined && { isActive }),
+        })
+        .where(eq(recipients.id, request.params.id))
+        .returning();
+
+      if (!recipient) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+      return reply.send({ recipient });
+    });
 
     scope.delete<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {
       await db.delete(recipients).where(eq(recipients.id, request.params.id));

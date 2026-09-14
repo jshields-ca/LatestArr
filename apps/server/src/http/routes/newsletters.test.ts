@@ -88,6 +88,17 @@ describe("POST /newsletters", () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it("rejects a lookbackDays of the wrong type instead of coercing it", async () => {
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1", lookbackDays: "seven" },
+      }),
+    );
+    expect(response.statusCode).toBe(400);
+  });
+
   it("creates a newsletter with defaults applied", async () => {
     const response = await app.inject(
       authed({

@@ -79,6 +79,17 @@ describe("POST /smtp-profiles", () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it("rejects a port of the wrong type instead of coercing it", async () => {
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/smtp-profiles",
+        payload: { ...validPayload, port: "587" },
+      }),
+    );
+    expect(response.statusCode).toBe(400);
+  });
+
   it("creates a profile and never returns the encrypted auth fields", async () => {
     const response = await app.inject(
       authed({ method: "POST", url: "/api/smtp-profiles", payload: validPayload }),
