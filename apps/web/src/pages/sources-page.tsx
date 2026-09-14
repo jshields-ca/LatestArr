@@ -16,14 +16,90 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   ApiError,
   createSource,
   deleteSource,
+  listSourceKinds,
   listSources,
   testSourceConnection,
   type SourceConnection,
 } from "@/lib/api";
+
+interface SourceKindField {
+  key: string;
+  label: string;
+  type?: string;
+}
+
+interface SourceKindConfig {
+  label: string;
+  description: string;
+  fields: SourceKindField[];
+}
+
+// The SourceAdapter contract takes an opaque Record<string, string> of
+// credentials, so field metadata (labels, how many fields, which are
+// secrets) isn't discoverable from the server — it's tracked here per kind.
+// A kind the server registers but that's missing from this map still works,
+// falling back to a single generic "API key" field.
+const KIND_CONFIG: Record<string, SourceKindConfig> = {
+  tautulli: {
+    label: "Tautulli",
+    description: "Connect a Tautulli server for Plex activity data.",
+    fields: [{ key: "apiKey", label: "Tautulli API key", type: "password" }],
+  },
+  plex: {
+    label: "Plex",
+    description: "Connect directly to a Plex Media Server.",
+    fields: [{ key: "token", label: "Plex token", type: "password" }],
+  },
+  booklore: {
+    label: "BookLore",
+    description: "Connect to a BookLore OPDS catalog.",
+    fields: [
+      { key: "username", label: "OPDS username" },
+      { key: "password", label: "OPDS password", type: "password" },
+    ],
+  },
+  bookorbit: {
+    label: "BookOrbit",
+    description: "Connect to a BookOrbit OPDS catalog.",
+    fields: [
+      { key: "username", label: "OPDS username" },
+      { key: "password", label: "OPDS password", type: "password" },
+    ],
+  },
+  grimmory: {
+    label: "Grimmory",
+    description: "Connect to a Grimmory OPDS catalog.",
+    fields: [
+      { key: "username", label: "OPDS username" },
+      { key: "password", label: "OPDS password", type: "password" },
+    ],
+  },
+  audiobookshelf: {
+    label: "Audiobookshelf",
+    description: "Connect to an Audiobookshelf server.",
+    fields: [{ key: "token", label: "Audiobookshelf API token", type: "password" }],
+  },
+  romm: {
+    label: "RomM",
+    description: "Connect to a RomM server.",
+    fields: [{ key: "token", label: "RomM client API token", type: "password" }],
+  },
+};
+
+const FALLBACK_CONFIG: SourceKindConfig = {
+  label: "Source",
+  description: "Connect a media source.",
+  fields: [{ key: "apiKey", label: "API key", type: "password" }],
+};
+
+// Used before the server's own list of registered kinds has loaded, so the
+// dialog is usable immediately rather than waiting on a second request.
+const FALLBACK_KINDS = Object.keys(KIND_CONFIG);
 
 function StatusBadge({ status }: { status: SourceConnection["status"] }) {
   if (status === "ok") return <Badge variant="success">Connected</Badge>;
@@ -31,19 +107,34 @@ function StatusBadge({ status }: { status: SourceConnection["status"] }) {
   return <Badge variant="neutral">Not yet tested</Badge>;
 }
 
-function AddSourceDialog({ onCreated }: { onCreated: (source: SourceConnection) => void }) {
+function AddSourceDialog({
+  kinds,
+  onCreated,
+}: {
+  kinds: string[];
+  onCreated: (source: SourceConnection) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
+  const [kind, setKind] = useState(kinds[0] ?? "tautulli");
+  const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const config = KIND_CONFIG[kind] ?? FALLBACK_CONFIG;
 
   function reset() {
     setName("");
     setBaseUrl("");
-    setApiKey("");
+    setKind(kinds[0] ?? "tautulli");
+    setCredentialValues({});
     setError(null);
+  }
+
+  function handleKindChange(nextKind: string) {
+    setKind(nextKind);
+    setCredentialValues({});
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -53,9 +144,9 @@ function AddSourceDialog({ onCreated }: { onCreated: (source: SourceConnection) 
     try {
       const { source } = await createSource({
         name,
-        kind: "tautulli",
+        kind,
         baseUrl,
-        credentials: { apiKey },
+        credentials: credentialValues,
       });
       onCreated(source);
       setOpen(false);
@@ -84,11 +175,24 @@ function AddSourceDialog({ onCreated }: { onCreated: (source: SourceConnection) 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a source</DialogTitle>
-          <DialogDescription>
-            Connect a Tautulli server. Support for more source types is planned.
-          </DialogDescription>
+          <DialogDescription>{config.description}</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="source-kind">Source type</Label>
+            <Select
+              id="source-kind"
+              value={kind}
+              onChange={(e) => handleKindChange(e.target.value)}
+              disabled={submitting}
+            >
+              {kinds.map((k) => (
+                <option key={k} value={k}>
+                  {KIND_CONFIG[k]?.label ?? k}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="source-name">Name</Label>
             <Input
@@ -112,17 +216,21 @@ function AddSourceDialog({ onCreated }: { onCreated: (source: SourceConnection) 
               disabled={submitting}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="source-api-key">Tautulli API key</Label>
-            <Input
-              id="source-api-key"
-              type="password"
-              required
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              disabled={submitting}
-            />
-          </div>
+          {config.fields.map((field) => (
+            <div className="flex flex-col gap-1.5" key={field.key}>
+              <Label htmlFor={`source-field-${field.key}`}>{field.label}</Label>
+              <Input
+                id={`source-field-${field.key}`}
+                type={field.type ?? "text"}
+                required
+                value={credentialValues[field.key] ?? ""}
+                onChange={(e) =>
+                  setCredentialValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                }
+                disabled={submitting}
+              />
+            </div>
+          ))}
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
@@ -254,12 +362,21 @@ function SourceRow({
 
 export function SourcesPage() {
   const [sources, setSources] = useState<SourceConnection[] | null>(null);
+  const [kinds, setKinds] = useState<string[]>(FALLBACK_KINDS);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     listSources()
       .then(({ sources: loaded }) => setSources(loaded))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load sources."));
+    // A failure here just keeps the FALLBACK_KINDS default — it shouldn't
+    // block the sources list (the more important half of this page) from
+    // loading.
+    listSourceKinds()
+      .then(({ kinds: loaded }) => {
+        if (loaded.length > 0) setKinds(loaded);
+      })
+      .catch(() => undefined);
   }, []);
 
   return (
@@ -272,7 +389,10 @@ export function SourcesPage() {
           </p>
         </div>
         {sources ? (
-          <AddSourceDialog onCreated={(source) => setSources((prev) => [...(prev ?? []), source])} />
+          <AddSourceDialog
+            kinds={kinds}
+            onCreated={(source) => setSources((prev) => [...(prev ?? []), source])}
+          />
         ) : null}
       </div>
 

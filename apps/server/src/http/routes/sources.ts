@@ -1,4 +1,4 @@
-import { getAdapter } from "@latestarr/adapter-core";
+import { getAdapter, listAdapterKinds } from "@latestarr/adapter-core";
 import { decrypt, encrypt } from "@latestarr/crypto";
 import { type Db, sourceConnections } from "@latestarr/db";
 import { eq } from "drizzle-orm";
@@ -60,6 +60,12 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
     scope.get("/sources", async (_request, reply) => {
       const rows = await db.select().from(sourceConnections);
       return reply.send({ sources: rows.map(sanitize) });
+    });
+
+    // Static route, so it's matched ahead of the "/sources/:id" param route
+    // below regardless of registration order.
+    scope.get("/sources/kinds", async (_request, reply) => {
+      return reply.send({ kinds: listAdapterKinds() });
     });
 
     scope.get<{ Params: IdParams }>("/sources/:id", async (request, reply) => {

@@ -61,6 +61,28 @@ describe("auth gating", () => {
   });
 });
 
+describe("GET /sources/kinds", () => {
+  it("lists every registered adapter kind", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/sources/kinds",
+      cookies: { latestarr_session: sessionCookie },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().kinds).toEqual(
+      expect.arrayContaining([
+        "tautulli",
+        "plex",
+        "booklore",
+        "bookorbit",
+        "grimmory",
+        "audiobookshelf",
+        "romm",
+      ]),
+    );
+  });
+});
+
 describe("POST /sources", () => {
   it("rejects an unknown source kind", async () => {
     const response = await app.inject({
