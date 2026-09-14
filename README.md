@@ -10,7 +10,7 @@
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
 
-> **Status (v0.2.0, Phase 5 underway):** the backend engine, admin WebUI, and drag-and-drop template builder are all complete and wired end-to-end — connect sources, manage recipients/SMTP/newsletters, design templates visually, and send on schedule, all from the browser. All planned v1 source adapters (Tautulli, direct Plex, BookLore-family, Audiobookshelf, RomM) are implemented. Currently working through security/accessibility hardening and polish ahead of a 1.0 release (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
+> **Status (v0.2.0):** the backend engine, admin WebUI, and drag-and-drop template builder are all complete and wired end-to-end — connect sources, manage recipients/SMTP/newsletters, design templates visually, and send on schedule, all from the browser. All planned v1 source adapters (Tautulli, direct Plex, BookLore-family, Audiobookshelf, RomM) are implemented. Currently building out first-run onboarding (a real setup dashboard, a docker-compose quick start) ahead of a `0.9.x` beta-testing cycle and a security/accessibility hardening pass before 1.0 (see [Roadmap](#roadmap)). See [`CHANGELOG.md`](CHANGELOG.md) for what shipped in each release.
 
 ## Why LatestArr?
 
@@ -45,7 +45,8 @@ Development is happening in phases. Versions follow [semver](https://semver.org/
 3. ✅ **Scheduler + email delivery MVP** — automated digest sends with a fixed starter template. *(v0.1.0)*
 4. ✅ **Frontend WebUI + drag-and-drop template builder** — the full admin UI (Tailwind + Radix + Lucide, dark-mode-first, mobile-responsive), the no-code visual editor, and the "Bloom" brand refresh. *(v0.2.0)*
 5. ✅ **Remaining v1 adapters** — direct Plex, BookLore-family, Audiobookshelf, RomM. *(v0.2.0)*
-6. 🚧 **Hardening & polish** *(current)* — security audit, accessibility audit, scale options, 1.0 release.
+6. 🚧 **Onboarding & first-run experience** *(current)* — a docker-compose quick start, a real dashboard with a setup checklist and recent-send activity, and guided empty states across the admin screens, so a new self-hoster can go from a fresh install to a first sent newsletter without reading source code.
+7. **Hardening & polish** — security audit, accessibility audit, scale options, 1.0 release.
 
 ### Releasing
 
@@ -53,7 +54,17 @@ Releases are fully automated with [Changesets](https://github.com/changesets/cha
 
 ## Getting started
 
-The backend and admin WebUI both run from a single container — build and run the Dockerfile in `docker/`, and the app is reachable on port 3000, WebUI included. It's not ready for non-technical end users yet: there's no first-run setup guidance beyond the in-app "create the admin account" screen, and the security/accessibility hardening pass (Phase 5) is still underway. A full self-hosting walkthrough (docker-compose, connecting a source, building a template, scheduling a newsletter) will land here ahead of the 1.0 release.
+The backend and admin WebUI both run from a single container.
+
+```bash
+cp .env.example .env
+# Generate a value for ENCRYPTION_KEY in .env: openssl rand -base64 32
+docker compose up -d
+```
+
+Then visit `http://localhost:3000`, create the admin account, and the dashboard's setup checklist walks you through connecting a source, adding recipients, configuring SMTP, and creating your first newsletter — no separate wizard, just the admin screens themselves in a sensible order.
+
+This is still pre-1.0: OIDC/SSO setup, SMTP-provider-specific guidance (Gmail app passwords, etc.), and a full security/accessibility hardening pass are ahead of a `1.0` release. See [`.env.example`](.env.example) for every supported environment variable.
 
 ## Contributing
 

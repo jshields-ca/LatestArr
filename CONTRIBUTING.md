@@ -19,7 +19,7 @@ docker/                   Container build files
 
 ## Development setup
 
-Requirements: Node.js (see `.nvmrc`/`engines` once added) and [pnpm](https://pnpm.io/).
+Requirements: Node.js (see `.nvmrc`/`engines` for the version) and [pnpm](https://pnpm.io/).
 
 ```bash
 pnpm install
