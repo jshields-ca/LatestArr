@@ -6,7 +6,8 @@ import { ArrowLeft, Loader2, Save } from "lucide-react";
 
 import "grapesjs/dist/css/grapes.min.css";
 import { Button } from "@/components/ui/button";
-import { registerCustomBlocks } from "@/lib/grapesjs-blocks";
+import { makeGrapesJsKeyboardOperable } from "@/lib/grapesjs-a11y";
+import { applyClickToAddFallback, registerCustomBlocks } from "@/lib/grapesjs-blocks";
 import { ApiError, getTemplate, updateTemplate, type Template } from "@/lib/api";
 
 // A curated subset of the plugin's default MJML blocks — layout/content
@@ -46,14 +47,23 @@ export function TemplateEditorPage() {
       },
     });
     registerCustomBlocks(editor);
+    applyClickToAddFallback(editor);
 
     if (template.designJson) {
       editor.loadProjectData(template.designJson);
     }
 
+    // The block panel's block list only renders into the DOM the first
+    // time it's opened, well after "load" — the observer this returns
+    // (not just a one-time pass) is what catches that.
+    const stopWatchingForKeyboardOperability = containerRef.current
+      ? makeGrapesJsKeyboardOperable(containerRef.current)
+      : () => {};
+
     editorRef.current = editor;
 
     return () => {
+      stopWatchingForKeyboardOperability();
       editor.destroy();
       editorRef.current = null;
     };
