@@ -18,6 +18,7 @@
     "@latestarr/adapter-booklore-family": "workspace:*",
     "@latestarr/adapter-core": "workspace:*",
     "@latestarr/adapter-plex": "workspace:*",
+    "@latestarr/adapter-romm": "workspace:*",
     "@latestarr/adapter-tautulli": "workspace:*",
     "@latestarr/crypto": "workspace:*",
     "@latestarr/db": "workspace:*",

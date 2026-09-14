@@ -17,6 +17,7 @@ COPY packages/adapters/tautulli/package.json packages/adapters/tautulli/package.
 COPY packages/adapters/plex/package.json packages/adapters/plex/package.json
 COPY packages/adapters/booklore-family/package.json packages/adapters/booklore-family/package.json
 COPY packages/adapters/audiobookshelf/package.json packages/adapters/audiobookshelf/package.json
+COPY packages/adapters/romm/package.json packages/adapters/romm/package.json
 RUN pnpm install --frozen-lockfile
 
 # ---- build everything ---------------------------------------------------

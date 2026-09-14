@@ -6,6 +6,7 @@ import { audiobookshelfAdapter } from "@latestarr/adapter-audiobookshelf";
 import { bookOrbitAdapter, bookloreAdapter, grimmoryAdapter } from "@latestarr/adapter-booklore-family";
 import { registerAdapter } from "@latestarr/adapter-core";
 import { plexAdapter } from "@latestarr/adapter-plex";
+import { rommAdapter } from "@latestarr/adapter-romm";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -26,6 +27,7 @@ registerAdapter(bookloreAdapter);
 registerAdapter(bookOrbitAdapter);
 registerAdapter(grimmoryAdapter);
 registerAdapter(audiobookshelfAdapter);
+registerAdapter(rommAdapter);
 
 export interface BuildAppOptions {
   // Directory containing the built admin WebUI (apps/web's `dist`), served
