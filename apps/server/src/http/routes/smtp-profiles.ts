@@ -2,9 +2,11 @@ import { decrypt, encrypt } from "@latestarr/crypto";
 import { type Db, smtpProfiles } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { sendEmail, verifySmtpConnection } from "../../mailer/send.js";
 import { getEncryptionKey } from "../../secrets.js";
 import { requireAuth } from "../require-auth.js";
+import { parseBody } from "../validate.js";
 
 type SelectedSmtpProfile = typeof smtpProfiles.$inferSelect;
 
@@ -27,48 +29,45 @@ function credentialsFor(row: SelectedSmtpProfile) {
   };
 }
 
-interface CreateSmtpProfileBody {
-  name?: string;
-  host?: string;
-  port?: number;
-  secure?: boolean;
-  username?: string;
-  password?: string;
-  defaultFromName?: string;
-  defaultFromEmail?: string;
-}
+const createSmtpProfileSchema = z.object({
+  name: z.string().trim().min(1, "name is required"),
+  host: z.string().trim().min(1, "host is required"),
+  port: z.number().int().min(1).max(65535),
+  secure: z.boolean().optional(),
+  username: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+  defaultFromName: z.string().trim().min(1, "defaultFromName is required"),
+  defaultFromEmail: z.email("defaultFromEmail must be a valid email"),
+});
 
-interface UpdateSmtpProfileBody {
-  name?: string;
-  host?: string;
-  port?: number;
-  secure?: boolean;
-  username?: string;
-  password?: string;
-  defaultFromName?: string;
-  defaultFromEmail?: string;
-}
+const updateSmtpProfileSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  host: z.string().trim().min(1).optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  secure: z.boolean().optional(),
+  username: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+  defaultFromName: z.string().trim().min(1).optional(),
+  defaultFromEmail: z.email().optional(),
+});
+
+const sendTestSchema = z.object({
+  to: z.email("to is required"),
+});
 
 interface IdParams {
   id: string;
-}
-
-interface SendTestBody {
-  to?: string;
 }
 
 export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db));
 
-    scope.post<{ Body: CreateSmtpProfileBody }>("/smtp-profiles", async (request, reply) => {
+    scope.post("/smtp-profiles", async (request, reply) => {
+      const body = parseBody(createSmtpProfileSchema, request.body, reply);
+      if (!body) return reply;
       const { name, host, port, secure, username, password, defaultFromName, defaultFromEmail } =
-        request.body ?? {};
-      if (!name || !host || !port || !defaultFromName || !defaultFromEmail) {
-        return reply.code(400).send({
-          error: "name, host, port, defaultFromName, and defaultFromEmail are required",
-        });
-      }
+        body;
 
       const key = getEncryptionKey();
       const [profile] = await db
@@ -104,34 +103,33 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
       return reply.send({ smtpProfile: sanitize(profile) });
     });
 
-    scope.patch<{ Params: IdParams; Body: UpdateSmtpProfileBody }>(
-      "/smtp-profiles/:id",
-      async (request, reply) => {
-        const { name, host, port, secure, username, password, defaultFromName, defaultFromEmail } =
-          request.body ?? {};
-        const key = getEncryptionKey();
+    scope.patch<{ Params: IdParams }>("/smtp-profiles/:id", async (request, reply) => {
+      const body = parseBody(updateSmtpProfileSchema, request.body, reply);
+      if (!body) return reply;
+      const { name, host, port, secure, username, password, defaultFromName, defaultFromEmail } =
+        body;
+      const key = getEncryptionKey();
 
-        const [profile] = await db
-          .update(smtpProfiles)
-          .set({
-            ...(name !== undefined && { name }),
-            ...(host !== undefined && { host }),
-            ...(port !== undefined && { port }),
-            ...(secure !== undefined && { secure }),
-            ...(username !== undefined && { authUserEncrypted: encrypt(username, key) }),
-            ...(password !== undefined && { authPassEncrypted: encrypt(password, key) }),
-            ...(defaultFromName !== undefined && { defaultFromName }),
-            ...(defaultFromEmail !== undefined && { defaultFromEmail }),
-          })
-          .where(eq(smtpProfiles.id, request.params.id))
-          .returning();
+      const [profile] = await db
+        .update(smtpProfiles)
+        .set({
+          ...(name !== undefined && { name }),
+          ...(host !== undefined && { host }),
+          ...(port !== undefined && { port }),
+          ...(secure !== undefined && { secure }),
+          ...(username !== undefined && { authUserEncrypted: encrypt(username, key) }),
+          ...(password !== undefined && { authPassEncrypted: encrypt(password, key) }),
+          ...(defaultFromName !== undefined && { defaultFromName }),
+          ...(defaultFromEmail !== undefined && { defaultFromEmail }),
+        })
+        .where(eq(smtpProfiles.id, request.params.id))
+        .returning();
 
-        if (!profile) {
-          return reply.code(404).send({ error: "Not found" });
-        }
-        return reply.send({ smtpProfile: sanitize(profile) });
-      },
-    );
+      if (!profile) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+      return reply.send({ smtpProfile: sanitize(profile) });
+    });
 
     scope.delete<{ Params: IdParams }>("/smtp-profiles/:id", async (request, reply) => {
       await db.delete(smtpProfiles).where(eq(smtpProfiles.id, request.params.id));
@@ -155,13 +153,12 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
       }
     });
 
-    scope.post<{ Params: IdParams; Body: SendTestBody }>(
+    scope.post<{ Params: IdParams }>(
       "/smtp-profiles/:id/send-test",
       async (request, reply) => {
-        const { to } = request.body ?? {};
-        if (!to) {
-          return reply.code(400).send({ error: "to is required" });
-        }
+        const body = parseBody(sendTestSchema, request.body, reply);
+        if (!body) return reply;
+        const { to } = body;
 
         const [profile] = await db
           .select()

@@ -31,7 +31,8 @@
     "handlebars": "^4.7.0",
     "mjml": "^5.4.1",
     "nodemailer": "^10.0.10",
-    "openid-client": "^6.1.0"
+    "openid-client": "^6.1.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@latestarr/config": "workspace:*",

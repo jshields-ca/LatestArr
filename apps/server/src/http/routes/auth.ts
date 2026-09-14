@@ -1,8 +1,10 @@
 import { type Db, users } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { hashPassword, verifyPassword } from "../../auth/password.js";
 import { createSession, deleteSession, getSessionUser, SESSION_COOKIE } from "../../auth/session.js";
+import { parseBody } from "../validate.js";
 
 const MIN_PASSWORD_LENGTH = 12;
 
@@ -17,16 +19,18 @@ function stringHeader(value: string | string[] | undefined): string | undefined 
   return typeof value === "string" ? value : undefined;
 }
 
-interface BootstrapBody {
-  email?: string;
-  password?: string;
-  displayName?: string;
-}
+const bootstrapSchema = z.object({
+  email: z.email("email, password, and displayName are required"),
+  password: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH, `password must be at least ${MIN_PASSWORD_LENGTH} characters`),
+  displayName: z.string().trim().min(1, "email, password, and displayName are required"),
+});
 
-interface LoginBody {
-  email?: string;
-  password?: string;
-}
+const loginSchema = z.object({
+  email: z.email("email and password are required"),
+  password: z.string().min(1, "email and password are required"),
+});
 
 export interface AuthRouteOptions {
   oidcEnabled: boolean;
@@ -46,7 +50,7 @@ export function registerAuthRoutes(
     });
   });
 
-  app.post<{ Body: BootstrapBody }>(
+  app.post(
     "/auth/bootstrap",
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
@@ -57,15 +61,9 @@ export function registerAuthRoutes(
           .send({ error: "Bootstrap is only available when no users exist yet" });
       }
 
-      const { email, password, displayName } = request.body ?? {};
-      if (!email || !password || !displayName) {
-        return reply.code(400).send({ error: "email, password, and displayName are required" });
-      }
-      if (password.length < MIN_PASSWORD_LENGTH) {
-        return reply
-          .code(400)
-          .send({ error: `password must be at least ${MIN_PASSWORD_LENGTH} characters` });
-      }
+      const body = parseBody(bootstrapSchema, request.body, reply);
+      if (!body) return reply;
+      const { email, password, displayName } = body;
 
       const passwordHash = await hashPassword(password);
       const [user] = await db
@@ -77,14 +75,13 @@ export function registerAuthRoutes(
     },
   );
 
-  app.post<{ Body: LoginBody }>(
+  app.post(
     "/auth/login",
     { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
     async (request, reply) => {
-      const { email, password } = request.body ?? {};
-      if (!email || !password) {
-        return reply.code(400).send({ error: "email and password are required" });
-      }
+      const body = parseBody(loginSchema, request.body, reply);
+      if (!body) return reply;
+      const { email, password } = body;
 
       const [user] = await db.select().from(users).where(eq(users.email, email));
       if (!user || !user.passwordHash || !user.isActive) {
