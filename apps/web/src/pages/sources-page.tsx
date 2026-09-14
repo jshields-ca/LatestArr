@@ -102,7 +102,7 @@ const FALLBACK_CONFIG: SourceKindConfig = {
 const FALLBACK_KINDS = Object.keys(KIND_CONFIG);
 
 function StatusBadge({ status }: { status: SourceConnection["status"] }) {
-  if (status === "ok") return <Badge variant="success">Connected</Badge>;
+  if (status === "ok") return <Badge variant="success" dot>Connected</Badge>;
   if (status === "error") return <Badge variant="destructive">Error</Badge>;
   return <Badge variant="neutral">Not yet tested</Badge>;
 }

@@ -21,10 +21,21 @@ const badgeVariants = cva(
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeVariants> {}
+    VariantProps<typeof badgeVariants> {
+  /** Adds a small pulsing dot — reserve for a genuinely live status (an
+   * active connection), not a static property like "TLS" or a kind label. */
+  dot?: boolean;
+}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant, className }))} {...props} />;
+function Badge({ className, variant, dot, children, ...props }: BadgeProps) {
+  return (
+    <span className={cn(badgeVariants({ variant, className }))} {...props}>
+      {dot ? (
+        <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-current motion-reduce:animate-none" />
+      ) : null}
+      {children}
+    </span>
+  );
 }
 
 export { Badge, badgeVariants };

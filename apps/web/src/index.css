@@ -5,31 +5,39 @@
  * Dark-mode-first theme: the app defaults to the dark palette (see
  * index.html's `class="dark"` on <html>) to match the conventions of
  * Sonarr/Radarr/Tautulli/Overseerr, with a light palette available via
- * the theme toggle. Brand accent is teal/cyan, chosen to be distinct
- * from Plex's orange and the purple/blue already common in this space.
+ * the theme toggle. Brand accent is "Bloom" — a rose (hue ~343) chosen
+ * over the project's original teal/cyan, which read too close to the
+ * blue/teal already common across this ecosystem. Green and red/orange
+ * are off the table for the accent itself since they're already the
+ * success/destructive and Plex's own colors, respectively.
+ *
+ * The light theme's neutrals are a warm, rose-tinted scale (--blush-*)
+ * rather than literal white/gray, so cards read as elevated against a
+ * genuinely warm ground instead of floating on stark white.
  */
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(222 47% 11%);
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222 47% 11%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222 47% 11%);
-  --primary: hsl(189 94% 34%);
+  --background: hsl(350 40% 97%);
+  --foreground: hsl(336 32% 15%);
+  --card: hsl(350 45% 99%);
+  --card-foreground: hsl(336 32% 15%);
+  --popover: hsl(350 45% 99%);
+  --popover-foreground: hsl(336 32% 15%);
+  --primary: hsl(343 74% 44%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(210 40% 96%);
-  --secondary-foreground: hsl(222 47% 11%);
-  --muted: hsl(210 40% 96%);
-  --muted-foreground: hsl(215 16% 47%);
-  --accent: hsl(189 80% 92%);
-  --accent-foreground: hsl(189 94% 20%);
+  --secondary: hsl(348 25% 94%);
+  --secondary-foreground: hsl(336 32% 15%);
+  --muted: hsl(348 25% 94%);
+  --muted-foreground: hsl(336 16% 42%);
+  --accent: hsl(343 70% 93%);
+  --accent-foreground: hsl(336 78% 38%);
   --destructive: hsl(0 72% 51%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(214 32% 91%);
-  --input: hsl(214 32% 91%);
-  --ring: hsl(189 94% 43%);
+  --border: hsl(345 24% 87%);
+  --input: hsl(345 24% 87%);
+  --ring: hsl(343 74% 44%);
+  --shadow-tint: 343 55% 45%;
   --radius: 0.625rem;
 }
 
@@ -40,22 +48,26 @@
   --card-foreground: hsl(210 40% 96%);
   --popover: hsl(222 39% 11%);
   --popover-foreground: hsl(210 40% 96%);
-  --primary: hsl(189 94% 43%);
-  --primary-foreground: hsl(222 47% 7%);
+  --primary: hsl(343 82% 65%);
+  --primary-foreground: hsl(224 45% 10%);
   --secondary: hsl(217 33% 17%);
   --secondary-foreground: hsl(210 40% 96%);
   --muted: hsl(217 33% 17%);
   --muted-foreground: hsl(215 20% 65%);
-  --accent: hsl(189 60% 20%);
-  --accent-foreground: hsl(189 94% 85%);
+  --accent: hsl(343 45% 22%);
+  --accent-foreground: hsl(350 88% 72%);
   --destructive: hsl(0 63% 51%);
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(217 33% 20%);
   --input: hsl(217 33% 20%);
-  --ring: hsl(189 94% 43%);
+  --ring: hsl(343 82% 65%);
+  --shadow-tint: 343 70% 30%;
 }
 
 @theme inline {
+  /* Used only for the "LatestArr" wordmark (components/logo.tsx) — every
+   * other heading and all body/UI text stays on the default sans stack. */
+  --font-brand: "Newsreader", ui-serif, Georgia, serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -88,5 +100,16 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* A tinted, softer replacement for Tailwind's default shadow-sm —
+   * every Card gets this so surfaces read as elevated against the
+   * warm --background instead of a flat border on a flat fill. */
+  .shadow-elevated {
+    box-shadow:
+      0 1px 2px hsl(var(--shadow-tint) / 0.08),
+      0 10px 28px -10px hsl(var(--shadow-tint) / 0.22);
   }
 }

@@ -7,9 +7,10 @@ interface LogoMarkProps extends SVGAttributes<SVGSVGElement> {
 }
 
 /**
- * The double-chevron mark reads as "newly added, trending up" — the core
- * concept of the app — and is deliberately simple so it stays legible down
- * to favicon size.
+ * An envelope with a spark reads as "a newsletter just arrived" — the
+ * literal core concept of the app — and stays legible down to favicon
+ * size (the spark's point-length is deliberately generous; a subtler
+ * sparkle nearly disappeared at 16px).
  */
 export function LogoMark({ size = 28, className, ...props }: LogoMarkProps) {
   return (
@@ -22,29 +23,25 @@ export function LogoMark({ size = 28, className, ...props }: LogoMarkProps) {
       aria-label="LatestArr"
       {...props}
     >
-      <defs>
-        <linearGradient id="logo-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#0d9488" />
-          <stop offset="1" stopColor="#06b6d4" />
-        </linearGradient>
-      </defs>
-      <rect width="32" height="32" rx="8" fill="url(#logo-gradient)" />
+      <rect width="32" height="32" rx="9" fill="#ef5d86" />
       <path
-        d="M10 14 L16 8 L22 14"
+        d="M8.5 13h13v8.5h-13z"
         fill="none"
-        stroke="#ffffff"
-        strokeWidth="2.25"
-        strokeLinecap="round"
+        stroke="#0e1425"
+        strokeWidth="1.6"
         strokeLinejoin="round"
-        opacity="0.55"
       />
       <path
-        d="M8 21 L16 13 L24 21"
+        d="M8.5 13l6.5 5 6.5-5"
         fill="none"
-        stroke="#ffffff"
-        strokeWidth="2.75"
+        stroke="#0e1425"
+        strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+      <path
+        d="M24 3.4 L25.9 7.1 L29.6 9 L25.9 10.9 L24 14.6 L22.1 10.9 L18.4 9 L22.1 7.1 Z"
+        fill="#0e1425"
       />
     </svg>
   );
@@ -60,9 +57,7 @@ export function Logo({ className, iconClassName, textClassName }: LogoProps) {
   return (
     <span className={cn("flex items-center gap-2", className)}>
       <LogoMark className={iconClassName} />
-      <span className={cn("text-base font-semibold tracking-tight", textClassName)}>
-        LatestArr
-      </span>
+      <span className={cn("font-brand text-lg font-bold", textClassName)}>LatestArr</span>
     </span>
   );
 }
