@@ -114,6 +114,10 @@ export function listSources(): Promise<{ sources: SourceConnection[] }> {
   return apiFetch<{ sources: SourceConnection[] }>("/sources");
 }
 
+export function listSourceKinds(): Promise<{ kinds: string[] }> {
+  return apiFetch<{ kinds: string[] }>("/sources/kinds");
+}
+
 export function createSource(input: CreateSourceInput): Promise<{ source: SourceConnection }> {
   return apiFetch<{ source: SourceConnection }>("/sources", {
     method: "POST",

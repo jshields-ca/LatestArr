@@ -20,6 +20,15 @@ function jsonResponse(status: number, body: unknown) {
   return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve(body) };
 }
 
+const ALL_KINDS = ["tautulli", "plex", "booklore", "bookorbit", "grimmory", "audiobookshelf", "romm"];
+
+// SourcesPage fetches the sources list and the available adapter kinds in
+// parallel on mount, so every render in these tests needs both queued.
+function mockLoad(sourcesBody: unknown, kinds: string[] = ALL_KINDS) {
+  fetchMock.mockResolvedValueOnce(jsonResponse(200, sourcesBody));
+  fetchMock.mockResolvedValueOnce(jsonResponse(200, { kinds }));
+}
+
 const exampleSource = {
   id: "1",
   name: "Home Tautulli",
@@ -34,7 +43,7 @@ const exampleSource = {
 
 describe("SourcesPage", () => {
   it("renders the empty state when there are no sources", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
+    mockLoad({ sources: [] });
 
     render(<SourcesPage />);
 
@@ -42,7 +51,7 @@ describe("SourcesPage", () => {
   });
 
   it("lists existing sources with their status", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [exampleSource] }));
+    mockLoad({ sources: [exampleSource] });
 
     render(<SourcesPage />);
 
@@ -52,13 +61,14 @@ describe("SourcesPage", () => {
 
   it("adds a new source through the dialog", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
+    mockLoad({ sources: [] });
     render(<SourcesPage />);
     await screen.findByText("No sources yet");
 
     await user.click(screen.getByRole("button", { name: "Add source" }));
     const dialog = await screen.findByRole("dialog");
 
+    expect(within(dialog).getByLabelText("Source type")).toHaveValue("tautulli");
     await user.type(within(dialog).getByLabelText("Name"), "Home Tautulli");
     await user.type(within(dialog).getByLabelText("Base URL"), "http://localhost:8181");
     await user.type(within(dialog).getByLabelText("Tautulli API key"), "secret-key");
@@ -69,7 +79,7 @@ describe("SourcesPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText("Home Tautulli")).toBeInTheDocument();
 
-    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toEqual({
       name: "Home Tautulli",
       kind: "tautulli",
@@ -78,9 +88,28 @@ describe("SourcesPage", () => {
     });
   });
 
+  it("switches credential fields when a different source type is picked", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [] });
+    render(<SourcesPage />);
+    await screen.findByText("No sources yet");
+
+    await user.click(screen.getByRole("button", { name: "Add source" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Tautulli API key")).toBeInTheDocument();
+
+    await user.selectOptions(within(dialog).getByLabelText("Source type"), "romm");
+    expect(within(dialog).queryByLabelText("Tautulli API key")).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("RomM client API token")).toBeInTheDocument();
+
+    await user.selectOptions(within(dialog).getByLabelText("Source type"), "booklore");
+    expect(within(dialog).getByLabelText("OPDS username")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("OPDS password")).toBeInTheDocument();
+  });
+
   it("tests a connection and shows the result", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [exampleSource] }));
+    mockLoad({ sources: [exampleSource] });
     render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
 
@@ -93,7 +122,7 @@ describe("SourcesPage", () => {
 
   it("deletes a source after confirmation", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [exampleSource] }));
+    mockLoad({ sources: [exampleSource] });
     render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
 
@@ -108,7 +137,7 @@ describe("SourcesPage", () => {
   });
 
   it("has no accessibility violations in the empty state", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
+    mockLoad({ sources: [] });
     const { container } = render(<SourcesPage />);
     await screen.findByText("No sources yet");
 
@@ -116,7 +145,7 @@ describe("SourcesPage", () => {
   });
 
   it("has no accessibility violations with a populated list", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [exampleSource] }));
+    mockLoad({ sources: [exampleSource] });
     const { container } = render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
 
@@ -125,7 +154,7 @@ describe("SourcesPage", () => {
 
   it("has no accessibility violations with the add-source dialog open", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
+    mockLoad({ sources: [] });
     render(<SourcesPage />);
     await screen.findByText("No sources yet");
 
