@@ -1,26 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <defs>
-    <linearGradient id="brand-gradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0d9488" />
-      <stop offset="1" stop-color="#06b6d4" />
-    </linearGradient>
-  </defs>
-  <rect width="32" height="32" rx="8" fill="url(#brand-gradient)" />
+  <rect width="32" height="32" rx="9" fill="#ef5d86" />
   <path
-    d="M10 14 L16 8 L22 14"
+    d="M8.5 13h13v8.5h-13z"
     fill="none"
-    stroke="#ffffff"
-    stroke-width="2.25"
-    stroke-linecap="round"
+    stroke="#0e1425"
+    stroke-width="1.6"
     stroke-linejoin="round"
-    opacity="0.55"
   />
   <path
-    d="M8 21 L16 13 L24 21"
+    d="M8.5 13l6.5 5 6.5-5"
     fill="none"
-    stroke="#ffffff"
-    stroke-width="2.75"
+    stroke="#0e1425"
+    stroke-width="1.6"
     stroke-linecap="round"
     stroke-linejoin="round"
+  />
+  <path
+    d="M24 3.4 L25.9 7.1 L29.6 9 L25.9 10.9 L24 14.6 L22.1 10.9 L18.4 9 L22.1 7.1 Z"
+    fill="#0e1425"
   />
 </svg>
