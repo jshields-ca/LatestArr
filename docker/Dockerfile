@@ -15,6 +15,7 @@ COPY packages/crypto/package.json packages/crypto/package.json
 COPY packages/adapters/core/package.json packages/adapters/core/package.json
 COPY packages/adapters/tautulli/package.json packages/adapters/tautulli/package.json
 COPY packages/adapters/plex/package.json packages/adapters/plex/package.json
+COPY packages/adapters/booklore-family/package.json packages/adapters/booklore-family/package.json
 RUN pnpm install --frozen-lockfile
 
 # ---- build everything ---------------------------------------------------

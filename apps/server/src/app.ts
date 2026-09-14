@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
+import { bookOrbitAdapter, bookloreAdapter, grimmoryAdapter } from "@latestarr/adapter-booklore-family";
 import { registerAdapter } from "@latestarr/adapter-core";
 import { plexAdapter } from "@latestarr/adapter-plex";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
@@ -20,6 +21,9 @@ import type { SchedulerHandle } from "./scheduler/engine.js";
 
 registerAdapter(tautulliAdapter);
 registerAdapter(plexAdapter);
+registerAdapter(bookloreAdapter);
+registerAdapter(bookOrbitAdapter);
+registerAdapter(grimmoryAdapter);
 
 export interface BuildAppOptions {
   // Directory containing the built admin WebUI (apps/web's `dist`), served
