@@ -14,7 +14,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "changeset": "changeset",
-    "version-packages": "changeset version && node scripts/sync-root-version.mjs"
+    "version-packages": "node scripts/write-changelog.mjs && changeset version && node scripts/sync-root-version.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^3.0.0",
