@@ -95,3 +95,83 @@ describe("with a staticRoot pointing at a built WebUI", () => {
     expect(response.json()).toEqual({ error: "Not found" });
   });
 });
+
+describe("security headers and cross-origin protection", () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await buildApp(db);
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it("sends a Content-Security-Policy header", async () => {
+    const response = await app.inject({ method: "GET", url: "/health" });
+    expect(response.headers["content-security-policy"]).toContain("default-src 'self'");
+  });
+
+  it("sends baseline helmet security headers", async () => {
+    const response = await app.inject({ method: "GET", url: "/health" });
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["x-frame-options"]).toBe("SAMEORIGIN");
+  });
+
+  it("allows a same-origin mutating request through", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      // A non-default port avoids the URL API silently stripping ":80"/":443"
+      // when serializing `origin`, which would make this comparison
+      // meaningless — matches how the app is actually deployed anyway.
+      headers: { origin: "http://localhost:3000", host: "localhost:3000" },
+      payload: { email: "nobody@example.com", password: "wrong" },
+    });
+    // 401 (wrong credentials), not 403 (blocked as cross-origin) — same
+    // origin is allowed through to the route handler itself.
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("rejects a mutating request from a mismatched Origin", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { origin: "https://evil.example.com", host: "localhost:3000" },
+      payload: { email: "nobody@example.com", password: "wrong" },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "Cross-origin request rejected" });
+  });
+
+  it("allows a request with no Origin or Referer through (e.g. non-browser clients)", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "nobody@example.com", password: "wrong" },
+    });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("does not apply the cross-origin check to safe methods", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: "https://evil.example.com", host: "localhost:80" },
+    });
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("rate-limits repeated login attempts", async () => {
+    const attempt = () =>
+      app.inject({
+        method: "POST",
+        url: "/api/auth/login",
+        payload: { email: "nobody@example.com", password: "wrong" },
+      });
+
+    const responses = await Promise.all(Array.from({ length: 11 }, attempt));
+    const statusCodes = responses.map((r) => r.statusCode);
+    expect(statusCodes).toContain(429);
+  });
+});
