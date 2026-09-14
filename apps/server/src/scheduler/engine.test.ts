@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, newsletters, runMigrations, type Db } from "@latestarr/db";
+import { createDb, newsletters, runMigrations, sendRuns, type Db } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -129,6 +129,73 @@ describe("stopScheduler", () => {
     for (const job of recordedJobs) {
       expect(job.stop).toHaveBeenCalled();
     }
+  });
+});
+
+describe("missed-schedule catch-up", () => {
+  // "0 9 * * 1" is every Monday 09:00 UTC; 2024-01-01 was itself a Monday,
+  // so occurrences fall on 2024-01-01, -08, -15, 09:00 UTC.
+  const scheduleCron = "0 9 * * 1";
+
+  it("runs a newsletter whose scheduled fire was missed while the process was down", async () => {
+    const newsletter = await createNewsletter({ scheduleCron });
+    await db
+      .update(newsletters)
+      .set({ createdAt: new Date("2024-01-01T00:00:00Z") })
+      .where(eq(newsletters.id, newsletter.id));
+    const onError = vi.fn();
+
+    await startScheduler(db, {
+      cronFactory: fakeCronFactory,
+      onError,
+      now: () => new Date("2024-01-02T00:00:00Z"),
+    });
+
+    // No SMTP profile configured, so the catch-up run fails the same way
+    // the "scheduled callback" test's normal fire does — onError being
+    // called at all is what proves runNewsletter actually executed.
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError.mock.calls[0]![0]).toBe(newsletter.id);
+  });
+
+  it("does not re-run a newsletter that already sent since its last scheduled fire", async () => {
+    const newsletter = await createNewsletter({ scheduleCron });
+    await db
+      .update(newsletters)
+      .set({ createdAt: new Date("2024-01-01T00:00:00Z") })
+      .where(eq(newsletters.id, newsletter.id));
+    await db.insert(sendRuns).values({
+      newsletterId: newsletter.id,
+      status: "success",
+      startedAt: new Date("2024-01-01T09:05:00Z"),
+    });
+    const onError = vi.fn();
+
+    await startScheduler(db, {
+      cronFactory: fakeCronFactory,
+      onError,
+      now: () => new Date("2024-01-02T00:00:00Z"),
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("does not run a newsletter whose first scheduled fire hasn't happened yet", async () => {
+    const newsletter = await createNewsletter({ scheduleCron });
+    await db
+      .update(newsletters)
+      .set({ createdAt: new Date("2024-01-01T00:00:00Z") })
+      .where(eq(newsletters.id, newsletter.id));
+    const onError = vi.fn();
+
+    await startScheduler(db, {
+      cronFactory: fakeCronFactory,
+      onError,
+      // "now" is before the newsletter's first scheduled occurrence.
+      now: () => new Date("2024-01-01T00:00:00Z"),
+    });
+
+    expect(onError).not.toHaveBeenCalled();
   });
 });
 
