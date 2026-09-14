@@ -5,15 +5,19 @@ security reports seriously.
 
 ## Supported Versions
 
-LatestArr is currently in pre-release, active development. Until a `1.0`
-release is tagged, security fixes will only target the `main` branch — there
-is no separate maintenance/patch track yet.
+LatestArr is currently in pre-release, active development. Tagged releases
+exist (see [Releases](https://github.com/jshields-ca/latestarr/releases)),
+but until a `1.0` release, security fixes only target the latest release —
+there is no separate maintenance/patch track yet, so upgrading to the
+current version is the supported path.
 
 | Version | Supported |
 | --- | --- |
-| `main` (pre-1.0) | ✅ |
+| Latest `0.x` release | ✅ |
+| Older `0.x` releases | ❌ |
 
-This table will be updated once tagged releases exist.
+This table will be revisited once `1.0` ships and a real support policy
+makes sense.
 
 ## Reporting a Vulnerability
 
