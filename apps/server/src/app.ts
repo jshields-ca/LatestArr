@@ -88,6 +88,18 @@ export async function buildApp(
         frameSrc: ["'self'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
+        // helmet's defaults silently include this even though we override
+        // every other default directive above — it tells the browser to
+        // rewrite every http:// subresource request (scripts, styles, the
+        // favicon, ...) on the page to https:// before sending it, per the
+        // CSP spec, independent of any browser "HTTPS-Only Mode" setting.
+        // LatestArr has no TLS listener of its own (TLS is a reverse
+        // proxy's job per docs/self-hosting.md), so for anyone running it
+        // over plain HTTP directly, those upgraded requests fail outright
+        // and the app never loads. `null` removes the directive instead of
+        // just omitting it, since omitting it still leaves the default in
+        // place (see helmet's `useDefaults`).
+        upgradeInsecureRequests: null,
       },
     },
     crossOriginEmbedderPolicy: false,
