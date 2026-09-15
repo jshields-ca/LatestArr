@@ -23,6 +23,9 @@ vi.mock("@/lib/grapesjs-blocks", () => ({
   registerCustomBlocks: vi.fn(),
   applyClickToAddFallback: vi.fn(),
 }));
+vi.mock("@/lib/grapesjs-reorder", () => ({
+  registerReorderControls: vi.fn(),
+}));
 
 const { TemplateEditorPage } = await import("./template-editor-page");
 

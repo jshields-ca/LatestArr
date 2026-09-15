@@ -12,9 +12,38 @@ const MEDIA_LIST_COMPONENT_TYPE = "media-list";
 
 const CONTENT_TYPE_OPTIONS = [
   { id: "movie", label: "Movies" },
-  { id: "tv_episode", label: "TV shows" },
+  { id: "tv_episode", label: "TV episodes" },
+  { id: "tv_season", label: "TV seasons" },
   { id: "book", label: "Books" },
+  { id: "audiobook", label: "Audiobooks" },
+  { id: "game", label: "Games" },
 ];
+
+// The accent color of LatestArr's own Bloom palette (hsl(343 74% 44%)),
+// hardcoded here rather than imported from the Tailwind theme because this
+// HTML ends up in a sent email, entirely outside the app's own CSS.
+const ACCENT_COLOR = "#c31d4c";
+
+// One Handlebars conditional per content type's most relevant secondary
+// metadata line — movies/TV get runtime, books get a page count, audiobooks
+// get a spoken-word duration, games get a platform. Falls through to
+// nothing rendered when a source didn't supply that field for an item.
+function metaLineForContentType(contentType: string): string {
+  switch (contentType) {
+    case "movie":
+    case "tv_episode":
+    case "tv_season":
+      return `{{#if runtimeFormatted}}{{runtimeFormatted}}{{/if}}`;
+    case "book":
+      return `{{#if pageCount}}{{pageCount}} pages{{/if}}`;
+    case "audiobook":
+      return `{{#if durationFormatted}}{{durationFormatted}}{{/if}}`;
+    case "game":
+      return `{{#if platform}}{{platform}}{{/if}}`;
+    default:
+      return "";
+  }
+}
 
 const SORT_OPTIONS = [
   { id: "added", label: "Latest added" },
@@ -89,14 +118,29 @@ function registerMediaListType(editor: Editor): void {
         const contentType = this.get("contentType");
         const sort = this.get("sort");
         const count = this.get("count");
+        const metaLine = metaLineForContentType(contentType);
+        // A table, not flex/grid, for the poster+text layout — the one
+        // layout mechanism that renders consistently across Gmail,
+        // Outlook, and the rest of the clients a sent newsletter has to
+        // survive. alt text on the poster is mandatory, not optional,
+        // since it's the only description a screen reader or "images
+        // off" client gets for that item.
         return (
           `{{#mediaList contentType="${contentType}" sort="${sort}" count="${count}"}}\n` +
-          `<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #eeeeee;">\n` +
-          `  <div style="font-weight:600;font-family:sans-serif;">{{title}}</div>\n` +
-          `  {{#if subtitle}}<div style="color:#666666;font-size:14px;font-family:sans-serif;">{{subtitle}}</div>{{/if}}\n` +
-          `  {{#if overview}}<div style="font-size:14px;font-family:sans-serif;">{{overview}}</div>{{/if}}\n` +
-          `  <div style="font-size:12px;color:#999999;font-family:sans-serif;">Added {{addedAtFormatted}}</div>\n` +
-          `</div>\n` +
+          `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">\n` +
+          `<tr>\n` +
+          `{{#if posterUrl}}<td width="80" style="vertical-align:top;padding-right:12px;">` +
+          `<img src="{{posterUrl}}" width="80" alt="{{title}} cover art" style="display:block;width:80px;max-width:80px;border-radius:6px;" />` +
+          `</td>{{/if}}\n` +
+          `<td style="vertical-align:top;font-family:sans-serif;">\n` +
+          `  <div style="font-weight:600;font-size:16px;color:#0f172a;">{{title}}</div>\n` +
+          `  {{#if subtitle}}<div style="color:#64748b;font-size:13px;">{{subtitle}}</div>{{/if}}\n` +
+          `  <div style="font-size:12px;font-weight:600;color:${ACCENT_COLOR};margin-top:2px;">${metaLine}{{#if rating}} · {{rating}}{{/if}}</div>\n` +
+          `  {{#if overview}}<div style="font-size:13px;color:#334155;margin-top:4px;">{{overview}}</div>{{/if}}\n` +
+          `  <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Added {{addedAtFormatted}}</div>\n` +
+          `</td>\n` +
+          `</tr>\n` +
+          `</table>\n` +
           `{{/mediaList}}`
         );
       },
