@@ -27,12 +27,24 @@ import {
   type SmtpProfile,
 } from "@/lib/api";
 
+// Port 465 is "implicit TLS" (the socket is wrapped in TLS before any SMTP
+// conversation happens); 587 and 25 are STARTTLS (a plain connection that
+// upgrades to TLS after the initial handshake). Sending implicit TLS's
+// raw TLS handshake to a STARTTLS-only port fails immediately with an
+// OpenSSL "wrong version number" error — the port and the toggle have to
+// agree. This only offers a starting guess; the toggle stays a manual
+// override for providers that don't follow the convention.
+function impliesSecure(port: string): boolean {
+  return port.trim() === "465";
+}
+
 function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile) => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [host, setHost] = useState("");
   const [port, setPort] = useState("587");
-  const [secure, setSecure] = useState(true);
+  const [secure, setSecure] = useState(impliesSecure("587"));
+  const [secureTouched, setSecureTouched] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [defaultFromName, setDefaultFromName] = useState("");
@@ -40,11 +52,17 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function handlePortChange(nextPort: string) {
+    setPort(nextPort);
+    if (!secureTouched) setSecure(impliesSecure(nextPort));
+  }
+
   function reset() {
     setName("");
     setHost("");
     setPort("587");
-    setSecure(true);
+    setSecure(impliesSecure("587"));
+    setSecureTouched(false);
     setUsername("");
     setPassword("");
     setDefaultFromName("");
@@ -127,17 +145,29 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
                 type="number"
                 required
                 value={port}
-                onChange={(e) => setPort(e.target.value)}
+                onChange={(e) => handlePortChange(e.target.value)}
                 disabled={submitting}
               />
             </div>
           </div>
           <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
             <div>
-              <Label htmlFor="smtp-secure">Use TLS</Label>
-              <p className="text-sm text-muted-foreground">Recommended for almost every provider.</p>
+              <Label htmlFor="smtp-secure">Use implicit TLS (port 465)</Label>
+              <p className="text-sm text-muted-foreground">
+                Leave this off for ports 587 and 25 — those use STARTTLS, which upgrades the
+                connection to TLS automatically. Turning this on for a STARTTLS port causes
+                connection failures.
+              </p>
             </div>
-            <Switch id="smtp-secure" checked={secure} onCheckedChange={setSecure} disabled={submitting} />
+            <Switch
+              id="smtp-secure"
+              checked={secure}
+              onCheckedChange={(next) => {
+                setSecure(next);
+                setSecureTouched(true);
+              }}
+              disabled={submitting}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
@@ -363,7 +393,7 @@ export function SmtpProfilesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">SMTP profiles</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">SMTP Profiles</h1>
           <p className="text-sm text-muted-foreground">Configure outgoing mail servers used to send newsletters.</p>
         </div>
         {profiles ? (

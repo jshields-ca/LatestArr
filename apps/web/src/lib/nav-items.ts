@@ -18,7 +18,7 @@ export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/sources", label: "Sources", icon: Server },
   { to: "/recipients", label: "Recipients", icon: Users },
-  { to: "/smtp", label: "SMTP profiles", icon: Mail },
+  { to: "/smtp", label: "SMTP Profiles", icon: Mail },
   { to: "/newsletters", label: "Newsletters", icon: Send },
   { to: "/templates", label: "Templates", icon: LayoutTemplate },
 ];

@@ -25,6 +25,10 @@ function buildTransport(smtp: SmtpCredentials) {
     host: smtp.host,
     port: smtp.port,
     secure: smtp.secure,
+    // When not using implicit TLS (the port 465 case), require the
+    // STARTTLS upgrade to succeed rather than silently falling back to an
+    // unencrypted connection if the server doesn't offer it.
+    requireTLS: !smtp.secure,
     auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
   });
 }
