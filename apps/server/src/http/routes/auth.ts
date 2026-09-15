@@ -32,6 +32,15 @@ const loginSchema = z.object({
   password: z.string().min(1, "email and password are required"),
 });
 
+const updateMeSchema = z.object({
+  displayName: z.string().trim().min(1).optional(),
+  currentPassword: z.string().min(1).optional(),
+  newPassword: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH, `newPassword must be at least ${MIN_PASSWORD_LENGTH} characters`)
+    .optional(),
+});
+
 export interface AuthRouteOptions {
   oidcEnabled: boolean;
 }
@@ -141,5 +150,52 @@ export function registerAuthRoutes(
     }
 
     return reply.send({ user: sanitizeUser(user) });
+  });
+
+  app.patch("/auth/me", async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (!token) {
+      return reply.code(401).send({ error: "Not authenticated" });
+    }
+    const currentUser = await getSessionUser(db, token);
+    if (!currentUser) {
+      return reply.code(401).send({ error: "Not authenticated" });
+    }
+
+    const body = parseBody(updateMeSchema, request.body, reply);
+    if (!body) return reply;
+    const { displayName, currentPassword, newPassword } = body;
+
+    const updates: { displayName?: string; passwordHash?: string } = {};
+
+    if (displayName !== undefined) {
+      updates.displayName = displayName;
+    }
+
+    if (currentPassword !== undefined || newPassword !== undefined) {
+      if (!currentPassword || !newPassword) {
+        return reply
+          .code(400)
+          .send({ error: "currentPassword and newPassword are both required to change the password" });
+      }
+      if (!currentUser.passwordHash) {
+        return reply
+          .code(400)
+          .send({ error: "This account signs in via SSO and has no local password to change" });
+      }
+      const valid = await verifyPassword(currentUser.passwordHash, currentPassword);
+      if (!valid) {
+        return reply.code(401).send({ error: "Current password is incorrect" });
+      }
+      updates.passwordHash = await hashPassword(newPassword);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return reply.send({ user: sanitizeUser(currentUser) });
+    }
+
+    const [updated] = await db.update(users).set(updates).where(eq(users.id, currentUser.id)).returning();
+
+    return reply.send({ user: sanitizeUser(updated!) });
   });
 }

@@ -173,6 +173,98 @@ describe("login / session lifecycle", () => {
     const response = await app.inject({ method: "GET", url: "/api/auth/me" });
     expect(response.statusCode).toBe(401);
   });
+
+  it("updates the display name via PATCH /auth/me", async () => {
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    const token = extractSessionCookie(loginResponse);
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/auth/me",
+      cookies: { latestarr_session: token },
+      payload: { displayName: "New Display Name" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user.displayName).toBe("New Display Name");
+  });
+
+  it("changes the password given the correct current password, and the new password works on next login", async () => {
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    const token = extractSessionCookie(loginResponse);
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/auth/me",
+      cookies: { latestarr_session: token },
+      payload: { currentPassword: "a-very-long-password", newPassword: "a-new-very-long-password" },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const oldPasswordLogin = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    expect(oldPasswordLogin.statusCode).toBe(401);
+
+    const newPasswordLogin = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-new-very-long-password" },
+    });
+    expect(newPasswordLogin.statusCode).toBe(200);
+  });
+
+  it("rejects a password change with the wrong current password", async () => {
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    const token = extractSessionCookie(loginResponse);
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/auth/me",
+      cookies: { latestarr_session: token },
+      payload: { currentPassword: "wrong-password", newPassword: "a-new-very-long-password" },
+    });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("rejects a password change missing newPassword", async () => {
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    const token = extractSessionCookie(loginResponse);
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/auth/me",
+      cookies: { latestarr_session: token },
+      payload: { currentPassword: "a-very-long-password" },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects PATCH /auth/me with no session cookie", async () => {
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/auth/me",
+      payload: { displayName: "New Name" },
+    });
+    expect(response.statusCode).toBe(401);
+  });
 });
 
 describe("login behind a trusted reverse proxy (TRUST_PROXY=true)", () => {
