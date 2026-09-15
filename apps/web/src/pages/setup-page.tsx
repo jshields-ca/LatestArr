@@ -23,6 +23,11 @@ export function SetupPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    displayName?: string;
+    email?: string;
+    password?: string;
+  }>({});
 
   useEffect(() => {
     getAuthProviders()
@@ -38,12 +43,22 @@ export function SetupPage() {
     return <Navigate to="/login" replace />;
   }
 
+  function validate(): boolean {
+    const errors: typeof fieldErrors = {};
+    if (!displayName.trim()) errors.displayName = "Name is required.";
+    if (!email.trim()) errors.email = "Email is required.";
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
 
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    if (!validate()) {
       return;
     }
 
@@ -78,9 +93,19 @@ export function SetupPage() {
                 autoComplete="name"
                 required
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  if (fieldErrors.displayName) setFieldErrors((prev) => ({ ...prev, displayName: undefined }));
+                }}
                 disabled={submitting}
+                aria-invalid={fieldErrors.displayName ? true : undefined}
+                aria-describedby={fieldErrors.displayName ? "displayName-error" : undefined}
               />
+              {fieldErrors.displayName ? (
+                <p id="displayName-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.displayName}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Email</Label>
@@ -90,9 +115,19 @@ export function SetupPage() {
                 autoComplete="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                }}
                 disabled={submitting}
+                aria-invalid={fieldErrors.email ? true : undefined}
+                aria-describedby={fieldErrors.email ? "email-error" : undefined}
               />
+              {fieldErrors.email ? (
+                <p id="email-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.email}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password">Password</Label>
@@ -103,13 +138,23 @@ export function SetupPage() {
                 required
                 minLength={MIN_PASSWORD_LENGTH}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                }}
                 disabled={submitting}
-                aria-describedby="password-hint"
+                aria-invalid={fieldErrors.password ? true : undefined}
+                aria-describedby={fieldErrors.password ? "password-error" : "password-hint"}
               />
-              <p id="password-hint" className="text-xs text-muted-foreground">
-                At least {MIN_PASSWORD_LENGTH} characters.
-              </p>
+              {fieldErrors.password ? (
+                <p id="password-error" role="alert" className="text-xs text-destructive">
+                  {fieldErrors.password}
+                </p>
+              ) : (
+                <p id="password-hint" className="text-xs text-muted-foreground">
+                  At least {MIN_PASSWORD_LENGTH} characters.
+                </p>
+              )}
             </div>
 
             {error ? (

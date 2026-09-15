@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,5 +53,34 @@ describe("SetupPage", () => {
     await screen.findByLabelText("Email");
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("shows validation errors for Name and Email, not just Password, on an empty submit", async () => {
+    const user = userEvent.setup();
+    renderSetupPage();
+    await screen.findByLabelText("Email");
+
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+
+    expect(await screen.findByText("Name is required.")).toBeInTheDocument();
+    expect(await screen.findByText("Email is required.")).toBeInTheDocument();
+    expect(await screen.findByText("Password must be at least 12 characters.")).toBeInTheDocument();
+
+    expect(screen.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Email")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Password")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("clears a field's validation error once the user starts fixing it", async () => {
+    const user = userEvent.setup();
+    renderSetupPage();
+    await screen.findByLabelText("Email");
+
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    expect(await screen.findByText("Name is required.")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Name"), "Jane Doe");
+    expect(screen.queryByText("Name is required.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).not.toHaveAttribute("aria-invalid");
   });
 });
