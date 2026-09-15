@@ -68,6 +68,17 @@ export function getCurrentUser(): Promise<{ user: AuthUser }> {
   return apiFetch<{ user: AuthUser }>("/auth/me");
 }
 
+export function updateCurrentUser(input: {
+  displayName?: string;
+  currentPassword?: string;
+  newPassword?: string;
+}): Promise<{ user: AuthUser }> {
+  return apiFetch<{ user: AuthUser }>("/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export function login(email: string, password: string): Promise<{ user: AuthUser }> {
   return apiFetch<{ user: AuthUser }>("/auth/login", {
     method: "POST",

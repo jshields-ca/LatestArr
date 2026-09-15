@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -82,5 +83,52 @@ describe("AppShell", () => {
   it("shows the running version once loaded", async () => {
     renderShell();
     await waitFor(() => expect(screen.getByText("v0.4.4")).toBeInTheDocument());
+  });
+
+  it("edits the display name through the Edit profile dialog", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await screen.findByText("Admin");
+
+    await user.click(screen.getByRole("button", { name: "Edit profile" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Display name")).toHaveValue("Admin");
+
+    fetchMock.mockImplementationOnce((url: string, init?: RequestInit) => {
+      if (url === "/api/auth/me" && init?.method === "PATCH") {
+        return Promise.resolve(
+          jsonResponse(200, { user: { ...exampleUser, displayName: "New Name" } }),
+        );
+      }
+      return Promise.reject(new Error(`Unexpected fetch to ${url}`));
+    });
+    fetchMock.mockImplementationOnce((url: string) => {
+      if (url === "/api/auth/me") {
+        return Promise.resolve(jsonResponse(200, { user: { ...exampleUser, displayName: "New Name" } }));
+      }
+      return Promise.reject(new Error(`Unexpected fetch to ${url}`));
+    });
+
+    await user.clear(within(dialog).getByLabelText("Display name"));
+    await user.type(within(dialog).getByLabelText("Display name"), "New Name");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByText("New Name")).toBeInTheDocument();
+  });
+
+  it("rejects a password change in the dialog when only one of the two password fields is filled", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await screen.findByText("Admin");
+
+    await user.click(screen.getByRole("button", { name: "Edit profile" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("New password"), "a-new-password");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    expect(
+      await within(dialog).findByText("Enter both your current password and a new password to change it."),
+    ).toBeInTheDocument();
   });
 });

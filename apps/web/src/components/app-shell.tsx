@@ -1,14 +1,25 @@
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { LogOut, Menu, Star } from "lucide-react";
+import { Loader2, LogOut, Menu, Pencil, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { getVersion } from "@/lib/api";
+import { ApiError, getVersion, updateCurrentUser } from "@/lib/api";
 import { navItems } from "@/lib/nav-items";
 import { cn } from "@/lib/utils";
 
@@ -88,6 +99,110 @@ function ProjectLinks() {
   );
 }
 
+function EditProfileDialog() {
+  const { user, refresh } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.displayName ?? "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openWithCurrentValues(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setDisplayName(user?.displayName ?? "");
+      setCurrentPassword("");
+      setNewPassword("");
+      setError(null);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    if ((currentPassword || newPassword) && !(currentPassword && newPassword)) {
+      setError("Enter both your current password and a new password to change it.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await updateCurrentUser({
+        displayName: displayName || undefined,
+        currentPassword: currentPassword || undefined,
+        newPassword: newPassword || undefined,
+      });
+      await refresh();
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Edit profile" title="Edit profile">
+          <Pencil />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit profile</DialogTitle>
+          <DialogDescription>Update your display name or change your password.</DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="profile-display-name">Display name</Label>
+            <Input
+              id="profile-display-name"
+              required
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="profile-current-password">Current password (to change password)</Label>
+            <Input
+              id="profile-current-password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="profile-new-password">New password</Label>
+            <Input
+              id="profile-new-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function UserFooter() {
   const { user, logout } = useAuth();
 
@@ -97,15 +212,18 @@ function UserFooter() {
         <p className="truncate text-sm font-medium">{user?.displayName}</p>
         <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => void logout()}
-        aria-label="Log out"
-        title="Log out"
-      >
-        <LogOut />
-      </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        <EditProfileDialog />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => void logout()}
+          aria-label="Log out"
+          title="Log out"
+        >
+          <LogOut />
+        </Button>
+      </div>
     </div>
   );
 }
