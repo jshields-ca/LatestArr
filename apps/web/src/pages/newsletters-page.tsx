@@ -48,10 +48,13 @@ import {
 } from "@/lib/api";
 import {
   DEFAULT_SIMPLE_SCHEDULE,
+  detectBrowserTimezone,
+  formatScheduleForDisplay,
   parseCronToSimpleSchedule,
   simpleScheduleToCron,
   type SimpleSchedule,
 } from "@/lib/schedule";
+import { sendRunBadgeLabel, sendRunBadgeVariant } from "@/lib/send-run";
 
 function AddNewsletterDialog({
   smtpProfiles,
@@ -67,7 +70,7 @@ function AddNewsletterDialog({
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("simple");
   const [simpleSchedule, setSimpleSchedule] = useState<SimpleSchedule>(DEFAULT_SIMPLE_SCHEDULE);
   const [advancedCron, setAdvancedCron] = useState(simpleScheduleToCron(DEFAULT_SIMPLE_SCHEDULE));
-  const [timezone, setTimezone] = useState("UTC");
+  const [timezone, setTimezone] = useState(() => detectBrowserTimezone());
   const [lookbackDays, setLookbackDays] = useState("7");
   const [subjectTemplate, setSubjectTemplate] = useState("");
   const [smtpProfileId, setSmtpProfileId] = useState("");
@@ -75,15 +78,20 @@ function AddNewsletterDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Called on every open *and* close so the dialog always starts from a
+  // clean slate: the browser's own timezone (not a hardcoded "UTC"), and
+  // the sole SMTP profile pre-selected when there's exactly one — with 0 or
+  // 2+ profiles it still starts unselected, since there's no unambiguous
+  // choice to make for the user.
   function reset() {
     setName("");
     setScheduleMode("simple");
     setSimpleSchedule(DEFAULT_SIMPLE_SCHEDULE);
     setAdvancedCron(simpleScheduleToCron(DEFAULT_SIMPLE_SCHEDULE));
-    setTimezone("UTC");
+    setTimezone(detectBrowserTimezone());
     setLookbackDays("7");
     setSubjectTemplate("");
-    setSmtpProfileId("");
+    setSmtpProfileId(smtpProfiles.length === 1 ? smtpProfiles[0]!.id : "");
     setTemplateId("");
     setError(null);
   }
@@ -118,7 +126,7 @@ function AddNewsletterDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) reset();
+        reset();
       }}
     >
       <DialogTrigger asChild>
@@ -143,63 +151,68 @@ function AddNewsletterDialog({
               disabled={submitting}
             />
           </div>
-          <ScheduleField
-            idPrefix="newsletter"
-            mode={scheduleMode}
-            onModeChange={setScheduleMode}
-            simple={simpleSchedule}
-            onSimpleChange={setSimpleSchedule}
-            scheduleCron={advancedCron}
-            onScheduleCronChange={setAdvancedCron}
-            timezone={timezone}
-            onTimezoneChange={setTimezone}
-            disabled={submitting}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="newsletter-lookback">Lookback (days)</Label>
-              <Input
-                id="newsletter-lookback"
-                type="number"
-                min={1}
-                required
-                value={lookbackDays}
-                onChange={(e) => setLookbackDays(e.target.value)}
-                disabled={submitting}
-              />
+          <div className="rounded-md border border-border p-3">
+            <ScheduleField
+              idPrefix="newsletter"
+              mode={scheduleMode}
+              onModeChange={setScheduleMode}
+              simple={simpleSchedule}
+              onSimpleChange={setSimpleSchedule}
+              scheduleCron={advancedCron}
+              onScheduleCronChange={setAdvancedCron}
+              timezone={timezone}
+              onTimezoneChange={setTimezone}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+            <p className="text-sm font-medium">Delivery</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="newsletter-lookback">Lookback (days)</Label>
+                <Input
+                  id="newsletter-lookback"
+                  type="number"
+                  min={1}
+                  required
+                  value={lookbackDays}
+                  onChange={(e) => setLookbackDays(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="newsletter-smtp">SMTP profile</Label>
+                <Select
+                  id="newsletter-smtp"
+                  value={smtpProfileId}
+                  onChange={(e) => setSmtpProfileId(e.target.value)}
+                  disabled={submitting}
+                >
+                  <option value="">None yet</option>
+                  {smtpProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="newsletter-smtp">SMTP profile</Label>
+              <Label htmlFor="newsletter-template">Template</Label>
               <Select
-                id="newsletter-smtp"
-                value={smtpProfileId}
-                onChange={(e) => setSmtpProfileId(e.target.value)}
+                id="newsletter-template"
+                value={templateId}
+                onChange={(e) => setTemplateId(e.target.value)}
                 disabled={submitting}
               >
-                <option value="">None yet</option>
-                {smtpProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
+                <option value="">Use the default layout</option>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
                   </option>
                 ))}
               </Select>
             </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="newsletter-template">Template</Label>
-            <Select
-              id="newsletter-template"
-              value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
-              disabled={submitting}
-            >
-              <option value="">Use the default layout</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="newsletter-subject">Subject template (optional)</Label>
@@ -493,24 +506,11 @@ function TemplatePicker({
   );
 }
 
-const SEND_RUN_STATUS_VARIANT = {
-  success: "success",
-  partial_failure: "destructive",
-  failed: "destructive",
-  pending: "neutral",
-  running: "neutral",
-} as const;
-
-function SendRunHistory({ newsletterId }: { newsletterId: string }) {
-  const [runs, setRuns] = useState<SendRun[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listSendRuns(newsletterId)
-      .then(({ sendRuns }) => setRuns(sendRuns))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load send history."));
-  }, [newsletterId]);
-
+// A dumb renderer over already-fetched runs — NewsletterCard owns the
+// fetching so it can both load history on expand and refresh it right after
+// a "Send now" click resolves (see Fix 6: the list used to only update on a
+// manual page reload).
+function SendRunHistoryList({ runs, error }: { runs: SendRun[] | null; error: string | null }) {
   if (error) {
     return (
       <p role="alert" className="text-sm text-destructive">
@@ -536,7 +536,7 @@ function SendRunHistory({ newsletterId }: { newsletterId: string }) {
     <ul className="flex flex-col gap-1.5">
       {runs.slice(0, 10).map((run) => (
         <li key={run.id} className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge variant={SEND_RUN_STATUS_VARIANT[run.status]}>{run.status}</Badge>
+          <Badge variant={sendRunBadgeVariant(run)}>{sendRunBadgeLabel(run)}</Badge>
           <span className="text-muted-foreground">
             {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
           </span>
@@ -633,46 +633,51 @@ function EditNewsletterDialog({
               disabled={submitting}
             />
           </div>
-          <ScheduleField
-            idPrefix="edit-newsletter"
-            mode={scheduleMode}
-            onModeChange={setScheduleMode}
-            simple={simpleSchedule}
-            onSimpleChange={setSimpleSchedule}
-            scheduleCron={advancedCron}
-            onScheduleCronChange={setAdvancedCron}
-            timezone={timezone}
-            onTimezoneChange={setTimezone}
-            disabled={submitting}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-newsletter-lookback">Lookback (days)</Label>
-              <Input
-                id="edit-newsletter-lookback"
-                type="number"
-                min={1}
-                required
-                value={lookbackDays}
-                onChange={(e) => setLookbackDays(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-newsletter-smtp">SMTP profile</Label>
-              <Select
-                id="edit-newsletter-smtp"
-                value={smtpProfileId}
-                onChange={(e) => setSmtpProfileId(e.target.value)}
-                disabled={submitting}
-              >
-                <option value="">None yet</option>
-                {smtpProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </option>
-                ))}
-              </Select>
+          <div className="rounded-md border border-border p-3">
+            <ScheduleField
+              idPrefix="edit-newsletter"
+              mode={scheduleMode}
+              onModeChange={setScheduleMode}
+              simple={simpleSchedule}
+              onSimpleChange={setSimpleSchedule}
+              scheduleCron={advancedCron}
+              onScheduleCronChange={setAdvancedCron}
+              timezone={timezone}
+              onTimezoneChange={setTimezone}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+            <p className="text-sm font-medium">Delivery</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-newsletter-lookback">Lookback (days)</Label>
+                <Input
+                  id="edit-newsletter-lookback"
+                  type="number"
+                  min={1}
+                  required
+                  value={lookbackDays}
+                  onChange={(e) => setLookbackDays(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-newsletter-smtp">SMTP profile</Label>
+                <Select
+                  id="edit-newsletter-smtp"
+                  value={smtpProfileId}
+                  onChange={(e) => setSmtpProfileId(e.target.value)}
+                  disabled={submitting}
+                >
+                  <option value="">None yet</option>
+                  {smtpProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -727,8 +732,11 @@ function NewsletterCard({
   const [detailError, setDetailError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sendRuns, setSendRuns] = useState<SendRun[] | null>(null);
+  const [sendRunsError, setSendRunsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!expanded || detail) return;
@@ -736,6 +744,20 @@ function NewsletterCard({
       .then(setDetail)
       .catch((err) => setDetailError(err instanceof ApiError ? err.message : "Failed to load details."));
   }, [expanded, detail, newsletter.id]);
+
+  function refreshSendRuns() {
+    listSendRuns(newsletter.id)
+      .then(({ sendRuns: loaded }) => {
+        setSendRuns(loaded);
+        setSendRunsError(null);
+      })
+      .catch((err) => setSendRunsError(err instanceof ApiError ? err.message : "Failed to load send history."));
+  }
+
+  useEffect(() => {
+    if (!expanded || sendRuns || sendRunsError) return;
+    refreshSendRuns();
+  }, [expanded, sendRuns, sendRunsError, newsletter.id]);
 
   async function handleToggleEnabled(next: boolean) {
     setToggling(true);
@@ -750,13 +772,18 @@ function NewsletterCard({
   async function handleSendNow() {
     setSending(true);
     setSendResult(null);
+    setSendError(null);
     try {
       await sendNewsletterNow(newsletter.id);
       setSendResult("Send started.");
     } catch (err) {
-      setSendResult(err instanceof ApiError ? err.message : "Failed to start send.");
+      setSendError(err instanceof ApiError ? err.message : "Failed to start send.");
     } finally {
       setSending(false);
+      // Whether the send succeeded or failed, a new (or updated) SendRun
+      // row exists now — refresh so it shows up immediately instead of
+      // only after a manual page reload (see Fix 6).
+      refreshSendRuns();
     }
   }
 
@@ -786,7 +813,8 @@ function NewsletterCard({
             <span className="min-w-0">
               <span className="block truncate font-medium">{newsletter.name}</span>
               <span className="block truncate text-sm text-muted-foreground">
-                {newsletter.scheduleCron} ({newsletter.timezone}) &middot; {newsletter.lookbackDays}-day lookback
+                {formatScheduleForDisplay(newsletter.scheduleCron, newsletter.timezone)} &middot;{" "}
+                {newsletter.lookbackDays}-day lookback
               </span>
             </span>
           </button>
@@ -874,8 +902,13 @@ function NewsletterCard({
                 </Button>
                 {sendResult ? <span className="text-sm text-muted-foreground">{sendResult}</span> : null}
               </div>
+              {sendError ? (
+                <span role="alert" className="text-sm text-destructive">
+                  {sendError}
+                </span>
+              ) : null}
               <p className="text-sm font-medium">Send history</p>
-              <SendRunHistory newsletterId={newsletter.id} />
+              <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
             </div>
           </div>
         ) : null}

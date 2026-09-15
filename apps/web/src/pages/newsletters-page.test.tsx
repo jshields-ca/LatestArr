@@ -64,6 +64,21 @@ const everyoneGroup = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
+const primarySmtpProfile = {
+  id: "smtp1",
+  name: "Primary",
+  host: "smtp.example.com",
+  port: 587,
+  secure: false,
+  hasAuth: true,
+  defaultFromName: "LatestArr",
+  defaultFromEmail: "noreply@example.com",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
+const secondarySmtpProfile = { ...primarySmtpProfile, id: "smtp2", name: "Secondary" };
+
 const weeklyLayoutTemplate = {
   id: "t1",
   name: "Weekly Layout",
@@ -98,12 +113,24 @@ describe("NewslettersPage", () => {
     expect(await screen.findByText("No newsletters yet")).toBeInTheDocument();
   });
 
-  it("lists a newsletter with its schedule", async () => {
+  it("lists a newsletter with its schedule humanized instead of the raw cron", async () => {
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
     renderPage();
 
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
-    expect(screen.getByText(/0 8 \* \* 1 \(UTC\)/)).toBeInTheDocument();
+    // weeklyDigest.scheduleCron is "0 8 * * 1" — weekly, Monday, 08:00 UTC —
+    // and should read as a sentence, not the literal cron string.
+    expect(screen.getByText(/Weekly on Monday at 8:00 AM \(UTC\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 8 \* \* 1/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the raw cron string for a schedule the simple picker can't express", async () => {
+    const customSchedule = { ...weeklyDigest, scheduleCron: "*/15 * * * *" };
+    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [customSchedule] }) }));
+    renderPage();
+
+    expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
+    expect(screen.getByText(/\*\/15 \* \* \* \* \(UTC\)/)).toBeInTheDocument();
   });
 
   it("adds a newsletter through the dialog", async () => {
@@ -211,6 +238,91 @@ describe("NewslettersPage", () => {
     expect(JSON.parse(init.body as string).timezone).toBe("America/Winnipeg");
   });
 
+  it("defaults the Add newsletter dialog's timezone to the browser's detected zone", async () => {
+    const user = userEvent.setup();
+    const dtfSpy = vi
+      .spyOn(Intl, "DateTimeFormat")
+      .mockImplementation(
+        () => ({ resolvedOptions: () => ({ timeZone: "America/Winnipeg" }) }) as unknown as Intl.DateTimeFormat,
+      );
+    mockRoutes(baseRoutes());
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Timezone")).toHaveValue("America/Winnipeg");
+
+    dtfSpy.mockRestore();
+  });
+
+  it("falls back to UTC when the browser reports a zone outside the supported list", async () => {
+    const user = userEvent.setup();
+    const dtfSpy = vi
+      .spyOn(Intl, "DateTimeFormat")
+      .mockImplementation(
+        () => ({ resolvedOptions: () => ({ timeZone: "Not/AZone" }) }) as unknown as Intl.DateTimeFormat,
+      );
+    mockRoutes(baseRoutes());
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Timezone")).toHaveValue("UTC");
+
+    dtfSpy.mockRestore();
+  });
+
+  it("auto-selects the sole SMTP profile in the Add newsletter dialog", async () => {
+    const user = userEvent.setup();
+    mockRoutes(baseRoutes({ "/api/smtp-profiles": jsonResponse(200, { smtpProfiles: [primarySmtpProfile] }) }));
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("SMTP profile")).toHaveValue("smtp1");
+  });
+
+  it("leaves the SMTP profile unselected in the Add newsletter dialog when there are no profiles yet", async () => {
+    const user = userEvent.setup();
+    mockRoutes(baseRoutes());
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("SMTP profile")).toHaveValue("");
+  });
+
+  it("leaves the SMTP profile unselected in the Add newsletter dialog when there are multiple profiles", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/smtp-profiles": jsonResponse(200, { smtpProfiles: [primarySmtpProfile, secondarySmtpProfile] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("SMTP profile")).toHaveValue("");
+  });
+
+  it("groups delivery fields under a labeled section in the Add newsletter dialog", async () => {
+    const user = userEvent.setup();
+    mockRoutes(baseRoutes());
+    renderPage();
+    await screen.findByText("No newsletters yet");
+
+    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Delivery")).toBeInTheDocument();
+    expect(within(dialog).getByText("Schedule")).toBeInTheDocument();
+  });
+
   it("toggles enabled via the switch", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
@@ -286,6 +398,145 @@ describe("NewslettersPage", () => {
     await user.click(screen.getByRole("button", { name: "Send now" }));
 
     expect(await screen.findByText("Newsletter has no SMTP profile configured")).toBeInTheDocument();
+  });
+
+  it("shows a specific send-now failure message inline immediately, not a generic Internal Server Error", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    await screen.findByText("No sends yet.");
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(502, {
+        error: "Could not reach one of this newsletter's connected sources (fetch failed)",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Send now" }));
+
+    expect(
+      await screen.findByText("Could not reach one of this newsletter's connected sources (fetch failed)"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Internal Server Error")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading state on Send now while the request is in flight", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    await screen.findByText("No sends yet.");
+
+    let resolveSend!: (value: unknown) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve;
+        }),
+    );
+    const sendButton = screen.getByRole("button", { name: "Send now" });
+    await user.click(sendButton);
+    expect(sendButton).toBeDisabled();
+
+    resolveSend(jsonResponse(200, { sendRunId: "run1" }));
+    await waitFor(() => expect(sendButton).not.toBeDisabled());
+  });
+
+  it("refreshes send history right after Send now resolves, without a page reload", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    await screen.findByText("No sends yet.");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRunId: "run1" }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        sendRuns: [
+          {
+            id: "run1",
+            newsletterId: "n1",
+            status: "success",
+            startedAt: "2026-01-02T00:00:00.000Z",
+            finishedAt: "2026-01-02T00:00:05.000Z",
+            itemCountIncluded: 3,
+            recipientCount: 2,
+            error: null,
+          },
+        ],
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Send now" }));
+
+    expect(await screen.findByText(/3 items/)).toBeInTheDocument();
+    expect(screen.queryByText("No sends yet.")).not.toBeInTheDocument();
+  });
+
+  it("visually distinguishes an empty successful send from a real one in send history", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, {
+          sendRuns: [
+            {
+              id: "run-empty",
+              newsletterId: "n1",
+              status: "success",
+              startedAt: "2026-01-01T00:00:00.000Z",
+              finishedAt: "2026-01-01T00:00:01.000Z",
+              itemCountIncluded: 0,
+              recipientCount: 0,
+              error: null,
+            },
+          ],
+        }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+
+    expect(await screen.findByText("Sent (empty)")).toBeInTheDocument();
+    expect(screen.queryByText("success")).not.toBeInTheDocument();
   });
 
   it("creates a newsletter with a template selected in the dialog", async () => {
@@ -458,6 +709,6 @@ describe("NewslettersPage", () => {
       // 5s test timeout under load.
       expect(await axe(document.body)).toHaveNoViolations();
     },
-    15000,
+    25000,
   );
 });
