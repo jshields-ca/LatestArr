@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { ChevronDown, ChevronRight, Loader2, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -154,6 +154,98 @@ function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) =
   );
 }
 
+function EditRecipientDialog({
+  recipient,
+  onSaved,
+}: {
+  recipient: Recipient;
+  onSaved: (recipient: Recipient) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState(recipient.email);
+  const [displayName, setDisplayName] = useState(recipient.displayName ?? "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openWithCurrentValues(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setEmail(recipient.email);
+      setDisplayName(recipient.displayName ?? "");
+      setError(null);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { recipient: updated } = await updateRecipient(recipient.id, {
+        email,
+        displayName: displayName || undefined,
+      });
+      onSaved(updated);
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${recipient.email}`}>
+          <Pencil />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit recipient</DialogTitle>
+          <DialogDescription>Update this recipient's email or display name.</DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-recipient-email">Email</Label>
+            <Input
+              id="edit-recipient-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-recipient-name">Name (optional)</Label>
+            <Input
+              id="edit-recipient-name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function RecipientRow({
   recipient,
   onChanged,
@@ -197,6 +289,7 @@ function RecipientRow({
               {recipient.isActive ? "Active" : "Inactive"}
             </Label>
           </div>
+          <EditRecipientDialog recipient={recipient} onSaved={onChanged} />
           <ConfirmDelete
             label={`Delete ${recipient.email}`}
             onConfirm={() => deleteRecipient(recipient.id).then(() => onDeleted(recipient.id))}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
   listSourceKinds,
   listSources,
   testSourceConnection,
+  updateSource,
   type SourceConnection,
 } from "@/lib/api";
 
@@ -250,6 +251,128 @@ function AddSourceDialog({
   );
 }
 
+function EditSourceDialog({
+  source,
+  onSaved,
+}: {
+  source: SourceConnection;
+  onSaved: (source: SourceConnection) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(source.name);
+  const [baseUrl, setBaseUrl] = useState(source.baseUrl);
+  const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const config = KIND_CONFIG[source.kind] ?? FALLBACK_CONFIG;
+
+  function openWithCurrentValues(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setName(source.name);
+      setBaseUrl(source.baseUrl);
+      setCredentialValues({});
+      setError(null);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+
+    // Credentials are a full replace (they're never returned decrypted, so
+    // there's nothing to merge partial edits into) — either leave every
+    // field blank to keep what's already stored, or fill in all of them.
+    const filledCount = config.fields.filter((f) => credentialValues[f.key]).length;
+    if (filledCount > 0 && filledCount < config.fields.length) {
+      setError("Fill in every credential field, or leave them all blank to keep the current ones.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { source: updated } = await updateSource(source.id, {
+        name,
+        baseUrl,
+        ...(filledCount > 0 && { credentials: credentialValues }),
+      });
+      onSaved(updated);
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${source.name}`}>
+          <Pencil />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit source</DialogTitle>
+          <DialogDescription>{config.description}</DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-source-name">Name</Label>
+            <Input
+              id="edit-source-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-source-base-url">Base URL</Label>
+            <Input
+              id="edit-source-base-url"
+              type="url"
+              required
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          {config.fields.map((field) => (
+            <div className="flex flex-col gap-1.5" key={field.key}>
+              <Label htmlFor={`edit-source-field-${field.key}`}>{field.label} (leave blank to keep current)</Label>
+              <Input
+                id={`edit-source-field-${field.key}`}
+                type={field.type ?? "text"}
+                value={credentialValues[field.key] ?? ""}
+                onChange={(e) =>
+                  setCredentialValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                }
+                disabled={submitting}
+              />
+            </div>
+          ))}
+
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface RowState {
   testing: boolean;
   testResult: string | null;
@@ -259,10 +382,12 @@ interface RowState {
 
 function SourceRow({
   source,
+  onChanged,
   onDeleted,
   onStatusChange,
 }: {
   source: SourceConnection;
+  onChanged: (source: SourceConnection) => void;
   onDeleted: (id: string) => void;
   onStatusChange: (id: string, status: SourceConnection["status"], lastError: string | null) => void;
 }) {
@@ -344,6 +469,7 @@ function SourceRow({
                 {state.testing ? <Loader2 className="animate-spin" /> : null}
                 Test connection
               </Button>
+              <EditSourceDialog source={source} onSaved={onChanged} />
               <Button
                 variant="ghost"
                 size="icon"
@@ -424,6 +550,9 @@ export function SourcesPage() {
             <SourceRow
               key={source.id}
               source={source}
+              onChanged={(updated) =>
+                setSources((prev) => (prev ?? []).map((s) => (s.id === updated.id ? updated : s)))
+              }
               onDeleted={(id) => setSources((prev) => (prev ?? []).filter((s) => s.id !== id))}
               onStatusChange={(id, status, lastError) =>
                 setSources((prev) =>

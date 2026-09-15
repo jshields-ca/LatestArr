@@ -93,6 +93,48 @@ describe("RecipientsPage", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
   });
 
+  it("edits a recipient's email and name through the edit dialog", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/recipients" && (!init || init.method === undefined))
+        return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients/r1" && init?.method === "PATCH") {
+        return Promise.resolve(
+          jsonResponse(200, {
+            recipient: { ...alice, email: "alice2@example.com", displayName: "Alice Two" },
+          }),
+        );
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Edit alice@example.com" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Email")).toHaveValue("alice@example.com");
+    expect(within(dialog).getByLabelText("Name (optional)")).toHaveValue("Alice");
+
+    await user.clear(within(dialog).getByLabelText("Email"));
+    await user.type(within(dialog).getByLabelText("Email"), "alice2@example.com");
+    await user.clear(within(dialog).getByLabelText("Name (optional)"));
+    await user.type(within(dialog).getByLabelText("Name (optional)"), "Alice Two");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByText("Alice Two")).toBeInTheDocument();
+
+    const patchCall = fetchMock.mock.calls.find(
+      ([, init]) => init?.method === "PATCH",
+    ) as [string, RequestInit];
+    expect(JSON.parse(patchCall[1].body as string)).toEqual({
+      email: "alice2@example.com",
+      displayName: "Alice Two",
+    });
+  });
+
   it("expands a group and adds an existing recipient as a member", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {

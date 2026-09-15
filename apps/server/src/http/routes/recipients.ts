@@ -12,6 +12,7 @@ const createRecipientSchema = z.object({
 });
 
 const updateRecipientSchema = z.object({
+  email: z.email("A valid email is required").optional(),
   displayName: z.string().trim().min(1).optional(),
   isActive: z.boolean().optional(),
 });
@@ -59,21 +60,29 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
     scope.patch<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {
       const body = parseBody(updateRecipientSchema, request.body, reply);
       if (!body) return reply;
-      const { displayName, isActive } = body;
+      const { email, displayName, isActive } = body;
 
-      const [recipient] = await db
-        .update(recipients)
-        .set({
-          ...(displayName !== undefined && { displayName }),
-          ...(isActive !== undefined && { isActive }),
-        })
-        .where(eq(recipients.id, request.params.id))
-        .returning();
+      try {
+        const [recipient] = await db
+          .update(recipients)
+          .set({
+            ...(email !== undefined && { email }),
+            ...(displayName !== undefined && { displayName }),
+            ...(isActive !== undefined && { isActive }),
+          })
+          .where(eq(recipients.id, request.params.id))
+          .returning();
 
-      if (!recipient) {
-        return reply.code(404).send({ error: "Not found" });
+        if (!recipient) {
+          return reply.code(404).send({ error: "Not found" });
+        }
+        return reply.send({ recipient });
+      } catch (err) {
+        if (isUniqueConstraintError(err)) {
+          return reply.code(409).send({ error: "A recipient with this email already exists" });
+        }
+        throw err;
       }
-      return reply.send({ recipient });
     });
 
     scope.delete<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {

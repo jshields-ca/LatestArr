@@ -266,6 +266,56 @@ describe("full source lifecycle", () => {
     expect(response.json().libraries).toEqual([{ id: "1", name: "Movies", kind: "movie" }]);
   });
 
+  it("updates name and baseUrl without requiring credentials", async () => {
+    const id = await createSource();
+
+    const patchResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/sources/${id}`,
+      cookies: { latestarr_session: sessionCookie },
+      payload: { name: "Bedroom Tautulli", baseUrl: "http://tautulli2.local:8181" },
+    });
+    expect(patchResponse.statusCode).toBe(200);
+    expect(patchResponse.json().source).toMatchObject({
+      name: "Bedroom Tautulli",
+      baseUrl: "http://tautulli2.local:8181",
+      kind: "tautulli",
+    });
+  });
+
+  it("re-encrypts credentials on update and the new value reaches the adapter", async () => {
+    const id = await createSource();
+
+    const patchResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/sources/${id}`,
+      cookies: { latestarr_session: sessionCookie },
+      payload: { credentials: { apiKey: "rotated-key" } },
+    });
+    expect(patchResponse.statusCode).toBe(200);
+
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "success", message: null, data: [] } }),
+    );
+    await app.inject({
+      method: "POST",
+      url: `/api/sources/${id}/test`,
+      cookies: { latestarr_session: sessionCookie },
+    });
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.searchParams.get("apikey")).toBe("rotated-key");
+  });
+
+  it("returns 404 when updating an unknown id", async () => {
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/api/sources/does-not-exist",
+      cookies: { latestarr_session: sessionCookie },
+      payload: { name: "Anything" },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
   it("deletes a source", async () => {
     const id = await createSource();
 
