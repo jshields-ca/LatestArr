@@ -76,10 +76,53 @@ describe("SmtpProfilesPage", () => {
       name: "Primary",
       host: "smtp.example.com",
       port: 587,
-      secure: true,
+      // Port 587 is STARTTLS, not implicit TLS — regression test for the
+      // form defaulting "Use implicit TLS" on for a port that isn't 465
+      // (a real Dreamhost user hit exactly this: implicit TLS on a
+      // STARTTLS-only port fails the handshake outright).
+      secure: false,
       defaultFromName: "LatestArr",
       defaultFromEmail: "digest@example.com",
     });
+  });
+
+  it("defaults 'Use implicit TLS' on when the port is changed to 465", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
+    render(<SmtpProfilesPage />);
+    await screen.findByText("No SMTP profiles yet");
+
+    await user.click(screen.getByRole("button", { name: "Add SMTP profile" }));
+    const dialog = await screen.findByRole("dialog");
+
+    const secureToggle = within(dialog).getByLabelText("Use implicit TLS (port 465)");
+    expect(secureToggle).not.toBeChecked();
+
+    await user.clear(within(dialog).getByLabelText("Port"));
+    await user.type(within(dialog).getByLabelText("Port"), "465");
+    expect(secureToggle).toBeChecked();
+
+    await user.clear(within(dialog).getByLabelText("Port"));
+    await user.type(within(dialog).getByLabelText("Port"), "587");
+    expect(secureToggle).not.toBeChecked();
+  });
+
+  it("does not override the toggle once the user has set it manually", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
+    render(<SmtpProfilesPage />);
+    await screen.findByText("No SMTP profiles yet");
+
+    await user.click(screen.getByRole("button", { name: "Add SMTP profile" }));
+    const dialog = await screen.findByRole("dialog");
+
+    const secureToggle = within(dialog).getByLabelText("Use implicit TLS (port 465)");
+    await user.click(secureToggle);
+    expect(secureToggle).toBeChecked();
+
+    await user.clear(within(dialog).getByLabelText("Port"));
+    await user.type(within(dialog).getByLabelText("Port"), "587");
+    expect(secureToggle).toBeChecked();
   });
 
   it("tests a connection and shows the result", async () => {

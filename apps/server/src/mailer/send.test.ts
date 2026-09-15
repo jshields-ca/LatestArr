@@ -30,9 +30,16 @@ describe("verifySmtpConnection", () => {
       host: "smtp.example.com",
       port: 587,
       secure: false,
+      requireTLS: true,
       auth: { user: "u", pass: "p" },
     });
     expect(mockVerify).toHaveBeenCalled();
+  });
+
+  it("does not require a STARTTLS upgrade when already using implicit TLS", async () => {
+    mockVerify.mockResolvedValueOnce(true);
+    await verifySmtpConnection({ host: "smtp.example.com", port: 465, secure: true });
+    expect(mockCreateTransport).toHaveBeenCalledWith(expect.objectContaining({ requireTLS: false }));
   });
 
   it("omits auth when no user is given", async () => {

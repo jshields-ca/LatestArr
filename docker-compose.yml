@@ -1,5 +1,13 @@
+# Pins the Compose project name so containers/volumes/networks are always
+# named "latestarr-*" regardless of what directory this file lives in —
+# without this, Compose derives the project name from the containing
+# folder (e.g. a checkout at ~/docker/test-latestarr/ produces a container
+# named "test-latestarr-latestarr-1").
+name: latestarr
+
 services:
   latestarr:
+    container_name: latestarr
     # Published on every tagged release (see .github/workflows/release.yml).
     # `build:` below is what actually runs when no image tagged
     # latestarr:${LATESTARR_VERSION:-latest} exists locally yet, or when you

@@ -203,7 +203,7 @@ export function DashboardPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Sources" value={sources?.length ?? 0} href="/sources" />
           <StatCard label="Recipients" value={recipients?.length ?? 0} href="/recipients" />
-          <StatCard label="SMTP profiles" value={smtpProfiles?.length ?? 0} href="/smtp" />
+          <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" />
           <StatCard label="Newsletters" value={newsletters?.length ?? 0} href="/newsletters" />
         </div>
       ) : null}
