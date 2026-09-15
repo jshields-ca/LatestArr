@@ -152,8 +152,68 @@ describe("login / session lifecycle", () => {
     expect(meAfterLogout.statusCode).toBe(401);
   });
 
+  it("does not mark the session cookie Secure for a plain http request", async () => {
+    // Regression test: this used to key off NODE_ENV, which the Docker
+    // image always sets to "production" regardless of whether TLS is
+    // actually in front of it — forcing Secure on for every deployment,
+    // including direct http:// access, and silently breaking login
+    // (browsers refuse to store a Secure cookie over a plain HTTP
+    // connection). It must instead reflect the real connection.
+    const loginResponse = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    const rawCookie = loginResponse.headers["set-cookie"];
+    const cookieHeader = Array.isArray(rawCookie) ? rawCookie[0] : rawCookie;
+    expect(cookieHeader).not.toContain("Secure");
+  });
+
   it("rejects /auth/me with no session cookie", async () => {
     const response = await app.inject({ method: "GET", url: "/api/auth/me" });
     expect(response.statusCode).toBe(401);
+  });
+});
+
+describe("login behind a trusted reverse proxy (TRUST_PROXY=true)", () => {
+  let proxiedApp: FastifyInstance;
+
+  beforeEach(async () => {
+    process.env.TRUST_PROXY = "true";
+    proxiedApp = await buildApp(db);
+    await proxiedApp.inject({
+      method: "POST",
+      url: "/api/auth/bootstrap",
+      payload: { email: "admin@example.com", password: "a-very-long-password", displayName: "Admin" },
+    });
+  });
+
+  afterEach(async () => {
+    delete process.env.TRUST_PROXY;
+    await proxiedApp.close();
+  });
+
+  it("marks the session cookie Secure when the proxy forwards X-Forwarded-Proto: https", async () => {
+    const loginResponse = await proxiedApp.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "x-forwarded-proto": "https" },
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    const rawCookie = loginResponse.headers["set-cookie"];
+    const cookieHeader = Array.isArray(rawCookie) ? rawCookie[0] : rawCookie;
+    expect(cookieHeader).toContain("Secure");
+  });
+
+  it("does not mark it Secure when the forwarded protocol is still http", async () => {
+    const loginResponse = await proxiedApp.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "x-forwarded-proto": "http" },
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+    const rawCookie = loginResponse.headers["set-cookie"];
+    const cookieHeader = Array.isArray(rawCookie) ? rawCookie[0] : rawCookie;
+    expect(cookieHeader).not.toContain("Secure");
   });
 });
