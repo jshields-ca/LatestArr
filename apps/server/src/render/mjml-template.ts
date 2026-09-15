@@ -15,6 +15,14 @@ interface RenderableItem {
   subtitle?: string;
   overview?: string;
   addedAtFormatted: string;
+  posterUrl?: string;
+  genres?: string;
+  rating?: string;
+  runtimeFormatted?: string;
+  pageCount?: number;
+  durationFormatted?: string;
+  platform?: string;
+  externalUrl?: string;
 }
 
 export interface MjmlRenderContext {
@@ -31,6 +39,21 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
+// Shared by runtimeMinutes (movies/TV) and durationSeconds (audiobooks,
+// converted to minutes first) so both land on the same "1h 45m" / "45m" shape.
+function formatMinutes(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+function formatRating(rating: NewItem["rating"]): string | undefined {
+  if (!rating) return undefined;
+  return `${rating.value}/${rating.scale}`;
+}
+
 function toRenderable(item: NewItem): RenderableItem {
   return {
     kind: item.kind,
@@ -38,6 +61,16 @@ function toRenderable(item: NewItem): RenderableItem {
     subtitle: item.subtitle,
     overview: item.overview,
     addedAtFormatted: formatDate(item.addedAt),
+    posterUrl: item.posterUrl,
+    genres: item.genres?.length ? item.genres.join(", ") : undefined,
+    rating: formatRating(item.rating),
+    runtimeFormatted: item.runtimeMinutes ? formatMinutes(item.runtimeMinutes) : undefined,
+    pageCount: item.pageCount,
+    durationFormatted: item.durationSeconds
+      ? formatMinutes(Math.round(item.durationSeconds / 60))
+      : undefined,
+    platform: item.platform,
+    externalUrl: item.externalUrl,
   };
 }
 

@@ -80,6 +80,69 @@ const MEDIA_LIST_MJML = `
 </mjml>
 `;
 
+const CARD_MJML = `
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-raw>
+        {{#mediaList contentType="movie" sort="added" count="5"}}
+        <table><tr>
+        {{#if posterUrl}}<td><img src="{{posterUrl}}" alt="{{title}} cover art" /></td>{{/if}}
+        <td>{{title}} {{#if runtimeFormatted}}{{runtimeFormatted}}{{/if}}{{#if rating}} · {{rating}}{{/if}}</td>
+        </tr></table>
+        {{/mediaList}}
+        </mj-raw>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+`;
+
+describe("poster and metadata fields on rendered items", () => {
+  it("exposes posterUrl, a formatted runtime, and a formatted rating to the template", async () => {
+    const html = await renderMjmlTemplate(CARD_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [
+        item({
+          title: "A Movie",
+          posterUrl: "https://example.com/poster.jpg",
+          runtimeMinutes: 105,
+          rating: { source: "tmdb", value: 7.8, scale: 10 },
+        }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain('src="https://example.com/poster.jpg"');
+    expect(html).toContain('alt="A Movie cover art"');
+    expect(html).toContain("1h 45m");
+    expect(html).toContain("7.8/10");
+  });
+
+  it("omits the poster image entirely when an item has no posterUrl", async () => {
+    const html = await renderMjmlTemplate(CARD_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "No Poster Movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("<img");
+    expect(html).toContain("No Poster Movie");
+  });
+
+  it("formats a runtime under an hour as minutes only", async () => {
+    const html = await renderMjmlTemplate(CARD_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "Short Film", runtimeMinutes: 45 })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("45m");
+    expect(html).not.toContain("0h");
+  });
+});
+
 describe("the mediaList block helper", () => {
   it("filters the 'added' pool by content type and truncates to count", async () => {
     const html = await renderMjmlTemplate(MEDIA_LIST_MJML, {

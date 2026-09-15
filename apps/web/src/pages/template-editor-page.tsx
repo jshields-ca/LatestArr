@@ -8,6 +8,7 @@ import "grapesjs/dist/css/grapes.min.css";
 import { Button } from "@/components/ui/button";
 import { makeGrapesJsKeyboardOperable } from "@/lib/grapesjs-a11y";
 import { applyClickToAddFallback, registerCustomBlocks } from "@/lib/grapesjs-blocks";
+import { registerReorderControls } from "@/lib/grapesjs-reorder";
 import { ApiError, getTemplate, updateTemplate, type Template } from "@/lib/api";
 
 // A curated subset of the plugin's default MJML blocks — layout/content
@@ -48,6 +49,7 @@ export function TemplateEditorPage() {
     });
     registerCustomBlocks(editor);
     applyClickToAddFallback(editor);
+    registerReorderControls(editor);
 
     if (template.designJson) {
       editor.loadProjectData(template.designJson);

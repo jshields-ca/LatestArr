@@ -11,7 +11,7 @@
 // list only renders into the DOM the first time "Open Blocks" is clicked
 // (confirmed by testing — at editor "load" time the .gjs-block elements
 // don't exist yet), so anything patched only once at load would miss it.
-const KEYBOARD_OPERABLE_SELECTOR = ".gjs-block, .gjs-pn-btn, .gjs-layer-title";
+const KEYBOARD_OPERABLE_SELECTOR = ".gjs-block, .gjs-pn-btn, .gjs-layer-title, .gjs-toolbar-item";
 
 function patch(el: HTMLElement): void {
   if (el.hasAttribute("tabindex")) return;

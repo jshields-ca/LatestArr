@@ -26,6 +26,54 @@ function fakeEditor() {
   return { BlockManager, Components, getWrapper, append };
 }
 
+describe("the media-list component's toHTML card markup", () => {
+  function getModelDefinition() {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+    const [, definition] = editor.Components.addType.mock.calls[0] as [string, { model: Record<string, unknown> }];
+    return definition.model;
+  }
+
+  function fakeComponent(contentType: string) {
+    const values: Record<string, unknown> = { contentType, sort: "added", count: 5 };
+    return { get: (key: string) => values[key] };
+  }
+
+  it("wraps a poster <img> in a Handlebars {{#if posterUrl}} guard with alt text on the title", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call(fakeComponent("movie"));
+
+    expect(html).toContain("{{#if posterUrl}}");
+    expect(html).toContain('alt="{{title}} cover art"');
+    expect(html).toContain("{{#mediaList contentType=\"movie\"");
+  });
+
+  it("shows runtime for movies, page count for books, duration for audiobooks, and platform for games", () => {
+    const model = getModelDefinition();
+    const toHTML = model.toHTML as (this: unknown) => string;
+
+    expect(toHTML.call(fakeComponent("movie"))).toContain("runtimeFormatted");
+    expect(toHTML.call(fakeComponent("book"))).toContain("pageCount");
+    expect(toHTML.call(fakeComponent("audiobook"))).toContain("durationFormatted");
+    expect(toHTML.call(fakeComponent("game"))).toContain("platform");
+  });
+
+  it("offers all six adapter media kinds in the content-type trait", () => {
+    const model = getModelDefinition();
+    const traits = (model.defaults as { traits: { name: string; options?: { id: string }[] }[] }).traits;
+    const contentTypeTrait = traits.find((t) => t.name === "contentType")!;
+
+    expect(contentTypeTrait.options?.map((o) => o.id)).toEqual([
+      "movie",
+      "tv_episode",
+      "tv_season",
+      "book",
+      "audiobook",
+      "game",
+    ]);
+  });
+});
+
 describe("registerCustomBlocks + applyClickToAddFallback", () => {
   it("gives every LatestArr block a click-to-add handler that appends its content", () => {
     const editor = fakeEditor();
