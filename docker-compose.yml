@@ -4,7 +4,10 @@ services:
       context: .
       dockerfile: docker/Dockerfile
     ports:
-      - "3000:3000"
+      # Change the host side (left of the colon) via PORT in .env if 3000
+      # collides with something else already running — the app inside the
+      # container always listens on 3000, so nothing else needs to change.
+      - "${PORT:-3000}:3000"
     environment:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}

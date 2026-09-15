@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
@@ -23,6 +24,15 @@ import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
 import { registerTemplateRoutes } from "./http/routes/templates.js";
 import type { SchedulerHandle } from "./scheduler/engine.js";
+
+// Read once at module load rather than per-request — the version can't
+// change without a restart anyway. `pnpm deploy` (used by the Docker
+// build) copies this package's own package.json alongside dist/, and in
+// dev (tsx running straight from src/) the same relative path resolves to
+// the identical file one level up from src/ — so this works unmodified in
+// both environments without needing to bundle package.json specially.
+const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "package.json");
+const appVersion = (JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version: string }).version;
 
 registerAdapter(tautulliAdapter);
 registerAdapter(plexAdapter);
@@ -105,6 +115,11 @@ export async function buildApp(
   // know about the prefix.
   await app.register(
     async (api) => {
+      // Unauthenticated (like /health) — the WebUI shows this in its
+      // sidebar so a self-hoster can tell what version they're running
+      // at a glance without checking the container image tag.
+      api.get("/version", async () => ({ version: appVersion }));
+
       registerAuthRoutes(api, db, { oidcEnabled: loadOidcConfigFromEnv() !== null });
       registerOidcRoutes(api, db);
       registerSourceRoutes(api, db);

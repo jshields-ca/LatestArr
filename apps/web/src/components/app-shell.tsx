@@ -1,15 +1,78 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { LogOut, Menu } from "lucide-react";
+import { FolderGit2, Globe, LogOut, Menu, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { getVersion } from "@/lib/api";
 import { navItems } from "@/lib/nav-items";
 import { cn } from "@/lib/utils";
+
+const REPO_URL = "https://github.com/jshields-ca/LatestArr";
+const AUTHOR_URL = "https://www.scootr.ca";
+
+const iconLinkClassName =
+  "text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
+
+function ProjectLinks() {
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getVersion()
+      .then(({ version }) => {
+        if (!cancelled) setVersion(version);
+      })
+      .catch(() => {
+        // Non-critical — the sidebar just shows no version rather than an error.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="flex items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+      <span>{version ? `v${version}` : null}</span>
+      <div className="flex items-center gap-3">
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="View on GitHub"
+          aria-label="View on GitHub"
+          className={iconLinkClassName}
+        >
+          <FolderGit2 className="size-4" />
+        </a>
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="Star on GitHub"
+          aria-label="Star on GitHub"
+          className={iconLinkClassName}
+        >
+          <Star className="size-4" />
+        </a>
+        <a
+          href={AUTHOR_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="scootr.ca"
+          aria-label="scootr.ca"
+          className={iconLinkClassName}
+        >
+          <Globe className="size-4" />
+        </a>
+      </div>
+    </div>
+  );
+}
 
 function UserFooter() {
   const { user, logout } = useAuth();
@@ -78,7 +141,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               </SheetTitle>
             </SheetHeader>
             <NavList onNavigate={() => setMobileNavOpen(false)} />
-            <div className="mt-auto">
+            <div className="mt-auto flex flex-col gap-3">
+              <ProjectLinks />
               <UserFooter />
             </div>
           </SheetContent>
@@ -97,7 +161,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Logo />
           </div>
           <NavList />
-          <div className="mt-auto">
+          <div className="mt-auto flex flex-col gap-3">
+            <ProjectLinks />
             <UserFooter />
           </div>
         </aside>
