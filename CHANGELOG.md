@@ -11,6 +11,12 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.6.0] - 2026-09-15
+
+- Newsletter admin fixes from design review and a real send-now test run: newsletter cards now show a human-readable schedule ("Weekly on Monday at 8:00 AM") instead of the raw cron string for schedules the Simple picker can express; the Add newsletter dialog defaults Timezone to the browser's own zone instead of always UTC, and pre-selects the SMTP profile when there's exactly one; the Add/Edit newsletter dialogs group their Schedule and Delivery fields into labeled sections instead of one flat list; a "Send now" that completes with nothing actually sent (no linked source or recipient group) is now visually distinguished from a real send in Send History and on the Dashboard; a genuine send failure (e.g. an unreachable source) now returns a specific, structured error instead of a bare "Internal Server Error", shown inline the moment the send fails; and Send History now refreshes automatically right after a "Send now" click resolves instead of requiring a page reload.
+- Add a proper "Page not found" screen (with a link back to the Dashboard) for unknown routes, replacing the blank content area you'd get from mistyping a URL like `/smtp-profiles` instead of `/smtp`. Also fix the first-admin signup form only flagging the Password field when submitted empty — Name and Email now get the same red-border-and-inline-message treatment when they're missing too.
+- Fix the "default layout" (no custom template picked) newsletter render falling back to a stale, pre-poster hardcoded template with no images and no MJML compilation. It now renders through the same MJML pipeline as a custom GrapesJS template, so a default-layout send gets the same poster + metadata cards, responsive layout, and Outlook/MSO compatibility.
+
 ## [0.5.0] - 2026-09-15
 
 - Give the Media List builder block real poster/cover-art and metadata (runtime, page count, audiobook duration, platform, rating), expand its content-type picker to all six adapter media kinds (movies, TV episodes, TV seasons, books, audiobooks, games), and add real, non-drag Move up/down buttons to every component's toolbar in the template editor.
