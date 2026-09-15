@@ -128,6 +128,11 @@ describe("security headers and cross-origin protection", () => {
     expect(response.headers["x-frame-options"]).toBe("SAMEORIGIN");
   });
 
+  it("does not send upgrade-insecure-requests, since this app has no TLS listener of its own", async () => {
+    const response = await app.inject({ method: "GET", url: "/health" });
+    expect(response.headers["content-security-policy"]).not.toContain("upgrade-insecure-requests");
+  });
+
   it("allows a same-origin mutating request through", async () => {
     const response = await app.inject({
       method: "POST",
