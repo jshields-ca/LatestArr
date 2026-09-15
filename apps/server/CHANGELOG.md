@@ -1,5 +1,19 @@
 # @latestarr/server
 
+## 0.4.6
+
+### Patch Changes
+
+- d5a8c93: Add a way to edit your own display name and change your password from the admin UI — previously there was no way to do either without direct database access. A new "Edit profile" button next to the sidebar's user info opens a dialog for both; changing the password requires the current password, and accounts that sign in via SSO (no local password) get a clear error if they try.
+- @latestarr/adapter-audiobookshelf@0.4.6
+  - @latestarr/adapter-booklore-family@0.4.6
+  - @latestarr/adapter-core@0.4.6
+  - @latestarr/adapter-plex@0.4.6
+  - @latestarr/adapter-romm@0.4.6
+  - @latestarr/adapter-tautulli@0.4.6
+  - @latestarr/crypto@0.4.6
+  - @latestarr/db@0.4.6
+
 ## 0.4.5
 
 ### Patch Changes
