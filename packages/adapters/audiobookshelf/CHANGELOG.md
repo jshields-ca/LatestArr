@@ -1,5 +1,11 @@
 # @latestarr/adapter-audiobookshelf
 
+## 0.4.1
+
+### Patch Changes
+
+- @latestarr/adapter-core@0.4.1
+
 ## 0.4.0
 
 ### Patch Changes
