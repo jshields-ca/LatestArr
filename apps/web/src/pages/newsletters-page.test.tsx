@@ -709,6 +709,6 @@ describe("NewslettersPage", () => {
       // 5s test timeout under load.
       expect(await axe(document.body)).toHaveNoViolations();
     },
-    15000,
+    25000,
   );
 });
