@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  Activity,
+  BookOpen,
+  Clapperboard,
+  Gamepad2,
+  Headphones,
+  Loader2,
+  Pencil,
+  Plus,
+  Server,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -96,6 +108,19 @@ const FALLBACK_CONFIG: SourceKindConfig = {
   label: "Source",
   description: "Connect a media source.",
   fields: [{ key: "apiKey", label: "API key", type: "password" }],
+};
+
+// BookLore, BookOrbit, and Grimmory are three separate forks of the same
+// OPDS-based catalog server, so they share both a field shape (above) and
+// an icon here.
+const KIND_ICON: Record<string, LucideIcon> = {
+  tautulli: Activity,
+  plex: Clapperboard,
+  booklore: BookOpen,
+  bookorbit: BookOpen,
+  grimmory: BookOpen,
+  audiobookshelf: Headphones,
+  romm: Gamepad2,
 };
 
 // Used before the server's own list of registered kinds has loaded, so the
@@ -428,17 +453,25 @@ function SourceRow({
     }
   }
 
+  const Icon = KIND_ICON[source.kind] ?? Server;
+  const kindLabel = KIND_CONFIG[source.kind]?.label ?? source.kind;
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="truncate font-medium">{source.name}</p>
-            <Badge variant="neutral">{source.kind}</Badge>
-            <StatusBadge status={source.status} />
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <Icon className="size-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate font-medium">{source.name}</p>
+              <Badge variant="neutral">{kindLabel}</Badge>
+              <StatusBadge status={source.status} />
+            </div>
+            <p className="truncate text-sm text-muted-foreground">{source.baseUrl}</p>
+            {state.testResult ? <p className="text-sm text-muted-foreground">{state.testResult}</p> : null}
           </div>
-          <p className="truncate text-sm text-muted-foreground">{source.baseUrl}</p>
-          {state.testResult ? <p className="text-sm text-muted-foreground">{state.testResult}</p> : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
