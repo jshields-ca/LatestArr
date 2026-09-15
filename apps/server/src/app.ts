@@ -60,7 +60,14 @@ export async function buildApp(
   scheduler?: SchedulerHandle,
   options: BuildAppOptions = {},
 ): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true });
+  // Only trust X-Forwarded-* when explicitly told to — this process never
+  // terminates TLS itself, so trusting those headers unconditionally would
+  // let anyone with direct network access (the default, undocumented-proxy
+  // deployment) spoof their IP (rate-limit bypass) or protocol. Reverse
+  // proxy setups opt in via TRUST_PROXY=true (see docs/self-hosting.md);
+  // this is also what makes the session cookie's Secure flag correct in
+  // both modes (see auth.ts/oidc.ts, which key off request.protocol).
+  const app = Fastify({ logger: true, trustProxy: process.env.TRUST_PROXY === "true" });
 
   await app.register(cookie);
 

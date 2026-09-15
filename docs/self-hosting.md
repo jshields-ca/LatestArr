@@ -66,8 +66,8 @@ None of this is a separate wizard — it's the same admin screens you'd use afte
 
 LatestArr's container serves plain HTTP on port 3000 and expects TLS termination to happen in front of it (nginx, Caddy, Traefik, or your platform's own ingress). Two things to get right:
 
-- Forward the real client IP and proto (`X-Forwarded-For`, `X-Forwarded-Proto`) so login rate-limiting and secure-cookie behavior work correctly.
-- Set `WEB_ORIGIN` to the externally-reachable `https://` URL — the app only sets the session cookie's `Secure` flag when `NODE_ENV=production` (already set inside the container) and trusts the proxy for the rest.
+- Forward the real client IP and proto (`X-Forwarded-For`, `X-Forwarded-Proto`) and set `TRUST_PROXY=true` in `.env` — without this, LatestArr ignores those headers (so it never knows the connection is actually HTTPS) and the session cookie's `Secure` flag won't be set, which login rate-limiting and secure-cookie behavior both depend on. Leave `TRUST_PROXY` unset for direct `http://` access with no proxy in front (the default Getting Started flow) — setting it without an actual proxy forwarding those headers lets a client spoof its own IP and protocol.
+- Set `WEB_ORIGIN` to the externally-reachable `https://` URL.
 
 A minimal Caddy example:
 

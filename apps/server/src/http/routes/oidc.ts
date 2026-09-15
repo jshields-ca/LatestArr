@@ -12,10 +12,6 @@ function stringHeader(value: string | string[] | undefined): string | undefined 
   return typeof value === "string" ? value : undefined;
 }
 
-function isProduction(): boolean {
-  return process.env.NODE_ENV === "production";
-}
-
 let cachedConfig: client.Configuration | null = null;
 
 async function getClientConfig(oidcConfig: OidcConfig): Promise<client.Configuration> {
@@ -36,7 +32,7 @@ export function registerOidcRoutes(app: FastifyInstance, db: Db): void {
     return;
   }
 
-  app.get("/auth/oidc/login", async (_request, reply) => {
+  app.get("/auth/oidc/login", async (request, reply) => {
     const config = await getClientConfig(oidcConfig);
     const codeVerifier = client.randomPKCECodeVerifier();
     const codeChallenge = await client.calculatePKCECodeChallenge(codeVerifier);
@@ -55,7 +51,9 @@ export function registerOidcRoutes(app: FastifyInstance, db: Db): void {
 
     reply.setCookie(FLOW_COOKIE, [state, nonce, codeVerifier].join("."), {
       httpOnly: true,
-      secure: isProduction(),
+      // See auth.ts's session cookie for why this keys off the actual
+      // request protocol rather than NODE_ENV.
+      secure: request.protocol === "https",
       sameSite: "lax",
       path: "/",
       maxAge: FLOW_TTL_SECONDS,
@@ -111,7 +109,7 @@ export function registerOidcRoutes(app: FastifyInstance, db: Db): void {
 
       reply.setCookie(SESSION_COOKIE, session.token, {
         httpOnly: true,
-        secure: isProduction(),
+        secure: request.protocol === "https",
         sameSite: "lax",
         path: "/",
         expires: session.expiresAt,

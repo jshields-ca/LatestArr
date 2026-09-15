@@ -102,10 +102,15 @@ export function registerAuthRoutes(
 
       reply.setCookie(SESSION_COOKIE, session.token, {
         httpOnly: true,
-        // Browsers drop Secure cookies over plain HTTP, which would break local
-        // dev (no TLS terminator in front of it); only require it in production,
-        // where the app is expected to sit behind a TLS-terminating proxy.
-        secure: process.env.NODE_ENV === "production",
+        // Browsers silently drop Secure cookies set over plain HTTP — this
+        // has to reflect the actual connection (direct HTTP, or HTTPS via a
+        // reverse proxy that set TRUST_PROXY=true and forwards
+        // X-Forwarded-Proto), not NODE_ENV. The Docker image always sets
+        // NODE_ENV=production regardless of whether TLS is in front of it,
+        // so keying off that unconditionally forced Secure on even for the
+        // documented plain-http:// Getting Started flow, silently breaking
+        // login (the cookie was set but never stored by the browser).
+        secure: request.protocol === "https",
         sameSite: "lax",
         path: "/",
         expires: session.expiresAt,
