@@ -1,5 +1,16 @@
 # @latestarr/web
 
+## 0.5.0
+
+### Minor Changes
+
+- d5673c5: Give the Media List builder block real poster/cover-art and metadata (runtime, page count, audiobook duration, platform, rating), expand its content-type picker to all six adapter media kinds (movies, TV episodes, TV seasons, books, audiobooks, games), and add real, non-drag Move up/down buttons to every component's toolbar in the template editor.
+- dc52fb4: Add a simple Daily/Weekly/Monthly schedule picker (with a raw-cron "Advanced" fallback) and a timezone selector to the newsletter Add/Edit dialogs, plus a new Edit dialog so a newsletter's schedule, lookback window, subject template, and SMTP profile can be changed after creation without recreating it.
+
+### Patch Changes
+
+- d9b6881: Give each source kind a distinct icon on the Sources page and show its friendly label (e.g. "BookOrbit") instead of the raw adapter id (e.g. "bookorbit").
+
 ## 0.4.6
 
 ### Patch Changes
