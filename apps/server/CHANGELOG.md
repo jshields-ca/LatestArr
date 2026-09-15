@@ -1,5 +1,19 @@
 # @latestarr/server
 
+## 0.4.2
+
+### Patch Changes
+
+- 80d7e1c: Fix login silently failing (redirects to the dashboard, then immediately shows "Not authenticated", every time, even right after refresh) when accessing the app directly over plain HTTP without a reverse proxy in front — again, exactly the documented default Getting Started flow. The session cookie's `Secure` flag was set based on `NODE_ENV === "production"`, but the Docker image always sets `NODE_ENV=production` regardless of whether TLS is actually in front of the app, so `Secure` was forced on unconditionally; browsers silently refuse to store a `Secure` cookie over a plain HTTP connection, so the cookie set by `/api/auth/login` was simply never kept. `Secure` is now based on the actual request protocol instead, which is `http` unless a reverse proxy is explicitly trusted via the new `TRUST_PROXY=true` env var and forwards `X-Forwarded-Proto: https` (documented in `docs/self-hosting.md`'s reverse-proxy section, which already described this as the intended mechanism).
+- @latestarr/adapter-audiobookshelf@0.4.2
+  - @latestarr/adapter-booklore-family@0.4.2
+  - @latestarr/adapter-core@0.4.2
+  - @latestarr/adapter-plex@0.4.2
+  - @latestarr/adapter-romm@0.4.2
+  - @latestarr/adapter-tautulli@0.4.2
+  - @latestarr/crypto@0.4.2
+  - @latestarr/db@0.4.2
+
 ## 0.4.1
 
 ### Patch Changes
