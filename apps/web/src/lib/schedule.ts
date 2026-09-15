@@ -86,6 +86,68 @@ export function formatHourMinute(hour: number, minute: number): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+function formatTime12h(hour: number, minute: number): string {
+  const period = hour < 12 ? "AM" : "PM";
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+// 11/12/13 (and their hundreds, e.g. 111/112/113) are the exception to the
+// usual 1/2/3 -> st/nd/rd pattern — every other number falls through to its
+// last digit.
+function ordinal(n: number): string {
+  const rem100 = n % 100;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+// Newsletter cards used to show the raw cron string even for schedules
+// created through the Simple picker, which defeats the point of offering a
+// friendly picker in the first place. Recognized shapes get a plain-English
+// sentence; a genuinely custom cron (parseCronToSimpleSchedule returns null)
+// still falls back to the raw string, which is the right call for power
+// users in Advanced mode.
+export function formatScheduleForDisplay(cron: string, timezone: string): string {
+  const parsed = parseCronToSimpleSchedule(cron);
+  if (!parsed) return `${cron} (${timezone})`;
+
+  const time = formatTime12h(parsed.hour, parsed.minute);
+  let sentence: string;
+  if (parsed.frequency === "daily") {
+    sentence = `Daily at ${time}`;
+  } else if (parsed.frequency === "weekly") {
+    sentence = `Weekly on ${DAY_NAMES[parsed.dayOfWeek]} at ${time}`;
+  } else {
+    sentence = `Monthly on the ${ordinal(parsed.dayOfMonth)} at ${time}`;
+  }
+  return `${sentence} (${timezone})`;
+}
+
+// The "Add newsletter" dialog used to default Timezone to "UTC" no matter
+// what the browser actually reports, silently mismatching the schedule for
+// anyone not in UTC. Guarded against an environment reporting a timezone
+// this build's TIMEZONES list doesn't contain (or resolvedOptions() being
+// unavailable at all) — either case falls back to the same "UTC" default as
+// before rather than setting a value the picker can't actually show.
+export function detectBrowserTimezone(): string {
+  try {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (detected && TIMEZONES.includes(detected)) return detected;
+  } catch {
+    // Fall through to the UTC default below.
+  }
+  return "UTC";
+}
+
 export function parseHourMinute(value: string): { hour: number; minute: number } | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value);
   if (!match) return null;

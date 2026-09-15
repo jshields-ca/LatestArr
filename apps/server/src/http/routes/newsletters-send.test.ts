@@ -381,6 +381,48 @@ describe("POST /newsletters/:id/send-now", () => {
     expect(results[0]?.error).toBe("relay refused");
   });
 
+  it("returns a structured error instead of a bare 500 when a source is unreachable", async () => {
+    const smtpProfileId = await createSmtpProfile();
+    const sourceId = await createSourceConnection();
+    const { groupId } = await createRecipientAndGroup("person@example.com");
+    const newsletterId = await createNewsletter(smtpProfileId);
+
+    await app.inject(
+      authed({
+        method: "POST",
+        url: `/api/newsletters/${newsletterId}/sources`,
+        payload: { sourceConnectionId: sourceId },
+      }),
+    );
+    await app.inject(
+      authed({
+        method: "POST",
+        url: `/api/newsletters/${newsletterId}/recipient-groups`,
+        payload: { groupId },
+      }),
+    );
+
+    // Simulates the real "fetch failed" (ECONNREFUSED-style) error a
+    // genuinely unreachable source produces.
+    mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
+
+    const response = await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
+    );
+    expect(response.statusCode).toBe(502);
+    const body = response.json();
+    expect(body.error).not.toBe("Internal Server Error");
+    expect(body.error).toContain("Could not reach one of this newsletter's connected sources");
+    expect(mockSendMail).not.toHaveBeenCalled();
+
+    const runsResponse = await app.inject(
+      authed({ method: "GET", url: `/api/newsletters/${newsletterId}/send-runs` }),
+    );
+    const [run] = runsResponse.json().sendRuns;
+    expect(run.status).toBe("failed");
+    expect(run.error).toContain("fetch failed");
+  });
+
   it("renders with the linked template's compiled MJML instead of the hardcoded template", async () => {
     const smtpProfileId = await createSmtpProfile();
     const sourceId = await createSourceConnection();

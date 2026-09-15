@@ -11,6 +11,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  describeSendFailure,
   NewsletterMisconfiguredError,
   NewsletterNotFoundError,
   runNewsletter,
@@ -320,7 +321,15 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         if (err instanceof SendAlreadyRunningError) {
           return reply.code(409).send({ error: err.message });
         }
-        throw err;
+        // A genuine pipeline failure (source fetch, template render, SMTP,
+        // ...) — runNewsletter has already recorded it on the SendRun row
+        // and rethrown. Without this catch, it would fall through to
+        // Fastify's default error handler and reach the frontend as a bare
+        // "Internal Server Error" (see describeSendFailure for why). 502
+        // since this is almost always this newsletter's own upstream
+        // dependency (a source or the SMTP server), not this API itself.
+        request.log.error({ err }, "Newsletter send failed");
+        return reply.code(502).send({ error: describeSendFailure(err) });
       }
     });
 
