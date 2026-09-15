@@ -30,10 +30,11 @@ Every variable is documented in [`.env.example`](../.env.example).
 ## 3. Start the container
 
 ```bash
+docker compose pull   # fetch the published image from ghcr.io
 docker compose up -d
 ```
 
-This builds the image from [`docker/Dockerfile`](../docker/Dockerfile) and starts one container exposing port `3000`, with a named Docker volume (`latestarr-data`) holding the SQLite database at `/app/data`. Nothing else to stand up — no separate database or cache container.
+`docker-compose.yml` points at `ghcr.io/jshields-ca/latestarr` — every tagged release publishes an image there, and `:latest` always tracks the most recent release (not every commit to `main`). Skip `docker compose pull` and run `docker compose up -d --build` instead if you'd rather build from [`docker/Dockerfile`](../docker/Dockerfile) locally (e.g. testing a change of your own). Either way you end up with one container exposing port `3000`, with a named Docker volume (`latestarr-data`) holding the SQLite database at `/app/data`. Nothing else to stand up — no separate database or cache container.
 
 If you'd rather not use Compose, the equivalent is:
 

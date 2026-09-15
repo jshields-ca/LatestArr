@@ -59,6 +59,7 @@ The backend and admin WebUI both run from a single container.
 ```bash
 cp .env.example .env
 # Generate a value for ENCRYPTION_KEY in .env: openssl rand -base64 32
+docker compose pull   # fetch the published image — skip this to build from source instead
 docker compose up -d
 ```
 
