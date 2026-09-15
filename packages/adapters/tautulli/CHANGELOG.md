@@ -1,5 +1,11 @@
 # @latestarr/adapter-tautulli
 
+## 0.6.0
+
+### Patch Changes
+
+- @latestarr/adapter-core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes
