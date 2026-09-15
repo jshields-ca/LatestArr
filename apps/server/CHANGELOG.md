@@ -1,5 +1,19 @@
 # @latestarr/server
 
+## 0.4.4
+
+### Patch Changes
+
+- 1f54bab: Add the ability to edit an existing Recipient, SMTP Profile, or Source connection instead of having to delete and re-create it to fix a typo or rotate a credential. Recipients gain email editing (previously only display name and active/inactive were editable). Sources gain a `PATCH /api/sources/:id` endpoint (previously the only mutations were create/delete/test). Credential fields on Sources and the username/password on SMTP Profiles are never pre-filled (they're not returned decrypted) — leave them blank to keep the stored value, or fill in every credential field for that source kind to replace them all at once.
+- @latestarr/adapter-audiobookshelf@0.4.4
+  - @latestarr/adapter-booklore-family@0.4.4
+  - @latestarr/adapter-core@0.4.4
+  - @latestarr/adapter-plex@0.4.4
+  - @latestarr/adapter-romm@0.4.4
+  - @latestarr/adapter-tautulli@0.4.4
+  - @latestarr/crypto@0.4.4
+  - @latestarr/db@0.4.4
+
 ## 0.4.3
 
 ### Patch Changes
