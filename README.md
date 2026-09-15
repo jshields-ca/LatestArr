@@ -7,6 +7,8 @@
 
 <img src="docs/assets/social-preview.png" alt="LatestArr — self-hosted digest newsletters for Plex, books, audiobooks & games" width="100%" />
 
+> **⚠️ Active testing and iteration.** LatestArr is pre-1.0 and changing fast — expect bugs, rough edges, and breaking changes between releases. It's usable today, but if you're testing it, back up your data first and don't treat it as a finished product yet. See [`CHANGELOG.md`](CHANGELOG.md) for what's changed recently and the [Issues](https://github.com/jshields-ca/latestarr/issues) page for known gaps.
+
 **LatestArr** is a self-hosted, open-source "new content" newsletter tool for the self-hosted media ecosystem — the *arr stack and friends. It connects to your existing media servers, pulls in whatever movies, TV episodes, books, audiobooks, and games were recently added, and sends a fully custom-branded HTML digest to your users on a schedule you control.
 
 It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, built around a drag-and-drop template editor so anyone can design their own newsletter without touching HTML or CSS.
@@ -29,16 +31,18 @@ It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter featur
 
 ## Supported sources
 
-| Source | Content type | Status |
-| --- | --- | --- |
-| [Tautulli](https://tautulli.com/) | Movies, TV | ✅ Implemented |
-| Plex (direct) | Movies, TV | ✅ Implemented |
-| [BookLore](https://github.com/booklore-app/booklore) | Books | ✅ Implemented |
-| [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | ✅ Implemented |
-| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | ✅ Implemented |
-| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks | ✅ Implemented |
-| [RomM](https://github.com/rommapp/romm) | Games | ✅ Implemented |
-| Kavita, Komga, Calibre-Web, Jellyfin/Emby, Immich, ... | Various | Under consideration |
+| Source | Content type | Connects via | Status |
+| --- | --- | --- | --- |
+| [Tautulli](https://tautulli.com/) | Movies, TV | Tautulli API | ✅ Implemented |
+| Plex (direct) | Movies, TV | Plex API | ✅ Implemented |
+| [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | ✅ Implemented |
+| [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | OPDS | ✅ Implemented |
+| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | OPDS | ✅ Implemented |
+| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks | Audiobookshelf API | ✅ Implemented |
+| [RomM](https://github.com/rommapp/romm) | Games | RomM API | ✅ Implemented |
+| Kavita, Komga, Calibre-Web, Jellyfin/Emby, Immich, ... | Various | — | Under consideration |
+
+BookLore, BookOrbit, and Grimmory are separate apps (forks of a common lineage) that all expose the same [OPDS](https://opds.io/) catalog protocol, so LatestArr talks to all three through one shared adapter rather than three separate integrations.
 
 New sources are added via a self-contained adapter interface — see [`CONTRIBUTING.md`](CONTRIBUTING.md) if you'd like to add support for something not listed here.
 
@@ -66,6 +70,20 @@ Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for how t
 Found a bug or want a feature? [Open an issue](https://github.com/jshields-ca/latestarr/issues/new/choose). Found a security issue? Please follow the process in [`SECURITY.md`](SECURITY.md) rather than opening a public issue.
 
 If you'd like to support development directly, [GitHub Sponsors](https://github.com/sponsors/jshields-ca) is open. If you just find this useful, a star on the repo goes a long way too.
+
+## Built with Claude Code
+
+LatestArr's code — application logic, tests, CI/release automation, and this documentation — is written by [Claude Code](https://claude.com/claude-code) (Anthropic's AI coding agent), directed by a single human maintainer acting as product owner and reviewer. This is disclosed here because it's directly relevant to how much scrutiny to apply before self-hosting a tool that handles credentials and can be exposed to the public internet.
+
+What that means in practice:
+
+- **Every change is validated before merge**: the full lint/typecheck/build/test suite (`pnpm turbo run lint typecheck build test`) must pass, including automated accessibility checks (axe-core) and a Docker build + runtime smoke test — all enforced in CI (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+- **UI changes are manually verified in a real browser**, not just against unit tests, before being considered done.
+- **Dependency and static-analysis scanning run continuously**: Dependabot for dependency updates, CodeQL for static security analysis.
+- **Security-sensitive design decisions are deliberate, not improvised**: envelope-encrypted credentials at rest, server-side sessions rather than client-stored tokens, rate limiting, CSRF protection, and input validation on every route — see [`SECURITY.md`](SECURITY.md) for the full scope and how to report a vulnerability.
+- **A human reviews and directs every change** — nothing merges without the maintainer reviewing the actual diff, not just a description of it.
+
+None of this makes LatestArr immune to bugs, and the project is still pre-1.0 (see the callout at the top of this README). Treat AI authorship as a reason to read the code before trusting it with sensitive data — not as a reason to trust this project less than any other early-stage open-source tool.
 
 ## License
 
