@@ -60,6 +60,10 @@ export function getAuthProviders(): Promise<AuthProviders> {
   return apiFetch<AuthProviders>("/auth/providers");
 }
 
+export function getVersion(): Promise<{ version: string }> {
+  return apiFetch<{ version: string }>("/version");
+}
+
 export function getCurrentUser(): Promise<{ user: AuthUser }> {
   return apiFetch<{ user: AuthUser }>("/auth/me");
 }

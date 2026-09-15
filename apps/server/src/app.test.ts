@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createDb, runMigrations, type Db } from "@latestarr/db";
@@ -41,6 +41,16 @@ describe("without a staticRoot (default: tests and local dev)", () => {
     const response = await app.inject({ method: "GET", url: "/some-spa-route" });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({ error: "Not Found" });
+  });
+
+  it("exposes the running version, unauthenticated, matching this package's own package.json", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/version" });
+    expect(response.statusCode).toBe(200);
+
+    const packageJson = JSON.parse(readFileSync(path.join(import.meta.dirname, "..", "package.json"), "utf8")) as {
+      version: string;
+    };
+    expect(response.json()).toEqual({ version: packageJson.version });
   });
 });
 
