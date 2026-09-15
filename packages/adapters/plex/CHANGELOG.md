@@ -1,5 +1,11 @@
 # @latestarr/adapter-plex
 
+## 0.4.3
+
+### Patch Changes
+
+- @latestarr/adapter-core@0.4.3
+
 ## 0.4.2
 
 ### Patch Changes
