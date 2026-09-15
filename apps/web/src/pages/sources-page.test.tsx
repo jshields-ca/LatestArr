@@ -88,6 +88,57 @@ describe("SourcesPage", () => {
     });
   });
 
+  it("edits a source's name and base URL without touching credentials", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [exampleSource] });
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    await user.click(screen.getByRole("button", { name: "Edit Home Tautulli" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("Home Tautulli");
+    expect(within(dialog).getByLabelText("Base URL")).toHaveValue("http://localhost:8181");
+    expect(within(dialog).getByLabelText("Tautulli API key (leave blank to keep current)")).toHaveValue("");
+
+    await user.clear(within(dialog).getByLabelText("Name"));
+    await user.type(within(dialog).getByLabelText("Name"), "Renamed Tautulli");
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { source: { ...exampleSource, name: "Renamed Tautulli" } }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByText("Renamed Tautulli")).toBeInTheDocument();
+
+    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: "Renamed Tautulli",
+      baseUrl: "http://localhost:8181",
+    });
+  });
+
+  it("rejects partially-filled credentials on edit rather than sending an incomplete replace", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [{ ...exampleSource, kind: "booklore" }] }, ALL_KINDS);
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    await user.click(screen.getByRole("button", { name: "Edit Home Tautulli" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.type(within(dialog).getByLabelText("OPDS username (leave blank to keep current)"), "new-user");
+    // OPDS password left blank — booklore needs both fields to replace.
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    expect(
+      await within(dialog).findByText(
+        "Fill in every credential field, or leave them all blank to keep the current ones.",
+      ),
+    ).toBeInTheDocument();
+    // No PATCH request was ever sent (still only the two initial GETs).
+    expect(fetchMock.mock.calls).toHaveLength(2);
+  });
+
   it("switches credential fields when a different source type is picked", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [] });

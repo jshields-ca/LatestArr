@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Loader2, Plus, Send, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Send, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
   listSmtpProfiles,
   sendTestEmail,
   testSmtpProfile,
+  updateSmtpProfile,
   type SmtpProfile,
 } from "@/lib/api";
 
@@ -233,6 +234,203 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
   );
 }
 
+function EditSmtpProfileDialog({
+  profile,
+  onSaved,
+}: {
+  profile: SmtpProfile;
+  onSaved: (profile: SmtpProfile) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(profile.name);
+  const [host, setHost] = useState(profile.host);
+  const [port, setPort] = useState(String(profile.port));
+  const [secure, setSecure] = useState(profile.secure);
+  const [secureTouched, setSecureTouched] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [defaultFromName, setDefaultFromName] = useState(profile.defaultFromName);
+  const [defaultFromEmail, setDefaultFromEmail] = useState(profile.defaultFromEmail);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openWithCurrentValues(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setName(profile.name);
+      setHost(profile.host);
+      setPort(String(profile.port));
+      setSecure(profile.secure);
+      setSecureTouched(false);
+      setUsername("");
+      setPassword("");
+      setDefaultFromName(profile.defaultFromName);
+      setDefaultFromEmail(profile.defaultFromEmail);
+      setError(null);
+    }
+  }
+
+  function handlePortChange(nextPort: string) {
+    setPort(nextPort);
+    if (!secureTouched) setSecure(impliesSecure(nextPort));
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { smtpProfile } = await updateSmtpProfile(profile.id, {
+        name,
+        host,
+        port: Number(port),
+        secure,
+        username: username || undefined,
+        password: password || undefined,
+        defaultFromName,
+        defaultFromEmail,
+      });
+      onSaved(smtpProfile);
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${profile.name}`}>
+          <Pencil />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit SMTP profile</DialogTitle>
+          <DialogDescription>Used to send newsletters and test emails.</DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-smtp-name">Name</Label>
+            <Input
+              id="edit-smtp-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <Label htmlFor="edit-smtp-host">Host</Label>
+              <Input
+                id="edit-smtp-host"
+                required
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-smtp-port">Port</Label>
+              <Input
+                id="edit-smtp-port"
+                type="number"
+                required
+                value={port}
+                onChange={(e) => handlePortChange(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+            <div>
+              <Label htmlFor="edit-smtp-secure">Use implicit TLS (port 465)</Label>
+              <p className="text-sm text-muted-foreground">
+                Leave this off for ports 587 and 25 — those use STARTTLS, which upgrades the
+                connection to TLS automatically. Turning this on for a STARTTLS port causes
+                connection failures.
+              </p>
+            </div>
+            <Switch
+              id="edit-smtp-secure"
+              checked={secure}
+              onCheckedChange={(next) => {
+                setSecure(next);
+                setSecureTouched(true);
+              }}
+              disabled={submitting}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-smtp-username">
+                Username {profile.hasAuth ? "(leave blank to keep current)" : "(optional)"}
+              </Label>
+              <Input
+                id="edit-smtp-username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-smtp-password">
+                Password {profile.hasAuth ? "(leave blank to keep current)" : "(optional)"}
+              </Label>
+              <Input
+                id="edit-smtp-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-smtp-from-name">From name</Label>
+              <Input
+                id="edit-smtp-from-name"
+                required
+                value={defaultFromName}
+                onChange={(e) => setDefaultFromName(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-smtp-from-email">From email</Label>
+              <Input
+                id="edit-smtp-from-email"
+                type="email"
+                required
+                value={defaultFromEmail}
+                onChange={(e) => setDefaultFromEmail(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+          </div>
+
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SendTestEmailControl({ profileId }: { profileId: string }) {
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState("");
@@ -287,9 +485,11 @@ function SendTestEmailControl({ profileId }: { profileId: string }) {
 
 function SmtpProfileRow({
   profile,
+  onChanged,
   onDeleted,
 }: {
   profile: SmtpProfile;
+  onChanged: (profile: SmtpProfile) => void;
   onDeleted: (id: string) => void;
 }) {
   const [testing, setTesting] = useState(false);
@@ -356,6 +556,7 @@ function SmtpProfileRow({
                   {testing ? <Loader2 className="animate-spin" /> : null}
                   Test connection
                 </Button>
+                <EditSmtpProfileDialog profile={profile} onSaved={onChanged} />
                 <Button
                   variant="ghost"
                   size="icon"
@@ -429,6 +630,9 @@ export function SmtpProfilesPage() {
             <SmtpProfileRow
               key={profile.id}
               profile={profile}
+              onChanged={(updated) =>
+                setProfiles((prev) => (prev ?? []).map((p) => (p.id === updated.id ? updated : p)))
+              }
               onDeleted={(id) => setProfiles((prev) => (prev ?? []).filter((p) => p.id !== id))}
             />
           ))}

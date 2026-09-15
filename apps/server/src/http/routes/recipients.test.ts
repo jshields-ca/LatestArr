@@ -124,6 +124,40 @@ describe("recipient lifecycle", () => {
     expect(response.json().recipient.isActive).toBe(false);
   });
 
+  it("updates the email", async () => {
+    const id = await createRecipient();
+    const response = await app.inject(
+      authed({
+        method: "PATCH",
+        url: `/api/recipients/${id}`,
+        payload: { email: "new-address@example.com" },
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json().recipient.email).toBe("new-address@example.com");
+  });
+
+  it("rejects updating to an email already used by another recipient", async () => {
+    await createRecipient();
+    const otherResponse = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/recipients",
+        payload: { email: "other@example.com" },
+      }),
+    );
+    const otherId = otherResponse.json().recipient.id as string;
+
+    const response = await app.inject(
+      authed({
+        method: "PATCH",
+        url: `/api/recipients/${otherId}`,
+        payload: { email: "person@example.com" },
+      }),
+    );
+    expect(response.statusCode).toBe(409);
+  });
+
   it("deletes", async () => {
     const id = await createRecipient();
     const deleteResponse = await app.inject(authed({ method: "DELETE", url: `/api/recipients/${id}` }));

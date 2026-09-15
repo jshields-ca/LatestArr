@@ -129,6 +129,16 @@ export function createSource(input: CreateSourceInput): Promise<{ source: Source
   });
 }
 
+export function updateSource(
+  id: string,
+  input: { name?: string; baseUrl?: string; credentials?: Record<string, string> },
+): Promise<{ source: SourceConnection }> {
+  return apiFetch<{ source: SourceConnection }>(`/sources/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export function deleteSource(id: string): Promise<void> {
   return apiFetch<void>(`/sources/${id}`, { method: "DELETE" });
 }
@@ -170,7 +180,7 @@ export function createRecipient(input: {
 
 export function updateRecipient(
   id: string,
-  input: { displayName?: string; isActive?: boolean },
+  input: { email?: string; displayName?: string; isActive?: boolean },
 ): Promise<{ recipient: Recipient }> {
   return apiFetch<{ recipient: Recipient }>(`/recipients/${id}`, {
     method: "PATCH",
@@ -256,6 +266,27 @@ export function createSmtpProfile(
 ): Promise<{ smtpProfile: SmtpProfile }> {
   return apiFetch<{ smtpProfile: SmtpProfile }>("/smtp-profiles", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export interface UpdateSmtpProfileInput {
+  name?: string;
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  username?: string;
+  password?: string;
+  defaultFromName?: string;
+  defaultFromEmail?: string;
+}
+
+export function updateSmtpProfile(
+  id: string,
+  input: UpdateSmtpProfileInput,
+): Promise<{ smtpProfile: SmtpProfile }> {
+  return apiFetch<{ smtpProfile: SmtpProfile }>(`/smtp-profiles/${id}`, {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
 }

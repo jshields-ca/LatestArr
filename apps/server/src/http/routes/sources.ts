@@ -28,6 +28,14 @@ const createSourceSchema = z.object({
   credentials: z.record(z.string(), z.string()),
 });
 
+// `kind` is deliberately not editable — changing it would leave stored
+// credentials shaped for a different adapter; delete and re-add instead.
+const updateSourceSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  baseUrl: z.url("baseUrl must be a valid URL").optional(),
+  credentials: z.record(z.string(), z.string()).optional(),
+});
+
 interface IdParams {
   id: string;
 }
@@ -73,6 +81,29 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
         .select()
         .from(sourceConnections)
         .where(eq(sourceConnections.id, request.params.id));
+      if (!row) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+      return reply.send({ source: sanitize(row) });
+    });
+
+    scope.patch<{ Params: IdParams }>("/sources/:id", async (request, reply) => {
+      const body = parseBody(updateSourceSchema, request.body, reply);
+      if (!body) return reply;
+      const { name, baseUrl, credentials } = body;
+
+      const [row] = await db
+        .update(sourceConnections)
+        .set({
+          ...(name !== undefined && { name }),
+          ...(baseUrl !== undefined && { baseUrl }),
+          ...(credentials !== undefined && {
+            credentialsEncrypted: encrypt(JSON.stringify(credentials), getEncryptionKey()),
+          }),
+        })
+        .where(eq(sourceConnections.id, request.params.id))
+        .returning();
+
       if (!row) {
         return reply.code(404).send({ error: "Not found" });
       }

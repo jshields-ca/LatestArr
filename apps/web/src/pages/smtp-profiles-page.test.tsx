@@ -49,6 +49,47 @@ describe("SmtpProfilesPage", () => {
     expect(screen.getByText("Authenticated")).toBeInTheDocument();
   });
 
+  it("edits a profile through the edit dialog, prefilled with its current values", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/smtp-profiles" && (!init || init.method === undefined))
+        return Promise.resolve(jsonResponse(200, { smtpProfiles: [exampleProfile] }));
+      if (url === "/api/smtp-profiles/s1" && init?.method === "PATCH") {
+        return Promise.resolve(
+          jsonResponse(200, { smtpProfile: { ...exampleProfile, name: "Backup" } }),
+        );
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<SmtpProfilesPage />);
+    await screen.findByText("Primary");
+
+    await user.click(screen.getByRole("button", { name: "Edit Primary" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("Primary");
+    expect(within(dialog).getByLabelText("Host")).toHaveValue("smtp.example.com");
+    expect(within(dialog).getByLabelText("Port")).toHaveValue(587);
+    // hasAuth: true on the fixture — username/password stay blank (never
+    // returned decrypted) with a "leave blank to keep current" label.
+    expect(within(dialog).getByLabelText("Username (leave blank to keep current)")).toHaveValue("");
+
+    await user.clear(within(dialog).getByLabelText("Name"));
+    await user.type(within(dialog).getByLabelText("Name"), "Backup");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByText("Backup")).toBeInTheDocument();
+
+    const patchCall = fetchMock.mock.calls.find(
+      ([, init]) => init?.method === "PATCH",
+    ) as [string, RequestInit];
+    const patchBody = JSON.parse(patchCall[1].body as string);
+    expect(patchBody).toMatchObject({ name: "Backup", host: "smtp.example.com", port: 587 });
+    expect(patchBody.username).toBeUndefined();
+    expect(patchBody.password).toBeUndefined();
+  });
+
   it("adds a profile through the dialog", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
