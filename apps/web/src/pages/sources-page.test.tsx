@@ -59,6 +59,15 @@ describe("SourcesPage", () => {
     expect(screen.getByText("Not yet tested")).toBeInTheDocument();
   });
 
+  it("shows a friendly label for the source's kind rather than the raw adapter id", async () => {
+    mockLoad({ sources: [{ ...exampleSource, kind: "bookorbit" }] });
+
+    render(<SourcesPage />);
+
+    expect(await screen.findByText("BookOrbit")).toBeInTheDocument();
+    expect(screen.queryByText("bookorbit")).not.toBeInTheDocument();
+  });
+
   it("adds a new source through the dialog", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [] });
