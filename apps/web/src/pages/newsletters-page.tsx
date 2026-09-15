@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 
+import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,12 @@ import {
   type SourceConnection,
   type Template,
 } from "@/lib/api";
+import {
+  DEFAULT_SIMPLE_SCHEDULE,
+  parseCronToSimpleSchedule,
+  simpleScheduleToCron,
+  type SimpleSchedule,
+} from "@/lib/schedule";
 
 function AddNewsletterDialog({
   smtpProfiles,
@@ -57,7 +64,9 @@ function AddNewsletterDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [scheduleCron, setScheduleCron] = useState("0 8 * * 1");
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("simple");
+  const [simpleSchedule, setSimpleSchedule] = useState<SimpleSchedule>(DEFAULT_SIMPLE_SCHEDULE);
+  const [advancedCron, setAdvancedCron] = useState(simpleScheduleToCron(DEFAULT_SIMPLE_SCHEDULE));
   const [timezone, setTimezone] = useState("UTC");
   const [lookbackDays, setLookbackDays] = useState("7");
   const [subjectTemplate, setSubjectTemplate] = useState("");
@@ -68,7 +77,9 @@ function AddNewsletterDialog({
 
   function reset() {
     setName("");
-    setScheduleCron("0 8 * * 1");
+    setScheduleMode("simple");
+    setSimpleSchedule(DEFAULT_SIMPLE_SCHEDULE);
+    setAdvancedCron(simpleScheduleToCron(DEFAULT_SIMPLE_SCHEDULE));
     setTimezone("UTC");
     setLookbackDays("7");
     setSubjectTemplate("");
@@ -82,6 +93,7 @@ function AddNewsletterDialog({
     setError(null);
     setSubmitting(true);
     try {
+      const scheduleCron = scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron;
       const { newsletter } = await createNewsletter({
         name,
         scheduleCron,
@@ -131,28 +143,18 @@ function AddNewsletterDialog({
               disabled={submitting}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="newsletter-cron">Schedule (cron)</Label>
-              <Input
-                id="newsletter-cron"
-                required
-                value={scheduleCron}
-                onChange={(e) => setScheduleCron(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="newsletter-timezone">Timezone</Label>
-              <Input
-                id="newsletter-timezone"
-                required
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-          </div>
+          <ScheduleField
+            idPrefix="newsletter"
+            mode={scheduleMode}
+            onModeChange={setScheduleMode}
+            simple={simpleSchedule}
+            onSimpleChange={setSimpleSchedule}
+            scheduleCron={advancedCron}
+            onScheduleCronChange={setAdvancedCron}
+            timezone={timezone}
+            onTimezoneChange={setTimezone}
+            disabled={submitting}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="newsletter-lookback">Lookback (days)</Label>
@@ -548,11 +550,166 @@ function SendRunHistory({ newsletterId }: { newsletterId: string }) {
   );
 }
 
+function EditNewsletterDialog({
+  newsletter,
+  smtpProfiles,
+  onSaved,
+}: {
+  newsletter: Newsletter;
+  smtpProfiles: SmtpProfile[];
+  onSaved: (newsletter: Newsletter) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(newsletter.name);
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("simple");
+  const [simpleSchedule, setSimpleSchedule] = useState<SimpleSchedule>(DEFAULT_SIMPLE_SCHEDULE);
+  const [advancedCron, setAdvancedCron] = useState(newsletter.scheduleCron);
+  const [timezone, setTimezone] = useState(newsletter.timezone);
+  const [lookbackDays, setLookbackDays] = useState(String(newsletter.lookbackDays));
+  const [subjectTemplate, setSubjectTemplate] = useState(newsletter.subjectTemplate ?? "");
+  const [smtpProfileId, setSmtpProfileId] = useState(newsletter.smtpProfileId ?? "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openWithCurrentValues(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setName(newsletter.name);
+      const parsed = parseCronToSimpleSchedule(newsletter.scheduleCron);
+      setScheduleMode(parsed ? "simple" : "advanced");
+      setSimpleSchedule(parsed ?? DEFAULT_SIMPLE_SCHEDULE);
+      setAdvancedCron(newsletter.scheduleCron);
+      setTimezone(newsletter.timezone);
+      setLookbackDays(String(newsletter.lookbackDays));
+      setSubjectTemplate(newsletter.subjectTemplate ?? "");
+      setSmtpProfileId(newsletter.smtpProfileId ?? "");
+      setError(null);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const scheduleCron = scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron;
+      const { newsletter: updated } = await updateNewsletter(newsletter.id, {
+        name,
+        scheduleCron,
+        timezone,
+        lookbackDays: Number(lookbackDays),
+        subjectTemplate: subjectTemplate || undefined,
+        smtpProfileId: smtpProfileId || null,
+      });
+      onSaved(updated);
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${newsletter.name}`}>
+          <Pencil />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit newsletter</DialogTitle>
+          <DialogDescription>Update the schedule, lookback window, or sender details.</DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-newsletter-name">Name</Label>
+            <Input
+              id="edit-newsletter-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <ScheduleField
+            idPrefix="edit-newsletter"
+            mode={scheduleMode}
+            onModeChange={setScheduleMode}
+            simple={simpleSchedule}
+            onSimpleChange={setSimpleSchedule}
+            scheduleCron={advancedCron}
+            onScheduleCronChange={setAdvancedCron}
+            timezone={timezone}
+            onTimezoneChange={setTimezone}
+            disabled={submitting}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-newsletter-lookback">Lookback (days)</Label>
+              <Input
+                id="edit-newsletter-lookback"
+                type="number"
+                min={1}
+                required
+                value={lookbackDays}
+                onChange={(e) => setLookbackDays(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-newsletter-smtp">SMTP profile</Label>
+              <Select
+                id="edit-newsletter-smtp"
+                value={smtpProfileId}
+                onChange={(e) => setSmtpProfileId(e.target.value)}
+                disabled={submitting}
+              >
+                <option value="">None yet</option>
+                {smtpProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-newsletter-subject">Subject template (optional)</Label>
+            <Input
+              id="edit-newsletter-subject"
+              placeholder="What's new this week"
+              value={subjectTemplate}
+              onChange={(e) => setSubjectTemplate(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function NewsletterCard({
   newsletter,
   allSources,
   allGroups,
   allTemplates,
+  smtpProfiles,
   onChanged,
   onDeleted,
 }: {
@@ -560,6 +717,7 @@ function NewsletterCard({
   allSources: SourceConnection[];
   allGroups: RecipientGroup[];
   allTemplates: Template[];
+  smtpProfiles: SmtpProfile[];
   onChanged: (newsletter: Newsletter) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -646,14 +804,17 @@ function NewsletterCard({
                 </Button>
               </>
             ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Delete ${newsletter.name}`}
-                onClick={() => setConfirmingDelete(true)}
-              >
-                <Trash2 />
-              </Button>
+              <>
+                <EditNewsletterDialog newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Delete ${newsletter.name}`}
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  <Trash2 />
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -806,6 +967,7 @@ export function NewslettersPage() {
               allSources={allSources}
               allGroups={allGroups}
               allTemplates={allTemplates}
+              smtpProfiles={smtpProfiles}
               onChanged={(updated) =>
                 setNewsletters((prev) => (prev ?? []).map((n) => (n.id === updated.id ? updated : n)))
               }
