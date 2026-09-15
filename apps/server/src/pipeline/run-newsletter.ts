@@ -16,7 +16,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { sendEmail, type SmtpCredentials } from "../mailer/send.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
-import { renderNewsletterHtml } from "../render/newsletter-template.js";
+import { renderDefaultNewsletterHtml } from "../render/newsletter-template.js";
 import { getEncryptionKey } from "../secrets.js";
 
 export class NewsletterNotFoundError extends Error {
@@ -144,7 +144,7 @@ async function renderNewsletterContent(
     }
   }
 
-  return renderNewsletterHtml({ newsletterName: newsletter.name, items, generatedAt });
+  return await renderDefaultNewsletterHtml({ newsletterName: newsletter.name, items, generatedAt });
 }
 
 async function resolveRecipients(db: Db, newsletterId: string) {
