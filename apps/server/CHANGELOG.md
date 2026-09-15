@@ -1,5 +1,26 @@
 # @latestarr/server
 
+## 0.4.0
+
+### Minor Changes
+
+- 2037414: Catch up newsletters whose scheduled send was missed while the process was down. On boot, the scheduler now checks each enabled newsletter's last actual send (or creation time, if it's never sent) against its cron schedule, and runs it once if a scheduled fire was missed — previously a missed occurrence during downtime just silently never happened.
+- 04b0293: Add security headers (`@fastify/helmet`, with a CSP tuned for the GrapesJS builder and Google Fonts), rate limiting (`@fastify/rate-limit`, generous global default plus a strict 10/minute cap on login and bootstrap), and CSRF protection via a same-origin check on every mutating request.
+- a097e99: Add an unauthenticated `GET /api/version` endpoint, and show the running version plus links to the GitHub repo (view + star) and the author's site in the admin sidebar. Also make the docker-compose host port configurable via a `PORT` env var, for anyone whose default `3000` collides with another running service.
+- a04bea7: Validate every request body with zod (sources, recipients, recipient groups, SMTP profiles, newsletters, templates, auth) instead of ad-hoc `if (!field)` checks. Malformed types (a string where a number is expected, an object where an array is expected) are now rejected with a 400 instead of reaching the database layer.
+
+### Patch Changes
+
+- b1b2130: Publish a container image to `ghcr.io/jshields-ca/latestarr` on every tagged release (`:latest` and `:vX.Y.Z`), so self-hosters can `docker compose pull` instead of always building from source. `docker-compose.yml` now references that image, falling back to building from `docker/Dockerfile` when no matching image exists locally.
+- @latestarr/adapter-audiobookshelf@0.4.0
+  - @latestarr/adapter-booklore-family@0.4.0
+  - @latestarr/adapter-core@0.4.0
+  - @latestarr/adapter-plex@0.4.0
+  - @latestarr/adapter-romm@0.4.0
+  - @latestarr/adapter-tautulli@0.4.0
+  - @latestarr/crypto@0.4.0
+  - @latestarr/db@0.4.0
+
 ## 0.3.0
 
 ### Patch Changes
