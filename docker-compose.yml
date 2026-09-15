@@ -1,5 +1,13 @@
 services:
   latestarr:
+    # Published on every tagged release (see .github/workflows/release.yml).
+    # `build:` below is what actually runs when no image tagged
+    # latestarr:${LATESTARR_VERSION:-latest} exists locally yet, or when you
+    # explicitly ask for it (`docker compose build` / `up --build`) — useful
+    # for contributors testing a Dockerfile change. Run `docker compose
+    # pull` first if you want the published image even when a locally-built
+    # one already exists under the same tag.
+    image: ghcr.io/jshields-ca/latestarr:${LATESTARR_VERSION:-latest}
     build:
       context: .
       dockerfile: docker/Dockerfile
