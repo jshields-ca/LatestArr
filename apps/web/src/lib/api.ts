@@ -379,9 +379,10 @@ export function createNewsletter(input: CreateNewsletterInput): Promise<{ newsle
 
 export function updateNewsletter(
   id: string,
-  input: Omit<Partial<CreateNewsletterInput>, "templateId"> & {
+  input: Omit<Partial<CreateNewsletterInput>, "templateId" | "smtpProfileId"> & {
     isEnabled?: boolean;
     templateId?: string | null;
+    smtpProfileId?: string | null;
   },
 ): Promise<{ newsletter: Newsletter }> {
   return apiFetch<{ newsletter: Newsletter }>(`/newsletters/${id}`, {
