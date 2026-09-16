@@ -134,34 +134,44 @@ describe("NewslettersPage", () => {
     expect(screen.getByText(/\*\/15 \* \* \* \* \(UTC\)/)).toBeInTheDocument();
   });
 
-  it("adds a newsletter through the dialog", async () => {
-    const user = userEvent.setup();
-    mockRoutes(baseRoutes());
-    renderPage();
-    await screen.findByText("No newsletters yet");
+  // The Add newsletter dialog mounts several real Radix Selects (Repeats,
+  // Timezone, SMTP profile) even though this test never opens one — on a
+  // busy CI runner just mounting them was enough to blow past the 5s
+  // default, so this gets an explicit timeout too.
+  it(
+    "adds a newsletter through the dialog",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(baseRoutes());
+      renderPage();
+      await screen.findByText("No newsletters yet");
 
-    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Name"), "Weekly digest");
+      await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.type(within(dialog).getByLabelText("Name"), "Weekly digest");
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
-    await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
+      fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
+      await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
 
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByText("Weekly digest")).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(screen.getByText("Weekly digest")).toBeInTheDocument();
 
-    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-    const body = JSON.parse(init.body as string);
-    // Default simple schedule: weekly, Monday, 08:00, UTC.
-    expect(body.scheduleCron).toBe("0 8 * * 1");
-    expect(body.timezone).toBe("UTC");
-  });
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      const body = JSON.parse(init.body as string);
+      // Default simple schedule: weekly, Monday, 08:00, UTC.
+      expect(body.scheduleCron).toBe("0 8 * * 1");
+      expect(body.timezone).toBe("UTC");
+    },
+    60000,
+  );
 
   // The Repeats <Select> is a real Radix dropdown now, not a native
   // <select> — jsdom's lack of real layout/pointer-capture support makes
   // the *next* async Testing Library call after opening/closing one
-  // noticeably slower to settle than in a real browser (measured ~35-40s
-  // here), so these get an explicit timeout rather than the 5s default.
+  // noticeably slower to settle than in a real browser (measured ~35-45s
+  // locally, but CI's runners show much wider variance under load — one
+  // otherwise-identical sibling test measured 70s+ on a busy CI run), so
+  // these get a generous explicit timeout rather than the 5s default.
   it(
     "builds a daily cron expression from the simple schedule picker",
     async () => {
@@ -183,7 +193,7 @@ describe("NewslettersPage", () => {
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string).scheduleCron).toBe("15 9 * * *");
     },
-    60000,
+    150000,
   );
 
   it(
@@ -208,7 +218,7 @@ describe("NewslettersPage", () => {
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string).scheduleCron).toBe("0 8 5 * *");
     },
-    60000,
+    150000,
   );
 
   it("switches to a custom cron expression and submits it as-is", async () => {
@@ -253,7 +263,7 @@ describe("NewslettersPage", () => {
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string).timezone).toBe("America/Winnipeg");
     },
-    60000,
+    150000,
   );
 
   it("defaults the Add newsletter dialog's timezone to the browser's detected zone", async () => {
@@ -396,7 +406,7 @@ describe("NewslettersPage", () => {
     // Two separate Select-then-userEvent-click sequences in one test, each
     // of which costs the ~30-40s jsdom/userEvent settling delay described
     // above — see the testTimeout comment in vitest.config.ts.
-    180000,
+    240000,
   );
 
   it("shows the send-now error when the newsletter is misconfigured", async () => {
@@ -584,7 +594,7 @@ describe("NewslettersPage", () => {
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string)).toMatchObject({ templateId: "t1" });
     },
-    60000,
+    150000,
   );
 
   it(
@@ -625,7 +635,7 @@ describe("NewslettersPage", () => {
     },
     // Two selectOption calls, each followed by an async `findBy`/`waitFor`
     // — see the testTimeout comment in vitest.config.ts.
-    180000,
+    240000,
   );
 
   it("prefills the edit dialog with the existing schedule parsed into simple mode", async () => {
@@ -685,7 +695,7 @@ describe("NewslettersPage", () => {
         timezone: "UTC",
       });
     },
-    60000,
+    150000,
   );
 
   it("deletes a newsletter after confirmation", async () => {

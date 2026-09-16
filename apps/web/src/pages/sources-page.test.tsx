@@ -149,31 +149,40 @@ describe("SourcesPage", () => {
     expect(fetchMock.mock.calls).toHaveLength(2);
   });
 
-  it("switches credential fields when a different source type is picked", async () => {
-    const user = userEvent.setup();
-    mockLoad({ sources: [] });
-    render(<SourcesPage />);
-    await screen.findByText("No sources yet");
+  // This test does two selectOption round-trips in sequence (RomM, then
+  // BookLore) — each is the same real-Radix-Select jsdom slowdown
+  // described below, so it needs the same generous, doubled-up timeout
+  // as the other two-Select tests in this suite.
+  it(
+    "switches credential fields when a different source type is picked",
+    async () => {
+      const user = userEvent.setup();
+      mockLoad({ sources: [] });
+      render(<SourcesPage />);
+      await screen.findByText("No sources yet");
 
-    await user.click(screen.getByRole("button", { name: "Add source" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Tautulli API key")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Add source" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByLabelText("Tautulli API key")).toBeInTheDocument();
 
-    selectOption(within(dialog).getByLabelText("Source type"), "RomM");
-    expect(within(dialog).queryByLabelText("Tautulli API key")).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("RomM client API token")).toBeInTheDocument();
+      selectOption(within(dialog).getByLabelText("Source type"), "RomM");
+      expect(within(dialog).queryByLabelText("Tautulli API key")).not.toBeInTheDocument();
+      expect(within(dialog).getByLabelText("RomM client API token")).toBeInTheDocument();
 
-    selectOption(within(dialog).getByLabelText("Source type"), "BookLore");
-    expect(within(dialog).getByLabelText("OPDS username")).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("OPDS password")).toBeInTheDocument();
-  });
+      selectOption(within(dialog).getByLabelText("Source type"), "BookLore");
+      expect(within(dialog).getByLabelText("OPDS username")).toBeInTheDocument();
+      expect(within(dialog).getByLabelText("OPDS password")).toBeInTheDocument();
+    },
+    240000,
+  );
 
-  // Measured ~35-40s in this suite once the Sources page started
-  // rendering a real Radix Select (for the Add-source dialog's kind
-  // picker) — jsdom's lack of real layout/pointer-capture support seems
-  // to slow down the *next* async Testing Library call in the same file
-  // even in a test that never opens the dropdown itself, so this gets an
-  // explicit timeout rather than the 5s default.
+  // Measured ~35-45s locally once the Sources page started rendering a
+  // real Radix Select (for the Add-source dialog's kind picker) — jsdom's
+  // lack of real layout/pointer-capture support seems to slow down the
+  // *next* async Testing Library call in the same file even in a test
+  // that never opens the dropdown itself. CI runner variance pushes this
+  // higher still, so this gets a generous explicit timeout rather than
+  // the 5s default.
   it(
     "tests a connection and shows the result",
     async () => {
@@ -188,7 +197,7 @@ describe("SourcesPage", () => {
       expect(await screen.findByText("Invalid API key")).toBeInTheDocument();
       expect(screen.getByText("Error")).toBeInTheDocument();
     },
-    60000,
+    150000,
   );
 
   it("deletes a source after confirmation", async () => {

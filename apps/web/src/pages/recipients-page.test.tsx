@@ -140,8 +140,9 @@ describe("RecipientsPage", () => {
   // now, not a native <select> — jsdom's lack of real layout/pointer-
   // capture support makes the *next* async Testing Library call after
   // opening/closing one noticeably slower to settle than in a real
-  // browser (measured ~35s here), so this gets an explicit timeout
-  // rather than the 5s default.
+  // browser (measured ~35s locally, but CI runner variance pushed this
+  // specific test past 70s on one run), so this gets a generous explicit
+  // timeout rather than the 5s default.
   it(
     "expands a group and adds an existing recipient as a member",
     async () => {
@@ -166,7 +167,7 @@ describe("RecipientsPage", () => {
 
       expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();
     },
-    60000,
+    150000,
   );
 
   it("deletes a group after confirmation", async () => {
