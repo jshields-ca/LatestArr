@@ -1,5 +1,0 @@
----
-"@latestarr/web": patch
----
-
-Dashboard polish from testing feedback: recent sends now show which newsletter, item/recipient counts, and outcome per entry (reusing the same Send History status logic as the Newsletters page) instead of just a status badge and timestamp; the setup checklist collapses to a small "Setup complete" summary once every required step is done, expandable again to double-check anything, instead of either vanishing or staying full-size forever; the stat tiles (Sources/Recipients/SMTP Profiles/Newsletters) now use per-tile accent-colored icon chips, a hover lift, and a secondary metric where one is meaningful (open sources needing attention, recipient group count, active newsletters); the checklist and Recent sends cards sit side by side on wide screens instead of stacking narrow and leaving the right side of the page empty; and the destructive/warning/success Badge text colors were adjusted to clear WCAG AA contrast against their tinted backgrounds in both themes.
