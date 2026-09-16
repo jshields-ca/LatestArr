@@ -217,6 +217,16 @@ export function createGroup(input: {
   });
 }
 
+export function updateGroup(
+  id: string,
+  input: { name?: string; description?: string },
+): Promise<{ group: RecipientGroup }> {
+  return apiFetch<{ group: RecipientGroup }>(`/recipient-groups/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export function deleteGroup(id: string): Promise<void> {
   return apiFetch<void>(`/recipient-groups/${id}`, { method: "DELETE" });
 }

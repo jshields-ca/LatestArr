@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -17,47 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import { ApiError, createTemplate, deleteTemplate, listTemplates, type Template } from "@/lib/api";
-
-function ConfirmDelete({
-  label,
-  onConfirm,
-}: {
-  label: string;
-  onConfirm: () => Promise<void>;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  if (!confirming) {
-    return (
-      <Button variant="ghost" size="icon" aria-label={label} onClick={() => setConfirming(true)}>
-        <Trash2 />
-      </Button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">Delete?</span>
-      <Button
-        variant="destructive"
-        size="sm"
-        disabled={deleting}
-        onClick={() => {
-          setDeleting(true);
-          void onConfirm();
-        }}
-      >
-        {deleting ? <Loader2 className="animate-spin" /> : null}
-        Confirm
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={deleting}>
-        Cancel
-      </Button>
-    </div>
-  );
-}
 
 function AddTemplateDialog({ onCreated }: { onCreated: (template: Template) => void }) {
   const [open, setOpen] = useState(false);
@@ -135,28 +96,28 @@ function TemplateRow({
   onDeleted: (id: string) => void;
 }) {
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between gap-4 p-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate font-medium">{template.name}</p>
-            <Badge variant="neutral">{template.compiledMjml ? "Designed" : "Not yet designed"}</Badge>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+    <ListRow
+      primary={
+        <>
+          <p className="truncate font-medium">{template.name}</p>
+          <Badge variant="neutral">{template.compiledMjml ? "Designed" : "Not yet designed"}</Badge>
+        </>
+      }
+      actions={
+        <>
           <Button variant="outline" size="sm" asChild>
             <Link to={`/templates/${template.id}/edit`}>
               <Pencil />
               Edit
             </Link>
           </Button>
-          <ConfirmDelete
+          <ConfirmDeleteButton
             label={`Delete ${template.name}`}
             onConfirm={() => deleteTemplate(template.id).then(() => onDeleted(template.id))}
           />
-        </div>
-      </CardContent>
-    </Card>
+        </>
+      }
+    />
   );
 }
 

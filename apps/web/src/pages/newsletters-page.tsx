@@ -3,8 +3,6 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
   Clock,
   Loader2,
   Pencil,
@@ -17,9 +15,10 @@ import {
 } from "lucide-react";
 
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
+import { ListRow } from "@/components/list-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -864,120 +863,108 @@ function NewsletterCard({
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex items-start justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => setExpanded((e) => !e)}
-            className="flex min-w-0 items-center gap-2 text-left"
-            aria-expanded={expanded}
-          >
-            {expanded ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
-            <span className="min-w-0">
-              <span className="block truncate font-medium">{newsletter.name}</span>
-              <span className="block truncate text-sm text-muted-foreground">
-                {formatScheduleForDisplay(newsletter.scheduleCron, newsletter.timezone)} &middot;{" "}
-                {newsletter.lookbackDays}-day lookback
-              </span>
-            </span>
-          </button>
+    <ListRow
+      primary={<span className="truncate font-medium">{newsletter.name}</span>}
+      secondary={
+        <span className="block truncate text-sm text-muted-foreground">
+          {formatScheduleForDisplay(newsletter.scheduleCron, newsletter.timezone)} &middot;{" "}
+          {newsletter.lookbackDays}-day lookback
+        </span>
+      }
+      expand={{ expanded, onToggle: () => setExpanded((e) => !e) }}
+      actions={
+        confirmingDelete ? (
+          <>
+            <span className="text-sm text-muted-foreground">Delete?</span>
+            <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
+              {deleting ? <Loader2 className="animate-spin" /> : null}
+              Confirm
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <EditNewsletterDialog newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${newsletter.name}`}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        )
+      }
+    >
+      <SettingRow
+        label="Enabled"
+        description="Send this newsletter on its configured schedule."
+        htmlFor={`newsletter-enabled-${newsletter.id}`}
+        control={
+          <Switch
+            id={`newsletter-enabled-${newsletter.id}`}
+            checked={newsletter.isEnabled}
+            onCheckedChange={(checked) => void handleToggleEnabled(checked)}
+            disabled={toggling}
+          />
+        }
+      />
 
-          <div className="flex shrink-0 items-center gap-2">
-            {confirmingDelete ? (
-              <>
-                <span className="text-sm text-muted-foreground">Delete?</span>
-                <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
-                  {deleting ? <Loader2 className="animate-spin" /> : null}
-                  Confirm
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <EditNewsletterDialog newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Delete ${newsletter.name}`}
-                  onClick={() => setConfirmingDelete(true)}
-                >
-                  <Trash2 />
-                </Button>
-              </>
-            )}
+      {expanded ? (
+        <div className="flex flex-col gap-4 border-t border-border pt-3">
+          {detailError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {detailError}
+            </p>
+          ) : null}
+
+          {!detail && !detailError ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading details...
+            </div>
+          ) : null}
+
+          {detail ? (
+            <>
+              <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
+              <LinkedSources
+                newsletterId={newsletter.id}
+                sources={detail.sources}
+                allSources={allSources}
+                onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
+              />
+              <LinkedGroups
+                newsletterId={newsletter.id}
+                groups={detail.recipientGroups}
+                allGroups={allGroups}
+                onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
+              />
+            </>
+          ) : null}
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => void handleSendNow()} disabled={sending}>
+                {sending ? <Loader2 className="animate-spin" /> : <Send />}
+                Send now
+              </Button>
+              {sendResult ? <span className="text-sm text-muted-foreground">{sendResult}</span> : null}
+            </div>
+            {sendError ? (
+              <span role="alert" className="text-sm text-destructive">
+                {sendError}
+              </span>
+            ) : null}
+            <p className="text-sm font-medium">Send history</p>
+            <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
           </div>
         </div>
-
-        <SettingRow
-          label="Enabled"
-          description="Send this newsletter on its configured schedule."
-          htmlFor={`newsletter-enabled-${newsletter.id}`}
-          control={
-            <Switch
-              id={`newsletter-enabled-${newsletter.id}`}
-              checked={newsletter.isEnabled}
-              onCheckedChange={(checked) => void handleToggleEnabled(checked)}
-              disabled={toggling}
-            />
-          }
-        />
-
-        {expanded ? (
-          <div className="flex flex-col gap-4 border-t border-border pt-3">
-            {detailError ? (
-              <p role="alert" className="text-sm text-destructive">
-                {detailError}
-              </p>
-            ) : null}
-
-            {!detail && !detailError ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Loading details...
-              </div>
-            ) : null}
-
-            {detail ? (
-              <>
-                <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
-                <LinkedSources
-                  newsletterId={newsletter.id}
-                  sources={detail.sources}
-                  allSources={allSources}
-                  onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
-                />
-                <LinkedGroups
-                  newsletterId={newsletter.id}
-                  groups={detail.recipientGroups}
-                  allGroups={allGroups}
-                  onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
-                />
-              </>
-            ) : null}
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <Button size="sm" onClick={() => void handleSendNow()} disabled={sending}>
-                  {sending ? <Loader2 className="animate-spin" /> : <Send />}
-                  Send now
-                </Button>
-                {sendResult ? <span className="text-sm text-muted-foreground">{sendResult}</span> : null}
-              </div>
-              {sendError ? (
-                <span role="alert" className="text-sm text-destructive">
-                  {sendError}
-                </span>
-              ) : null}
-              <p className="text-sm font-medium">Send history</p>
-              <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
-            </div>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      ) : null}
+    </ListRow>
   );
 }
 
