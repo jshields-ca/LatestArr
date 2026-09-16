@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { SourceLogo } from "@/components/source-logo";
 import {
   ApiError,
   createSource,
@@ -50,6 +51,10 @@ interface SourceKindConfig {
   label: string;
   description: string;
   fields: SourceKindField[];
+  /** BookLore, BookOrbit, and Grimmory authenticate over OPDS, a protocol
+   *  name most self-hosters won't recognize — this shows a plain-language
+   *  note next to their username/password fields instead. */
+  opdsHint?: boolean;
 }
 
 // The SourceAdapter contract takes an opaque Record<string, string> of
@@ -75,6 +80,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
       { key: "username", label: "OPDS username" },
       { key: "password", label: "OPDS password", type: "password" },
     ],
+    opdsHint: true,
   },
   bookorbit: {
     label: "BookOrbit",
@@ -83,6 +89,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
       { key: "username", label: "OPDS username" },
       { key: "password", label: "OPDS password", type: "password" },
     ],
+    opdsHint: true,
   },
   grimmory: {
     label: "Grimmory",
@@ -91,6 +98,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
       { key: "username", label: "OPDS username" },
       { key: "password", label: "OPDS password", type: "password" },
     ],
+    opdsHint: true,
   },
   audiobookshelf: {
     label: "Audiobookshelf",
@@ -126,6 +134,14 @@ const KIND_ICON: Record<string, LucideIcon> = {
 // Used before the server's own list of registered kinds has loaded, so the
 // dialog is usable immediately rather than waiting on a second request.
 const FALLBACK_KINDS = Object.keys(KIND_CONFIG);
+
+function OpdsHint({ id, label }: { id: string; label: string }) {
+  return (
+    <p id={id} className="text-xs text-muted-foreground">
+      OPDS is just how {label} shares its catalog — use the same username and password you already use to sign in to {label}&apos;s own web reader, not a separate API key.
+    </p>
+  );
+}
 
 function StatusBadge({ status }: { status: SourceConnection["status"] }) {
   if (status === "ok") return <Badge variant="success" dot>Connected</Badge>;
@@ -214,7 +230,10 @@ function AddSourceDialog({
             >
               {kinds.map((k) => (
                 <option key={k} value={k}>
-                  {KIND_CONFIG[k]?.label ?? k}
+                  <span className="flex items-center gap-2">
+                    <SourceLogo kind={k} />
+                    {KIND_CONFIG[k]?.label ?? k}
+                  </span>
                 </option>
               ))}
             </Select>
@@ -254,9 +273,11 @@ function AddSourceDialog({
                   setCredentialValues((prev) => ({ ...prev, [field.key]: e.target.value }))
                 }
                 disabled={submitting}
+                aria-describedby={config.opdsHint ? "source-opds-hint" : undefined}
               />
             </div>
           ))}
+          {config.opdsHint ? <OpdsHint id="source-opds-hint" label={config.label} /> : null}
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
@@ -376,9 +397,13 @@ function EditSourceDialog({
                   setCredentialValues((prev) => ({ ...prev, [field.key]: e.target.value }))
                 }
                 disabled={submitting}
+                aria-describedby={config.opdsHint ? `edit-source-opds-hint-${source.id}` : undefined}
               />
             </div>
           ))}
+          {config.opdsHint ? (
+            <OpdsHint id={`edit-source-opds-hint-${source.id}`} label={config.label} />
+          ) : null}
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
@@ -466,7 +491,10 @@ function SourceRow({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="truncate font-medium">{source.name}</p>
-              <Badge variant="neutral">{kindLabel}</Badge>
+              <Badge variant="neutral">
+                <SourceLogo kind={source.kind} className="size-3.5" />
+                {kindLabel}
+              </Badge>
               <StatusBadge status={source.status} />
             </div>
             <p className="truncate text-sm text-muted-foreground">{source.baseUrl}</p>

@@ -69,6 +69,15 @@ describe("SourcesPage", () => {
     expect(screen.queryByText("bookorbit")).not.toBeInTheDocument();
   });
 
+  it("shows a logo badge next to a source's kind label", async () => {
+    mockLoad({ sources: [exampleSource] });
+
+    const { container } = render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    expect(container.querySelector('[data-kind="tautulli"] img')).toBeInTheDocument();
+  });
+
   it("adds a new source through the dialog", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [] });
@@ -147,6 +156,39 @@ describe("SourcesPage", () => {
     ).toBeInTheDocument();
     // No PATCH request was ever sent (still only the two initial GETs).
     expect(fetchMock.mock.calls).toHaveLength(2);
+  });
+
+  // Exercised via the Edit dialog rather than the Add dialog's Source-type
+  // Select: the kind is fixed there (no dropdown to open), which sidesteps
+  // the real-Radix-Select jsdom slowdown the other tests in this file work
+  // around with generous explicit timeouts.
+  it("explains OPDS in plain language for BookLore-family source kinds", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [{ ...exampleSource, kind: "grimmory" }] }, ALL_KINDS);
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    await user.click(screen.getByRole("button", { name: "Edit Home Tautulli" }));
+    const dialog = await screen.findByRole("dialog");
+
+    const hint = await within(dialog).findByText(/OPDS is just how Grimmory shares its catalog/);
+    expect(hint).toBeInTheDocument();
+    expect(hint).toHaveTextContent("Grimmory's own web reader");
+    expect(
+      within(dialog).getByLabelText("OPDS username (leave blank to keep current)"),
+    ).toHaveAttribute("aria-describedby", hint.id);
+  });
+
+  it("shows no OPDS hint for a non-OPDS source kind", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [exampleSource] });
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    await user.click(screen.getByRole("button", { name: "Edit Home Tautulli" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).queryByText(/OPDS is just how/)).not.toBeInTheDocument();
   });
 
   // This test does two selectOption round-trips in sequence (RomM, then

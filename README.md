@@ -89,6 +89,8 @@ None of this makes LatestArr immune to bugs, and the project is still pre-1.0 (s
 
 LatestArr is licensed under the [GNU General Public License v3.0](LICENSE). This is a copyleft license: if you distribute a modified version of LatestArr (including as a fork or a hosted service that distributes the code), your version must also be licensed under GPLv3 and its source made available. Third-party dependencies under permissive licenses (e.g. MIT) are used as libraries and do not change this obligation for LatestArr's own code.
 
+The Sources page's service logos (Tautulli, Plex, BookLore, BookOrbit, Grimmory, Audiobookshelf, RomM) are bundled from [selfh.st/icons](https://selfh.st/icons) under [CC BY 4.0](https://github.com/selfhst/icons/blob/main/LICENSE) — see [`apps/web/src/assets/logos/NOTICE.md`](apps/web/src/assets/logos/NOTICE.md) for per-file attribution. Each logo is also a trademark of its respective project, used here only to identify that source, not to imply endorsement.
+
 ---
 
 Built by [Jeremy Shields](https://www.scootr.ca) — see more projects at [scootr.ca](https://www.scootr.ca/projects).
