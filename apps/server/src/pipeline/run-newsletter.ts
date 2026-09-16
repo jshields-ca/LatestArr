@@ -16,7 +16,7 @@ import {
 import { and, eq, inArray } from "drizzle-orm";
 import { sendEmail, type SmtpCredentials } from "../mailer/send.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
-import { renderNewsletterHtml } from "../render/newsletter-template.js";
+import { renderDefaultNewsletterHtml } from "../render/newsletter-template.js";
 import { getEncryptionKey } from "../secrets.js";
 
 export class NewsletterNotFoundError extends Error {
@@ -38,6 +38,25 @@ export class SendAlreadyRunningError extends Error {
     super("A send is already running for this newsletter");
     this.name = "SendAlreadyRunningError";
   }
+}
+
+// A real send failure (an unreachable source, SMTP rejecting the
+// connection, ...) used to bubble out of runNewsletter as a bare thrown
+// Error, which the send-now route let fall through to Fastify's default
+// error handler — that handler's JSON body puts the generic HTTP reason
+// phrase ("Internal Server Error") in `error` and the actual detail in
+// `message`, but the frontend only ever reads `error`. The result: a real,
+// specific failure (e.g. "fetch failed: connect ECONNREFUSED ...") showed
+// up as a useless "Internal Server Error" the moment someone clicked "Send
+// now", with the real reason only visible later in Send History. This
+// turns that same underlying error into a message worth putting in
+// `error` directly.
+export function describeSendFailure(err: unknown): string {
+  const detail = err instanceof Error ? err.message : String(err);
+  if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|fetch failed/i.test(detail)) {
+    return `Could not reach one of this newsletter's connected sources (${detail})`;
+  }
+  return `Send failed: ${detail}`;
 }
 
 type Newsletter = typeof newsletters.$inferSelect;
@@ -144,7 +163,7 @@ async function renderNewsletterContent(
     }
   }
 
-  return renderNewsletterHtml({ newsletterName: newsletter.name, items, generatedAt });
+  return await renderDefaultNewsletterHtml({ newsletterName: newsletter.name, items, generatedAt });
 }
 
 async function resolveRecipients(db: Db, newsletterId: string) {

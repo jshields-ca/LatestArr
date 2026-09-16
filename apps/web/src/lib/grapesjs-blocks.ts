@@ -1,4 +1,4 @@
-import type { Block, Editor } from "grapesjs";
+import type { Block, Component, Editor } from "grapesjs";
 
 // The Media List block is the one genuinely dynamic block in the library:
 // a non-technical user configures it entirely through its three Traits
@@ -112,6 +112,21 @@ function registerMediaListType(editor: Editor): void {
             `${count} ${contentTypeLabel(contentType)}, sorted by ${sortLabel(sort)}` +
             `</div>`,
         );
+        // GrapesJS parses the HTML string above into a real child
+        // component (a generic "text" type, since it's just a <div> with
+        // text) that's independently selectable/hoverable by default. Left
+        // alone, clicking anywhere on the rendered preview card selects
+        // that inner child instead of this media-list wrapper, so the
+        // Settings panel shows only the child's generic Id/Title traits —
+        // not this component's real Content type/Sort/Number of items
+        // traits — until the user finds the toolbar's unlabeled "select
+        // parent" button. Locking the injected child(ren) makes a click
+        // bubble straight up to this wrapper, the only thing meant to be
+        // selectable here. `locked` (not just selectable/hoverable) also
+        // covers any further-nested elements inside the injected HTML.
+        this.components().forEach((child: Component) => {
+          child.set({ selectable: false, hoverable: false, editable: false, locked: true });
+        });
       },
 
       toHTML() {

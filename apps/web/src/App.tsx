@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
 import { NewslettersPage } from "@/pages/newsletters-page";
+import { NotFoundPage } from "@/pages/not-found-page";
 import { RecipientsPage } from "@/pages/recipients-page";
 import { SetupPage } from "@/pages/setup-page";
 import { SmtpProfilesPage } from "@/pages/smtp-profiles-page";
@@ -43,6 +44,7 @@ export default function App() {
                     </Suspense>
                   }
                 />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </AppShell>
           </ProtectedRoute>

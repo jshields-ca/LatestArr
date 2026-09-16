@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  detectBrowserTimezone,
   formatHourMinute,
+  formatScheduleForDisplay,
   parseCronToSimpleSchedule,
   parseHourMinute,
   simpleScheduleToCron,
@@ -81,5 +83,71 @@ describe("TIMEZONES", () => {
     expect(TIMEZONES[0]).toBe("UTC");
     expect(TIMEZONES).toContain("America/Winnipeg");
     expect(TIMEZONES.length).toBeGreaterThan(300);
+  });
+});
+
+describe("formatScheduleForDisplay", () => {
+  it("formats a daily schedule", () => {
+    expect(formatScheduleForDisplay("30 8 * * *", "UTC")).toBe("Daily at 8:30 AM (UTC)");
+  });
+
+  it("formats a weekly schedule with the day name", () => {
+    expect(formatScheduleForDisplay("0 8 * * 1", "UTC")).toBe("Weekly on Monday at 8:00 AM (UTC)");
+  });
+
+  it("formats a monthly schedule with an ordinal day", () => {
+    expect(formatScheduleForDisplay("0 8 15 * *", "UTC")).toBe("Monthly on the 15th at 8:00 AM (UTC)");
+  });
+
+  it("uses the right ordinal suffix for 1st/2nd/3rd/4th/11th/21st", () => {
+    expect(formatScheduleForDisplay("0 8 1 * *", "UTC")).toContain("the 1st");
+    expect(formatScheduleForDisplay("0 8 2 * *", "UTC")).toContain("the 2nd");
+    expect(formatScheduleForDisplay("0 8 3 * *", "UTC")).toContain("the 3rd");
+    expect(formatScheduleForDisplay("0 8 4 * *", "UTC")).toContain("the 4th");
+    expect(formatScheduleForDisplay("0 8 11 * *", "UTC")).toContain("the 11th");
+    expect(formatScheduleForDisplay("0 8 21 * *", "UTC")).toContain("the 21st");
+  });
+
+  it("uses PM and 12-hour wraparound correctly", () => {
+    expect(formatScheduleForDisplay("0 0 * * *", "UTC")).toBe("Daily at 12:00 AM (UTC)");
+    expect(formatScheduleForDisplay("0 12 * * *", "UTC")).toBe("Daily at 12:00 PM (UTC)");
+    expect(formatScheduleForDisplay("0 13 * * *", "UTC")).toBe("Daily at 1:00 PM (UTC)");
+  });
+
+  it("appends a non-UTC timezone the same way the raw display used to", () => {
+    expect(formatScheduleForDisplay("0 8 * * 1", "America/Winnipeg")).toBe(
+      "Weekly on Monday at 8:00 AM (America/Winnipeg)",
+    );
+  });
+
+  it("falls back to the raw cron string for a schedule the simple picker can't express", () => {
+    expect(formatScheduleForDisplay("*/15 * * * *", "UTC")).toBe("*/15 * * * * (UTC)");
+  });
+});
+
+describe("detectBrowserTimezone", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns the browser's detected zone when it's a recognized timezone", () => {
+    vi.spyOn(Intl, "DateTimeFormat").mockImplementation(
+      () => ({ resolvedOptions: () => ({ timeZone: "America/Winnipeg" }) }) as unknown as Intl.DateTimeFormat,
+    );
+    expect(detectBrowserTimezone()).toBe("America/Winnipeg");
+  });
+
+  it("falls back to UTC when the detected zone isn't in the TIMEZONES list", () => {
+    vi.spyOn(Intl, "DateTimeFormat").mockImplementation(
+      () => ({ resolvedOptions: () => ({ timeZone: "Not/AZone" }) }) as unknown as Intl.DateTimeFormat,
+    );
+    expect(detectBrowserTimezone()).toBe("UTC");
+  });
+
+  it("falls back to UTC when Intl.DateTimeFormat throws", () => {
+    vi.spyOn(Intl, "DateTimeFormat").mockImplementation(() => {
+      throw new Error("not available");
+    });
+    expect(detectBrowserTimezone()).toBe("UTC");
   });
 });

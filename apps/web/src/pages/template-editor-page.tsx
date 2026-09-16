@@ -5,9 +5,11 @@ import grapesjsMjml from "grapesjs-mjml";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 
 import "grapesjs/dist/css/grapes.min.css";
+import "@/lib/grapesjs-theme.css";
 import { Button } from "@/components/ui/button";
 import { makeGrapesJsKeyboardOperable } from "@/lib/grapesjs-a11y";
 import { applyClickToAddFallback, registerCustomBlocks } from "@/lib/grapesjs-blocks";
+import { GRAPESJS_PANELS_CONFIG } from "@/lib/grapesjs-panels";
 import { registerReorderControls } from "@/lib/grapesjs-reorder";
 import { ApiError, getTemplate, updateTemplate, type Template } from "@/lib/api";
 
@@ -27,6 +29,14 @@ export function TemplateEditorPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedJustNow, setSavedJustNow] = useState(false);
+  // Whether the editor holds edits the person hasn't saved yet. Plain
+  // BrowserRouter (this app doesn't use React Router's data router) means
+  // useBlocker/unstable_usePrompt aren't available, so this only guards the
+  // two realistic data-loss paths a plain router can: tab close/refresh
+  // (beforeunload, below) and this page's own "Back to templates" button.
+  // It deliberately doesn't try to intercept every sidebar link elsewhere
+  // in the app shell — that would need deeper router changes.
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -42,6 +52,7 @@ export function TemplateEditorPage() {
       container: containerRef.current,
       height: "100%",
       storageManager: false,
+      panels: GRAPESJS_PANELS_CONFIG,
       plugins: [{ id: "grapesjs-mjml", plugin: grapesjsMjml }],
       pluginsOpts: {
         "grapesjs-mjml": { blocks: MJML_BLOCKS },
@@ -54,6 +65,14 @@ export function TemplateEditorPage() {
     if (template.designJson) {
       editor.loadProjectData(template.designJson);
     }
+
+    // Registered *after* the initial load above so restoring a saved
+    // design doesn't itself flip the page into "unsaved changes" — only
+    // edits a person actually makes from here on should. These three
+    // events reliably fire on real content edits (adding/removing a
+    // block, editing a trait or RTE text) without also firing for
+    // selection/hover/UI-only changes.
+    editor.on("component:update component:add component:remove", () => setDirty(true));
 
     // The block panel's block list only renders into the DOM the first
     // time it's opened, well after "load" — the observer this returns
@@ -71,6 +90,19 @@ export function TemplateEditorPage() {
     };
   }, [template]);
 
+  // Only registered while there's something to lose — warns on tab
+  // close/refresh/external navigation, which React Router's plain
+  // BrowserRouter has no hook into.
+  useEffect(() => {
+    if (!dirty) return;
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [dirty]);
+
   async function handleSave() {
     const editor = editorRef.current;
     if (!editor || !id) return;
@@ -83,11 +115,19 @@ export function TemplateEditorPage() {
       const { template: updated } = await updateTemplate(id, { designJson, compiledMjml });
       setTemplate(updated);
       setSavedJustNow(true);
+      setDirty(false);
     } catch (err) {
       setSaveError(err instanceof ApiError ? err.message : "Failed to save the template.");
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleBackClick() {
+    if (dirty && !window.confirm("You have unsaved changes. Leave without saving?")) {
+      return;
+    }
+    navigate("/templates");
   }
 
   return (
@@ -98,7 +138,7 @@ export function TemplateEditorPage() {
             variant="ghost"
             size="icon"
             aria-label="Back to templates"
-            onClick={() => navigate("/templates")}
+            onClick={handleBackClick}
           >
             <ArrowLeft />
           </Button>

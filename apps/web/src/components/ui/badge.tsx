@@ -11,6 +11,7 @@ const badgeVariants = cva(
         neutral: "bg-muted text-muted-foreground",
         success: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
         destructive: "bg-destructive/15 text-destructive",
+        warning: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
       },
     },
     defaultVariants: {

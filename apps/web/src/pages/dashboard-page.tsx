@@ -21,14 +21,7 @@ import {
   type SourceConnection,
   type Template,
 } from "@/lib/api";
-
-const SEND_RUN_STATUS_VARIANT = {
-  success: "success",
-  partial_failure: "destructive",
-  failed: "destructive",
-  pending: "neutral",
-  running: "neutral",
-} as const;
+import { sendRunBadgeLabel, sendRunBadgeVariant } from "@/lib/send-run";
 
 interface ChecklistItem {
   key: string;
@@ -236,7 +229,7 @@ export function DashboardPage() {
               <ul className="flex flex-col gap-1.5">
                 {recentRuns.map((run) => (
                   <li key={run.id} className="flex flex-wrap items-center gap-2 text-sm">
-                    <Badge variant={SEND_RUN_STATUS_VARIANT[run.status]}>{run.status}</Badge>
+                    <Badge variant={sendRunBadgeVariant(run)}>{sendRunBadgeLabel(run)}</Badge>
                     <span className="font-medium">{run.newsletterName}</span>
                     <span className="text-muted-foreground">
                       {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
