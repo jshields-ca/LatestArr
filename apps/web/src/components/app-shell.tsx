@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Loader2, LogOut, Menu, Pencil, Star } from "lucide-react";
+import { Globe, Info, Loader2, LogOut, Menu, Pencil, Scale, Star, User } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ApiError, getVersion, updateCurrentUser } from "@/lib/api";
@@ -41,7 +43,44 @@ function GitHubMark({ className }: { className?: string }) {
   );
 }
 
-function ProjectLinks() {
+function AboutPopoverContent() {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <Logo iconClassName="size-4" textClassName="text-sm font-semibold" />
+      <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <User className="size-3.5 shrink-0" aria-hidden="true" />
+          <span>Jeremy Shields</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Scale className="size-3.5 shrink-0" aria-hidden="true" />
+          <a
+            href={LICENSE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:text-foreground hover:underline"
+          >
+            GPLv3
+          </a>
+          <span>license</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Globe className="size-3.5 shrink-0" aria-hidden="true" />
+          <a
+            href={AUTHOR_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="underline-offset-2 hover:text-foreground hover:underline"
+          >
+            scootr.ca
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectFooterCard() {
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,42 +98,51 @@ function ProjectLinks() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
-      <div className="flex items-center justify-between gap-2">
-        <span>{version ? `v${version}` : null}</span>
-        <div className="flex items-center gap-3">
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            title="View on GitHub"
-            aria-label="View on GitHub"
-            className={iconLinkClassName}
-          >
-            <GitHubMark className="size-4" />
-          </a>
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            title="Star on GitHub"
-            aria-label="Star on GitHub"
-            className="text-amber-500 transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
-          >
-            <Star className="size-4 fill-current" />
-          </a>
-        </div>
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+      <div className="min-w-0">
+        {version ? (
+          <Badge variant="neutral" className="font-mono text-[10px] tracking-tight">
+            v{version}
+          </Badge>
+        ) : null}
       </div>
-      <p>
-        Jeremy Shields &middot;{" "}
-        <a href={LICENSE_URL} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">
-          GPLv3
-        </a>{" "}
-        &middot;{" "}
-        <a href={AUTHOR_URL} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">
-          scootr.ca
+      <div className="flex shrink-0 items-center gap-2.5">
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="View on GitHub"
+          aria-label="View on GitHub"
+          className={iconLinkClassName}
+        >
+          <GitHubMark className="size-4" />
         </a>
-      </p>
+        <a
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="Star on GitHub"
+          aria-label="Star on GitHub"
+          className="text-amber-500 transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+        >
+          <Star className="size-4 fill-current" />
+        </a>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="About LatestArr"
+              title="About LatestArr"
+              className={iconLinkClassName}
+            >
+              <Info className="size-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="end">
+            <AboutPopoverContent />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }
@@ -207,7 +255,7 @@ function UserFooter() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+    <div className="flex items-center justify-between gap-2">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{user?.displayName}</p>
         <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
@@ -273,8 +321,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               </SheetTitle>
             </SheetHeader>
             <NavList onNavigate={() => setMobileNavOpen(false)} />
-            <div className="mt-auto flex flex-col gap-3">
-              <ProjectLinks />
+            <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3">
+              <ProjectFooterCard />
               <UserFooter />
             </div>
           </SheetContent>
@@ -293,8 +341,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Logo />
           </div>
           <NavList />
-          <div className="mt-auto flex flex-col gap-3">
-            <ProjectLinks />
+          <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3">
+            <ProjectFooterCard />
             <UserFooter />
           </div>
         </aside>

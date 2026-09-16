@@ -221,27 +221,36 @@ describe("NewslettersPage", () => {
     150000,
   );
 
-  it("switches to a custom cron expression and submits it as-is", async () => {
-    const user = userEvent.setup();
-    mockRoutes(baseRoutes());
-    renderPage();
-    await screen.findByText("No newsletters yet");
+  // Like "adds a newsletter through the dialog" above, this mounts the Add
+  // newsletter dialog's several Radix Selects without ever opening one —
+  // observed to occasionally exceed the 5s default under CI runner
+  // contention (never under normal load), so it gets the same explicit
+  // timeout as that test rather than the default.
+  it(
+    "switches to a custom cron expression and submits it as-is",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(baseRoutes());
+      renderPage();
+      await screen.findByText("No newsletters yet");
 
-    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Name"), "Custom schedule");
-    await user.click(within(dialog).getByRole("button", { name: "Use a custom cron expression" }));
-    const cronInput = within(dialog).getByLabelText("Cron expression");
-    await user.clear(cronInput);
-    await user.type(cronInput, "*/15 * * * *");
+      await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.type(within(dialog).getByLabelText("Name"), "Custom schedule");
+      await user.click(within(dialog).getByRole("button", { name: "Use a custom cron expression" }));
+      const cronInput = within(dialog).getByLabelText("Cron expression");
+      await user.clear(cronInput);
+      await user.type(cronInput, "*/15 * * * *");
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
-    await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
+      await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-    expect(JSON.parse(init.body as string).scheduleCron).toBe("*/15 * * * *");
-  });
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(init.body as string).scheduleCron).toBe("*/15 * * * *");
+    },
+    60000,
+  );
 
   it(
     "changes the timezone in the add dialog",

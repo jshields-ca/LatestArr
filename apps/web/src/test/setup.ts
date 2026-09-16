@@ -30,3 +30,23 @@ if (typeof Element.prototype.releasePointerCapture === "undefined") {
 if (typeof Element.prototype.scrollIntoView === "undefined") {
   Element.prototype.scrollIntoView = () => {};
 }
+
+// jsdom's CSS engine (nwsapi) takes ~500ms per call to resolve the
+// `:modal` pseudo-class (a known nwsapi perf pathology, unrelated to
+// selector complexity — a trivial selector like "div" is sub-millisecond).
+// Radix UI's Popper positioning (used by Popover, DropdownMenu, Tooltip,
+// etc.) calls `element.matches(':modal')`/`':popover-open'` on every
+// overflow-ancestor it walks while computing collision avoidance, so
+// opening so much as one of these components under jsdom takes 10-15+
+// real seconds and can blow a test's timeout. No element in this app
+// tree is ever an open native <dialog> or Popover-API element (Radix
+// implements both in JS, not via the native APIs those pseudo-classes
+// describe), so short-circuiting them to `false` is always correct here,
+// not just a testing shortcut.
+if (typeof Element.prototype.matches === "function") {
+  const originalMatches = Element.prototype.matches;
+  Element.prototype.matches = function (selector: string) {
+    if (selector === ":modal" || selector === ":popover-open") return false;
+    return originalMatches.call(this, selector);
+  };
+}
