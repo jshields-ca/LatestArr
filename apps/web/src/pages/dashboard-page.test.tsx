@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +10,11 @@ const fetchMock = vi.fn();
 
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
+  try {
+    window.localStorage.clear();
+  } catch {
+    // ignore — localStorage isn't required for these tests to pass
+  }
 });
 
 afterEach(() => {
@@ -59,7 +65,7 @@ const exampleSendRun = {
 // Every required step is done: one source, one recipient in one group, one
 // SMTP profile, one newsletter (template stays optional/empty).
 function mockCompleteLoad() {
-  fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [{ id: "s1" }] }));
+  fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [{ id: "s1", status: "ok" }] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [{ id: "r1" }] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [{ id: "g1" }] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [{ id: "smtp1" }] }));
@@ -88,20 +94,60 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("Setup checklist")).not.toBeInTheDocument();
   });
 
-  it("shows stats and recent sends once every required step is done", async () => {
+  it("shows stats and a collapsed setup-complete summary once every required step is done", async () => {
     mockCompleteLoad();
     renderDashboard();
 
-    expect(await screen.findByText("Setup checklist")).toBeInTheDocument();
-    expect(screen.getByText("Recent sends")).toBeInTheDocument();
+    expect(await screen.findByText("Recent sends")).toBeInTheDocument();
+
+    // The checklist is done, so it collapses to a compact summary by
+    // default instead of taking up the same space as the in-progress state.
+    expect(screen.getByText("Setup complete")).toBeInTheDocument();
+    expect(screen.queryByText("Setup checklist")).not.toBeInTheDocument();
+    expect(screen.queryByText("Connect a source")).not.toBeInTheDocument();
+
+    // Stat tiles.
+    expect(screen.getByText("Sources")).toBeInTheDocument();
+    expect(screen.getByText("Recipients")).toBeInTheDocument();
+    expect(screen.getByText("SMTP Profiles")).toBeInTheDocument();
+    expect(screen.getByText("Newsletters")).toBeInTheDocument();
+
+    // Recent send detail: which newsletter, item/recipient counts, outcome.
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
     expect(screen.getByText("success")).toBeInTheDocument();
+    expect(screen.getByText("4 items")).toBeInTheDocument();
+    expect(screen.getByText("2 recipients")).toBeInTheDocument();
+  });
+
+  it("re-expands the completed checklist on request, and can collapse it again", async () => {
+    mockCompleteLoad();
+    renderDashboard();
+
+    await screen.findByText("Setup complete");
+
+    await userEvent.click(screen.getByRole("button", { name: "Review checklist" }));
+
+    expect(screen.getByText("Setup checklist")).toBeInTheDocument();
+    expect(screen.getByText("Connect a source")).toBeInTheDocument();
+    expect(screen.queryByText("Setup complete")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse setup checklist" }));
+
+    expect(screen.getByText("Setup complete")).toBeInTheDocument();
+    expect(screen.queryByText("Setup checklist")).not.toBeInTheDocument();
   });
 
   it("has no accessibility violations in the getting-started state", async () => {
     mockEmptyLoad();
     const { container } = renderDashboard();
     await screen.findByText("Getting started");
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no accessibility violations in the completed state", async () => {
+    mockCompleteLoad();
+    const { container } = renderDashboard();
+    await screen.findByText("Setup complete");
     expect(await axe(container)).toHaveNoViolations();
   });
 });

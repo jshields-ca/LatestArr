@@ -1,8 +1,19 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  Loader2,
+  Mail,
+  Send,
+  Server,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ApiError,
@@ -22,6 +33,32 @@ import {
   type Template,
 } from "@/lib/api";
 import { sendRunBadgeLabel, sendRunBadgeVariant } from "@/lib/send-run";
+import { cn } from "@/lib/utils";
+
+// Whether the setup checklist should default to its compact "Setup
+// complete" summary. It's set the first time the checklist is seen fully
+// done, and toggled again whenever the user expands/collapses it by hand —
+// so re-opening it to double-check something "sticks" for next time, but a
+// brand-new completion always starts collapsed rather than surprising a
+// returning user with a suddenly-expanded card.
+const CHECKLIST_EXPANDED_STORAGE_KEY = "latestarr:dashboard-checklist-expanded";
+
+function readStoredChecklistExpanded(): boolean {
+  try {
+    return window.localStorage.getItem(CHECKLIST_EXPANDED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredChecklistExpanded(expanded: boolean) {
+  try {
+    window.localStorage.setItem(CHECKLIST_EXPANDED_STORAGE_KEY, String(expanded));
+  } catch {
+    // Best-effort only — a private window or blocked storage just means the
+    // checklist won't remember its state across reloads.
+  }
+}
 
 interface ChecklistItem {
   key: string;
@@ -54,13 +91,65 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
   );
 }
 
-function StatCard({ label, value, href }: { label: string; value: number; href: string }) {
+// Per-tile accent so the four stat cards read as distinct at a glance
+// instead of four identical gray boxes. Text/icon shades are picked (not
+// the raw 500-weight swatch) so each clears WCAG AA/non-text contrast
+// against its own tinted chip background in both themes — same approach
+// as the Badge variants above.
+const STAT_ACCENTS = {
+  primary: {
+    chip: "bg-primary/15 text-primary",
+    glow: "group-hover:border-primary/40",
+  },
+  sky: {
+    chip: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
+    glow: "group-hover:border-sky-500/40",
+  },
+  violet: {
+    chip: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+    glow: "group-hover:border-violet-500/40",
+  },
+  amber: {
+    chip: "bg-amber-500/15 text-amber-800 dark:text-amber-400",
+    glow: "group-hover:border-amber-500/40",
+  },
+} as const;
+
+function StatCard({
+  label,
+  value,
+  secondary,
+  href,
+  icon: Icon,
+  accent,
+}: {
+  label: string;
+  value: number;
+  secondary?: string;
+  href: string;
+  icon: LucideIcon;
+  accent: keyof typeof STAT_ACCENTS;
+}) {
+  const { chip, glow } = STAT_ACCENTS[accent];
   return (
-    <Link to={href}>
-      <Card className="transition-colors hover:bg-accent/50">
-        <CardContent className="p-4">
-          <p className="text-2xl font-semibold tracking-tight">{value}</p>
-          <p className="text-sm text-muted-foreground">{label}</p>
+    <Link to={href} className="group block">
+      <Card
+        className={cn(
+          "h-full transition-all hover:-translate-y-0.5 hover:shadow-elevated",
+          glow,
+        )}
+      >
+        <CardContent className="flex items-center gap-4 p-4">
+          <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-full", chip)}>
+            <Icon className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+            <p className="truncate text-sm text-muted-foreground">{label}</p>
+            {secondary ? (
+              <p className="truncate text-xs text-muted-foreground/80">{secondary}</p>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
     </Link>
@@ -68,6 +157,29 @@ function StatCard({ label, value, href }: { label: string; value: number; href: 
 }
 
 type RecentRun = SendRun & { newsletterName: string };
+
+function RecentRunRow({ run }: { run: RecentRun }) {
+  return (
+    <li className="flex flex-col gap-1.5 rounded-md border border-border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="truncate text-sm font-medium">{run.newsletterName}</span>
+        <Badge variant={sendRunBadgeVariant(run)}>{sendRunBadgeLabel(run)}</Badge>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span>{run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}</span>
+        <span aria-hidden="true">&middot;</span>
+        <span>
+          {run.itemCountIncluded} item{run.itemCountIncluded === 1 ? "" : "s"}
+        </span>
+        <span aria-hidden="true">&middot;</span>
+        <span>
+          {run.recipientCount} recipient{run.recipientCount === 1 ? "" : "s"}
+        </span>
+      </div>
+      {run.error ? <p className="text-xs text-destructive">{run.error}</p> : null}
+    </li>
+  );
+}
 
 export function DashboardPage() {
   const [sources, setSources] = useState<SourceConnection[] | null>(null);
@@ -78,6 +190,12 @@ export function DashboardPage() {
   const [newsletters, setNewsletters] = useState<Newsletter[] | null>(null);
   const [recentRuns, setRecentRuns] = useState<RecentRun[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [checklistExpanded, setChecklistExpandedState] = useState(readStoredChecklistExpanded);
+
+  function setChecklistExpanded(expanded: boolean) {
+    setChecklistExpandedState(expanded);
+    writeStoredChecklistExpanded(expanded);
+  }
 
   useEffect(() => {
     function fail(err: unknown) {
@@ -180,6 +298,49 @@ export function DashboardPage() {
   ];
 
   const requiredDone = checklist.filter((item) => !item.optional).every((item) => item.done);
+  const showFullChecklist = !requiredDone || checklistExpanded;
+
+  const sourcesWithErrors = sources?.filter((s) => s.status === "error").length ?? 0;
+  const enabledNewsletters = newsletters?.filter((n) => n.isEnabled).length ?? 0;
+
+  const checklistCard = (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <CardTitle>{requiredDone ? "Setup checklist" : "Getting started"}</CardTitle>
+        {requiredDone ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setChecklistExpanded(false)}
+            aria-label="Collapse setup checklist"
+          >
+            Collapse
+            <ChevronDown className="rotate-180" aria-hidden="true" />
+          </Button>
+        ) : null}
+      </CardHeader>
+      <CardContent className="flex flex-col divide-y divide-border">
+        {checklist.map((item) => (
+          <ChecklistRow key={item.key} item={item} />
+        ))}
+      </CardContent>
+    </Card>
+  );
+
+  const checklistSummary = (
+    <Card>
+      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+          Setup complete
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => setChecklistExpanded(true)}>
+          Review checklist
+          <ChevronDown aria-hidden="true" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -194,53 +355,61 @@ export function DashboardPage() {
 
       {requiredDone ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Sources" value={sources?.length ?? 0} href="/sources" />
-          <StatCard label="Recipients" value={recipients?.length ?? 0} href="/recipients" />
-          <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" />
-          <StatCard label="Newsletters" value={newsletters?.length ?? 0} href="/newsletters" />
+          <StatCard
+            label="Sources"
+            value={sources?.length ?? 0}
+            secondary={sourcesWithErrors > 0 ? `${sourcesWithErrors} need attention` : "All connected"}
+            href="/sources"
+            icon={Server}
+            accent="sky"
+          />
+          <StatCard
+            label="Recipients"
+            value={recipients?.length ?? 0}
+            secondary={`${groups?.length ?? 0} group${groups?.length === 1 ? "" : "s"}`}
+            href="/recipients"
+            icon={Users}
+            accent="violet"
+          />
+          <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" icon={Mail} accent="amber" />
+          <StatCard
+            label="Newsletters"
+            value={newsletters?.length ?? 0}
+            secondary={`${enabledNewsletters} active`}
+            href="/newsletters"
+            icon={Send}
+            accent="primary"
+          />
         </div>
       ) : null}
 
-      <Card className="max-w-xl">
-        <CardHeader>
-          <CardTitle>{requiredDone ? "Setup checklist" : "Getting started"}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col divide-y divide-border">
-          {checklist.map((item) => (
-            <ChecklistRow key={item.key} item={item} />
-          ))}
-        </CardContent>
-      </Card>
+      <div className={cn("grid gap-4", requiredDone ? "lg:grid-cols-2" : "max-w-2xl")}>
+        {showFullChecklist ? checklistCard : checklistSummary}
 
-      {requiredDone ? (
-        <Card className="max-w-xl">
-          <CardHeader>
-            <CardTitle>Recent sends</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentRuns === null ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Loading recent sends...
-              </div>
-            ) : recentRuns.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sends yet.</p>
-            ) : (
-              <ul className="flex flex-col gap-1.5">
-                {recentRuns.map((run) => (
-                  <li key={run.id} className="flex flex-wrap items-center gap-2 text-sm">
-                    <Badge variant={sendRunBadgeVariant(run)}>{sendRunBadgeLabel(run)}</Badge>
-                    <span className="font-medium">{run.newsletterName}</span>
-                    <span className="text-muted-foreground">
-                      {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
+        {requiredDone ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent sends</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {recentRuns === null ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading recent sends...
+                </div>
+              ) : recentRuns.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No sends yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {recentRuns.map((run) => (
+                    <RecentRunRow key={run.id} run={run} />
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
     </div>
   );
 }
