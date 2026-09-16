@@ -269,7 +269,7 @@ describe("NewslettersPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add newsletter" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Timezone")).toHaveValue("America/Winnipeg");
+    expect(within(dialog).getByLabelText("Timezone")).toHaveTextContent("America/Winnipeg");
 
     dtfSpy.mockRestore();
   });
@@ -287,7 +287,7 @@ describe("NewslettersPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add newsletter" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Timezone")).toHaveValue("UTC");
+    expect(within(dialog).getByLabelText("Timezone")).toHaveTextContent("UTC");
 
     dtfSpy.mockRestore();
   });
@@ -300,7 +300,7 @@ describe("NewslettersPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add newsletter" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("SMTP profile")).toHaveValue("smtp1");
+    expect(within(dialog).getByLabelText("SMTP profile")).toHaveTextContent("Primary");
   });
 
   it("leaves the SMTP profile unselected in the Add newsletter dialog when there are no profiles yet", async () => {
