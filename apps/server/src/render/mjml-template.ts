@@ -108,10 +108,21 @@ export async function renderMjmlTemplate(
     generatedAtFormatted: formatDate(context.generatedAt),
   });
 
+  // A template saved from the builder before it's ever had an initial
+  // design loaded exports a bare fragment (just its section/column
+  // content, no root element) — mjml2html rejects that outright, even
+  // under "soft" validation, rather than returning best-effort HTML. Wrap
+  // it the same way a template built from scratch in the editor ends up
+  // wrapped, so a truly bare-bones custom template still renders instead
+  // of failing the whole send.
+  const wrappedMjml = /^\s*<mjml[\s>]/.test(substitutedMjml)
+    ? substitutedMjml
+    : `<mjml><mj-body>${substitutedMjml}</mj-body></mjml>`;
+
   // "soft" validation still returns best-effort HTML for a malformed
   // custom template rather than aborting the send outright — a user's
   // builder mistake shouldn't take down a newsletter that otherwise has
   // real content to deliver.
-  const { html } = await mjml2html(substitutedMjml, { validationLevel: "soft" });
+  const { html } = await mjml2html(wrappedMjml, { validationLevel: "soft" });
   return html;
 }
