@@ -143,6 +143,57 @@ describe("poster and metadata fields on rendered items", () => {
   });
 });
 
+// Mirrors the actual shape apps/web/src/lib/grapesjs-blocks.ts's media-list
+// component type exports (one <mj-raw> pair per rendered item, nested right
+// inside the {{#mediaList}}/{{/mediaList}} block), rather than hand-writing
+// a fixture that's already careful to wrap things correctly — this is the
+// regression guard for a real bug: MJML's compiler silently drops a bare
+// <table> placed directly under <mj-column> (it isn't one of MJML's own
+// recognized component tags there) instead of raising an error under
+// "soft" validation, so the previous, unwrapped version of this markup
+// compiled without any thrown error yet produced a template that rendered
+// with an empty section in the actually-sent email.
+const UNWRAPPED_TABLE_MJML = `
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        {{#mediaList contentType="movie" sort="added" count="5"}}
+        <table><tr><td>{{title}}</td></tr></table>
+        {{/mediaList}}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+`;
+
+const MJ_RAW_WRAPPED_TABLE_MJML = UNWRAPPED_TABLE_MJML.replace(
+  "<table><tr><td>{{title}}</td></tr></table>",
+  "<mj-raw><table><tr><td>{{title}}</td></tr></table></mj-raw>",
+);
+
+describe("mediaList output must survive real MJML compilation, not just look right pre-compile", () => {
+  it("silently drops a <table> placed directly under <mj-column> with no thrown error (the bug)", async () => {
+    const html = await renderMjmlTemplate(UNWRAPPED_TABLE_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "Ghost Movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("Ghost Movie");
+  });
+
+  it("passes the <table> through untouched once it's wrapped in <mj-raw> (the fix)", async () => {
+    const html = await renderMjmlTemplate(MJ_RAW_WRAPPED_TABLE_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "Real Movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Real Movie");
+  });
+});
+
 describe("the mediaList block helper", () => {
   it("filters the 'added' pool by content type and truncates to count", async () => {
     const html = await renderMjmlTemplate(MEDIA_LIST_MJML, {
