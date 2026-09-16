@@ -1,7 +1,0 @@
----
-"@latestarr/web": patch
----
-
-Expand the template editor's block library beyond the previous three generic blocks (Header, Footer, Media List) so it's actually discoverable: six new "content-kind" preset blocks (Movies, TV episodes, TV seasons, Books, Audiobooks, Games) let a user drag in a ready-to-go section for a specific *arr media kind instead of dragging the generic Media List and then hunting for its Content type trait afterward — each preset is just the existing Media List component with that trait pre-set, not a second implementation. Also add two standard newsletter-builder primitives the library was missing entirely: a Divider (`mj-divider`) and a Spacer (`mj-spacer`). The block panel is now organized under "Layout" (Header, Footer, Divider, Spacer) and "Content" (Media List and its six presets) category headers instead of one flat, unlabeled list.
-
-Also fixes a real bug surfaced while verifying the new preset blocks against the actual MJML compile pipeline (not just the editor canvas): the Media List component's exported `<table>` markup sat directly under `<mj-column>` with no `<mj-raw>` wrapper, so MJML's compiler silently dropped it (no thrown error under "soft" validation) — meaning the *existing*, already-shipped Media List block rendered its section as empty in a real compiled/sent newsletter despite looking correct in the editor. This affects every content type, not just the new presets, and is fixed alongside them since it shares the same `toHTML()` code.
