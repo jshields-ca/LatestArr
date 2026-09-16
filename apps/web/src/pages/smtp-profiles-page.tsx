@@ -39,6 +39,28 @@ function impliesSecure(port: string): boolean {
   return port.trim() === "465";
 }
 
+// A compact, always-visible reference for the three port conventions, shown
+// next to the Port field so users can pick a port without first learning
+// what a TLS handshake is. One short line per port instead of a paragraph.
+const PORT_GUIDE: Array<{ port: string; mode: string }> = [
+  { port: "587", mode: "STARTTLS — starts unencrypted, then upgrades to TLS" },
+  { port: "465", mode: "Implicit TLS — encrypted from the start" },
+  { port: "25 / 2525", mode: "Usually unencrypted or relay-only" },
+];
+
+function PortGuide({ id }: { id: string }) {
+  return (
+    <dl id={id} className="flex flex-col gap-1 text-xs text-muted-foreground">
+      {PORT_GUIDE.map(({ port, mode }) => (
+        <div key={port} className="flex gap-1.5">
+          <dt className="shrink-0 font-medium text-foreground">{port}</dt>
+          <dd>{mode}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile) => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -127,18 +149,19 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
               disabled={submitting}
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="smtp-host">Host</Label>
-              <Input
-                id="smtp-host"
-                placeholder="smtp.example.com"
-                required
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="smtp-host">Host</Label>
+            <Input
+              id="smtp-host"
+              placeholder="smtp.example.com"
+              required
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+            <p className="text-sm font-medium">Port &amp; encryption</p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="smtp-port">Port</Label>
               <Input
@@ -148,27 +171,29 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
                 value={port}
                 onChange={(e) => handlePortChange(e.target.value)}
                 disabled={submitting}
+                aria-describedby="smtp-port-guide"
               />
             </div>
-          </div>
-          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-            <div>
-              <Label htmlFor="smtp-secure">Use implicit TLS (port 465)</Label>
-              <p className="text-sm text-muted-foreground">
-                Leave this off for ports 587 and 25 — those use STARTTLS, which upgrades the
-                connection to TLS automatically. Turning this on for a STARTTLS port causes
-                connection failures.
-              </p>
+            <PortGuide id="smtp-port-guide" />
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <div>
+                <Label htmlFor="smtp-secure">Use implicit TLS (port 465)</Label>
+                <p id="smtp-secure-hint" className="text-xs text-muted-foreground">
+                  Set for you based on the port above. Only change it if your provider says
+                  otherwise.
+                </p>
+              </div>
+              <Switch
+                id="smtp-secure"
+                checked={secure}
+                onCheckedChange={(next) => {
+                  setSecure(next);
+                  setSecureTouched(true);
+                }}
+                disabled={submitting}
+                aria-describedby="smtp-secure-hint"
+              />
             </div>
-            <Switch
-              id="smtp-secure"
-              checked={secure}
-              onCheckedChange={(next) => {
-                setSecure(next);
-                setSecureTouched(true);
-              }}
-              disabled={submitting}
-            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
@@ -322,17 +347,18 @@ function EditSmtpProfileDialog({
               disabled={submitting}
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="edit-smtp-host">Host</Label>
-              <Input
-                id="edit-smtp-host"
-                required
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-smtp-host">Host</Label>
+            <Input
+              id="edit-smtp-host"
+              required
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+            <p className="text-sm font-medium">Port &amp; encryption</p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="edit-smtp-port">Port</Label>
               <Input
@@ -342,27 +368,29 @@ function EditSmtpProfileDialog({
                 value={port}
                 onChange={(e) => handlePortChange(e.target.value)}
                 disabled={submitting}
+                aria-describedby="edit-smtp-port-guide"
               />
             </div>
-          </div>
-          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
-            <div>
-              <Label htmlFor="edit-smtp-secure">Use implicit TLS (port 465)</Label>
-              <p className="text-sm text-muted-foreground">
-                Leave this off for ports 587 and 25 — those use STARTTLS, which upgrades the
-                connection to TLS automatically. Turning this on for a STARTTLS port causes
-                connection failures.
-              </p>
+            <PortGuide id="edit-smtp-port-guide" />
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <div>
+                <Label htmlFor="edit-smtp-secure">Use implicit TLS (port 465)</Label>
+                <p id="edit-smtp-secure-hint" className="text-xs text-muted-foreground">
+                  Set for you based on the port above. Only change it if your provider says
+                  otherwise.
+                </p>
+              </div>
+              <Switch
+                id="edit-smtp-secure"
+                checked={secure}
+                onCheckedChange={(next) => {
+                  setSecure(next);
+                  setSecureTouched(true);
+                }}
+                disabled={submitting}
+                aria-describedby="edit-smtp-secure-hint"
+              />
             </div>
-            <Switch
-              id="edit-smtp-secure"
-              checked={secure}
-              onCheckedChange={(next) => {
-                setSecure(next);
-                setSecureTouched(true);
-              }}
-              disabled={submitting}
-            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
