@@ -1,0 +1,47 @@
+/*
+ * Two separate sources of GrapesJS's stock "active" accent color, both
+ * overridden below to use this app's own Bloom accent instead:
+ *
+ * 1. grapes.min.css itself defines --gjs-color-blue (used for the
+ *    selected-component outline in the canvas — .gjs-highlighter-sel —
+ *    the floating per-component toolbar's background — .gjs-toolbar —
+ *    and the drag-preview helper — .gjs-drag-helper).
+ *
+ * 2. The grapesjs-mjml plugin's `useCustomTheme` option (on by default —
+ *    see node_modules/grapesjs-mjml/dist/index.js, search "f45e43") goes
+ *    further: at runtime it injects its own <style> tag that hardcodes
+ *    `.gjs-four-color`/`.gjs-four-bg` to a literal #f45e43 — GrapesJS's
+ *    own flame-orange brand color from its stock demo theme. GrapesJS
+ *    itself applies `.gjs-four-color` to *any* panel/toolbar button
+ *    marked `active: true` (see ButtonView's `activeCls` in
+ *    node_modules/grapesjs/dist/grapes.mjs), which is exactly what makes
+ *    the active device-switcher button (Desktop/Tablet/Mobile, active by
+ *    default) — and, without this override, our own "View components"/
+ *    "Open Style Manager" panel buttons above, both marked `active: true`
+ *    in grapesjs-panels.ts — show up in that orange rather than the rest
+ *    of the app's pink.
+ *
+ *    Because that <style> tag is injected by JS at grapesjs.init() time —
+ *    after this stylesheet has already loaded — a same-specificity
+ *    `.gjs-four-color` rule here would lose the cascade order tiebreak to
+ *    it. Scoping to GrapesJS's own root wrapper class below
+ *    (.gjs-editor-cont .gjs-four-color) gives this rule higher
+ *    specificity instead, so it wins regardless of injection order.
+ *
+ * Both read from --primary (defined for both light and dark mode in
+ * index.css) rather than a hardcoded hex, so this follows the app's
+ * palette — including automatically if that palette ever changes —
+ * instead of duplicating it.
+ */
+.gjs-editor-cont {
+  --gjs-color-blue: var(--primary);
+}
+
+.gjs-editor-cont .gjs-four-color,
+.gjs-editor-cont .gjs-four-color-h:hover {
+  color: var(--primary);
+}
+
+.gjs-editor-cont .gjs-four-bg {
+  background-color: var(--primary);
+}
