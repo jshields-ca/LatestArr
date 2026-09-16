@@ -168,18 +168,28 @@ describe("SourcesPage", () => {
     expect(within(dialog).getByLabelText("OPDS password")).toBeInTheDocument();
   });
 
-  it("tests a connection and shows the result", async () => {
-    const user = userEvent.setup();
-    mockLoad({ sources: [exampleSource] });
-    render(<SourcesPage />);
-    await screen.findByText("Home Tautulli");
+  // Measured ~35-40s in this suite once the Sources page started
+  // rendering a real Radix Select (for the Add-source dialog's kind
+  // picker) — jsdom's lack of real layout/pointer-capture support seems
+  // to slow down the *next* async Testing Library call in the same file
+  // even in a test that never opens the dropdown itself, so this gets an
+  // explicit timeout rather than the 5s default.
+  it(
+    "tests a connection and shows the result",
+    async () => {
+      const user = userEvent.setup();
+      mockLoad({ sources: [exampleSource] });
+      render(<SourcesPage />);
+      await screen.findByText("Home Tautulli");
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: false, message: "Invalid API key" }));
-    await user.click(screen.getByRole("button", { name: "Test connection" }));
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: false, message: "Invalid API key" }));
+      await user.click(screen.getByRole("button", { name: "Test connection" }));
 
-    expect(await screen.findByText("Invalid API key")).toBeInTheDocument();
-    expect(screen.getByText("Error")).toBeInTheDocument();
-  });
+      expect(await screen.findByText("Invalid API key")).toBeInTheDocument();
+      expect(screen.getByText("Error")).toBeInTheDocument();
+    },
+    60000,
+  );
 
   it("deletes a source after confirmation", async () => {
     const user = userEvent.setup();

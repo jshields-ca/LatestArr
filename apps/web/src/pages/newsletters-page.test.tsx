@@ -130,46 +130,59 @@ describe("NewslettersPage", () => {
     expect(body.timezone).toBe("UTC");
   });
 
-  it("builds a daily cron expression from the simple schedule picker", async () => {
-    const user = userEvent.setup();
-    mockRoutes(baseRoutes());
-    renderPage();
-    await screen.findByText("No newsletters yet");
+  // The Repeats <Select> is a real Radix dropdown now, not a native
+  // <select> — jsdom's lack of real layout/pointer-capture support makes
+  // the *next* async Testing Library call after opening/closing one
+  // noticeably slower to settle than in a real browser (measured ~35-40s
+  // here), so these get an explicit timeout rather than the 5s default.
+  it(
+    "builds a daily cron expression from the simple schedule picker",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(baseRoutes());
+      renderPage();
+      await screen.findByText("No newsletters yet");
 
-    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Name"), "Daily digest");
-    selectOption(within(dialog).getByLabelText("Repeats"), "Every day");
-    fireEvent.change(within(dialog).getByLabelText("At"), { target: { value: "09:15" } });
+      await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.type(within(dialog).getByLabelText("Name"), "Daily digest");
+      selectOption(within(dialog).getByLabelText("Repeats"), "Every day");
+      fireEvent.change(within(dialog).getByLabelText("At"), { target: { value: "09:15" } });
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
-    await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
+      await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-    expect(JSON.parse(init.body as string).scheduleCron).toBe("15 9 * * *");
-  });
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(init.body as string).scheduleCron).toBe("15 9 * * *");
+    },
+    60000,
+  );
 
-  it("builds a monthly cron expression from the simple schedule picker", async () => {
-    const user = userEvent.setup();
-    mockRoutes(baseRoutes());
-    renderPage();
-    await screen.findByText("No newsletters yet");
+  it(
+    "builds a monthly cron expression from the simple schedule picker",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(baseRoutes());
+      renderPage();
+      await screen.findByText("No newsletters yet");
 
-    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Name"), "Monthly digest");
-    selectOption(within(dialog).getByLabelText("Repeats"), "Every month");
-    await user.clear(within(dialog).getByLabelText("On day of the month"));
-    await user.type(within(dialog).getByLabelText("On day of the month"), "5");
+      await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.type(within(dialog).getByLabelText("Name"), "Monthly digest");
+      selectOption(within(dialog).getByLabelText("Repeats"), "Every month");
+      await user.clear(within(dialog).getByLabelText("On day of the month"));
+      await user.type(within(dialog).getByLabelText("On day of the month"), "5");
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
-    await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
+      await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-    expect(JSON.parse(init.body as string).scheduleCron).toBe("0 8 5 * *");
-  });
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(init.body as string).scheduleCron).toBe("0 8 5 * *");
+    },
+    60000,
+  );
 
   it("switches to a custom cron expression and submits it as-is", async () => {
     const user = userEvent.setup();
@@ -193,24 +206,28 @@ describe("NewslettersPage", () => {
     expect(JSON.parse(init.body as string).scheduleCron).toBe("*/15 * * * *");
   });
 
-  it("changes the timezone in the add dialog", async () => {
-    const user = userEvent.setup();
-    mockRoutes(baseRoutes());
-    renderPage();
-    await screen.findByText("No newsletters yet");
+  it(
+    "changes the timezone in the add dialog",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(baseRoutes());
+      renderPage();
+      await screen.findByText("No newsletters yet");
 
-    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Name"), "Winnipeg digest");
-    selectOption(within(dialog).getByLabelText("Timezone"), "America/Winnipeg");
+      await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.type(within(dialog).getByLabelText("Name"), "Winnipeg digest");
+      selectOption(within(dialog).getByLabelText("Timezone"), "America/Winnipeg");
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
-    await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: weeklyDigest }));
+      await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-    expect(JSON.parse(init.body as string).timezone).toBe("America/Winnipeg");
-  });
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(init.body as string).timezone).toBe("America/Winnipeg");
+    },
+    60000,
+  );
 
   it("toggles enabled via the switch", async () => {
     const user = userEvent.setup();
@@ -296,24 +313,28 @@ describe("NewslettersPage", () => {
     expect(await screen.findByText("Newsletter has no SMTP profile configured")).toBeInTheDocument();
   });
 
-  it("creates a newsletter with a template selected in the dialog", async () => {
-    const user = userEvent.setup();
-    mockRoutes(baseRoutes({ "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }) }));
-    renderPage();
-    await screen.findByText("No newsletters yet");
+  it(
+    "creates a newsletter with a template selected in the dialog",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(baseRoutes({ "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }) }));
+      renderPage();
+      await screen.findByText("No newsletters yet");
 
-    await user.click(screen.getByRole("button", { name: "Add newsletter" }));
-    const dialog = await screen.findByRole("dialog");
-    await user.type(within(dialog).getByLabelText("Name"), "Weekly digest");
-    selectOption(within(dialog).getByLabelText("Template"), "Weekly Layout");
+      await user.click(screen.getByRole("button", { name: "Add newsletter" }));
+      const dialog = await screen.findByRole("dialog");
+      await user.type(within(dialog).getByLabelText("Name"), "Weekly digest");
+      selectOption(within(dialog).getByLabelText("Template"), "Weekly Layout");
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
-    await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
+      fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
+      await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
 
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-    expect(JSON.parse(init.body as string)).toMatchObject({ templateId: "t1" });
-  });
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toMatchObject({ templateId: "t1" });
+    },
+    60000,
+  );
 
   it(
     "changes and then unsets an existing newsletter's template",
@@ -386,31 +407,35 @@ describe("NewslettersPage", () => {
     expect(within(dialog).queryByLabelText("Repeats")).not.toBeInTheDocument();
   });
 
-  it("edits a newsletter's schedule and saves", async () => {
-    const user = userEvent.setup();
-    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
-    renderPage();
-    await screen.findByText("Weekly digest");
+  it(
+    "edits a newsletter's schedule and saves",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
+      renderPage();
+      await screen.findByText("Weekly digest");
 
-    await user.click(screen.getByRole("button", { name: "Edit Weekly digest" }));
-    const dialog = await screen.findByRole("dialog");
-    selectOption(within(dialog).getByLabelText("Repeats"), "Every day");
-    fireEvent.change(within(dialog).getByLabelText("At"), { target: { value: "10:30" } });
+      await user.click(screen.getByRole("button", { name: "Edit Weekly digest" }));
+      const dialog = await screen.findByRole("dialog");
+      selectOption(within(dialog).getByLabelText("Repeats"), "Every day");
+      fireEvent.change(within(dialog).getByLabelText("At"), { target: { value: "10:30" } });
 
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { newsletter: { ...weeklyDigest, scheduleCron: "30 10 * * *" } }),
-    );
-    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(200, { newsletter: { ...weeklyDigest, scheduleCron: "30 10 * * *" } }),
+      );
+      await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-    expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body as string)).toMatchObject({
-      name: "Weekly digest",
-      scheduleCron: "30 10 * * *",
-      timezone: "UTC",
-    });
-  });
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(init.method).toBe("PATCH");
+      expect(JSON.parse(init.body as string)).toMatchObject({
+        name: "Weekly digest",
+        scheduleCron: "30 10 * * *",
+        timezone: "UTC",
+      });
+    },
+    60000,
+  );
 
   it("deletes a newsletter after confirmation", async () => {
     const user = userEvent.setup();
