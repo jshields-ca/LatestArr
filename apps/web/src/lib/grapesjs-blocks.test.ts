@@ -74,6 +74,68 @@ describe("the media-list component's toHTML card markup", () => {
   });
 });
 
+describe("the media-list component's updatePreview", () => {
+  function getModelDefinition() {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+    const [, definition] = editor.Components.addType.mock.calls[0] as [string, { model: Record<string, unknown> }];
+    return definition.model;
+  }
+
+  // A fake of the slice of the Component API updatePreview() actually
+  // uses: `this.get(...)` for the current trait values and
+  // `this.components(html?)` both to inject the preview HTML (called with
+  // an argument) and to read back the resulting children (called with
+  // none) — mirroring how GrapesJS's real Components collection is both
+  // the setter and the getter for a component's children.
+  function fakeMediaListComponent() {
+    const values: Record<string, unknown> = { contentType: "movie", sort: "added", count: 5 };
+    const children: { set: ReturnType<typeof vi.fn> }[] = [];
+    let injectedHtml: string | undefined;
+
+    return {
+      get: (key: string) => values[key],
+      components: (html?: string) => {
+        if (html === undefined) {
+          return { forEach: (fn: (child: { set: ReturnType<typeof vi.fn> }) => void) => children.forEach(fn) };
+        }
+        injectedHtml = html;
+        children.length = 0;
+        children.push({ set: vi.fn() });
+        return undefined;
+      },
+      getInjectedHtml: () => injectedHtml,
+      getChildren: () => children,
+    };
+  }
+
+  it("injects the trait-summary HTML as this component's children", () => {
+    const model = getModelDefinition();
+    const component = fakeMediaListComponent();
+
+    (model.updatePreview as (this: unknown) => void).call(component);
+
+    expect(component.getInjectedHtml()).toContain("Media List");
+    expect(component.getInjectedHtml()).toContain("5 Movies, sorted by Latest added");
+  });
+
+  it("locks every injected child so a click selects the media-list wrapper, not the child", () => {
+    const model = getModelDefinition();
+    const component = fakeMediaListComponent();
+
+    (model.updatePreview as (this: unknown) => void).call(component);
+
+    const children = component.getChildren();
+    expect(children).toHaveLength(1);
+    expect(children[0].set).toHaveBeenCalledWith({
+      selectable: false,
+      hoverable: false,
+      editable: false,
+      locked: true,
+    });
+  });
+});
+
 describe("registerCustomBlocks + applyClickToAddFallback", () => {
   it("gives every LatestArr block a click-to-add handler that appends its content", () => {
     const editor = fakeEditor();
