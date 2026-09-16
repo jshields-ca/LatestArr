@@ -96,6 +96,17 @@ describe("TemplateEditorPage", () => {
     await waitFor(() => expect(mockInit).toHaveBeenCalledTimes(1));
   });
 
+  it("enables convertDataGjsAttributesHyphens so the content-kind preset blocks' data-gjs-content-type attribute binds", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { template: exampleTemplate }));
+    renderPage();
+    await screen.findByText("Weekly Digest");
+
+    await waitFor(() => expect(mockInit).toHaveBeenCalledTimes(1));
+    const calls = mockInit.mock.calls as unknown as [{ parser?: { optionsHtml?: Record<string, unknown> } }][];
+    const initConfig = calls[0][0];
+    expect(initConfig.parser?.optionsHtml?.convertDataGjsAttributesHyphens).toBe(true);
+  });
+
   it("loads an existing design into the editor when one exists", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, { template: { ...exampleTemplate, designJson: { pages: ["saved"] } } }),

@@ -48,6 +48,20 @@ describe("the media-list component's toHTML card markup", () => {
     expect(html).toContain("{{#mediaList contentType=\"movie\"");
   });
 
+  it("wraps its <table> markup in <mj-raw> so MJML's compiler passes it through instead of silently dropping it", () => {
+    // Regression test: this component's parent in the exported MJML is
+    // always an <mj-column>, which MJML's compiler only accepts its own
+    // known component tags inside — a bare <table> isn't one, and got
+    // silently stripped under "soft" validation (no thrown error, just an
+    // empty rendered section), even though the canvas preview looked
+    // correct. See the toHTML() comment above for the full story.
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call(fakeComponent("movie"));
+
+    expect(html).toContain("<mj-raw>\n<table");
+    expect(html).toContain("</table>\n</mj-raw>");
+  });
+
   it("shows runtime for movies, page count for books, duration for audiobooks, and platform for games", () => {
     const model = getModelDefinition();
     const toHTML = model.toHTML as (this: unknown) => string;
@@ -147,6 +161,70 @@ describe("registerCustomBlocks + applyClickToAddFallback", () => {
 
     onClick(headerBlock, editor);
     expect(editor.append).toHaveBeenCalledWith(headerBlock.get("content"));
+  });
+
+  it("groups Header/Footer/Divider/Spacer under Layout and Media List + its presets under Content", () => {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+    const blocks = editor.BlockManager.getAll();
+    const categoryOf = (label: string) => blocks.find((b) => b.get("label") === label)!.get("category");
+
+    expect(categoryOf("Header")).toBe("Layout");
+    expect(categoryOf("Footer")).toBe("Layout");
+    expect(categoryOf("Divider")).toBe("Layout");
+    expect(categoryOf("Spacer")).toBe("Layout");
+
+    expect(categoryOf("Media List")).toBe("Content");
+    for (const label of ["Movies", "TV episodes", "TV seasons", "Books", "Audiobooks", "Games"]) {
+      expect(categoryOf(label)).toBe("Content");
+    }
+  });
+
+  it("adds a Divider and a Spacer block using MJML's own mj-divider/mj-spacer tags", () => {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+    const blocks = editor.BlockManager.getAll();
+
+    const divider = blocks.find((b) => b.get("label") === "Divider")!;
+    expect(divider.get("content")).toContain("<mj-divider");
+
+    const spacer = blocks.find((b) => b.get("label") === "Spacer")!;
+    expect(spacer.get("content")).toContain("<mj-spacer");
+  });
+
+  it("adds one Media List preset block per adapter content kind, each pre-setting the content-type attribute", () => {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+    const blocks = editor.BlockManager.getAll();
+
+    const presets: [string, string][] = [
+      ["Movies", "movie"],
+      ["TV episodes", "tv_episode"],
+      ["TV seasons", "tv_season"],
+      ["Books", "book"],
+      ["Audiobooks", "audiobook"],
+      ["Games", "game"],
+    ];
+
+    for (const [label, contentType] of presets) {
+      const block = blocks.find((b) => b.get("label") === label)!;
+      expect(block).toBeDefined();
+      const content = block.get("content") as string;
+      expect(content).toContain('data-gjs-type="media-list"');
+      expect(content).toContain(`data-gjs-content-type="${contentType}"`);
+    }
+  });
+
+  it("gives every preset block a click-to-add handler too, consistent with the rest of the library", () => {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+
+    const moviesBlock = editor.BlockManager.getAll().find((b) => b.get("label") === "Movies")!;
+    const onClick = moviesBlock.get("onClick") as (block: unknown, ed: unknown) => void;
+    expect(onClick).toBeTypeOf("function");
+
+    onClick(moviesBlock, editor);
+    expect(editor.append).toHaveBeenCalledWith(moviesBlock.get("content"));
   });
 
   it("patches a block that has no onClick (e.g. one registered by a plugin) without touching one that already has one", () => {

@@ -53,6 +53,18 @@ export function TemplateEditorPage() {
       height: "100%",
       storageManager: false,
       panels: GRAPESJS_PANELS_CONFIG,
+      // Lets the content-kind preset blocks in grapesjs-blocks.ts (Movies,
+      // Books, etc.) pre-set the Media List component's camelCase
+      // `contentType` prop from a hyphenated `data-gjs-content-type="..."`
+      // HTML attribute — GrapesJS's HTML parser otherwise lowercases
+      // attribute names (it parses block content with a real browser
+      // DOMParser), so a literal `data-gjs-contentType` would arrive as
+      // `data-gjs-contenttype` and silently fail to bind. This option only
+      // takes effect when the camelCase form already exists in that
+      // component type's own defaults (it does — see media-list's
+      // `contentType: "movie"` default), so it can't affect any other
+      // component's attributes.
+      parser: { optionsHtml: { convertDataGjsAttributesHyphens: true } },
       plugins: [{ id: "grapesjs-mjml", plugin: grapesjsMjml }],
       pluginsOpts: {
         "grapesjs-mjml": { blocks: MJML_BLOCKS },
