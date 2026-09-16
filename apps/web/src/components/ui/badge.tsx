@@ -9,9 +9,14 @@ const badgeVariants = cva(
     variants: {
       variant: {
         neutral: "bg-muted text-muted-foreground",
-        success: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-        destructive: "bg-destructive/15 text-destructive",
-        warning: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+        // Text shades are chosen (not the semantic --emerald/--amber/--destructive
+        // tokens directly) so each variant clears WCAG AA (4.5:1) small-text
+        // contrast against its own tinted background in *both* themes —
+        // e.g. emerald-600/amber-600/destructive all measured below 4.5:1 on
+        // the light card background at this bg opacity.
+        success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+        destructive: "bg-destructive/15 text-red-700 dark:text-red-400",
+        warning: "bg-amber-500/15 text-amber-800 dark:text-amber-400",
       },
     },
     defaultVariants: {
