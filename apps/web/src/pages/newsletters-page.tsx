@@ -1,7 +1,20 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Loader2,
+  Pencil,
+  Plus,
+  Send,
+  Trash2,
+  TriangleAlert,
+  X,
+  XCircle,
+} from "lucide-react";
 
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +68,7 @@ import {
   type SimpleSchedule,
 } from "@/lib/schedule";
 import { sendRunBadgeLabel, sendRunBadgeVariant } from "@/lib/send-run";
+import { cn } from "@/lib/utils";
 
 function AddNewsletterDialog({
   smtpProfiles,
@@ -506,6 +520,35 @@ function TemplatePicker({
   );
 }
 
+// Icon + color pairing kept in lockstep with the badge colors in
+// sendRunBadgeVariant so the row's leading icon and its status badge always
+// agree at a glance.
+function sendRunStatusIcon(variant: ReturnType<typeof sendRunBadgeVariant>) {
+  switch (variant) {
+    case "success":
+      return CheckCircle2;
+    case "warning":
+      return TriangleAlert;
+    case "destructive":
+      return XCircle;
+    default:
+      return Clock;
+  }
+}
+
+function sendRunIconClass(variant: ReturnType<typeof sendRunBadgeVariant>) {
+  switch (variant) {
+    case "success":
+      return "text-emerald-600 dark:text-emerald-400";
+    case "warning":
+      return "text-amber-600 dark:text-amber-400";
+    case "destructive":
+      return "text-destructive";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
 // A dumb renderer over already-fetched runs — NewsletterCard owns the
 // fetching so it can both load history on expand and refresh it right after
 // a "Send now" click resolves (see Fix 6: the list used to only update on a
@@ -533,19 +576,40 @@ function SendRunHistoryList({ runs, error }: { runs: SendRun[] | null; error: st
   }
 
   return (
-    <ul className="flex flex-col gap-1.5">
-      {runs.slice(0, 10).map((run) => (
-        <li key={run.id} className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge variant={sendRunBadgeVariant(run)}>{sendRunBadgeLabel(run)}</Badge>
-          <span className="text-muted-foreground">
-            {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
-          </span>
-          <span className="text-muted-foreground">
-            {run.itemCountIncluded} items &middot; {run.recipientCount} recipients
-          </span>
-          {run.error ? <span className="text-destructive">{run.error}</span> : null}
-        </li>
-      ))}
+    <ul className="flex flex-col gap-2">
+      {runs.slice(0, 10).map((run) => {
+        const variant = sendRunBadgeVariant(run);
+        const isFailed = variant === "destructive";
+        const StatusIcon = sendRunStatusIcon(variant);
+
+        return (
+          <li
+            key={run.id}
+            className={cn(
+              "flex items-start gap-2.5 rounded-md border border-border bg-muted/30 p-3",
+              isFailed && "border-l-4 border-l-destructive bg-destructive/5",
+            )}
+          >
+            <StatusIcon className={cn("mt-0.5 size-4 shrink-0", sendRunIconClass(variant))} aria-hidden="true" />
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">
+                  {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
+                </span>
+                <Badge variant={variant}>{sendRunBadgeLabel(run)}</Badge>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {run.itemCountIncluded} items &middot; {run.recipientCount} recipients
+              </span>
+              {run.error ? (
+                <span role="alert" className="text-sm text-destructive">
+                  {run.error}
+                </span>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
