@@ -4,6 +4,7 @@ import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecipientsPage } from "./recipients-page";
+import { selectOption } from "@/test/select";
 
 const fetchMock = vi.fn();
 
@@ -152,7 +153,7 @@ describe("RecipientsPage", () => {
     expect(await screen.findByText("No members yet.")).toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    await user.selectOptions(screen.getByLabelText("Add a recipient to this group"), "r1");
+    selectOption(screen.getByLabelText("Add a recipient to this group"), "Alice");
     await user.click(screen.getByRole("button", { name: "Add" }));
 
     expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();

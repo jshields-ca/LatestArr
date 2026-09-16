@@ -4,6 +4,7 @@ import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SourcesPage } from "./sources-page";
+import { selectOption } from "@/test/select";
 
 const fetchMock = vi.fn();
 
@@ -77,7 +78,7 @@ describe("SourcesPage", () => {
     await user.click(screen.getByRole("button", { name: "Add source" }));
     const dialog = await screen.findByRole("dialog");
 
-    expect(within(dialog).getByLabelText("Source type")).toHaveValue("tautulli");
+    expect(within(dialog).getByLabelText("Source type")).toHaveTextContent("Tautulli");
     await user.type(within(dialog).getByLabelText("Name"), "Home Tautulli");
     await user.type(within(dialog).getByLabelText("Base URL"), "http://localhost:8181");
     await user.type(within(dialog).getByLabelText("Tautulli API key"), "secret-key");
@@ -158,11 +159,11 @@ describe("SourcesPage", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText("Tautulli API key")).toBeInTheDocument();
 
-    await user.selectOptions(within(dialog).getByLabelText("Source type"), "romm");
+    selectOption(within(dialog).getByLabelText("Source type"), "RomM");
     expect(within(dialog).queryByLabelText("Tautulli API key")).not.toBeInTheDocument();
     expect(within(dialog).getByLabelText("RomM client API token")).toBeInTheDocument();
 
-    await user.selectOptions(within(dialog).getByLabelText("Source type"), "booklore");
+    selectOption(within(dialog).getByLabelText("Source type"), "BookLore");
     expect(within(dialog).getByLabelText("OPDS username")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("OPDS password")).toBeInTheDocument();
   });
