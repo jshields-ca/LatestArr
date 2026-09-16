@@ -64,6 +64,19 @@ describe("renderMjmlTemplate", () => {
 
     expect(typeof html).toBe("string");
   });
+
+  it("wraps a bare fragment with no <mjml> root instead of throwing (a template saved before its first design load)", async () => {
+    const bareFragment = `<mj-section><mj-column><mj-text>{{newsletterName}}</mj-text></mj-column></mj-section>`;
+
+    const html = await renderMjmlTemplate(bareFragment, {
+      newsletterName: "Weekly Digest",
+      items: [],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("<!doctype html");
+    expect(html).toContain("Weekly Digest");
+  });
 });
 
 const MEDIA_LIST_MJML = `
