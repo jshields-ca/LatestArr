@@ -4,6 +4,7 @@ import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecipientsPage } from "./recipients-page";
+import { selectOption } from "@/test/select";
 
 const fetchMock = vi.fn();
 
@@ -135,28 +136,39 @@ describe("RecipientsPage", () => {
     });
   });
 
-  it("expands a group and adds an existing recipient as a member", async () => {
-    const user = userEvent.setup();
-    fetchMock.mockImplementation((url: string) => {
-      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
-      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
-      if (url === "/api/recipient-groups/g1")
-        return Promise.resolve(jsonResponse(200, { group: everyoneGroup, members: [] }));
-      throw new Error(`Unexpected fetch to ${url}`);
-    });
+  // The "Add a recipient to this group" control is a real Radix Select
+  // now, not a native <select> — jsdom's lack of real layout/pointer-
+  // capture support makes the *next* async Testing Library call after
+  // opening/closing one noticeably slower to settle than in a real
+  // browser (measured ~35s locally, but CI runner variance pushed this
+  // specific test past 70s on one run), so this gets a generous explicit
+  // timeout rather than the 5s default.
+  it(
+    "expands a group and adds an existing recipient as a member",
+    async () => {
+      const user = userEvent.setup();
+      fetchMock.mockImplementation((url: string) => {
+        if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+        if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+        if (url === "/api/recipient-groups/g1")
+          return Promise.resolve(jsonResponse(200, { group: everyoneGroup, members: [] }));
+        throw new Error(`Unexpected fetch to ${url}`);
+      });
 
-    render(<RecipientsPage />);
-    await screen.findByText("Everyone");
+      render(<RecipientsPage />);
+      await screen.findByText("Everyone");
 
-    await user.click(screen.getByRole("button", { name: "Everyone" }));
-    expect(await screen.findByText("No members yet.")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Everyone" }));
+      expect(await screen.findByText("No members yet.")).toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    await user.selectOptions(screen.getByLabelText("Add a recipient to this group"), "r1");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+      fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+      selectOption(screen.getByLabelText("Add a recipient to this group"), "Alice");
+      await user.click(screen.getByRole("button", { name: "Add" }));
 
-    expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();
-  });
+      expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();
+    },
+    150000,
+  );
 
   it("deletes a group after confirmation", async () => {
     const user = userEvent.setup();
