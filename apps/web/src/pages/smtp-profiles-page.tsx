@@ -4,7 +4,8 @@ import { Loader2, Pencil, Plus, Send, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListRow } from "@/components/list-row";
 import {
   Dialog,
   DialogContent,
@@ -551,60 +552,59 @@ function SmtpProfileRow({
   }
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-medium">{profile.name}</p>
-              <Badge variant={profile.secure ? "success" : "neutral"}>{profile.secure ? "TLS" : "No TLS"}</Badge>
-              <Badge variant="neutral">{profile.hasAuth ? "Authenticated" : "No auth"}</Badge>
-            </div>
-            <p className="truncate text-sm text-muted-foreground">
-              {profile.host}:{profile.port} &middot; {profile.defaultFromName} &lt;{profile.defaultFromEmail}&gt;
-            </p>
-            {testResult ? <p className="text-sm text-muted-foreground">{testResult}</p> : null}
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {confirmingDelete ? (
-              <>
-                <span className="text-sm text-muted-foreground">Delete this profile?</span>
-                <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
-                  {deleting ? <Loader2 className="animate-spin" /> : null}
-                  Confirm
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" size="sm" onClick={() => void handleTest()} disabled={testing}>
-                  {testing ? <Loader2 className="animate-spin" /> : null}
-                  Test connection
-                </Button>
-                <EditSmtpProfileDialog profile={profile} onSaved={onChanged} />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Delete ${profile.name}`}
-                  onClick={() => setConfirmingDelete(true)}
-                >
-                  <Trash2 />
-                </Button>
-              </>
-            )}
-          </div>
+    <ListRow
+      primary={
+        <>
+          <p className="truncate font-medium">{profile.name}</p>
+          <Badge variant={profile.secure ? "success" : "neutral"}>{profile.secure ? "TLS" : "No TLS"}</Badge>
+          <Badge variant="neutral">{profile.hasAuth ? "Authenticated" : "No auth"}</Badge>
+        </>
+      }
+      secondary={
+        <>
+          <p className="truncate text-sm text-muted-foreground">
+            {profile.host}:{profile.port} &middot; {profile.defaultFromName} &lt;{profile.defaultFromEmail}&gt;
+          </p>
+          {testResult ? <p className="text-sm text-muted-foreground">{testResult}</p> : null}
+        </>
+      }
+      actions={
+        confirmingDelete ? (
+          <>
+            <span className="text-sm text-muted-foreground">Delete this profile?</span>
+            <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
+              {deleting ? <Loader2 className="animate-spin" /> : null}
+              Confirm
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" size="sm" onClick={() => void handleTest()} disabled={testing}>
+              {testing ? <Loader2 className="animate-spin" /> : null}
+              Test connection
+            </Button>
+            <EditSmtpProfileDialog profile={profile} onSaved={onChanged} />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${profile.name}`}
+              onClick={() => setConfirmingDelete(true)}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        )
+      }
+    >
+      {!confirmingDelete ? (
+        <div className="border-t border-border pt-3">
+          <SendTestEmailControl profileId={profile.id} />
         </div>
-
-        {!confirmingDelete ? (
-          <div className="border-t border-border pt-3">
-            <SendTestEmailControl profileId={profile.id} />
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      ) : null}
+    </ListRow>
   );
 }
 

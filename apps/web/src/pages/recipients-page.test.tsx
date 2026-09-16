@@ -170,6 +170,40 @@ describe("RecipientsPage", () => {
     150000,
   );
 
+  it("edits a group's name through the edit dialog", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/api/recipient-groups" && (!init || init.method === undefined))
+        return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      if (url === "/api/recipient-groups/g1" && init?.method === "PATCH") {
+        return Promise.resolve(
+          jsonResponse(200, { group: { ...everyoneGroup, name: "Everyone (renamed)" } }),
+        );
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Everyone");
+
+    await user.click(screen.getByRole("button", { name: "Edit Everyone" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("Everyone");
+
+    await user.clear(within(dialog).getByLabelText("Name"));
+    await user.type(within(dialog).getByLabelText("Name"), "Everyone (renamed)");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(await screen.findByText("Everyone (renamed)")).toBeInTheDocument();
+
+    const patchCall = fetchMock.mock.calls.find(
+      ([, init]) => init?.method === "PATCH",
+    ) as [string, RequestInit];
+    expect(JSON.parse(patchCall[1].body as string)).toEqual({ name: "Everyone (renamed)" });
+  });
+
   it("deletes a group after confirmation", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {

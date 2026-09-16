@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { ChevronDown, ChevronRight, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Plus, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
   ApiError,
   addGroupMember,
@@ -29,50 +30,11 @@ import {
   listGroups,
   listRecipients,
   removeGroupMember,
+  updateGroup,
   updateRecipient,
   type Recipient,
   type RecipientGroup,
 } from "@/lib/api";
-
-function ConfirmDelete({
-  label,
-  onConfirm,
-}: {
-  label: string;
-  onConfirm: () => Promise<void>;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  if (!confirming) {
-    return (
-      <Button variant="ghost" size="icon" aria-label={label} onClick={() => setConfirming(true)}>
-        <Trash2 />
-      </Button>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">Delete?</span>
-      <Button
-        variant="destructive"
-        size="sm"
-        disabled={deleting}
-        onClick={() => {
-          setDeleting(true);
-          void onConfirm();
-        }}
-      >
-        {deleting ? <Loader2 className="animate-spin" /> : null}
-        Confirm
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={deleting}>
-        Cancel
-      </Button>
-    </div>
-  );
-}
 
 function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) => void }) {
   const [open, setOpen] = useState(false);
@@ -268,15 +230,15 @@ function RecipientRow({
   }
 
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between gap-4 p-4">
-        <div className="min-w-0">
-          <p className="truncate font-medium">{recipient.displayName || recipient.email}</p>
-          {recipient.displayName ? (
-            <p className="truncate text-sm text-muted-foreground">{recipient.email}</p>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 items-center gap-4">
+    <ListRow
+      primary={<p className="truncate font-medium">{recipient.displayName || recipient.email}</p>}
+      secondary={
+        recipient.displayName ? (
+          <p className="truncate text-sm text-muted-foreground">{recipient.email}</p>
+        ) : null
+      }
+      actions={
+        <>
           <div className="flex items-center gap-2">
             <Switch
               id={`recipient-active-${recipient.id}`}
@@ -290,13 +252,13 @@ function RecipientRow({
             </Label>
           </div>
           <EditRecipientDialog recipient={recipient} onSaved={onChanged} />
-          <ConfirmDelete
+          <ConfirmDeleteButton
             label={`Delete ${recipient.email}`}
             onConfirm={() => deleteRecipient(recipient.id).then(() => onDeleted(recipient.id))}
           />
-        </div>
-      </CardContent>
-    </Card>
+        </>
+      }
+    />
   );
 }
 
@@ -432,6 +394,97 @@ function AddGroupDialog({ onCreated }: { onCreated: (group: RecipientGroup) => v
   );
 }
 
+function EditGroupDialog({
+  group,
+  onSaved,
+}: {
+  group: RecipientGroup;
+  onSaved: (group: RecipientGroup) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(group.name);
+  const [description, setDescription] = useState(group.description ?? "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function openWithCurrentValues(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setName(group.name);
+      setDescription(group.description ?? "");
+      setError(null);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { group: updated } = await updateGroup(group.id, {
+        name,
+        description: description || undefined,
+      });
+      onSaved(updated);
+      setOpen(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${group.name}`}>
+          <Pencil />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit group</DialogTitle>
+          <DialogDescription>Update this group's name or description.</DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-group-name">Name</Label>
+            <Input
+              id="edit-group-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-group-description">Description (optional)</Label>
+            <Input
+              id="edit-group-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={submitting}
+            />
+          </div>
+
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? <Loader2 className="animate-spin" /> : null}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipients: Recipient[] }) {
   const [members, setMembers] = useState<Recipient[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -544,45 +597,41 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
 function GroupCard({
   group,
   allRecipients,
+  onChanged,
   onDeleted,
 }: {
   group: RecipientGroup;
   allRecipients: Recipient[];
+  onChanged: (group: RecipientGroup) => void;
   onDeleted: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 p-4">
-        <div className="flex items-center justify-between gap-4">
-          <button
-            type="button"
-            onClick={() => setExpanded((e) => !e)}
-            className="flex min-w-0 items-center gap-2 text-left"
-            aria-expanded={expanded}
-          >
-            {expanded ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
-            <span className="min-w-0">
-              <span className="block truncate font-medium">{group.name}</span>
-              {group.description ? (
-                <span className="block truncate text-sm text-muted-foreground">{group.description}</span>
-              ) : null}
-            </span>
-          </button>
-          <ConfirmDelete
+    <ListRow
+      primary={<span className="truncate font-medium">{group.name}</span>}
+      secondary={
+        group.description ? (
+          <span className="block truncate text-sm text-muted-foreground">{group.description}</span>
+        ) : null
+      }
+      expand={{ expanded, onToggle: () => setExpanded((e) => !e) }}
+      actions={
+        <>
+          <EditGroupDialog group={group} onSaved={onChanged} />
+          <ConfirmDeleteButton
             label={`Delete ${group.name}`}
             onConfirm={() => deleteGroup(group.id).then(() => onDeleted(group.id))}
           />
+        </>
+      }
+    >
+      {expanded ? (
+        <div className="border-t border-border pt-3">
+          <GroupMembers groupId={group.id} allRecipients={allRecipients} />
         </div>
-
-        {expanded ? (
-          <div className="border-t border-border pt-3">
-            <GroupMembers groupId={group.id} allRecipients={allRecipients} />
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      ) : null}
+    </ListRow>
   );
 }
 
@@ -632,6 +681,9 @@ function GroupsSection({ allRecipients }: { allRecipients: Recipient[] }) {
               key={group.id}
               group={group}
               allRecipients={allRecipients}
+              onChanged={(updated) =>
+                setGroups((prev) => (prev ?? []).map((g) => (g.id === updated.id ? updated : g)))
+              }
               onDeleted={(id) => setGroups((prev) => (prev ?? []).filter((g) => g.id !== id))}
             />
           ))}

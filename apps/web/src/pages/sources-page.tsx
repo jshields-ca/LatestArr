@@ -16,7 +16,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { ListRow } from "@/components/list-row";
 import { SourceLogo } from "@/components/source-logo";
 import {
   ApiError,
@@ -482,68 +483,69 @@ function SourceRow({
   const kindLabel = KIND_CONFIG[source.kind]?.label ?? source.kind;
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-            <Icon className="size-4" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="truncate font-medium">{source.name}</p>
-              <Badge variant="neutral">
-                <SourceLogo kind={source.kind} className="size-3.5" />
-                {kindLabel}
-              </Badge>
-              <StatusBadge status={source.status} />
-            </div>
-            <p className="truncate text-sm text-muted-foreground">{source.baseUrl}</p>
-            {state.testResult ? <p className="text-sm text-muted-foreground">{state.testResult}</p> : null}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {state.confirmingDelete ? (
-            <>
-              <span className="text-sm text-muted-foreground">Delete this source?</span>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => void handleDelete()}
-                disabled={state.deleting}
-              >
-                {state.deleting ? <Loader2 className="animate-spin" /> : null}
-                Confirm
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setState((s) => ({ ...s, confirmingDelete: false }))}
-                disabled={state.deleting}
-              >
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" size="sm" onClick={() => void handleTest()} disabled={state.testing}>
-                {state.testing ? <Loader2 className="animate-spin" /> : null}
-                Test connection
-              </Button>
-              <EditSourceDialog source={source} onSaved={onChanged} />
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Delete ${source.name}`}
-                onClick={() => setState((s) => ({ ...s, confirmingDelete: true }))}
-              >
-                <Trash2 />
-              </Button>
-            </>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <ListRow
+      leading={
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+          <Icon className="size-4" aria-hidden="true" />
+        </span>
+      }
+      primary={
+        <>
+          <p className="truncate font-medium">{source.name}</p>
+          <Badge variant="neutral">
+            <SourceLogo kind={source.kind} className="size-3.5" />
+            {kindLabel}
+          </Badge>
+          <StatusBadge status={source.status} />
+        </>
+      }
+      secondary={
+        <>
+          <p className="truncate text-sm text-muted-foreground">{source.baseUrl}</p>
+          {state.testResult ? <p className="text-sm text-muted-foreground">{state.testResult}</p> : null}
+        </>
+      }
+      actions={
+        state.confirmingDelete ? (
+          <>
+            <span className="text-sm text-muted-foreground">Delete this source?</span>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => void handleDelete()}
+              disabled={state.deleting}
+            >
+              {state.deleting ? <Loader2 className="animate-spin" /> : null}
+              Confirm
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setState((s) => ({ ...s, confirmingDelete: false }))}
+              disabled={state.deleting}
+            >
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" size="sm" onClick={() => void handleTest()} disabled={state.testing}>
+              {state.testing ? <Loader2 className="animate-spin" /> : null}
+              Test connection
+            </Button>
+            <EditSourceDialog source={source} onSaved={onChanged} />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${source.name}`}
+              onClick={() => setState((s) => ({ ...s, confirmingDelete: true }))}
+            >
+              <Trash2 />
+            </Button>
+          </>
+        )
+      }
+    />
   );
 }
 
