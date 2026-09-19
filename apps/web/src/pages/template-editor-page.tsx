@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Save } from "lucide-react";
 import "grapesjs/dist/css/grapes.min.css";
 import "@/lib/grapesjs-theme.css";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import { makeGrapesJsKeyboardOperable } from "@/lib/grapesjs-a11y";
 import { applyClickToAddFallback, registerCustomBlocks } from "@/lib/grapesjs-blocks";
 import { GRAPESJS_PANELS_CONFIG } from "@/lib/grapesjs-panels";
@@ -128,8 +129,18 @@ export function TemplateEditorPage() {
       setTemplate(updated);
       setSavedJustNow(true);
       setDirty(false);
+      // The inline "Saved" indicator right next to the button already
+      // covers the in-context case; this toast is for the same signal to
+      // reach someone who's scrolled the canvas away from the toolbar.
+      toast({ variant: "success", title: "Template saved" });
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "Failed to save the template.");
+      const message = err instanceof ApiError ? err.message : "Failed to save the template.";
+      setSaveError(message);
+      // Same reasoning as the success toast above — someone who's
+      // scrolled the canvas away from the toolbar wouldn't otherwise see
+      // this either, and a failed save is at least as important to
+      // notice as a successful one.
+      toast({ variant: "destructive", title: "Failed to save template", description: message });
     } finally {
       setSaving(false);
     }
@@ -155,7 +166,7 @@ export function TemplateEditorPage() {
             <ArrowLeft />
           </Button>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-semibold tracking-tight">
+            <h1 className="truncate font-brand text-xl font-semibold tracking-tight">
               {template?.name ?? "Loading..."}
             </h1>
             <p className="text-sm text-muted-foreground">Design this newsletter&apos;s layout.</p>

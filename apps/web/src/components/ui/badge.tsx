@@ -17,6 +17,13 @@ const badgeVariants = cva(
         success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
         destructive: "bg-destructive/15 text-red-700 dark:text-red-400",
         warning: "bg-amber-500/15 text-amber-800 dark:text-amber-400",
+        // The app's secondary accent (see the "Secondary accent" note in
+        // index.css) — for a label that's genuinely informational rather
+        // than neutral filler, without implying success/warning/failure.
+        // Contrast measured the same way as the three variants above:
+        // violet-700/violet-400 on this tint both clear 4.5:1 in their
+        // respective themes.
+        accent: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
       },
     },
     defaultVariants: {

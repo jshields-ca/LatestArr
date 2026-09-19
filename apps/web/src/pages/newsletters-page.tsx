@@ -16,6 +16,7 @@ import {
 
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { ListRow } from "@/components/list-row";
+import { SourceLogo } from "@/components/source-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,9 +31,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { SettingRow } from "@/components/ui/setting-row";
+import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
   addNewsletterGroup,
@@ -127,6 +131,7 @@ function AddNewsletterDialog({
       onCreated(newsletter);
       setOpen(false);
       reset();
+      toast({ variant: "success", title: "Newsletter added", description: newsletter.name });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -179,7 +184,7 @@ function AddNewsletterDialog({
             />
           </div>
           <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-            <p className="text-sm font-medium">Delivery</p>
+            <SubsectionHeading>Delivery</SubsectionHeading>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="newsletter-lookback">Lookback (days)</Label>
@@ -285,8 +290,11 @@ function LinkedSources({
       const added = allSources.find((s) => s.id === selectedId);
       if (added) onChange([...sources, { ...added, mediaTypeFilter: null, libraryFilter: null }]);
       setSelectedId("");
+      toast({ variant: "success", title: "Source linked", description: added?.name });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to add source.");
+      const message = err instanceof ApiError ? err.message : "Failed to add source.";
+      setError(message);
+      toast({ variant: "destructive", title: "Failed to link source", description: message });
     } finally {
       setAdding(false);
     }
@@ -297,6 +305,13 @@ function LinkedSources({
     try {
       await removeNewsletterSource(newsletterId, sourceId);
       onChange(sources.filter((s) => s.id !== sourceId));
+      toast({ variant: "success", title: "Source unlinked" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to unlink source",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
     } finally {
       setRemovingId(null);
     }
@@ -304,7 +319,7 @@ function LinkedSources({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">Sources</p>
+      <SubsectionHeading>Sources</SubsectionHeading>
       {sources.length === 0 ? (
         <p className="text-sm text-muted-foreground">No sources linked yet.</p>
       ) : (
@@ -312,6 +327,7 @@ function LinkedSources({
           {sources.map((source) => (
             <li key={source.id}>
               <Badge variant="neutral" className="gap-1.5 py-1 pl-2.5 pr-1">
+                <SourceLogo kind={source.kind} className="size-3.5" />
                 {source.name}
                 <button
                   type="button"
@@ -384,8 +400,11 @@ function LinkedGroups({
       const added = allGroups.find((g) => g.id === selectedId);
       if (added) onChange([...groups, added]);
       setSelectedId("");
+      toast({ variant: "success", title: "Recipient group linked", description: added?.name });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to add group.");
+      const message = err instanceof ApiError ? err.message : "Failed to add group.";
+      setError(message);
+      toast({ variant: "destructive", title: "Failed to link recipient group", description: message });
     } finally {
       setAdding(false);
     }
@@ -396,6 +415,13 @@ function LinkedGroups({
     try {
       await removeNewsletterGroup(newsletterId, groupId);
       onChange(groups.filter((g) => g.id !== groupId));
+      toast({ variant: "success", title: "Recipient group unlinked" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to unlink recipient group",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
     } finally {
       setRemovingId(null);
     }
@@ -403,7 +429,7 @@ function LinkedGroups({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">Recipient groups</p>
+      <SubsectionHeading>Recipient groups</SubsectionHeading>
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">No recipient groups linked yet.</p>
       ) : (
@@ -476,8 +502,16 @@ function TemplatePicker({
         templateId: nextTemplateId || null,
       });
       onChanged(updated);
+      const templateName = templates.find((t) => t.id === nextTemplateId)?.name;
+      toast({
+        variant: "success",
+        title: "Template updated",
+        description: templateName ?? "Using the default layout.",
+      });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to update template.");
+      const message = err instanceof ApiError ? err.message : "Failed to update template.";
+      setError(message);
+      toast({ variant: "destructive", title: "Failed to update template", description: message });
     } finally {
       setSaving(false);
     }
@@ -485,7 +519,7 @@ function TemplatePicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">Template</p>
+      <SubsectionHeading>Template</SubsectionHeading>
       <div className="flex items-center gap-2">
         <Select
           aria-label="Template"
@@ -665,6 +699,7 @@ function EditNewsletterDialog({
         smtpProfileId: smtpProfileId || null,
       });
       onSaved(updated);
+      toast({ variant: "success", title: "Newsletter updated" });
       setOpen(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -711,7 +746,7 @@ function EditNewsletterDialog({
             />
           </div>
           <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-            <p className="text-sm font-medium">Delivery</p>
+            <SubsectionHeading>Delivery</SubsectionHeading>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="edit-newsletter-lookback">Lookback (days)</Label>
@@ -827,6 +862,13 @@ function NewsletterCard({
     try {
       const { newsletter: updated } = await updateNewsletter(newsletter.id, { isEnabled: next });
       onChanged(updated);
+      toast({ variant: "success", title: next ? "Newsletter enabled" : "Newsletter disabled" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to update newsletter",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
     } finally {
       setToggling(false);
     }
@@ -839,8 +881,11 @@ function NewsletterCard({
     try {
       await sendNewsletterNow(newsletter.id);
       setSendResult("Send started.");
+      toast({ variant: "success", title: "Send started", description: `${newsletter.name} is being sent.` });
     } catch (err) {
-      setSendError(err instanceof ApiError ? err.message : "Failed to start send.");
+      const message = err instanceof ApiError ? err.message : "Failed to start send.";
+      setSendError(message);
+      toast({ variant: "destructive", title: "Failed to start send", description: message });
     } finally {
       setSending(false);
       // Whether the send succeeded or failed, a new (or updated) SendRun
@@ -855,10 +900,13 @@ function NewsletterCard({
     try {
       await deleteNewsletter(newsletter.id);
       onDeleted(newsletter.id);
+      toast({ variant: "success", title: "Newsletter deleted", description: newsletter.name });
     } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to delete.";
       setDeleting(false);
       setConfirmingDelete(false);
-      setSendResult(err instanceof ApiError ? err.message : "Failed to delete.");
+      setSendResult(message);
+      toast({ variant: "destructive", title: "Failed to delete newsletter", description: message });
     }
   }
 
@@ -959,7 +1007,7 @@ function NewsletterCard({
                 {sendError}
               </span>
             ) : null}
-            <p className="text-sm font-medium">Send history</p>
+            <SubsectionHeading>Send history</SubsectionHeading>
             <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
           </div>
         </div>
@@ -1004,21 +1052,19 @@ export function NewslettersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Newsletters</h1>
-          <p className="text-sm text-muted-foreground">
-            Build, schedule, and send digests from your connected sources.
-          </p>
-        </div>
-        {newsletters ? (
-          <AddNewsletterDialog
-            smtpProfiles={smtpProfiles}
-            templates={allTemplates}
-            onCreated={(newsletter) => setNewsletters((prev) => [...(prev ?? []), newsletter])}
-          />
-        ) : null}
-      </div>
+      <PageHeader
+        title="Newsletters"
+        description="Build, schedule, and send digests from your connected sources."
+        actions={
+          newsletters ? (
+            <AddNewsletterDialog
+              smtpProfiles={smtpProfiles}
+              templates={allTemplates}
+              onCreated={(newsletter) => setNewsletters((prev) => [...(prev ?? []), newsletter])}
+            />
+          ) : null
+        }
+      />
 
       {loadError ? (
         <p role="alert" className="text-sm text-destructive">

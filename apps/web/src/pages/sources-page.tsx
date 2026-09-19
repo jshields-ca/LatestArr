@@ -28,7 +28,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
+import { toast } from "@/components/ui/use-toast";
 import { ListRow } from "@/components/list-row";
 import { SourceLogo } from "@/components/source-logo";
 import {
@@ -194,6 +196,7 @@ function AddSourceDialog({
       onCreated(source);
       setOpen(false);
       reset();
+      toast({ variant: "success", title: "Source added", description: `${source.name} is ready to connect.` });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -346,6 +349,7 @@ function EditSourceDialog({
       });
       onSaved(updated);
       setOpen(false);
+      toast({ variant: "success", title: "Source updated" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -454,13 +458,17 @@ function SourceRow({
     try {
       const result = await testSourceConnection(source.id);
       onStatusChange(source.id, result.ok ? "ok" : "error", result.ok ? null : (result.message ?? "Unknown error"));
-      setState((s) => ({ ...s, testing: false, testResult: result.ok ? "Connection succeeded." : (result.message ?? "Connection failed.") }));
+      const message = result.ok ? "Connection succeeded." : (result.message ?? "Connection failed.");
+      setState((s) => ({ ...s, testing: false, testResult: message }));
+      toast({
+        variant: result.ok ? "success" : "destructive",
+        title: result.ok ? "Connection succeeded" : "Connection failed",
+        description: result.ok ? undefined : message,
+      });
     } catch (err) {
-      setState((s) => ({
-        ...s,
-        testing: false,
-        testResult: err instanceof ApiError ? err.message : "Something went wrong.",
-      }));
+      const message = err instanceof ApiError ? err.message : "Something went wrong.";
+      setState((s) => ({ ...s, testing: false, testResult: message }));
+      toast({ variant: "destructive", title: "Connection failed", description: message });
     }
   }
 
@@ -469,13 +477,16 @@ function SourceRow({
     try {
       await deleteSource(source.id);
       onDeleted(source.id);
+      toast({ variant: "success", title: "Source deleted", description: `${source.name} was removed.` });
     } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to delete.";
       setState((s) => ({
         ...s,
         deleting: false,
         confirmingDelete: false,
-        testResult: err instanceof ApiError ? err.message : "Failed to delete.",
+        testResult: message,
       }));
+      toast({ variant: "destructive", title: "Failed to delete source", description: message });
     }
   }
 
@@ -570,20 +581,18 @@ export function SourcesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sources</h1>
-          <p className="text-sm text-muted-foreground">
-            Connect and manage Tautulli, Plex, and other media source connections.
-          </p>
-        </div>
-        {sources ? (
-          <AddSourceDialog
-            kinds={kinds}
-            onCreated={(source) => setSources((prev) => [...(prev ?? []), source])}
-          />
-        ) : null}
-      </div>
+      <PageHeader
+        title="Sources"
+        description="Connect and manage Tautulli, Plex, and other media source connections."
+        actions={
+          sources ? (
+            <AddSourceDialog
+              kinds={kinds}
+              onCreated={(source) => setSources((prev) => [...(prev ?? []), source])}
+            />
+          ) : null
+        }
+      />
 
       {loadError ? (
         <p role="alert" className="text-sm text-destructive">

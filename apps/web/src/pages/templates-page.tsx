@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
+import { toast } from "@/components/ui/use-toast";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import { ApiError, createTemplate, deleteTemplate, listTemplates, type Template } from "@/lib/api";
 
@@ -35,6 +37,7 @@ function AddTemplateDialog({ onCreated }: { onCreated: (template: Template) => v
       onCreated(template);
       setOpen(false);
       setName("");
+      toast({ variant: "success", title: "Template added", description: template.name });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -100,7 +103,9 @@ function TemplateRow({
       primary={
         <>
           <p className="truncate font-medium">{template.name}</p>
-          <Badge variant="neutral">{template.compiledMjml ? "Designed" : "Not yet designed"}</Badge>
+          <Badge variant={template.compiledMjml ? "accent" : "neutral"}>
+            {template.compiledMjml ? "Designed" : "Not yet designed"}
+          </Badge>
         </>
       }
       actions={
@@ -113,7 +118,21 @@ function TemplateRow({
           </Button>
           <ConfirmDeleteButton
             label={`Delete ${template.name}`}
-            onConfirm={() => deleteTemplate(template.id).then(() => onDeleted(template.id))}
+            onConfirm={() =>
+              deleteTemplate(template.id)
+                .then(() => {
+                  onDeleted(template.id);
+                  toast({ variant: "success", title: "Template deleted" });
+                })
+                .catch((err) => {
+                  toast({
+                    variant: "destructive",
+                    title: "Failed to delete template",
+                    description: err instanceof ApiError ? err.message : undefined,
+                  });
+                  throw err;
+                })
+            }
           />
         </>
       }
@@ -133,17 +152,15 @@ export function TemplatesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Templates</h1>
-          <p className="text-sm text-muted-foreground">
-            Design newsletter layouts with the drag-and-drop builder.
-          </p>
-        </div>
-        {templates ? (
-          <AddTemplateDialog onCreated={(template) => setTemplates((prev) => [...(prev ?? []), template])} />
-        ) : null}
-      </div>
+      <PageHeader
+        title="Templates"
+        description="Design newsletter layouts with the drag-and-drop builder."
+        actions={
+          templates ? (
+            <AddTemplateDialog onCreated={(template) => setTemplates((prev) => [...(prev ?? []), template])} />
+          ) : null
+        }
+      />
 
       {loadError ? (
         <p role="alert" className="text-sm text-destructive">

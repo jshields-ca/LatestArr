@@ -16,8 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "@/components/ui/use-toast";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
   ApiError,
@@ -56,6 +58,7 @@ function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) =
       setOpen(false);
       setEmail("");
       setDisplayName("");
+      toast({ variant: "success", title: "Recipient added", description: recipient.email });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -149,6 +152,7 @@ function EditRecipientDialog({
       });
       onSaved(updated);
       setOpen(false);
+      toast({ variant: "success", title: "Recipient updated" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -224,6 +228,13 @@ function RecipientRow({
     try {
       const { recipient: updated } = await updateRecipient(recipient.id, { isActive: nextActive });
       onChanged(updated);
+      toast({ variant: "success", title: nextActive ? "Recipient activated" : "Recipient deactivated" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to update recipient",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
     } finally {
       setToggling(false);
     }
@@ -254,7 +265,21 @@ function RecipientRow({
           <EditRecipientDialog recipient={recipient} onSaved={onChanged} />
           <ConfirmDeleteButton
             label={`Delete ${recipient.email}`}
-            onConfirm={() => deleteRecipient(recipient.id).then(() => onDeleted(recipient.id))}
+            onConfirm={() =>
+              deleteRecipient(recipient.id)
+                .then(() => {
+                  onDeleted(recipient.id);
+                  toast({ variant: "success", title: "Recipient deleted" });
+                })
+                .catch((err) => {
+                  toast({
+                    variant: "destructive",
+                    title: "Failed to delete recipient",
+                    description: err instanceof ApiError ? err.message : undefined,
+                  });
+                  throw err;
+                })
+            }
           />
         </>
       }
@@ -335,6 +360,7 @@ function AddGroupDialog({ onCreated }: { onCreated: (group: RecipientGroup) => v
       setOpen(false);
       setName("");
       setDescription("");
+      toast({ variant: "success", title: "Group added", description: group.name });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -427,6 +453,7 @@ function EditGroupDialog({
       });
       onSaved(updated);
       setOpen(false);
+      toast({ variant: "success", title: "Group updated" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -510,8 +537,11 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
       const added = allRecipients.find((r) => r.id === selectedId);
       if (added) setMembers((prev) => [...(prev ?? []), added]);
       setSelectedId("");
+      toast({ variant: "success", title: "Member added to group" });
     } catch (err) {
-      setLoadError(err instanceof ApiError ? err.message : "Failed to add member.");
+      const message = err instanceof ApiError ? err.message : "Failed to add member.";
+      setLoadError(message);
+      toast({ variant: "destructive", title: "Failed to add member", description: message });
     } finally {
       setAdding(false);
     }
@@ -522,6 +552,13 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
     try {
       await removeGroupMember(groupId, recipientId);
       setMembers((prev) => (prev ?? []).filter((m) => m.id !== recipientId));
+      toast({ variant: "success", title: "Member removed from group" });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to remove member",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
     } finally {
       setRemovingId(null);
     }
@@ -621,7 +658,21 @@ function GroupCard({
           <EditGroupDialog group={group} onSaved={onChanged} />
           <ConfirmDeleteButton
             label={`Delete ${group.name}`}
-            onConfirm={() => deleteGroup(group.id).then(() => onDeleted(group.id))}
+            onConfirm={() =>
+              deleteGroup(group.id)
+                .then(() => {
+                  onDeleted(group.id);
+                  toast({ variant: "success", title: "Group deleted" });
+                })
+                .catch((err) => {
+                  toast({
+                    variant: "destructive",
+                    title: "Failed to delete group",
+                    description: err instanceof ApiError ? err.message : undefined,
+                  });
+                  throw err;
+                })
+            }
           />
         </>
       }
@@ -705,10 +756,7 @@ export function RecipientsPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Recipients</h1>
-        <p className="text-sm text-muted-foreground">Manage recipients and the groups newsletters send to.</p>
-      </div>
+      <PageHeader title="Recipients" description="Manage recipients and the groups newsletters send to." />
 
       <RecipientsSection
         recipients={recipients}
