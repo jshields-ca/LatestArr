@@ -74,17 +74,26 @@ export function buildCoverUrl(baseUrl: string, token: string, itemId: string): s
   return buildUrl(baseUrl, `/api/items/${itemId}/cover`, { token }).toString();
 }
 
+// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
+// awaits every referenced item's image via Promise.all, so a source that's
+// gone unreachable in a way that just hangs (rather than erroring — no
+// RST, no timeout of its own) would otherwise never let that Promise.all
+// settle, stalling the entire send indefinitely instead of failing this
+// one item's poster softly.
+const IMAGE_FETCH_TIMEOUT_MS = 10_000;
+
 /**
  * Fetches a library item's cover image bytes for CID embedding. `imageUrl`
  * is expected to be one buildCoverUrl already produced (so the token is
- * already on it). Returns null instead of throwing on any failure, so a
- * caller embedding several items' images can skip just this one.
+ * already on it). Returns null instead of throwing on any failure
+ * (including a timeout), so a caller embedding several items' images can
+ * skip just this one.
  */
 export async function fetchImage(
   imageUrl: string,
 ): Promise<{ data: Uint8Array; contentType: string } | null> {
   try {
-    const response = await fetch(imageUrl);
+    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
     const data = new Uint8Array(await response.arrayBuffer());

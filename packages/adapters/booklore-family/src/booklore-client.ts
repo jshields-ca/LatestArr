@@ -151,14 +151,22 @@ export async function getLibraries(
   return fetchOpdsFeed(baseUrl, "/api/v1/opds/libraries", username, password);
 }
 
+// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
+// awaits every referenced item's image via Promise.all, so a source that's
+// gone unreachable in a way that just hangs (rather than erroring — no
+// RST, no timeout of its own) would otherwise never let that Promise.all
+// settle, stalling the entire send indefinitely instead of failing this
+// one item's poster softly.
+const IMAGE_FETCH_TIMEOUT_MS = 10_000;
+
 /**
  * Fetches an OPDS cover image's raw bytes, authenticated with the same
  * Basic Auth credentials as every other OPDS request this client makes —
  * unlike Plex/Tautulli/Audiobookshelf, Basic Auth can't be embedded as a
  * query param on the URL itself, so this always needs the credentials
  * passed explicitly rather than being just a plain fetch of `imageUrl`.
- * Returns null instead of throwing on any failure, so a caller embedding
- * several items' images can skip just this one.
+ * Returns null instead of throwing on any failure (including a timeout),
+ * so a caller embedding several items' images can skip just this one.
  */
 export async function fetchOpdsImage(
   imageUrl: string,
@@ -168,6 +176,7 @@ export async function fetchOpdsImage(
   try {
     const response = await fetch(imageUrl, {
       headers: { Authorization: buildAuthHeader(username, password) },
+      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
     });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";

@@ -86,4 +86,24 @@ describe("fetchImage", () => {
     const result = await fetchImage("http://romm.local:3000/nope");
     expect(result).toBeNull();
   });
+
+  it("passes a timeout signal so a hung source can't stall the fetch (and Promise.all in resolvePosterPlaceholders) forever", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+
+    await fetchImage("http://romm.local:3000/cover.jpg");
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null instead of throwing when the fetch is aborted (a timeout firing looks the same as any other rejection)", async () => {
+    mockFetch.mockRejectedValueOnce(new DOMException("The operation was aborted.", "TimeoutError"));
+    const result = await fetchImage("http://romm.local:3000/nope");
+    expect(result).toBeNull();
+  });
 });

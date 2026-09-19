@@ -129,19 +129,27 @@ export function buildImageProxyUrl(baseUrl: string, apiKey: string, imagePath: s
   return buildUrl(baseUrl, "pms_image_proxy", apiKey, { img: imagePath }).toString();
 }
 
+// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
+// awaits every referenced item's image via Promise.all, so a source that's
+// gone unreachable in a way that just hangs (rather than erroring — no
+// RST, no timeout of its own) would otherwise never let that Promise.all
+// settle, stalling the entire send indefinitely instead of failing this
+// one item's poster softly.
+const IMAGE_FETCH_TIMEOUT_MS = 10_000;
+
 /**
  * Fetches an image proxied through pms_image_proxy. Unlike the JSON
  * commands above, this endpoint returns the image bytes directly (no
  * envelope) on success, so it's fetched and returned as-is rather than
  * going through callTautulli. Returns null instead of throwing on any
- * failure, so a caller embedding several items' images can skip just
- * this one.
+ * failure (including a timeout), so a caller embedding several items'
+ * images can skip just this one.
  */
 export async function fetchImage(
   imageUrl: string,
 ): Promise<{ data: Uint8Array; contentType: string } | null> {
   try {
-    const response = await fetch(imageUrl);
+    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
     const data = new Uint8Array(await response.arrayBuffer());

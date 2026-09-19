@@ -204,4 +204,24 @@ describe("fetchOpdsImage", () => {
     const result = await fetchOpdsImage("http://booklore.local:6060/nope", "admin", "secret");
     expect(result).toBeNull();
   });
+
+  it("passes a timeout signal alongside the Basic Auth header so a hung source can't stall the fetch (and Promise.all in resolvePosterPlaceholders) forever", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+
+    await fetchOpdsImage("http://booklore.local:6060/api/v1/opds/cover/1", "admin", "secret");
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null instead of throwing when the fetch is aborted (a timeout firing looks the same as any other rejection)", async () => {
+    mockFetch.mockRejectedValueOnce(new DOMException("The operation was aborted.", "TimeoutError"));
+    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "admin", "secret");
+    expect(result).toBeNull();
+  });
 });
