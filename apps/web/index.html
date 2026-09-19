@@ -7,12 +7,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Newsreader is used only for the "LatestArr" wordmark (see
-         components/logo.tsx) — every other heading and all body/UI text
-         stays on the default system sans stack. -->
+    <!-- Two families, one request: Newsreader is the brand/display face —
+         the "LatestArr" wordmark (components/logo.tsx) and, at large
+         sizes, each page's own <h1> (components/ui/page-header.tsx).
+         Plus Jakarta Sans is the UI/body face everywhere else, replacing
+         the unstyled system-font stack the app shipped with — see
+         --font-sans in index.css. -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@72,700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@72,500;72,600;72,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
     />
     <title>LatestArr</title>
   </head>

@@ -7,7 +7,13 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
       ref={ref}
       className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-elevated",
+        // ring-inset ring-white/5 is a hairline top-to-bottom highlight,
+        // not a blur (there's nothing behind a static card in normal page
+        // flow to blur) — it's what reads as "glassy" here instead: see
+        // the "Glassy surfaces" note in index.css for why cards get this
+        // rather than the translucent+blurred treatment floating chrome
+        // (Popover, Dialog, toasts) gets.
+        "rounded-xl border border-border bg-card text-card-foreground shadow-elevated ring-1 ring-inset ring-white/5",
         className,
       )}
       {...props}

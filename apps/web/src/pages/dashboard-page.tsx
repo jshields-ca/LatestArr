@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   ApiError,
   listGroups,
@@ -83,7 +84,7 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
       <div className="flex flex-col gap-0.5">
         <span className="flex items-center gap-2 text-sm font-medium">
           {item.label}
-          {item.optional ? <Badge variant="neutral">Optional</Badge> : null}
+          {item.optional ? <Badge variant="accent">Optional</Badge> : null}
         </span>
         <span className="text-sm text-muted-foreground">{item.description}</span>
       </div>
@@ -344,14 +345,14 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          {requiredDone
+      <PageHeader
+        title="Dashboard"
+        description={
+          requiredDone
             ? "Your setup is complete — here's what's running."
-            : "Finish setting up LatestArr to send your first newsletter."}
-        </p>
-      </div>
+            : "Finish setting up LatestArr to send your first newsletter."
+        }
+      />
 
       {requiredDone ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

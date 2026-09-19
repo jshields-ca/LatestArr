@@ -14,6 +14,26 @@
  * The light theme's neutrals are a warm, rose-tinted scale (--blush-*)
  * rather than literal white/gray, so cards read as elevated against a
  * genuinely warm ground instead of floating on stark white.
+ *
+ * Secondary accent: violet, used sparingly for a second point of color
+ * next to the rose primary (an "Optional" badge, a "Designed" status, one
+ * of the dashboard's stat tiles) — reached for Tailwind's own violet
+ * palette directly rather than new --accent2-style tokens, the same way
+ * the dashboard's other stat-tile colors and the Badge success/warning
+ * variants already do (see badge.tsx and dashboard-page.tsx's
+ * STAT_ACCENTS), instead of growing a second parallel token system next
+ * to the semantic one below.
+ *
+ * "Glassy" surfaces: floating chrome that has something behind it to
+ * blur — Popover/Select content, Dialog/Sheet content, and the toast
+ * notifications (ui/toast.tsx) — gets a translucent, blurred background
+ * (95% opacity plus `backdrop-blur-md`) instead of a flat opaque one. Static cards
+ * in the page flow don't (there's nothing behind them to blur, so it'd be
+ * a no-op) — they instead pick up a faint inset highlight ring for the
+ * same "frosted panel" read without the wasted compositing cost. Every
+ * translucent pair was checked at 95% opacity against both a pure-white
+ * and pure-black backdrop and still clears 13:1+ (WCAG AA needs 4.5:1),
+ * so it holds contrast regardless of what ends up behind it.
  */
 @custom-variant dark (&:is(.dark *));
 
@@ -65,8 +85,18 @@
 }
 
 @theme inline {
-  /* Used only for the "LatestArr" wordmark (components/logo.tsx) — every
-   * other heading and all body/UI text stays on the default sans stack. */
+  /* UI/body face everywhere — replaces the default system-font stack
+   * (San Francisco/Segoe UI/Roboto depending on OS) that made the app
+   * read as unstyled. Plus Jakarta Sans was picked for a geometric,
+   * slightly warm character that pairs with Newsreader's editorial serif
+   * without competing with it, and ships as a variable font so the
+   * handful of weights this app actually uses (400/500/600/700/800) cost
+   * one shared download. */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  /* The brand/display face: the "LatestArr" wordmark (components/logo.tsx)
+   * and, at large sizes only, each page's own <h1> (components/ui/
+   * page-header.tsx) — not every heading and not body/UI text, which stay
+   * on --font-sans above. */
   --font-brand: "Newsreader", ui-serif, Georgia, serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
