@@ -134,7 +134,13 @@ export function TemplateEditorPage() {
       // reach someone who's scrolled the canvas away from the toolbar.
       toast({ variant: "success", title: "Template saved" });
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "Failed to save the template.");
+      const message = err instanceof ApiError ? err.message : "Failed to save the template.";
+      setSaveError(message);
+      // Same reasoning as the success toast above — someone who's
+      // scrolled the canvas away from the toolbar wouldn't otherwise see
+      // this either, and a failed save is at least as important to
+      // notice as a successful one.
+      toast({ variant: "destructive", title: "Failed to save template", description: message });
     } finally {
       setSaving(false);
     }

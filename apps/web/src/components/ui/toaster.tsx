@@ -6,7 +6,7 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast";
-import { useToast } from "@/components/ui/use-toast";
+import { DEFAULT_DURATION, useToast } from "@/components/ui/use-toast";
 
 /**
  * Mounted once near the app root (see App.tsx). Every page calls the
@@ -17,7 +17,10 @@ export function Toaster() {
   const { toasts, dismiss } = useToast();
 
   return (
-    <ToastProvider duration={6000}>
+    // This is only Radix's fallback for a toast that didn't set its own
+    // `duration` — every toast() call already does (see use-toast.ts's
+    // DEFAULT_DURATION), so in practice this and that always agree.
+    <ToastProvider duration={DEFAULT_DURATION}>
       {toasts.map(({ id, title, description, action, variant, ...props }) => (
         <Toast
           key={id}
