@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 
 import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
+import { Toaster } from "@/components/ui/toaster";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
 import { NewslettersPage } from "@/pages/newsletters-page";
@@ -21,35 +22,38 @@ const TemplateEditorPage = lazy(() =>
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/setup" element={<SetupPage />} />
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <AppShell>
-              <Routes>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/sources" element={<SourcesPage />} />
-                <Route path="/recipients" element={<RecipientsPage />} />
-                <Route path="/smtp" element={<SmtpProfilesPage />} />
-                <Route path="/newsletters" element={<NewslettersPage />} />
-                <Route path="/templates" element={<TemplatesPage />} />
-                <Route
-                  path="/templates/:id/edit"
-                  element={
-                    <Suspense fallback={null}>
-                      <TemplateEditorPage />
-                    </Suspense>
-                  }
-                />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </AppShell>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/setup" element={<SetupPage />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <Routes>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/sources" element={<SourcesPage />} />
+                  <Route path="/recipients" element={<RecipientsPage />} />
+                  <Route path="/smtp" element={<SmtpProfilesPage />} />
+                  <Route path="/newsletters" element={<NewslettersPage />} />
+                  <Route path="/templates" element={<TemplatesPage />} />
+                  <Route
+                    path="/templates/:id/edit"
+                    element={
+                      <Suspense fallback={null}>
+                        <TemplateEditorPage />
+                      </Suspense>
+                    }
+                  />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+      <Toaster />
+    </>
   );
 }

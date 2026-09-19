@@ -17,7 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
+import { SubsectionHeading } from "@/components/ui/subsection-heading";
+import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
   createSmtpProfile,
@@ -112,6 +115,7 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
       onCreated(smtpProfile);
       setOpen(false);
       reset();
+      toast({ variant: "success", title: "SMTP profile added", description: smtpProfile.name });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -162,7 +166,7 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
             />
           </div>
           <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-            <p className="text-sm font-medium">Port &amp; encryption</p>
+            <SubsectionHeading>Port &amp; encryption</SubsectionHeading>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="smtp-port">Port</Label>
               <Input
@@ -318,6 +322,7 @@ function EditSmtpProfileDialog({
       });
       onSaved(smtpProfile);
       setOpen(false);
+      toast({ variant: "success", title: "SMTP profile updated" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -359,7 +364,7 @@ function EditSmtpProfileDialog({
             />
           </div>
           <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-            <p className="text-sm font-medium">Port &amp; encryption</p>
+            <SubsectionHeading>Port &amp; encryption</SubsectionHeading>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="edit-smtp-port">Port</Label>
               <Input
@@ -471,10 +476,18 @@ function SendTestEmailControl({ profileId }: { profileId: string }) {
     setResult(null);
     try {
       const res = await sendTestEmail(profileId, to);
-      setResult(res.ok ? "Test email sent." : (res.message ?? "Failed to send."));
+      const message = res.ok ? "Test email sent." : (res.message ?? "Failed to send.");
+      setResult(message);
+      toast({
+        variant: res.ok ? "success" : "destructive",
+        title: res.ok ? "Test email sent" : "Failed to send test email",
+        description: res.ok ? `Sent to ${to}.` : message,
+      });
       if (res.ok) setOpen(false);
     } catch (err) {
-      setResult(err instanceof ApiError ? err.message : "Failed to send.");
+      const message = err instanceof ApiError ? err.message : "Failed to send.";
+      setResult(message);
+      toast({ variant: "destructive", title: "Failed to send test email", description: message });
     } finally {
       setSending(false);
     }
@@ -531,9 +544,17 @@ function SmtpProfileRow({
     setTestResult(null);
     try {
       const result = await testSmtpProfile(profile.id);
-      setTestResult(result.ok ? "Connection succeeded." : (result.message ?? "Connection failed."));
+      const message = result.ok ? "Connection succeeded." : (result.message ?? "Connection failed.");
+      setTestResult(message);
+      toast({
+        variant: result.ok ? "success" : "destructive",
+        title: result.ok ? "Connection succeeded" : "Connection failed",
+        description: result.ok ? undefined : message,
+      });
     } catch (err) {
-      setTestResult(err instanceof ApiError ? err.message : "Something went wrong.");
+      const message = err instanceof ApiError ? err.message : "Something went wrong.";
+      setTestResult(message);
+      toast({ variant: "destructive", title: "Connection failed", description: message });
     } finally {
       setTesting(false);
     }
@@ -544,10 +565,13 @@ function SmtpProfileRow({
     try {
       await deleteSmtpProfile(profile.id);
       onDeleted(profile.id);
+      toast({ variant: "success", title: "SMTP profile deleted", description: profile.name });
     } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to delete.";
       setDeleting(false);
       setConfirmingDelete(false);
-      setTestResult(err instanceof ApiError ? err.message : "Failed to delete.");
+      setTestResult(message);
+      toast({ variant: "destructive", title: "Failed to delete SMTP profile", description: message });
     }
   }
 
@@ -620,15 +644,15 @@ export function SmtpProfilesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">SMTP Profiles</h1>
-          <p className="text-sm text-muted-foreground">Configure outgoing mail servers used to send newsletters.</p>
-        </div>
-        {profiles ? (
-          <AddSmtpProfileDialog onCreated={(profile) => setProfiles((prev) => [...(prev ?? []), profile])} />
-        ) : null}
-      </div>
+      <PageHeader
+        title="SMTP Profiles"
+        description="Configure outgoing mail servers used to send newsletters."
+        actions={
+          profiles ? (
+            <AddSmtpProfileDialog onCreated={(profile) => setProfiles((prev) => [...(prev ?? []), profile])} />
+          ) : null
+        }
+      />
 
       {loadError ? (
         <p role="alert" className="text-sm text-destructive">
