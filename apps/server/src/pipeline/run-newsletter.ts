@@ -21,7 +21,11 @@ import {
 } from "@latestarr/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { sendEmail, type EmailAttachment, type SmtpCredentials } from "../mailer/send.js";
-import { embedPosterImages, type ItemImageSource } from "./embed-images.js";
+import {
+  preparePosterPlaceholders,
+  resolvePosterPlaceholders,
+  type ItemImageSource,
+} from "./embed-images.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { renderDefaultNewsletterHtml } from "../render/newsletter-template.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -182,6 +186,8 @@ interface RenderedNewsletter {
   itemCount: number;
 }
 
+const EMPTY_FETCHED_ITEMS: FetchedItems = { items: [], sourceByItem: new Map() };
+
 async function renderNewsletterContent(
   db: Db,
   newsletter: Newsletter,
@@ -191,57 +197,80 @@ async function renderNewsletterContent(
   const linkedSources = await resolveLinkedSources(db, newsletter);
 
   const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since);
-  const embeddedAdded = await embedPosterImages(items, (item) => sourceByItem.get(item), "added");
+  // Real posterUrls are swapped for opaque placeholder tokens *before* any
+  // template rendering happens — see embed-images.ts's own doc comment for
+  // why: a Media List block's count/order/showAll/emptyFallback selection
+  // (in mjml-template.ts's `mediaList` helper) can pick as few as 5 items
+  // out of a much larger fetched pool, and eagerly embedding every
+  // fetched item's poster (rather than only the ones actually rendered)
+  // wastes fetches/resizes on images that never appear in the sent email
+  // — exactly the "keep message size sane" goal CID embedding exists for.
+  const addedPlaceholders = preparePosterPlaceholders(items);
 
   if (newsletter.templateId) {
     const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
     if (template?.compiledMjml) {
       // Fetching "most watched" data, or an all-time fallback pool, means
       // extra adapter API calls — only pay for either when the compiled
-      // template actually has a Media List block configured to use it.
+      // template actually has a Media List block configured to use it,
+      // and run both concurrently rather than one after the other since
+      // neither depends on the other's result.
       const needsPopular = template.compiledMjml.includes('sort="mostWatched"');
       const needsFallback = template.compiledMjml.includes('emptyFallback="random"');
 
-      const embeddedPopular = needsPopular
-        ? await (async () => {
-            const popular = await fetchPopularItemsFromSources(linkedSources, since);
-            return embedPosterImages(popular.items, (item) => popular.sourceByItem.get(item), "popular");
-          })()
-        : { items: [], attachments: [] };
+      const [popular, fallback] = await Promise.all([
+        needsPopular ? fetchPopularItemsFromSources(linkedSources, since) : Promise.resolve(EMPTY_FETCHED_ITEMS),
+        // No "since" cutoff for the fallback pool — it exists specifically
+        // for when nothing was added in the lookback window, so it has to
+        // look further back than that window to find anything at all.
+        needsFallback
+          ? fetchRecentItemsFromSources(linkedSources, new Date(0))
+          : Promise.resolve(EMPTY_FETCHED_ITEMS),
+      ]);
 
-      const embeddedFallback = needsFallback
-        ? await (async () => {
-            // No "since" cutoff — this pool exists specifically for when
-            // nothing was added in the lookback window, so it has to look
-            // further back than that window to find anything at all.
-            const fallback = await fetchRecentItemsFromSources(linkedSources, new Date(0));
-            return embedPosterImages(fallback.items, (item) => fallback.sourceByItem.get(item), "fallback");
-          })()
-        : { items: [], attachments: [] };
+      const popularPlaceholders = preparePosterPlaceholders(popular.items);
+      const fallbackPlaceholders = preparePosterPlaceholders(fallback.items);
 
       const html = await renderMjmlTemplate(template.compiledMjml, {
         newsletterName: newsletter.name,
-        items: embeddedAdded.items,
-        popularItems: embeddedPopular.items,
-        fallbackItems: embeddedFallback.items,
+        items: addedPlaceholders.items,
+        popularItems: popularPlaceholders.items,
+        fallbackItems: fallbackPlaceholders.items,
         sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
         generatedAt,
       });
 
-      return {
-        html,
-        attachments: [...embeddedAdded.attachments, ...embeddedPopular.attachments, ...embeddedFallback.attachments],
-        itemCount: items.length,
-      };
+      // Only *now*, once the template has already decided which items it
+      // actually shows, do we look up which placeholder tokens made it
+      // into the output and fetch/embed images for just those.
+      const allPlaceholders = new Map([
+        ...addedPlaceholders.placeholders,
+        ...popularPlaceholders.placeholders,
+        ...fallbackPlaceholders.placeholders,
+      ]);
+      const allSourceByItem = new Map([...sourceByItem, ...popular.sourceByItem, ...fallback.sourceByItem]);
+      const resolved = await resolvePosterPlaceholders(html, allPlaceholders, (item) =>
+        allSourceByItem.get(item),
+      );
+
+      return { html: resolved.html, attachments: resolved.attachments, itemCount: items.length };
     }
   }
 
+  // The default template has no per-block selection to wait on (it shows
+  // every fetched item, uncapped) — but it still goes through the same
+  // placeholder round-trip, both to share one code path and because it's
+  // no less correct here: only posters that actually end up in the output
+  // get fetched.
   const html = await renderDefaultNewsletterHtml({
     newsletterName: newsletter.name,
-    items: embeddedAdded.items,
+    items: addedPlaceholders.items,
     generatedAt,
   });
-  return { html, attachments: embeddedAdded.attachments, itemCount: items.length };
+  const resolved = await resolvePosterPlaceholders(html, addedPlaceholders.placeholders, (item) =>
+    sourceByItem.get(item),
+  );
+  return { html: resolved.html, attachments: resolved.attachments, itemCount: items.length };
 }
 
 async function resolveRecipients(db: Db, newsletterId: string) {
