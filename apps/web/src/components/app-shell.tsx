@@ -80,7 +80,35 @@ function AboutPopoverContent() {
   );
 }
 
-function ProjectFooterCard() {
+function StarPopoverContent() {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        <Star className="size-4 shrink-0 fill-amber-500 text-amber-500" aria-hidden="true" />
+        Enjoying LatestArr?
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Starring the repo on GitHub helps other self-hosters find it and shows there&apos;s real
+        interest in keeping it going. Costs nothing, means a lot — thank you.
+      </p>
+      <Button asChild size="sm">
+        <a href={REPO_URL} target="_blank" rel="noreferrer">
+          <Star className="size-3.5 fill-current" aria-hidden="true" />
+          Star on GitHub
+        </a>
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * The version badge, GitHub view link, Star popover, and About popover as
+ * one deliberate cluster. Rendered in the desktop header and, unchanged,
+ * inside the mobile nav sheet — same shared component, same card styling
+ * ("belongs" wherever it lands), so the two surfaces read as one design
+ * rather than two different treatments.
+ */
+function ProjectInfoCard() {
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -90,7 +118,7 @@ function ProjectFooterCard() {
         if (!cancelled) setVersion(version);
       })
       .catch(() => {
-        // Non-critical — the sidebar just shows no version rather than an error.
+        // Non-critical — the header just shows no version rather than an error.
       });
     return () => {
       cancelled = true;
@@ -98,10 +126,10 @@ function ProjectFooterCard() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5">
       <div className="min-w-0">
         {version ? (
-          <Badge variant="neutral" className="font-mono text-[10px] tracking-tight">
+          <Badge variant="neutral" className="font-mono text-xs tracking-tight">
             v{version}
           </Badge>
         ) : null}
@@ -117,16 +145,21 @@ function ProjectFooterCard() {
         >
           <GitHubMark className="size-4" />
         </a>
-        <a
-          href={REPO_URL}
-          target="_blank"
-          rel="noreferrer"
-          title="Star on GitHub"
-          aria-label="Star on GitHub"
-          className="text-amber-500 transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
-        >
-          <Star className="size-4 fill-current" />
-        </a>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label="Star on GitHub"
+              title="Star on GitHub"
+              className="text-amber-500 transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+            >
+              <Star className="size-4 fill-current" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="end">
+            <StarPopoverContent />
+          </PopoverContent>
+        </Popover>
         <Popover>
           <PopoverTrigger asChild>
             <button
@@ -251,14 +284,23 @@ function EditProfileDialog() {
   );
 }
 
-function UserFooter() {
+/**
+ * Name + email + account actions, shared between the desktop header and the
+ * mobile nav sheet. The email gets its own `title` so the full address is
+ * always available on hover/focus even where its column truncates.
+ */
+function UserSummary() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex min-w-0 items-center justify-between gap-2">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{user?.displayName}</p>
-        <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+        <p className="truncate text-sm font-medium" title={user?.displayName || undefined}>
+          {user?.displayName}
+        </p>
+        <p className="truncate text-xs text-muted-foreground" title={user?.email || undefined}>
+          {user?.email}
+        </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <EditProfileDialog />
@@ -307,44 +349,50 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
-        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu">
-              <Menu />
-            </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader>
-              <SheetTitle>
-                <Logo />
-              </SheetTitle>
-            </SheetHeader>
-            <NavList onNavigate={() => setMobileNavOpen(false)} />
-            <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3">
-              <ProjectFooterCard />
-              <UserFooter />
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4 md:px-6">
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu">
+                <Menu />
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>
+                  <Logo />
+                </SheetTitle>
+              </SheetHeader>
+              <NavList onNavigate={() => setMobileNavOpen(false)} />
+              <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3">
+                <ProjectInfoCard />
+                <UserSummary />
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Logo />
+
+          {/* Desktop-only: the project cluster and account summary now live
+              here instead of the sidebar footer, since the header has the
+              width to give the email room and let everything breathe. On
+              mobile they stay in the nav sheet above. */}
+          <div className="ml-auto flex items-center gap-2 md:gap-3">
+            <div className="hidden items-center gap-3 md:flex">
+              <ProjectInfoCard />
+              <div className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
+              <div className="w-52 lg:w-64">
+                <UserSummary />
+              </div>
             </div>
-          </SheetContent>
-        </Sheet>
-
-        <Logo className="md:hidden" />
-
-        <div className="ml-auto flex items-center gap-1">
-          <ThemeToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-7xl">
         <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 flex-col border-r border-border p-4 md:flex">
-          <div className="mb-4">
-            <Logo />
-          </div>
           <NavList />
-          <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3">
-            <ProjectFooterCard />
-            <UserFooter />
-          </div>
         </aside>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
