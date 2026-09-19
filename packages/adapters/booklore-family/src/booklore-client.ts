@@ -1,3 +1,4 @@
+import { trimTrailingSlashes } from "@latestarr/adapter-core";
 import { XMLParser } from "fast-xml-parser";
 
 // BookLore (and its compatible forks BookOrbit and Grimmory) expose their
@@ -109,7 +110,7 @@ export function resolveOpdsUrl(baseUrl: string, href: string): string {
 }
 
 function buildUrl(baseUrl: string, path: string, params: Record<string, string> = {}): URL {
-  const trimmedBase = baseUrl.replace(/\/+$/, "");
+  const trimmedBase = trimTrailingSlashes(baseUrl);
   const url = new URL(`${trimmedBase}${path}`);
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, value);

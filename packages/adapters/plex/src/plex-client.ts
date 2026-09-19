@@ -1,3 +1,5 @@
+import { trimTrailingSlashes } from "@latestarr/adapter-core";
+
 export interface PlexLibrary {
   key: string;
   title: string;
@@ -33,7 +35,7 @@ function buildUrl(
   // Concatenate rather than resolve as a relative URL, so any subpath in
   // baseUrl (e.g. behind a reverse proxy) is preserved instead of being
   // replaced by a leading-slash path.
-  const trimmedBase = baseUrl.replace(/\/+$/, "");
+  const trimmedBase = trimTrailingSlashes(baseUrl);
   const url = new URL(`${trimmedBase}${path}`);
   url.searchParams.set("X-Plex-Token", token);
   for (const [key, value] of Object.entries(params)) {

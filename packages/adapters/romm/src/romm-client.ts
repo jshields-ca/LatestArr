@@ -5,6 +5,8 @@
 // header shape as the OAuth2 access tokens the browser flow uses, so one
 // client works for both.
 
+import { trimTrailingSlashes } from "@latestarr/adapter-core";
+
 export interface RommPlatform {
   id: number;
   name: string;
@@ -26,7 +28,7 @@ interface RommPage<T> {
 }
 
 function buildUrl(baseUrl: string, path: string, params: Record<string, string | string[]> = {}): URL {
-  const trimmedBase = baseUrl.replace(/\/+$/, "");
+  const trimmedBase = trimTrailingSlashes(baseUrl);
   const url = new URL(`${trimmedBase}${path}`);
   for (const [key, value] of Object.entries(params)) {
     for (const item of Array.isArray(value) ? value : [value]) {

@@ -1,3 +1,5 @@
+import { trimTrailingSlashes } from "@latestarr/adapter-core";
+
 export interface TautulliLibrary {
   section_id: string;
   section_name: string;
@@ -64,7 +66,7 @@ function buildUrl(
   // Concatenate rather than resolve as a relative URL, so any HTTP_ROOT
   // subpath in baseUrl (e.g. "http://host:8181/tautulli") is preserved
   // instead of being replaced by a leading-slash path.
-  const trimmedBase = baseUrl.replace(/\/+$/, "");
+  const trimmedBase = trimTrailingSlashes(baseUrl);
   const url = new URL(`${trimmedBase}/api/v2`);
   url.searchParams.set("apikey", apiKey);
   url.searchParams.set("cmd", cmd);
