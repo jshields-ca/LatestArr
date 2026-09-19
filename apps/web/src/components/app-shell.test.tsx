@@ -51,12 +51,25 @@ function renderShell() {
 }
 
 describe("AppShell", () => {
-  it("shows a GitHub view link and a star link, both pointing at the repo", async () => {
+  it("shows a GitHub view link that points straight at the repo", async () => {
     renderShell();
 
     const viewLink = await screen.findByRole("link", { name: "View on GitHub" });
-    const starLink = screen.getByRole("link", { name: "Star on GitHub" });
     expect(viewLink).toHaveAttribute("href", "https://github.com/jshields-ca/LatestArr");
+  });
+
+  it("opens a Star popover instead of linking straight out, with a link inside that goes to GitHub", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await screen.findByRole("link", { name: "View on GitHub" });
+
+    const starTrigger = screen.getByRole("button", { name: "Star on GitHub" });
+    expect(starTrigger).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(starTrigger);
+
+    expect(await screen.findByText(/Enjoying LatestArr/)).toBeInTheDocument();
+    const starLink = screen.getByRole("link", { name: /Star on GitHub/ });
     expect(starLink).toHaveAttribute("href", "https://github.com/jshields-ca/LatestArr");
   });
 
@@ -107,6 +120,12 @@ describe("AppShell", () => {
   it("shows the running version once loaded", async () => {
     renderShell();
     await waitFor(() => expect(screen.getByText("v0.4.4")).toBeInTheDocument());
+  });
+
+  it("gives the account email a title attribute so the full address is available if it truncates", async () => {
+    renderShell();
+    const email = await screen.findByText("admin@example.com");
+    expect(email).toHaveAttribute("title", "admin@example.com");
   });
 
   it("edits the display name through the Edit profile dialog", async () => {

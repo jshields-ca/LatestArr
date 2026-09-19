@@ -1,0 +1,5 @@
+---
+"@latestarr/web": patch
+---
+
+Redesign the relationship between the top banner and the sidebar footer, addressing feedback from a production user: the header was mostly dead space (just the theme toggle), the sidebar footer's account email got cut off next to the Edit profile/Sign out buttons, and the Star icon linked straight out to GitHub with no context. The version/GitHub/Star/About cluster and the account summary (name, email, edit, sign out) now live in the desktop header, which has the width to give the email room to stay legible (still truncates gracefully with a `title` tooltip if needed) instead of the cramped 240px sidebar column; the sidebar itself is now just branding-free navigation. The Star icon now opens a small popover — matching the existing About popover's pattern — with a short explanation of why starring helps, and a button that actually links out to GitHub, instead of linking out immediately. The version badge's text is also a size larger while keeping the same mini-card styling. The mobile nav sheet keeps the same compact card layout as before, unchanged.
