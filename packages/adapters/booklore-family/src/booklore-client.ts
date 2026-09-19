@@ -12,6 +12,14 @@ export interface OpdsAuthor {
   name?: string;
 }
 
+// fast-xml-parser (with attributeNamePrefix "@_") turns each <link
+// rel="..." href="..." type="..."/> into an object of its attributes.
+export interface OpdsLink {
+  "@_rel"?: string;
+  "@_href"?: string;
+  "@_type"?: string;
+}
+
 export interface OpdsEntry {
   id: string;
   title: string;
@@ -22,6 +30,10 @@ export interface OpdsEntry {
   // publication year like "2020") into a JS number, not a string — callers
   // must stringify before treating this as a date string.
   "dc:issued"?: string | number;
+  // An entry typically carries several <link> elements (self, alternate,
+  // acquisition, image, image/thumbnail, ...) — see getEntryImageHref and
+  // getEntryFormatLabel below for what this is used for.
+  link?: OpdsLink | OpdsLink[];
 }
 
 interface RawOpdsFeed {
@@ -40,6 +52,60 @@ export function getEntryAuthorName(entry: OpdsEntry): string | undefined {
 export function getEntrySummaryText(entry: OpdsEntry): string | undefined {
   if (typeof entry.summary === "string") return entry.summary;
   return entry.summary?.["#text"];
+}
+
+function getEntryLinks(entry: OpdsEntry): OpdsLink[] {
+  if (!entry.link) return [];
+  return Array.isArray(entry.link) ? entry.link : [entry.link];
+}
+
+const OPDS_IMAGE_REL = "http://opds-spec.org/image";
+const OPDS_IMAGE_THUMBNAIL_REL = "http://opds-spec.org/image/thumbnail";
+
+/**
+ * The href of an entry's cover image link, preferring the full-size image
+ * rel over the thumbnail rel when both are present (per the OPDS spec,
+ * https://specs.opds.io/opds-1.2#4-acquisition-feeds — a client should
+ * fall back to the thumbnail only when no full image is offered).
+ */
+export function getEntryImageHref(entry: OpdsEntry): string | undefined {
+  const links = getEntryLinks(entry);
+  const full = links.find((link) => link["@_rel"] === OPDS_IMAGE_REL);
+  if (full?.["@_href"]) return full["@_href"];
+  const thumbnail = links.find((link) => link["@_rel"] === OPDS_IMAGE_THUMBNAIL_REL);
+  return thumbnail?.["@_href"];
+}
+
+// Comic archive MIME types BookLore/BookOrbit/Grimmory serve their
+// acquisition link as when an entry is a comic rather than a prose ebook.
+const COMIC_MIME_TYPES = new Set([
+  "application/vnd.comicbook+zip",
+  "application/vnd.comicbook-rar",
+  "application/x-cbz",
+  "application/x-cbr",
+]);
+
+/**
+ * A short "Ebook"/"Comic"/"Book" badge derived from the acquisition
+ * link's declared MIME type — OPDS itself has no dedicated field for this,
+ * so the file format on the download link is the only signal available.
+ * Falls back to the generic "Book" label when there's no acquisition link
+ * or its type isn't one we recognize, rather than guessing.
+ */
+export function getEntryFormatLabel(entry: OpdsEntry): string {
+  const acquisitionLink = getEntryLinks(entry).find((link) =>
+    (link["@_rel"] ?? "").startsWith("http://opds-spec.org/acquisition"),
+  );
+  const type = acquisitionLink?.["@_type"];
+  if (type && COMIC_MIME_TYPES.has(type)) return "Comic";
+  if (type === "application/epub+zip" || type === "application/pdf") return "Ebook";
+  return "Book";
+}
+
+/** Resolves a (possibly relative) OPDS link href against the feed's own
+ * base URL, the way a browser would resolve a relative <img src>. */
+export function resolveOpdsUrl(baseUrl: string, href: string): string {
+  return new URL(href, baseUrl).toString();
 }
 
 function buildUrl(baseUrl: string, path: string, params: Record<string, string> = {}): URL {
@@ -83,6 +149,33 @@ export async function getLibraries(
   password: string,
 ): Promise<OpdsEntry[]> {
   return fetchOpdsFeed(baseUrl, "/api/v1/opds/libraries", username, password);
+}
+
+/**
+ * Fetches an OPDS cover image's raw bytes, authenticated with the same
+ * Basic Auth credentials as every other OPDS request this client makes —
+ * unlike Plex/Tautulli/Audiobookshelf, Basic Auth can't be embedded as a
+ * query param on the URL itself, so this always needs the credentials
+ * passed explicitly rather than being just a plain fetch of `imageUrl`.
+ * Returns null instead of throwing on any failure, so a caller embedding
+ * several items' images can skip just this one.
+ */
+export async function fetchOpdsImage(
+  imageUrl: string,
+  username: string,
+  password: string,
+): Promise<{ data: Uint8Array; contentType: string } | null> {
+  try {
+    const response = await fetch(imageUrl, {
+      headers: { Authorization: buildAuthHeader(username, password) },
+    });
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    const data = new Uint8Array(await response.arrayBuffer());
+    return { data, contentType };
+  } catch {
+    return null;
+  }
 }
 
 export async function getRecentEntries(

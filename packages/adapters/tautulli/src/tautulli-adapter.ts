@@ -1,5 +1,6 @@
 import type {
   ConnectionTestResult,
+  FetchedImage,
   FetchPopularItemsParams,
   FetchRecentItemsParams,
   MediaKind,
@@ -8,7 +9,15 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { getHomeStats, getLibraries, getRecentlyAdded, type TautulliHomeStatRow } from "./tautulli-client.js";
+import {
+  buildImageProxyUrl,
+  fetchImage,
+  getHomeStats,
+  getLibraries,
+  getRecentlyAdded,
+  type TautulliHomeStatRow,
+  type TautulliRecentlyAddedItem,
+} from "./tautulli-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
 
@@ -51,7 +60,35 @@ function mapLibraryType(sectionType: string): MediaKind {
   return sectionType === "show" ? "tv_episode" : "movie";
 }
 
-function mapHomeStatRow(row: TautulliHomeStatRow): NewItem | null {
+// A `tv_episode` item's Tautulli-given `title` is just the episode's name
+// (e.g. "Winter Is Coming") — rendered as the prominent title on its own,
+// that reads as if the *episode* were the show, with no indication which
+// series it belongs to. The series name (`grandparent_title`) belongs in
+// the primary title instead, with the SxxExx/episode-name detail demoted
+// to the subtitle. Only applied when Tautulli actually gives a
+// grandparent_title (episode entries do; movies/other kinds don't), so a
+// kind this doesn't apply to falls through to the caller's own default.
+function buildEpisodeTitle(item: TautulliRecentlyAddedItem): string {
+  return item.grandparent_title ?? item.title;
+}
+
+function buildEpisodeSubtitle(item: TautulliRecentlyAddedItem): string {
+  const season = String(item.parent_media_index ?? 0).padStart(2, "0");
+  const episode = String(item.media_index ?? 0).padStart(2, "0");
+  return `S${season}E${episode} - ${item.title}`;
+}
+
+function resolvePosterUrl(
+  baseUrl: string,
+  apiKey: string,
+  thumb: string | undefined,
+  art: string | undefined,
+): string | undefined {
+  const imagePath = thumb || art;
+  return imagePath ? buildImageProxyUrl(baseUrl, apiKey, imagePath) : undefined;
+}
+
+function mapHomeStatRow(row: TautulliHomeStatRow, baseUrl: string, apiKey: string): NewItem | null {
   const kind = mapHomeStatMediaType(row.media_type);
   if (!kind) return null;
 
@@ -65,6 +102,7 @@ function mapHomeStatRow(row: TautulliHomeStatRow): NewItem | null {
     addedAt: row.last_play ? new Date(Number(row.last_play) * 1000) : new Date(0),
     playCount: row.total_plays,
     uniqueViewerCount: row.users_watched,
+    posterUrl: resolvePosterUrl(baseUrl, apiKey, row.thumb, row.art),
     raw: row,
   };
 }
@@ -118,18 +156,25 @@ export const tautulliAdapter: SourceAdapter = {
         // by most-recently-added, so we page in `count` items and cut here.
         if (addedAt < params.since) continue;
 
+        const isEpisodeWithSeriesInfo = kind === "tv_episode" && Boolean(item.grandparent_title);
+
         results.push({
           id: item.rating_key,
           externalId: item.rating_key,
           kind,
-          title: item.title,
-          subtitle: item.full_title !== item.title ? item.full_title : undefined,
+          title: isEpisodeWithSeriesInfo ? buildEpisodeTitle(item) : item.title,
+          subtitle: isEpisodeWithSeriesInfo
+            ? buildEpisodeSubtitle(item)
+            : item.full_title !== item.title
+              ? item.full_title
+              : undefined,
           overview: item.summary || undefined,
           addedAt,
           releaseDate: item.originally_available_at
             ? new Date(item.originally_available_at)
             : undefined,
           genres: item.genres,
+          posterUrl: resolvePosterUrl(config.baseUrl, apiKey, item.thumb, item.art),
           raw: item,
         });
       }
@@ -162,7 +207,7 @@ export const tautulliAdapter: SourceAdapter = {
     for (const statId of statIds) {
       const rows = await getHomeStats(config.baseUrl, apiKey, statId, timeRangeDays, limit);
       for (const row of rows) {
-        const item = mapHomeStatRow(row);
+        const item = mapHomeStatRow(row, config.baseUrl, apiKey);
         if (!item) continue;
         if (params.mediaKinds && !params.mediaKinds.includes(item.kind)) continue;
         results.push(item);
@@ -170,5 +215,14 @@ export const tautulliAdapter: SourceAdapter = {
     }
 
     return results;
+  },
+
+  // posterUrl is already a full pms_image_proxy URL (built with
+  // resolvePosterUrl above), which carries its own apikey — Tautulli
+  // handles reaching the underlying Plex server itself, so this client
+  // never needs a separate Plex token the way the Plex adapter does.
+  async fetchImageBytes(_config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {
+    if (!item.posterUrl) return null;
+    return fetchImage(item.posterUrl);
   },
 };

@@ -1,5 +1,6 @@
 import type {
   ConnectionTestResult,
+  FetchedImage,
   FetchRecentItemsParams,
   MediaKind,
   NewItem,
@@ -7,7 +8,13 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { getLibraries, getRecentlyAdded, type PlexMetadataItem } from "./plex-client.js";
+import {
+  buildImageUrl,
+  fetchImage,
+  getLibraries,
+  getRecentlyAdded,
+  type PlexMetadataItem,
+} from "./plex-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
 
@@ -30,11 +37,21 @@ function mapLibraryType(sectionType: string): MediaKind {
   return sectionType === "show" ? "tv_episode" : "movie";
 }
 
+// A `tv_episode` item's own `title` is just the episode's name (e.g.
+// "Winter Is Coming") — rendered as the prominent title on its own, that
+// reads as if the *episode* were the show, with no indication which series
+// it belongs to. The series name (`grandparentTitle`) belongs in the
+// primary title instead, with the SxxExx/episode-name detail demoted to
+// the subtitle.
+function buildEpisodeTitle(item: PlexMetadataItem): string {
+  return item.grandparentTitle ?? item.title;
+}
+
 function buildEpisodeSubtitle(item: PlexMetadataItem): string | undefined {
   if (!item.grandparentTitle) return undefined;
   const season = String(item.parentIndex ?? 0).padStart(2, "0");
   const episode = String(item.index ?? 0).padStart(2, "0");
-  return `${item.grandparentTitle} - S${season}E${episode} - ${item.title}`;
+  return `S${season}E${episode} - ${item.title}`;
 }
 
 export const plexAdapter: SourceAdapter = {
@@ -91,16 +108,26 @@ export const plexAdapter: SourceAdapter = {
           id: item.ratingKey,
           externalId: item.ratingKey,
           kind,
-          title: item.title,
+          title: kind === "tv_episode" ? buildEpisodeTitle(item) : item.title,
           subtitle: kind === "tv_episode" ? buildEpisodeSubtitle(item) : undefined,
           overview: item.summary || undefined,
           addedAt,
           releaseDate: item.originallyAvailableAt ? new Date(item.originallyAvailableAt) : undefined,
+          posterUrl: item.thumb ? buildImageUrl(config.baseUrl, token, item.thumb) : undefined,
           raw: item,
         });
       }
     }
 
     return results;
+  },
+
+  // config is unused here — posterUrl (built above with buildImageUrl) is
+  // already an absolute, token-bearing URL, so no extra auth is needed at
+  // fetch time. It's still part of the signature to satisfy SourceAdapter
+  // and to mirror the other adapters, some of which do need it.
+  async fetchImageBytes(_config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {
+    if (!item.posterUrl) return null;
+    return fetchImage(item.posterUrl);
   },
 };

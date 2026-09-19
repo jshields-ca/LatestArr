@@ -1,29 +1,44 @@
 import type {
   ConnectionTestResult,
+  FetchedImage,
   FetchRecentItemsParams,
   NewItem,
   SourceAdapter,
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { getLibraries, getLibraryItems, type AudiobookshelfLibraryItem } from "./audiobookshelf-client.js";
+import {
+  buildCoverUrl,
+  fetchImage,
+  getLibraries,
+  getLibraryItems,
+  type AudiobookshelfLibraryItem,
+} from "./audiobookshelf-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
 
-function mapItem(item: AudiobookshelfLibraryItem): NewItem {
+// Audiobookshelf's item mediaType is "book" or "podcast" (episode), but our
+// MediaKind vocabulary only models "audiobook" — every item this adapter
+// returns is mapped to that one MediaKind (a known simplification).
+// contentLabel keeps the book/podcast distinction visible in a rendered
+// newsletter without widening the shared MediaKind enum for it.
+function mapContentLabel(mediaType: string): string {
+  return mediaType === "podcast" ? "Podcast" : "Audiobook";
+}
+
+function mapItem(item: AudiobookshelfLibraryItem, baseUrl: string, token: string): NewItem {
   const metadata = item.media.metadata;
   return {
     id: item.id,
     externalId: item.id,
-    // Audiobookshelf's item mediaType is "book" or "podcast" (episode),
-    // but our MediaKind vocabulary only models "audiobook" — every item
-    // this adapter returns is mapped to it, a known simplification.
     kind: "audiobook",
+    contentLabel: mapContentLabel(item.mediaType),
     title: metadata.title,
     subtitle: metadata.authorName,
     overview: metadata.description,
     addedAt: new Date(item.addedAt),
     releaseDate: metadata.publishedYear ? new Date(metadata.publishedYear) : undefined,
+    posterUrl: item.media.coverPath ? buildCoverUrl(baseUrl, token, item.id) : undefined,
     raw: item,
   };
 }
@@ -73,7 +88,7 @@ export const audiobookshelfAdapter: SourceAdapter = {
     for (const libraryId of libraryIds) {
       const items = await getLibraryItems(config.baseUrl, token, libraryId, count);
       for (const item of items) {
-        const mapped = mapItem(item);
+        const mapped = mapItem(item, config.baseUrl, token);
         if (mapped.addedAt >= params.since) {
           results.push(mapped);
         }
@@ -81,5 +96,13 @@ export const audiobookshelfAdapter: SourceAdapter = {
     }
 
     return results;
+  },
+
+  // config is unused here — posterUrl (built above with buildCoverUrl) is
+  // already an absolute, token-bearing URL, so no extra auth is needed at
+  // fetch time.
+  async fetchImageBytes(_config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {
+    if (!item.posterUrl) return null;
+    return fetchImage(item.posterUrl);
   },
 };

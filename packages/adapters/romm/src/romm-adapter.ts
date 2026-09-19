@@ -1,12 +1,13 @@
 import type {
   ConnectionTestResult,
+  FetchedImage,
   FetchRecentItemsParams,
   NewItem,
   SourceAdapter,
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { getPlatforms, getRoms, type RommRom } from "./romm-client.js";
+import { fetchImage, getPlatforms, getRoms, type RommRom } from "./romm-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
 
@@ -64,5 +65,12 @@ export const rommAdapter: SourceAdapter = {
     );
 
     return roms.map(mapRom).filter((item) => item.addedAt >= params.since);
+  },
+
+  // config is unused — url_cover is RomM's own public static asset URL, no
+  // auth needed to fetch it (see romm-client.ts's fetchImage).
+  async fetchImageBytes(_config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {
+    if (!item.posterUrl) return null;
+    return fetchImage(item.posterUrl);
   },
 };

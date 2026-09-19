@@ -13,6 +13,20 @@ export interface TautulliRecentlyAddedItem {
   originally_available_at?: string;
   summary?: string;
   genres?: string[];
+  // Present on episode entries — the show's own title, and the season/
+  // episode numbers, all proxied straight through from the underlying
+  // Plex server. Used to compose a real "Series - SxxExx - Episode" title
+  // instead of just the bare episode title full_title alone would give.
+  grandparent_title?: string;
+  parent_media_index?: number;
+  media_index?: number;
+  // Paths relative to the underlying Plex server (Tautulli proxies Plex),
+  // not standalone URLs — resolved into a fetchable image URL via
+  // buildImageProxyUrl below, which routes the request back through
+  // Tautulli's own pms_image_proxy so this client never needs the Plex
+  // server's own token.
+  thumb?: string;
+  art?: string;
 }
 
 export interface TautulliHomeStatRow {
@@ -24,6 +38,8 @@ export interface TautulliHomeStatRow {
   last_play?: string;
   year?: number;
   content_rating?: string;
+  thumb?: string;
+  art?: string;
 }
 
 interface TautulliHomeStat {
@@ -102,6 +118,37 @@ export async function getHomeStats(
     stats_count: String(count),
   });
   return data.find((stat) => stat.stat_id === statId)?.rows ?? [];
+}
+
+// Tautulli's own pms_image_proxy command fetches an image from the
+// underlying Plex server on Tautulli's behalf and streams it back — so
+// this only ever needs the apikey we already have, never a separate Plex
+// token, unlike calling the Plex server directly. `imagePath` is a
+// thumb/art path exactly as given by get_recently_added/get_home_stats.
+export function buildImageProxyUrl(baseUrl: string, apiKey: string, imagePath: string): string {
+  return buildUrl(baseUrl, "pms_image_proxy", apiKey, { img: imagePath }).toString();
+}
+
+/**
+ * Fetches an image proxied through pms_image_proxy. Unlike the JSON
+ * commands above, this endpoint returns the image bytes directly (no
+ * envelope) on success, so it's fetched and returned as-is rather than
+ * going through callTautulli. Returns null instead of throwing on any
+ * failure, so a caller embedding several items' images can skip just
+ * this one.
+ */
+export async function fetchImage(
+  imageUrl: string,
+): Promise<{ data: Uint8Array; contentType: string } | null> {
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    const data = new Uint8Array(await response.arrayBuffer());
+    return { data, contentType };
+  } catch {
+    return null;
+  }
 }
 
 export async function getRecentlyAdded(

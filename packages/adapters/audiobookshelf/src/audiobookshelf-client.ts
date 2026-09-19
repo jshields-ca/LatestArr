@@ -65,6 +65,35 @@ export async function getLibraries(baseUrl: string, token: string): Promise<Audi
   return body.libraries ?? [];
 }
 
+// Audiobookshelf's cover endpoint accepts the token as a `?token=` query
+// param for GET requests (see the top-of-file comment) — unlike
+// callAudiobookshelf's header-based auth used for the JSON API, this lets
+// the resulting URL be fetched with no extra headers, the same way
+// buildImageUrl works for the Plex adapter.
+export function buildCoverUrl(baseUrl: string, token: string, itemId: string): string {
+  return buildUrl(baseUrl, `/api/items/${itemId}/cover`, { token }).toString();
+}
+
+/**
+ * Fetches a library item's cover image bytes for CID embedding. `imageUrl`
+ * is expected to be one buildCoverUrl already produced (so the token is
+ * already on it). Returns null instead of throwing on any failure, so a
+ * caller embedding several items' images can skip just this one.
+ */
+export async function fetchImage(
+  imageUrl: string,
+): Promise<{ data: Uint8Array; contentType: string } | null> {
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    const data = new Uint8Array(await response.arrayBuffer());
+    return { data, contentType };
+  } catch {
+    return null;
+  }
+}
+
 export async function getLibraryItems(
   baseUrl: string,
   token: string,

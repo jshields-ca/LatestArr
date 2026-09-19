@@ -52,6 +52,29 @@ async function callRomm<T>(
   return (await response.json()) as T;
 }
 
+/**
+ * Fetches a rom's cover image bytes for CID embedding. `rom.url_cover` is
+ * RomM's own already-public, unauthenticated static asset URL (the same
+ * one this adapter has always handed straight to an `<img src>` in a sent
+ * email) — no bearer token needed, unlike every request this client makes
+ * against RomM's actual `/api/...` surface. Returns null instead of
+ * throwing on any failure, so a caller embedding several items' images
+ * can skip just this one.
+ */
+export async function fetchImage(
+  imageUrl: string,
+): Promise<{ data: Uint8Array; contentType: string } | null> {
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    const data = new Uint8Array(await response.arrayBuffer());
+    return { data, contentType };
+  } catch {
+    return null;
+  }
+}
+
 export async function getPlatforms(baseUrl: string, token: string): Promise<RommPlatform[]> {
   return callRomm<RommPlatform[]>(baseUrl, "/api/platforms", token);
 }
