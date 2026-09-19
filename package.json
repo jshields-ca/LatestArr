@@ -17,9 +17,9 @@
     "version-packages": "node scripts/write-changelog.mjs && changeset version && node scripts/sync-root-version.mjs"
   },
   "devDependencies": {
-    "@changesets/cli": "^3.0.0",
+    "@changesets/cli": "^3.0.3",
     "prettier": "^3.3.0",
-    "turbo": "^2.3.0"
+    "turbo": "^2.10.13"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
