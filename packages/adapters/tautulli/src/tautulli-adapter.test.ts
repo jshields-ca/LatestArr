@@ -101,7 +101,84 @@ describe("fetchRecentItems", () => {
     expect(items).toHaveLength(2);
     expect(items[0]?.kind).toBe("movie");
     expect(items[1]?.kind).toBe("tv_episode");
+    // No grandparent_title on this fixture, so it falls back to the
+    // pre-existing full_title-based subtitle rather than the structured
+    // "SxxExx - Episode" form.
+    expect(items[1]?.title).toBe("Ep");
     expect(items[1]?.subtitle).toBe("Show - S01E01 - Ep");
+  });
+
+  it("uses the series title and SxxExx when Tautulli gives grandparent/episode info", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              {
+                ...baseItem,
+                rating_key: "2",
+                title: "Winter Is Coming",
+                full_title: "Game of Thrones - S01E01 - Winter Is Coming",
+                media_type: "episode",
+                added_at: "1700000000",
+                grandparent_title: "Game of Thrones",
+                parent_media_index: 1,
+                media_index: 1,
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.title).toBe("Game of Thrones");
+    expect(items[0]?.subtitle).toBe("S01E01 - Winter Is Coming");
+  });
+
+  it("maps thumb into a pms_image_proxy posterUrl", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              { ...baseItem, rating_key: "1", media_type: "movie", added_at: "1700000000", thumb: "/thumb/1" },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    const url = new URL(items[0]!.posterUrl!);
+    expect(url.searchParams.get("cmd")).toBe("pms_image_proxy");
+    expect(url.searchParams.get("img")).toBe("/thumb/1");
+    expect(url.searchParams.get("apikey")).toBe("key123");
+  });
+
+  it("falls back to art when there's no thumb", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              { ...baseItem, rating_key: "1", media_type: "movie", added_at: "1700000000", art: "/art/1" },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+    expect(new URL(items[0]!.posterUrl!).searchParams.get("img")).toBe("/art/1");
   });
 
   it("filters out items added before the since cutoff", async () => {
@@ -280,5 +357,40 @@ describe("fetchPopularItems", () => {
 
     const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
     expect(calledUrl.searchParams.get("time_range")).toBe("7");
+  });
+});
+
+describe("fetchImageBytes", () => {
+  it("fetches the item's posterUrl directly and returns its bytes and content type", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/jpeg" }),
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+
+    const result = await tautulliAdapter.fetchImageBytes!(config, {
+      id: "1",
+      externalId: "1",
+      kind: "movie",
+      title: "A Movie",
+      addedAt: new Date(),
+      posterUrl: "http://tautulli.local:8181/api/v2?apikey=key123&cmd=pms_image_proxy&img=%2Fthumb%2F1",
+    });
+
+    expect(result).toEqual({ data: new Uint8Array([1, 2, 3]), contentType: "image/jpeg" });
+  });
+
+  it("returns null when the item has no posterUrl", async () => {
+    const result = await tautulliAdapter.fetchImageBytes!(config, {
+      id: "1",
+      externalId: "1",
+      kind: "movie",
+      title: "A Movie",
+      addedAt: new Date(),
+    });
+
+    expect(result).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });

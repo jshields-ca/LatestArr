@@ -111,6 +111,37 @@ describe("renderDefaultNewsletterHtml", () => {
     expect(html).toContain("1h 30m");
   });
 
+  it("shows a contentLabel badge next to the title when present", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item({ kind: "book", title: "Some Comic", contentLabel: "Comic" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Comic");
+  });
+
+  it("omits the contentLabel badge entirely when absent", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item()],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("undefined");
+  });
+
+  it("shows both the added date and a formatted release date when present", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item({ releaseDate: new Date("2020-05-01T00:00:00Z") })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Added January 15, 2026");
+    expect(html).toContain("Released May 1, 2020");
+  });
+
   it("does not fall back to the old bare list markup", async () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",

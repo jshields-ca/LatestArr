@@ -1,4 +1,10 @@
-import { getAdapter, type MediaKind, type NewItem, type SourceAdapter } from "@latestarr/adapter-core";
+import {
+  getAdapter,
+  type MediaKind,
+  type NewItem,
+  type SourceAdapter,
+  type SourceConnectionConfig,
+} from "@latestarr/adapter-core";
 import { decrypt } from "@latestarr/crypto";
 import {
   type Db,
@@ -14,7 +20,12 @@ import {
   templates,
 } from "@latestarr/db";
 import { and, eq, inArray } from "drizzle-orm";
-import { sendEmail, type SmtpCredentials } from "../mailer/send.js";
+import { sendEmail, type EmailAttachment, type SmtpCredentials } from "../mailer/send.js";
+import {
+  preparePosterPlaceholders,
+  resolvePosterPlaceholders,
+  type ItemImageSource,
+} from "./embed-images.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { renderDefaultNewsletterHtml } from "../render/newsletter-template.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -99,71 +110,167 @@ async function resolveLinkedSources(db: Db, newsletter: Newsletter): Promise<Lin
   return resolved;
 }
 
-async function fetchItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<NewItem[]> {
-  const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
-  const linkedSources = await resolveLinkedSources(db, newsletter);
-  const allItems: NewItem[] = [];
+interface FetchedItems {
+  items: NewItem[];
+  /** Maps each item back to the adapter/config it came from, so
+   * embed-images.ts can fetch its poster with the right source's own
+   * credentials — a newsletter pulling from several linked sources at
+   * once means this can't be a single shared config. Keyed by object
+   * identity: safe here because every item is a freshly-built object for
+   * this one render, never reused or cloned before this map is read. */
+  sourceByItem: Map<NewItem, ItemImageSource>;
+}
+
+async function fetchRecentItemsFromSources(
+  linkedSources: LinkedSource[],
+  since: Date,
+): Promise<FetchedItems> {
+  const items: NewItem[] = [];
+  const sourceByItem = new Map<NewItem, ItemImageSource>();
 
   for (const { link, source, adapter, credentials } of linkedSources) {
-    const items = await adapter.fetchRecentItems(
-      { baseUrl: source.baseUrl, credentials },
-      {
-        since,
-        mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
-        libraryIds: link.libraryFilter ?? undefined,
-      },
-    );
-    allItems.push(...items);
+    const config: SourceConnectionConfig = { baseUrl: source.baseUrl, credentials };
+    const sourceItems = await adapter.fetchRecentItems(config, {
+      since,
+      mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
+      libraryIds: link.libraryFilter ?? undefined,
+    });
+    for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
+    items.push(...sourceItems);
   }
 
-  return allItems;
+  return { items, sourceByItem };
 }
 
 // Only called for a newsletter rendering through a custom compiled template
 // — a Media List block with sort="mostWatched" is the only consumer of this
 // pool, so the hardcoded-template fallback path never pays for it.
-async function fetchPopularItemsForNewsletter(db: Db, newsletter: Newsletter): Promise<NewItem[]> {
-  const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
-  const linkedSources = await resolveLinkedSources(db, newsletter);
-  const allItems: NewItem[] = [];
+async function fetchPopularItemsFromSources(
+  linkedSources: LinkedSource[],
+  since: Date,
+): Promise<FetchedItems> {
+  const items: NewItem[] = [];
+  const sourceByItem = new Map<NewItem, ItemImageSource>();
 
   for (const { link, source, adapter, credentials } of linkedSources) {
     if (!adapter.fetchPopularItems) continue;
-    const items = await adapter.fetchPopularItems(
-      { baseUrl: source.baseUrl, credentials },
-      { since, mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined },
-    );
-    allItems.push(...items);
+    const config: SourceConnectionConfig = { baseUrl: source.baseUrl, credentials };
+    const sourceItems = await adapter.fetchPopularItems(config, {
+      since,
+      mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
+    });
+    for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
+    items.push(...sourceItems);
   }
 
-  return allItems;
+  return { items, sourceByItem };
 }
+
+// Each content kind's linked source base URL, for a Media List block's
+// emptyFallback="link" ("nothing new — go browse the library yourself").
+// Cheap: reuses the already-resolved linkedSources, no extra source calls.
+function buildSourceLinksByContentType(linkedSources: LinkedSource[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const { link, source, adapter } of linkedSources) {
+    const kinds = (link.mediaTypeFilter as MediaKind[] | undefined) ?? adapter.capabilities.supportsMediaKinds;
+    for (const kind of kinds) {
+      if (!(kind in result)) result[kind] = source.baseUrl;
+    }
+  }
+  return result;
+}
+
+interface RenderedNewsletter {
+  html: string;
+  attachments: EmailAttachment[];
+  itemCount: number;
+}
+
+const EMPTY_FETCHED_ITEMS: FetchedItems = { items: [], sourceByItem: new Map() };
 
 async function renderNewsletterContent(
   db: Db,
   newsletter: Newsletter,
-  items: NewItem[],
   generatedAt: Date,
-): Promise<string> {
+): Promise<RenderedNewsletter> {
+  const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
+  const linkedSources = await resolveLinkedSources(db, newsletter);
+
+  const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since);
+  // Real posterUrls are swapped for opaque placeholder tokens *before* any
+  // template rendering happens — see embed-images.ts's own doc comment for
+  // why: a Media List block's count/order/showAll/emptyFallback selection
+  // (in mjml-template.ts's `mediaList` helper) can pick as few as 5 items
+  // out of a much larger fetched pool, and eagerly embedding every
+  // fetched item's poster (rather than only the ones actually rendered)
+  // wastes fetches/resizes on images that never appear in the sent email
+  // — exactly the "keep message size sane" goal CID embedding exists for.
+  const addedPlaceholders = preparePosterPlaceholders(items);
+
   if (newsletter.templateId) {
     const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
     if (template?.compiledMjml) {
-      // Fetching "most watched" data means extra adapter API calls, so only
-      // pay for it when the compiled template actually has a Media List
-      // block configured to use that pool.
-      const popularItems = template.compiledMjml.includes('sort="mostWatched"')
-        ? await fetchPopularItemsForNewsletter(db, newsletter)
-        : [];
-      return await renderMjmlTemplate(template.compiledMjml, {
+      // Fetching "most watched" data, or an all-time fallback pool, means
+      // extra adapter API calls — only pay for either when the compiled
+      // template actually has a Media List block configured to use it,
+      // and run both concurrently rather than one after the other since
+      // neither depends on the other's result.
+      const needsPopular = template.compiledMjml.includes('sort="mostWatched"');
+      const needsFallback = template.compiledMjml.includes('emptyFallback="random"');
+
+      const [popular, fallback] = await Promise.all([
+        needsPopular ? fetchPopularItemsFromSources(linkedSources, since) : Promise.resolve(EMPTY_FETCHED_ITEMS),
+        // No "since" cutoff for the fallback pool — it exists specifically
+        // for when nothing was added in the lookback window, so it has to
+        // look further back than that window to find anything at all.
+        needsFallback
+          ? fetchRecentItemsFromSources(linkedSources, new Date(0))
+          : Promise.resolve(EMPTY_FETCHED_ITEMS),
+      ]);
+
+      const popularPlaceholders = preparePosterPlaceholders(popular.items);
+      const fallbackPlaceholders = preparePosterPlaceholders(fallback.items);
+
+      const html = await renderMjmlTemplate(template.compiledMjml, {
         newsletterName: newsletter.name,
-        items,
-        popularItems,
+        items: addedPlaceholders.items,
+        popularItems: popularPlaceholders.items,
+        fallbackItems: fallbackPlaceholders.items,
+        sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
         generatedAt,
       });
+
+      // Only *now*, once the template has already decided which items it
+      // actually shows, do we look up which placeholder tokens made it
+      // into the output and fetch/embed images for just those.
+      const allPlaceholders = new Map([
+        ...addedPlaceholders.placeholders,
+        ...popularPlaceholders.placeholders,
+        ...fallbackPlaceholders.placeholders,
+      ]);
+      const allSourceByItem = new Map([...sourceByItem, ...popular.sourceByItem, ...fallback.sourceByItem]);
+      const resolved = await resolvePosterPlaceholders(html, allPlaceholders, (item) =>
+        allSourceByItem.get(item),
+      );
+
+      return { html: resolved.html, attachments: resolved.attachments, itemCount: items.length };
     }
   }
 
-  return await renderDefaultNewsletterHtml({ newsletterName: newsletter.name, items, generatedAt });
+  // The default template has no per-block selection to wait on (it shows
+  // every fetched item, uncapped) — but it still goes through the same
+  // placeholder round-trip, both to share one code path and because it's
+  // no less correct here: only posters that actually end up in the output
+  // get fetched.
+  const html = await renderDefaultNewsletterHtml({
+    newsletterName: newsletter.name,
+    items: addedPlaceholders.items,
+    generatedAt,
+  });
+  const resolved = await resolvePosterPlaceholders(html, addedPlaceholders.placeholders, (item) =>
+    sourceByItem.get(item),
+  );
+  return { html: resolved.html, attachments: resolved.attachments, itemCount: items.length };
 }
 
 async function resolveRecipients(db: Db, newsletterId: string) {
@@ -219,8 +326,7 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
   const sendRunId = sendRun!.id;
 
   try {
-    const items = await fetchItemsForNewsletter(db, newsletter);
-    const html = await renderNewsletterContent(db, newsletter, items, new Date());
+    const { html, attachments, itemCount } = await renderNewsletterContent(db, newsletter, new Date());
     const subject = newsletter.subjectTemplate || newsletter.name;
 
     const recipientRows = await resolveRecipients(db, newsletterId);
@@ -248,6 +354,7 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
           to: recipient.email,
           subject,
           html,
+          attachments,
         });
         await db.insert(sendRunRecipientResults).values({
           sendRunId,
@@ -275,7 +382,7 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
       .set({
         status: finalStatus,
         finishedAt: new Date(),
-        itemCountIncluded: items.length,
+        itemCountIncluded: itemCount,
         recipientCount: activeRecipients.length,
       })
       .where(eq(sendRuns.id, sendRunId));

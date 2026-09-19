@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPlatforms, getRoms } from "./romm-client.js";
+import { fetchImage, getPlatforms, getRoms } from "./romm-client.js";
 
 const mockFetch = vi.fn();
 
@@ -59,5 +59,51 @@ describe("getRoms", () => {
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(new URL(url).searchParams.getAll("platform_ids")).toEqual(["1", "2"]);
+  });
+});
+
+describe("fetchImage", () => {
+  it("returns the image bytes and content type on success", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new Uint8Array([9, 8, 7]).buffer,
+    });
+
+    const result = await fetchImage("http://romm.local:3000/cover.jpg");
+    expect(result).toEqual({ data: new Uint8Array([9, 8, 7]), contentType: "image/png" });
+  });
+
+  it("returns null instead of throwing on a non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
+    const result = await fetchImage("http://romm.local:3000/nope");
+    expect(result).toBeNull();
+  });
+
+  it("returns null instead of throwing when the request itself fails", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    const result = await fetchImage("http://romm.local:3000/nope");
+    expect(result).toBeNull();
+  });
+
+  it("passes a timeout signal so a hung source can't stall the fetch (and Promise.all in resolvePosterPlaceholders) forever", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+
+    await fetchImage("http://romm.local:3000/cover.jpg");
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null instead of throwing when the fetch is aborted (a timeout firing looks the same as any other rejection)", async () => {
+    mockFetch.mockRejectedValueOnce(new DOMException("The operation was aborted.", "TimeoutError"));
+    const result = await fetchImage("http://romm.local:3000/nope");
+    expect(result).toBeNull();
   });
 });

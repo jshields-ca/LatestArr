@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getHomeStats, getLibraries, getRecentlyAdded } from "./tautulli-client.js";
+import { buildImageProxyUrl, fetchImage, getHomeStats, getLibraries, getRecentlyAdded } from "./tautulli-client.js";
 
 const mockFetch = vi.fn();
 
@@ -143,5 +143,62 @@ describe("getHomeStats", () => {
 
     const rows = await getHomeStats("http://tautulli.local:8181", "key123", "top_movies", 7, 10);
     expect(rows).toEqual([]);
+  });
+});
+
+describe("buildImageProxyUrl", () => {
+  it("builds a pms_image_proxy URL carrying the apikey and image path", () => {
+    const url = buildImageProxyUrl("http://tautulli.local:8181", "key123", "/thumb/1");
+    const parsed = new URL(url);
+    expect(parsed.pathname).toBe("/api/v2");
+    expect(parsed.searchParams.get("cmd")).toBe("pms_image_proxy");
+    expect(parsed.searchParams.get("apikey")).toBe("key123");
+    expect(parsed.searchParams.get("img")).toBe("/thumb/1");
+  });
+});
+
+describe("fetchImage", () => {
+  it("returns the image bytes and content type on success", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new Uint8Array([9, 8, 7]).buffer,
+    });
+
+    const result = await fetchImage(buildImageProxyUrl("http://tautulli.local:8181", "key123", "/thumb/1"));
+    expect(result).toEqual({ data: new Uint8Array([9, 8, 7]), contentType: "image/png" });
+  });
+
+  it("returns null instead of throwing on a non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
+    const result = await fetchImage("http://tautulli.local:8181/nope");
+    expect(result).toBeNull();
+  });
+
+  it("returns null instead of throwing when the request itself fails", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    const result = await fetchImage("http://tautulli.local:8181/nope");
+    expect(result).toBeNull();
+  });
+
+  it("passes a timeout signal so a hung source can't stall the fetch (and Promise.all in resolvePosterPlaceholders) forever", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+
+    await fetchImage(buildImageProxyUrl("http://tautulli.local:8181", "key123", "/thumb/1"));
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("returns null instead of throwing when the fetch is aborted (a timeout firing looks the same as any other rejection)", async () => {
+    mockFetch.mockRejectedValueOnce(new DOMException("The operation was aborted.", "TimeoutError"));
+    const result = await fetchImage("http://tautulli.local:8181/nope");
+    expect(result).toBeNull();
   });
 });

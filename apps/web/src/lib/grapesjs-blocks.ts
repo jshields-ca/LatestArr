@@ -24,6 +24,20 @@ const CONTENT_TYPE_OPTIONS = [
 // HTML ends up in a sent email, entirely outside the app's own CSS.
 const ACCENT_COLOR = "#c31d4c";
 
+// A small outlined badge next to the title for a kind MediaKind itself
+// doesn't distinguish — "Ebook" vs "Comic", "Audiobook" vs "Podcast" (see
+// NewItem.contentLabel and mjml-template.ts's RenderableItem). Mirrors the
+// same badge markup newsletter-template.ts's default layout uses.
+const CONTENT_LABEL_BADGE =
+  `{{#if contentLabel}} <span style="display:inline-block;font-size:10px;font-weight:600;` +
+  `color:${ACCENT_COLOR};border:1px solid ${ACCENT_COLOR};border-radius:4px;padding:1px 5px;` +
+  `vertical-align:middle;">{{contentLabel}}</span>{{/if}}`;
+
+// Marks a card substituted in by emptyFallback="random" as a suggestion
+// rather than something newly added, so it doesn't read as a false claim
+// that this was actually added during the period.
+const ISFALLBACK_PREFIX = `{{#if isFallback}}<span style="color:${ACCENT_COLOR};font-weight:600;">Suggested — nothing new this period · </span>{{/if}}`;
+
 // One Handlebars conditional per content type's most relevant secondary
 // metadata line — movies/TV get runtime, books get a page count, audiobooks
 // get a spoken-word duration, games get a platform. Falls through to
@@ -50,12 +64,36 @@ const SORT_OPTIONS = [
   { id: "mostWatched", label: "Most watched" },
 ];
 
+// order="random" picks `count` random items from the matching pool instead
+// of always the first `count` — a different axis from `sort` (which pool:
+// added vs. most-watched), so it's its own trait rather than a third sort
+// option.
+const ORDER_OPTIONS = [
+  { id: "sequential", label: "In order" },
+  { id: "random", label: "Random" },
+];
+
+// What a block shows when nothing in its pool matches its filters for this
+// send's period — e.g. a Games block with nothing added in the last 7
+// days. "none" (the default, and the only behavior before this existed)
+// renders nothing at all, matching every template saved before this trait
+// existed.
+const EMPTY_FALLBACK_OPTIONS = [
+  { id: "none", label: "Show nothing" },
+  { id: "random", label: "Random items instead" },
+  { id: "link", label: "Link to browse the source" },
+];
+
 function contentTypeLabel(id: string): string {
   return CONTENT_TYPE_OPTIONS.find((option) => option.id === id)?.label ?? id;
 }
 
 function sortLabel(id: string): string {
   return SORT_OPTIONS.find((option) => option.id === id)?.label ?? id;
+}
+
+function emptyFallbackLabel(id: string): string {
+  return EMPTY_FALLBACK_OPTIONS.find((option) => option.id === id)?.label ?? id;
 }
 
 function registerMediaListType(editor: Editor): void {
@@ -71,6 +109,11 @@ function registerMediaListType(editor: Editor): void {
         contentType: "movie",
         sort: "added",
         count: 5,
+        order: "sequential",
+        showAll: false,
+        emptyFallback: "none",
+        fallbackCount: 5,
+        fallbackLinkLabel: "Browse the library",
         traits: [
           {
             type: "select",
@@ -94,11 +137,48 @@ function registerMediaListType(editor: Editor): void {
             min: 1,
             max: 20,
           },
+          {
+            type: "checkbox",
+            name: "showAll",
+            label: "Show all items in the period (ignore the number above)",
+            changeProp: true,
+          },
+          {
+            type: "select",
+            name: "order",
+            label: "Order",
+            changeProp: true,
+            options: ORDER_OPTIONS,
+          },
+          {
+            type: "select",
+            name: "emptyFallback",
+            label: "When nothing matches this period",
+            changeProp: true,
+            options: EMPTY_FALLBACK_OPTIONS,
+          },
+          {
+            type: "number",
+            name: "fallbackCount",
+            label: "Random fallback: how many to show",
+            changeProp: true,
+            min: 1,
+            max: 20,
+          },
+          {
+            type: "text",
+            name: "fallbackLinkLabel",
+            label: "Link fallback: link text",
+            changeProp: true,
+          },
         ],
       },
 
       init() {
-        this.on("change:contentType change:sort change:count", () => this.updatePreview());
+        this.on(
+          "change:contentType change:sort change:count change:order change:showAll change:emptyFallback",
+          () => this.updatePreview(),
+        );
         this.updatePreview();
       },
 
@@ -106,10 +186,21 @@ function registerMediaListType(editor: Editor): void {
         const contentType = this.get("contentType");
         const sort = this.get("sort");
         const count = this.get("count");
+        const order = this.get("order");
+        const showAll = this.get("showAll");
+        const emptyFallback = this.get("emptyFallback");
+
+        const countSummary = showAll ? "All" : count;
+        const orderSummary = order === "random" ? ", random order" : "";
+        const fallbackSummary =
+          emptyFallback && emptyFallback !== "none"
+            ? ` · if empty: ${emptyFallbackLabel(emptyFallback).toLowerCase()}`
+            : "";
+
         this.components(
           `<div style="padding:12px;border:1px dashed #94a3b8;border-radius:6px;font-family:sans-serif;font-size:13px;color:#475569;">` +
             `<strong>Media List</strong><br/>` +
-            `${count} ${contentTypeLabel(contentType)}, sorted by ${sortLabel(sort)}` +
+            `${countSummary} ${contentTypeLabel(contentType)}, sorted by ${sortLabel(sort)}${orderSummary}${fallbackSummary}` +
             `</div>`,
         );
         // GrapesJS parses the HTML string above into a real child
@@ -133,6 +224,11 @@ function registerMediaListType(editor: Editor): void {
         const contentType = this.get("contentType");
         const sort = this.get("sort");
         const count = this.get("count");
+        const order = this.get("order");
+        const showAll = this.get("showAll");
+        const emptyFallback = this.get("emptyFallback");
+        const fallbackCount = this.get("fallbackCount");
+        const fallbackLinkLabel = this.get("fallbackLinkLabel");
         const metaLine = metaLineForContentType(contentType);
         // A table, not flex/grid, for the poster+text layout — the one
         // layout mechanism that renders consistently across Gmail,
@@ -154,8 +250,18 @@ function registerMediaListType(editor: Editor): void {
         // <mj-raw> is MJML's own explicit escape hatch for exactly this:
         // arbitrary HTML that should pass into the output completely
         // unvalidated and unmodified.
+        // fallbackLinkLabel is the one piece of this that's free text
+        // (every other trait is a bounded select/number) — JSON.stringify
+        // gives it a properly quote-escaped Handlebars string literal
+        // instead of letting a literal `"` in the label break the
+        // surrounding hash-argument syntax.
+        const fallbackLinkLabelLiteral = JSON.stringify(fallbackLinkLabel || "Browse the library");
+
         return (
-          `{{#mediaList contentType="${contentType}" sort="${sort}" count="${count}"}}\n` +
+          `{{#mediaList contentType="${contentType}" sort="${sort}" count="${count}" ` +
+          `order="${order}" showAll="${showAll ? "true" : "false"}" ` +
+          `emptyFallback="${emptyFallback}" fallbackCount="${fallbackCount}" ` +
+          `fallbackLinkLabel=${fallbackLinkLabelLiteral}}}\n` +
           `<mj-raw>\n` +
           `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">\n` +
           `<tr>\n` +
@@ -163,11 +269,11 @@ function registerMediaListType(editor: Editor): void {
           `<img src="{{posterUrl}}" width="80" alt="{{title}} cover art" style="display:block;width:80px;max-width:80px;border-radius:6px;" />` +
           `</td>{{/if}}\n` +
           `<td style="vertical-align:top;font-family:sans-serif;">\n` +
-          `  <div style="font-weight:600;font-size:16px;color:#0f172a;">{{title}}</div>\n` +
+          `  <div style="font-weight:600;font-size:16px;color:#0f172a;">{{title}}${CONTENT_LABEL_BADGE}</div>\n` +
           `  {{#if subtitle}}<div style="color:#64748b;font-size:13px;">{{subtitle}}</div>{{/if}}\n` +
           `  <div style="font-size:12px;font-weight:600;color:${ACCENT_COLOR};margin-top:2px;">${metaLine}{{#if rating}} · {{rating}}{{/if}}</div>\n` +
           `  {{#if overview}}<div style="font-size:13px;color:#334155;margin-top:4px;">{{overview}}</div>{{/if}}\n` +
-          `  <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Added {{addedAtFormatted}}</div>\n` +
+          `  <div style="font-size:11px;color:#94a3b8;margin-top:4px;">${ISFALLBACK_PREFIX}Added {{addedAtFormatted}}{{#if releaseDateFormatted}} · Released {{releaseDateFormatted}}{{/if}}</div>\n` +
           `</td>\n` +
           `</tr>\n` +
           `</table>\n` +

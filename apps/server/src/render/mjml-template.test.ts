@@ -250,3 +250,174 @@ describe("the mediaList block helper", () => {
     expect(html).not.toContain("A Show");
   });
 });
+
+describe("the mediaList block helper's showAll variant", () => {
+  it("ignores count entirely and renders every matching item when showAll is true", async () => {
+    const mjml = MEDIA_LIST_MJML.replace('count="2"', 'count="2" showAll="true"');
+
+    const html = await renderMjmlTemplate(mjml, {
+      newsletterName: "Weekly Digest",
+      items: [
+        item({ title: "Movie One", kind: "movie" }),
+        item({ title: "Movie Two", kind: "movie" }),
+        item({ title: "Movie Three", kind: "movie" }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Movie One");
+    expect(html).toContain("Movie Two");
+    expect(html).toContain("Movie Three");
+  });
+});
+
+describe("the mediaList block helper's order=\"random\" variant", () => {
+  it("still renders exactly `count` items, just not necessarily the first ones", async () => {
+    const mjml = MEDIA_LIST_MJML.replace('count="2"', 'count="2" order="random"');
+
+    const html = await renderMjmlTemplate(mjml, {
+      newsletterName: "Weekly Digest",
+      items: [
+        item({ title: "Movie One", kind: "movie" }),
+        item({ title: "Movie Two", kind: "movie" }),
+        item({ title: "Movie Three", kind: "movie" }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    const renderedCount = ["Movie One", "Movie Two", "Movie Three"].filter((title) =>
+      html.includes(title),
+    ).length;
+    expect(renderedCount).toBe(2);
+  });
+});
+
+describe("the mediaList block helper's emptyFallback variant", () => {
+  const FALLBACK_MJML = `
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        {{#mediaList contentType="game" sort="added" count="5" emptyFallback="random" fallbackCount="2"}}
+        <mj-text>{{title}}{{#if isFallback}} (suggested){{/if}}</mj-text>
+        {{/mediaList}}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+`;
+
+  it("substitutes random items from fallbackItems when the normal pool is empty", async () => {
+    const html = await renderMjmlTemplate(FALLBACK_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [],
+      fallbackItems: [
+        item({ title: "Old Game One", kind: "game" }),
+        item({ title: "Old Game Two", kind: "game" }),
+        item({ title: "Old Game Three", kind: "game" }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    const renderedCount = ["Old Game One", "Old Game Two", "Old Game Three"].filter((title) =>
+      html.includes(title),
+    ).length;
+    expect(renderedCount).toBe(2);
+    expect(html).toContain("(suggested)");
+  });
+
+  it("does not use the fallback pool when the normal pool already has items", async () => {
+    const html = await renderMjmlTemplate(FALLBACK_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "New Game", kind: "game" })],
+      fallbackItems: [item({ title: "Old Game", kind: "game" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("New Game");
+    expect(html).not.toContain("Old Game");
+    expect(html).not.toContain("(suggested)");
+  });
+
+  it("renders nothing when both the normal and fallback pools are empty", async () => {
+    const html = await renderMjmlTemplate(FALLBACK_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [],
+      fallbackItems: [],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("(suggested)");
+  });
+
+  const LINK_MJML = `
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        {{#mediaList contentType="game" sort="added" count="5" emptyFallback="link" fallbackLinkLabel="Browse RomM"}}
+        <mj-text>{{title}}</mj-text>
+        {{/mediaList}}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+`;
+
+  it("renders a link to the source when emptyFallback is link and a source URL is known", async () => {
+    const html = await renderMjmlTemplate(LINK_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [],
+      sourceLinksByContentType: { game: "http://romm.local:3000" },
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain('href="http://romm.local:3000"');
+    expect(html).toContain("Browse RomM");
+  });
+
+  it("renders nothing when emptyFallback is link but no source URL is known for that content type", async () => {
+    const html = await renderMjmlTemplate(LINK_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("<a href");
+  });
+});
+
+describe("releaseDateFormatted and contentLabel on rendered items", () => {
+  const CARD_WITH_DETAILS_MJML = `
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        {{#mediaList contentType="book" sort="added" count="5"}}
+        <mj-text>{{title}} {{#if contentLabel}}[{{contentLabel}}]{{/if}} - Added {{addedAtFormatted}}{{#if releaseDateFormatted}}, released {{releaseDateFormatted}}{{/if}}</mj-text>
+        {{/mediaList}}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+`;
+
+  it("exposes both a formatted release date and the added date", async () => {
+    const html = await renderMjmlTemplate(CARD_WITH_DETAILS_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [
+        item({
+          title: "Some Comic",
+          kind: "book",
+          contentLabel: "Comic",
+          releaseDate: new Date("2020-05-01T00:00:00Z"),
+        }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("[Comic]");
+    expect(html).toContain("released May 1, 2020");
+    expect(html).toContain("Added January 15, 2026");
+  });
+});

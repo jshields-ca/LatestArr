@@ -34,8 +34,18 @@ describe("the media-list component's toHTML card markup", () => {
     return definition.model;
   }
 
-  function fakeComponent(contentType: string) {
-    const values: Record<string, unknown> = { contentType, sort: "added", count: 5 };
+  function fakeComponent(contentType: string, overrides: Record<string, unknown> = {}) {
+    const values: Record<string, unknown> = {
+      contentType,
+      sort: "added",
+      count: 5,
+      order: "sequential",
+      showAll: false,
+      emptyFallback: "none",
+      fallbackCount: 5,
+      fallbackLinkLabel: "Browse the library",
+      ...overrides,
+    };
     return { get: (key: string) => values[key] };
   }
 
@@ -86,6 +96,52 @@ describe("the media-list component's toHTML card markup", () => {
       "game",
     ]);
   });
+
+  it("wraps a contentLabel badge in its own {{#if}} guard next to the title", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call(fakeComponent("book"));
+
+    expect(html).toContain("{{#if contentLabel}}");
+    expect(html).toContain("{{contentLabel}}");
+  });
+
+  it("shows a Suggested marker guarded by {{#if isFallback}} and a releaseDateFormatted guard", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call(fakeComponent("movie"));
+
+    expect(html).toContain("{{#if isFallback}}");
+    expect(html).toContain("Suggested");
+    expect(html).toContain("{{#if releaseDateFormatted}}");
+  });
+
+  it("passes order, showAll, emptyFallback, fallbackCount, and fallbackLinkLabel through as hash args", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call(
+      fakeComponent("game", {
+        order: "random",
+        showAll: true,
+        emptyFallback: "random",
+        fallbackCount: 3,
+      }),
+    );
+
+    expect(html).toContain('order="random"');
+    expect(html).toContain('showAll="true"');
+    expect(html).toContain('emptyFallback="random"');
+    expect(html).toContain('fallbackCount="3"');
+    expect(html).toContain("fallbackLinkLabel=");
+  });
+
+  it("safely embeds a fallbackLinkLabel containing a double quote", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call(
+      fakeComponent("game", { fallbackLinkLabel: 'Browse "RomM" now' }),
+    );
+
+    // JSON.stringify escapes the embedded quote, so the hash argument
+    // stays a single well-formed Handlebars string literal.
+    expect(html).toContain('fallbackLinkLabel="Browse \\"RomM\\" now"');
+  });
 });
 
 describe("the media-list component's updatePreview", () => {
@@ -102,8 +158,8 @@ describe("the media-list component's updatePreview", () => {
   // an argument) and to read back the resulting children (called with
   // none) — mirroring how GrapesJS's real Components collection is both
   // the setter and the getter for a component's children.
-  function fakeMediaListComponent() {
-    const values: Record<string, unknown> = { contentType: "movie", sort: "added", count: 5 };
+  function fakeMediaListComponent(overrides: Record<string, unknown> = {}) {
+    const values: Record<string, unknown> = { contentType: "movie", sort: "added", count: 5, ...overrides };
     const children: { set: ReturnType<typeof vi.fn> }[] = [];
     let injectedHtml: string | undefined;
 
@@ -131,6 +187,23 @@ describe("the media-list component's updatePreview", () => {
 
     expect(component.getInjectedHtml()).toContain("Media List");
     expect(component.getInjectedHtml()).toContain("5 Movies, sorted by Latest added");
+  });
+
+  it("summarizes showAll, random order, and an empty-fallback choice in the preview text", () => {
+    const model = getModelDefinition();
+    const component = fakeMediaListComponent({
+      contentType: "game",
+      order: "random",
+      showAll: true,
+      emptyFallback: "random",
+    });
+
+    (model.updatePreview as (this: unknown) => void).call(component);
+
+    const html = component.getInjectedHtml()!;
+    expect(html).toContain("All Games");
+    expect(html).toContain("random order");
+    expect(html).toContain("if empty: random items instead");
   });
 
   it("locks every injected child so a click selects the media-list wrapper, not the child", () => {
