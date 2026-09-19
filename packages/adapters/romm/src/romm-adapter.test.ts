@@ -110,3 +110,38 @@ describe("fetchRecentItems", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+describe("fetchImageBytes", () => {
+  it("fetches the item's posterUrl directly (RomM's cover is public) and returns its bytes", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/jpeg" }),
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+
+    const result = await rommAdapter.fetchImageBytes!(config, {
+      id: "1",
+      externalId: "1",
+      kind: "game",
+      title: "A Game",
+      addedAt: new Date(),
+      posterUrl: "http://romm.local:3000/cover.jpg",
+    });
+
+    expect(result).toEqual({ data: new Uint8Array([1, 2, 3]), contentType: "image/jpeg" });
+  });
+
+  it("returns null when the item has no posterUrl", async () => {
+    const result = await rommAdapter.fetchImageBytes!(config, {
+      id: "1",
+      externalId: "1",
+      kind: "game",
+      title: "A Game",
+      addedAt: new Date(),
+    });
+
+    expect(result).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+});

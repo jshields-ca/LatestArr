@@ -40,6 +40,8 @@ const RECENT_FEED = `<?xml version="1.0" encoding="UTF-8"?>
     <author><name>Someone Else</name></author>
     <dc:issued>2020</dc:issued>
     <summary type="text">A newer book.</summary>
+    <link rel="http://opds-spec.org/image" href="/api/v1/opds/cover/book-new" type="image/jpeg"/>
+    <link rel="http://opds-spec.org/acquisition" href="/api/v1/opds/download/book-new" type="application/epub+zip"/>
   </entry>
 </feed>`;
 
@@ -107,8 +109,57 @@ describe("fetchRecentItems", () => {
       title: "New Book",
       subtitle: "Someone Else",
       overview: "A newer book.",
+      contentLabel: "Ebook",
+      posterUrl: "http://booklore.local:6060/api/v1/opds/cover/book-new",
     });
     expect(items[0]?.releaseDate?.getFullYear()).toBe(2020);
+  });
+
+  it("labels a comic acquisition link as Comic and falls back to Book with no acquisition link", async () => {
+    const comicFeed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>urn:uuid:recent</id>
+  <title>Recently Added</title>
+  <updated>2026-01-20T00:00:00Z</updated>
+  <entry>
+    <title>Some Comic</title>
+    <id>urn:uuid:comic-1</id>
+    <updated>2026-01-15T00:00:00Z</updated>
+    <link rel="http://opds-spec.org/acquisition" href="/download/comic-1" type="application/vnd.comicbook+zip"/>
+  </entry>
+  <entry>
+    <title>Untyped Entry</title>
+    <id>urn:uuid:untyped-1</id>
+    <updated>2026-01-16T00:00:00Z</updated>
+  </entry>
+</feed>`;
+    mockFetch.mockResolvedValueOnce(xmlResponse(comicFeed));
+
+    const items = await bookloreAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items.find((item) => item.externalId === "urn:uuid:comic-1")?.contentLabel).toBe("Comic");
+    expect(items.find((item) => item.externalId === "urn:uuid:untyped-1")?.contentLabel).toBe("Book");
+  });
+
+  it("prefers the full image link over the thumbnail when both are present", async () => {
+    const feedWithBoth = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>urn:uuid:recent</id>
+  <title>Recently Added</title>
+  <updated>2026-01-20T00:00:00Z</updated>
+  <entry>
+    <title>Book With Both</title>
+    <id>urn:uuid:book-both</id>
+    <updated>2026-01-15T00:00:00Z</updated>
+    <link rel="http://opds-spec.org/image/thumbnail" href="/thumb/book-both"/>
+    <link rel="http://opds-spec.org/image" href="/full/book-both"/>
+  </entry>
+</feed>`;
+    mockFetch.mockResolvedValueOnce(xmlResponse(feedWithBoth));
+
+    const items = await bookloreAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.posterUrl).toBe("http://booklore.local:6060/full/book-both");
   });
 
   it("returns nothing when mediaKinds excludes book", async () => {
@@ -128,5 +179,43 @@ describe("fetchRecentItems", () => {
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(new URL(url).searchParams.get("size")).toBe("10");
+  });
+});
+
+describe("fetchImageBytes", () => {
+  it("fetches the item's posterUrl with Basic Auth and returns its bytes and content type", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/jpeg" }),
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    });
+
+    const result = await bookloreAdapter.fetchImageBytes!(config, {
+      id: "1",
+      externalId: "1",
+      kind: "book",
+      title: "A Book",
+      addedAt: new Date(),
+      posterUrl: "http://booklore.local:6060/api/v1/opds/cover/1",
+    });
+
+    expect(result).toEqual({ data: new Uint8Array([1, 2, 3]), contentType: "image/jpeg" });
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const expectedAuth = `Basic ${Buffer.from("admin:secret").toString("base64")}`;
+    expect((init.headers as Record<string, string>).Authorization).toBe(expectedAuth);
+  });
+
+  it("returns null when the item has no posterUrl", async () => {
+    const result = await bookloreAdapter.fetchImageBytes!(config, {
+      id: "1",
+      externalId: "1",
+      kind: "book",
+      title: "A Book",
+      addedAt: new Date(),
+    });
+
+    expect(result).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });

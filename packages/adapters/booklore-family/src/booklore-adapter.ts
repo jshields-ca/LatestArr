@@ -1,5 +1,6 @@
 import type {
   ConnectionTestResult,
+  FetchedImage,
   FetchRecentItemsParams,
   NewItem,
   SourceAdapter,
@@ -7,25 +8,31 @@ import type {
   SourceLibrary,
 } from "@latestarr/adapter-core";
 import {
+  fetchOpdsImage,
   getEntryAuthorName,
+  getEntryFormatLabel,
+  getEntryImageHref,
   getEntrySummaryText,
   getLibraries,
   getRecentEntries,
+  resolveOpdsUrl,
   type OpdsEntry,
 } from "./booklore-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
 
-function mapEntry(entry: OpdsEntry): NewItem {
+function mapEntry(entry: OpdsEntry, baseUrl: string): NewItem {
   // See the OpdsEntry["dc:issued"] type comment: this can arrive as a
   // number (e.g. a bare year like 2020) when the source text node is
   // purely numeric, and `new Date(2020)` would misinterpret that as a
   // millisecond timestamp rather than the year 2020.
   const issued = entry["dc:issued"] !== undefined ? String(entry["dc:issued"]) : undefined;
+  const imageHref = getEntryImageHref(entry);
   return {
     id: entry.id,
     externalId: entry.id,
     kind: "book",
+    contentLabel: getEntryFormatLabel(entry),
     title: entry.title,
     subtitle: getEntryAuthorName(entry),
     overview: getEntrySummaryText(entry),
@@ -35,6 +42,11 @@ function mapEntry(entry: OpdsEntry): NewItem {
     // dedicated /recent feed we read from.
     addedAt: entry.updated ? new Date(entry.updated) : new Date(0),
     releaseDate: issued ? new Date(issued) : undefined,
+    // Resolved to an absolute URL, but unlike Plex/Tautulli/Audiobookshelf
+    // this carries no credentials — OPDS covers sit behind the same HTTP
+    // Basic Auth as the feed itself, which fetchImageBytes below supplies
+    // at fetch time rather than embedding it in the URL.
+    posterUrl: imageHref ? resolveOpdsUrl(baseUrl, imageHref) : undefined,
     raw: entry,
   };
 }
@@ -93,8 +105,17 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
       );
 
       return entries
-        .map(mapEntry)
+        .map((entry) => mapEntry(entry, config.baseUrl))
         .filter((item) => item.addedAt >= params.since);
+    },
+
+    async fetchImageBytes(config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {
+      if (!item.posterUrl) return null;
+      return fetchOpdsImage(
+        item.posterUrl,
+        config.credentials.username ?? "",
+        config.credentials.password ?? "",
+      );
     },
   };
 }

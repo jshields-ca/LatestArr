@@ -8,12 +8,27 @@ export interface SmtpCredentials {
   pass?: string;
 }
 
+// The shape a poster/cover image ends up in once apps/server/src/pipeline
+// /embed-images.ts has fetched and resized it — passed straight through to
+// Nodemailer's own `attachments` option. `cid` is what the rendered HTML's
+// `<img src="cid:...">` references; Nodemailer embeds the attachment
+// inline rather than as a regular download when a message part actually
+// references its cid, so this is real inline embedding, not just an
+// attached file that happens to share an id.
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  cid: string;
+  contentType: string;
+}
+
 export interface SendEmailInput {
   from: string;
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface SendEmailResult {

@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getEntryAuthorName, getEntrySummaryText, getLibraries, getRecentEntries } from "./booklore-client.js";
+import {
+  fetchOpdsImage,
+  getEntryAuthorName,
+  getEntryFormatLabel,
+  getEntryImageHref,
+  getEntrySummaryText,
+  getLibraries,
+  getRecentEntries,
+  resolveOpdsUrl,
+} from "./booklore-client.js";
 
 const mockFetch = vi.fn();
 
@@ -93,5 +102,106 @@ describe("getRecentEntries", () => {
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(new URL(url).pathname).toBe("/api/v1/opds/recent");
     expect(new URL(url).searchParams.get("size")).toBe("25");
+  });
+});
+
+describe("getEntryImageHref", () => {
+  it("prefers the full image rel over the thumbnail rel", () => {
+    const entry = {
+      id: "1",
+      title: "Book",
+      link: [
+        { "@_rel": "http://opds-spec.org/image/thumbnail", "@_href": "/thumb" },
+        { "@_rel": "http://opds-spec.org/image", "@_href": "/full" },
+      ],
+    };
+    expect(getEntryImageHref(entry)).toBe("/full");
+  });
+
+  it("falls back to the thumbnail rel when there's no full image", () => {
+    const entry = {
+      id: "1",
+      title: "Book",
+      link: { "@_rel": "http://opds-spec.org/image/thumbnail", "@_href": "/thumb" },
+    };
+    expect(getEntryImageHref(entry)).toBe("/thumb");
+  });
+
+  it("returns undefined when there's no image link at all", () => {
+    expect(getEntryImageHref({ id: "1", title: "Book" })).toBeUndefined();
+  });
+});
+
+describe("getEntryFormatLabel", () => {
+  it("labels comic archive MIME types as Comic", () => {
+    const entry = {
+      id: "1",
+      title: "Comic",
+      link: { "@_rel": "http://opds-spec.org/acquisition", "@_type": "application/vnd.comicbook+zip" },
+    };
+    expect(getEntryFormatLabel(entry)).toBe("Comic");
+  });
+
+  it("labels epub/pdf acquisition types as Ebook", () => {
+    const epub = {
+      id: "1",
+      title: "Book",
+      link: { "@_rel": "http://opds-spec.org/acquisition", "@_type": "application/epub+zip" },
+    };
+    const pdf = {
+      id: "2",
+      title: "Book",
+      link: { "@_rel": "http://opds-spec.org/acquisition", "@_type": "application/pdf" },
+    };
+    expect(getEntryFormatLabel(epub)).toBe("Ebook");
+    expect(getEntryFormatLabel(pdf)).toBe("Ebook");
+  });
+
+  it("falls back to Book when there's no acquisition link or an unrecognized type", () => {
+    expect(getEntryFormatLabel({ id: "1", title: "Book" })).toBe("Book");
+  });
+});
+
+describe("resolveOpdsUrl", () => {
+  it("resolves a relative href against the feed's base URL", () => {
+    expect(resolveOpdsUrl("http://booklore.local:6060", "/api/v1/opds/cover/1")).toBe(
+      "http://booklore.local:6060/api/v1/opds/cover/1",
+    );
+  });
+
+  it("leaves an already-absolute href untouched", () => {
+    expect(resolveOpdsUrl("http://booklore.local:6060", "http://cdn.example.com/cover.jpg")).toBe(
+      "http://cdn.example.com/cover.jpg",
+    );
+  });
+});
+
+describe("fetchOpdsImage", () => {
+  it("fetches with Basic Auth and returns the image bytes and content type", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new Uint8Array([9, 8, 7]).buffer,
+    });
+
+    const result = await fetchOpdsImage("http://booklore.local:6060/api/v1/opds/cover/1", "admin", "secret");
+    expect(result).toEqual({ data: new Uint8Array([9, 8, 7]), contentType: "image/png" });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const expectedAuth = `Basic ${Buffer.from("admin:secret").toString("base64")}`;
+    expect((init.headers as Record<string, string>).Authorization).toBe(expectedAuth);
+  });
+
+  it("returns null instead of throwing on a non-2xx response", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "admin", "wrong");
+    expect(result).toBeNull();
+  });
+
+  it("returns null instead of throwing when the request itself fails", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "admin", "secret");
+    expect(result).toBeNull();
   });
 });

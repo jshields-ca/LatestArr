@@ -42,6 +42,36 @@ function buildUrl(
   return url;
 }
 
+// `thumb`/`art` on a PlexMetadataItem are paths relative to this same
+// server (e.g. "/library/metadata/123/thumb/456"), not standalone URLs —
+// this builds the same kind of token-bearing absolute URL any other Plex
+// API call in this client already authenticates with, so the result can
+// be fetched directly with no extra headers.
+export function buildImageUrl(baseUrl: string, token: string, imagePath: string): string {
+  return buildUrl(baseUrl, imagePath, token).toString();
+}
+
+/**
+ * Fetches a Plex thumb/art image's raw bytes for CID embedding. `imageUrl`
+ * is expected to be one buildImageUrl already produced (so the token is
+ * already on it) — a plain fetch with no extra auth is enough. Returns
+ * null instead of throwing on any failure, so a caller embedding several
+ * items' images can skip just this one.
+ */
+export async function fetchImage(
+  imageUrl: string,
+): Promise<{ data: Uint8Array; contentType: string } | null> {
+  try {
+    const response = await fetch(imageUrl, { headers: { Accept: "image/*" } });
+    if (!response.ok) return null;
+    const contentType = response.headers.get("content-type") ?? "image/jpeg";
+    const data = new Uint8Array(await response.arrayBuffer());
+    return { data, contentType };
+  } catch {
+    return null;
+  }
+}
+
 async function callPlex<T>(
   baseUrl: string,
   path: string,
