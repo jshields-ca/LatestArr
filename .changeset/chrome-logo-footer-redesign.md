@@ -2,4 +2,11 @@
 "@latestarr/web": patch
 ---
 
-Make the wordmark more prominent (a larger `LogoMark`, larger tracked-out text with a subtle rose gradient fill) and move the version/GitHub/Star cluster up next to the `Logo` in the mobile nav sheet, matching where it already sits in the desktop header — the two surfaces now read as one consistent design. Removes the sidebar's "About" info-icon popover (author/license/site) entirely and replaces it with a real page footer, visible on every page instead of hidden behind a click: author link, GPLv3 license link, a "Report an issue" link to the GitHub issue tracker, and an "In Active Development" badge.
+**Improved:** The LatestArr logo is more prominent, the version/GitHub/Star links now sit right next to it on mobile too (matching how they already looked on desktop), and the old hidden "About" info icon has been replaced with a real page footer showing the license, the author, and a link to report an issue.
+
+<details>
+<summary>Technical details</summary>
+
+Makes the wordmark more prominent (a larger `LogoMark`, larger tracked-out text with a subtle rose gradient fill) and moves the version/GitHub/Star cluster up next to the `Logo` in the mobile nav sheet, matching where it already sits in the desktop header — the two surfaces now read as one consistent design. Removes the sidebar's "About" info-icon popover (author/license/site) entirely and replaces it with a real page footer, visible on every page instead of hidden behind a click: author link, GPLv3 license link, a "Report an issue" link to the GitHub issue tracker, and an "In Active Development" badge.
+
+</details>
