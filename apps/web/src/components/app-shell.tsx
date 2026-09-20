@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Globe, Info, Loader2, LogOut, Menu, Pencil, Scale, Star, User } from "lucide-react";
+import { Bug, Globe, Loader2, LogOut, Menu, Pencil, Scale, Sparkles, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
@@ -43,43 +43,6 @@ function GitHubMark({ className }: { className?: string }) {
   );
 }
 
-function AboutPopoverContent() {
-  return (
-    <div className="flex flex-col gap-2.5">
-      <Logo iconClassName="size-4" textClassName="text-sm font-semibold" />
-      <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <User className="size-3.5 shrink-0" aria-hidden="true" />
-          <span>Jeremy Shields</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Scale className="size-3.5 shrink-0" aria-hidden="true" />
-          <a
-            href={LICENSE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="underline-offset-2 hover:text-foreground hover:underline"
-          >
-            GPLv3
-          </a>
-          <span>license</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Globe className="size-3.5 shrink-0" aria-hidden="true" />
-          <a
-            href={AUTHOR_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="underline-offset-2 hover:text-foreground hover:underline"
-          >
-            scootr.ca
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function StarPopoverContent() {
   return (
     <div className="flex flex-col gap-2.5">
@@ -102,11 +65,13 @@ function StarPopoverContent() {
 }
 
 /**
- * The version badge, GitHub view link, Star popover, and About popover as
- * one deliberate cluster. Rendered in the desktop header and, unchanged,
- * inside the mobile nav sheet — same shared component, same card styling
- * ("belongs" wherever it lands), so the two surfaces read as one design
- * rather than two different treatments.
+ * The version badge, GitHub view link, and Star popover as one deliberate
+ * cluster, sitting right next to the Logo at the top of both surfaces —
+ * the desktop header and, unchanged, the mobile nav sheet — so the two
+ * read as one design rather than two different treatments. The "About"
+ * info popover this card used to also hold (author, license, site) has
+ * moved out to a real page footer (see `AppFooter` below) instead of
+ * living behind an icon here.
  */
 function ProjectInfoCard() {
   const [version, setVersion] = useState<string | null>(null);
@@ -129,7 +94,7 @@ function ProjectInfoCard() {
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5">
       <div className="min-w-0">
         {version ? (
-          <Badge variant="neutral" className="font-mono text-xs tracking-tight">
+          <Badge variant="tertiary" className="font-mono text-xs tracking-tight">
             v{version}
           </Badge>
         ) : null}
@@ -160,23 +125,58 @@ function ProjectInfoCard() {
             <StarPopoverContent />
           </PopoverContent>
         </Popover>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="About LatestArr"
-              title="About LatestArr"
-              className={iconLinkClassName}
-            >
-              <Info className="size-4" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="top" align="end">
-            <AboutPopoverContent />
-          </PopoverContent>
-        </Popover>
       </div>
     </div>
+  );
+}
+
+/**
+ * The real page footer (see item 5 of the design-polish pass): the
+ * author/license/issue-tracker attribution that used to live behind the
+ * sidebar's "About" info-icon popover, now visible at the bottom of every
+ * page instead of hidden a click away. Rendered once per page, inside
+ * `AppShell` below — not duplicated per-surface the way `ProjectInfoCard`
+ * is, since there's only one page footer regardless of viewport width.
+ */
+function AppFooter() {
+  return (
+    <footer className="border-t border-border">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          <a
+            href={AUTHOR_URL}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(iconLinkClassName, "flex items-center gap-1.5")}
+          >
+            <Globe className="size-3.5 shrink-0" aria-hidden="true" />
+            Jeremy Shields
+          </a>
+          <a
+            href={LICENSE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(iconLinkClassName, "flex items-center gap-1.5")}
+          >
+            <Scale className="size-3.5 shrink-0" aria-hidden="true" />
+            GPLv3 license
+          </a>
+          <a
+            href={`${REPO_URL}/issues`}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(iconLinkClassName, "flex items-center gap-1.5")}
+          >
+            <Bug className="size-3.5 shrink-0" aria-hidden="true" />
+            Report an issue
+          </a>
+        </div>
+        <Badge variant="tertiary" className="w-fit">
+          <Sparkles className="size-3" aria-hidden="true" />
+          In Active Development
+        </Badge>
+      </div>
+    </footer>
   );
 }
 
@@ -318,6 +318,11 @@ function UserSummary() {
   );
 }
 
+// navItems (lib/nav-items.ts) is a flat list with no grouping concept —
+// deliberately not carved into invented sections here, since there's no
+// natural "these belong together" split in the current six items. If a
+// real grouping emerges as the nav grows, add a `group` field there and
+// section this list by it.
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1" aria-label="Main navigation">
@@ -329,15 +334,29 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200",
               isActive
                 ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
             )
           }
         >
-          <Icon className="size-4" aria-hidden="true" />
-          {label}
+          {({ isActive }) => (
+            <>
+              {/* Left-edge accent bar — on top of the existing background
+                  tint, not instead of it, so the active item reads clearly
+                  even for anyone who has trouble distinguishing the tint
+                  from the hover state. */}
+              {isActive ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary"
+                />
+              ) : null}
+              <Icon className="size-4" aria-hidden="true" />
+              {label}
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
@@ -348,7 +367,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4 md:px-6">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -363,9 +382,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Logo />
                 </SheetTitle>
               </SheetHeader>
+              {/* Version/GitHub/Star cluster lives right under the logo,
+                  matching the desktop header's placement, rather than down
+                  in the footer with the account summary. */}
+              <ProjectInfoCard />
               <NavList onNavigate={() => setMobileNavOpen(false)} />
-              <div className="mt-auto flex flex-col gap-3 border-t border-border pt-3">
-                <ProjectInfoCard />
+              <div className="mt-auto border-t border-border pt-3">
                 <UserSummary />
               </div>
             </SheetContent>
@@ -390,13 +412,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-7xl">
+      <div className="mx-auto flex w-full max-w-7xl flex-1">
         <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 flex-col border-r border-border p-4 md:flex">
           <NavList />
         </aside>
 
         <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
       </div>
+
+      <AppFooter />
     </div>
   );
 }

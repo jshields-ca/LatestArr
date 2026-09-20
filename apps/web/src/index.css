@@ -24,6 +24,20 @@
  * STAT_ACCENTS), instead of growing a second parallel token system next
  * to the semantic one below.
  *
+ * Tertiary: --tertiary/--tertiary-foreground (hue ~228, indigo/blue) is a
+ * genuine *third* palette hue, defined as a real token pair — unlike the
+ * violet secondary accent above, it's meant to be reached for as
+ * `bg-tertiary`/`text-tertiary-foreground` the same way `--primary` is,
+ * not borrowed ad hoc from Tailwind's stock palette. Indigo/blue was
+ * picked as the clearest complementary/triadic partner to rose that
+ * still stays clear of green (already = success) and red/orange (already
+ * = destructive, and Plex's own brand color). Used for the Badge
+ * `tertiary` variant, reserved for calm, informational labels (a running
+ * version number, an "in active development" status) — never for
+ * success/warning/destructive states, which stay on their own tokens.
+ * Both light and dark pairs were checked for 4.5:1+ text contrast the
+ * same way the rest of this file's pairs are.
+ *
  * "Glassy" surfaces: floating chrome that has something behind it to
  * blur — Popover/Select content, Dialog/Sheet content, and the toast
  * notifications (ui/toast.tsx) — gets a translucent, blurred background
@@ -52,6 +66,8 @@
   --muted-foreground: hsl(336 16% 42%);
   --accent: hsl(343 70% 93%);
   --accent-foreground: hsl(336 78% 38%);
+  --tertiary: hsl(228 62% 53%);
+  --tertiary-foreground: hsl(0 0% 100%);
   --destructive: hsl(0 72% 51%);
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(345 24% 87%);
@@ -76,6 +92,8 @@
   --muted-foreground: hsl(215 20% 65%);
   --accent: hsl(343 45% 22%);
   --accent-foreground: hsl(350 88% 72%);
+  --tertiary: hsl(228 70% 72%);
+  --tertiary-foreground: hsl(224 45% 10%);
   --destructive: hsl(0 63% 51%);
   --destructive-foreground: hsl(0 0% 100%);
   --border: hsl(217 33% 20%);
@@ -112,6 +130,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-foreground: var(--tertiary-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -141,5 +161,44 @@
     box-shadow:
       0 1px 2px hsl(var(--shadow-tint) / 0.08),
       0 10px 28px -10px hsl(var(--shadow-tint) / 0.22);
+  }
+
+  /* A one-shot diagonal light sweep for the primary button's hover state
+   * (see button.tsx's `default` variant) — a `::after` pseudo-element
+   * holding a diagonal, semi-transparent-white gradient, parked off the
+   * button's left edge and swept across to the right edge on hover. It's
+   * a transform transition (not a looping @keyframes animation) so it
+   * plays once per hover-enter and simply holds at the far side rather
+   * than replaying while the pointer sits still — a repeating sweep reads
+   * as a busy/looping ad unit, not "premium". `overflow-hidden` on the
+   * button (applied alongside this class) clips it to the button's own
+   * rounded shape.
+   */
+  .btn-glint {
+    position: relative;
+    isolation: isolate;
+  }
+  .btn-glint::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 40%,
+      hsl(0 0% 100% / 0.35) 50%,
+      transparent 60%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+  }
+  .btn-glint:hover::after {
+    transform: translateX(120%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-glint::after {
+      transition: none;
+      display: none;
+    }
   }
 }

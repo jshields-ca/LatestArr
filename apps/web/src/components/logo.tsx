@@ -12,7 +12,7 @@ interface LogoMarkProps extends SVGAttributes<SVGSVGElement> {
  * size (the spark's point-length is deliberately generous; a subtler
  * sparkle nearly disappeared at 16px).
  */
-export function LogoMark({ size = 28, className, ...props }: LogoMarkProps) {
+export function LogoMark({ size = 32, className, ...props }: LogoMarkProps) {
   return (
     <svg
       viewBox="0 0 32 32"
@@ -57,7 +57,18 @@ export function Logo({ className, iconClassName, textClassName }: LogoProps) {
   return (
     <span className={cn("flex items-center gap-2", className)}>
       <LogoMark className={iconClassName} />
-      <span className={cn("font-brand text-lg font-bold", textClassName)}>LatestArr</span>
+      {/* A subtle two-stop gradient (same hue, just a lighter tint of
+       * itself) on the wordmark — reads as a soft sheen rather than a
+       * loud rainbow effect, the same restraint as .shadow-elevated's
+       * tinted-not-flashy shadow. */}
+      <span
+        className={cn(
+          "font-brand text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent",
+          textClassName,
+        )}
+      >
+        LatestArr
+      </span>
     </span>
   );
 }

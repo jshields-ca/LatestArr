@@ -18,9 +18,17 @@ const buttonVariants = cva(
       variant: {
         // The lift + tinted shadow is reserved for the primary action on
         // a screen — applying it to every button variant would make
-        // nothing stand out as *the* button to press.
+        // nothing stand out as *the* button to press. The hover state
+        // also gets its own slower, spring-like duration/easing (via the
+        // `hover:` variants below) instead of the base's snappy 150ms
+        // ease-out, so the lift reads as smooth/premium rather than an
+        // abrupt bump — the base timing stays as-is for every variant's
+        // active:scale press, which is deliberately quick and un-springy
+        // (see the comment on the shared classes above). `btn-glint`
+        // (index.css) adds a one-shot diagonal light sweep across the
+        // button on hover, clipped by `overflow-hidden`.
         default:
-          "bg-primary text-primary-foreground shadow-[0_1px_2px_hsl(var(--shadow-tint)/0.3),0_4px_14px_-4px_hsl(var(--shadow-tint)/0.4)] hover:bg-primary/90 hover:-translate-y-0.5 hover:shadow-[0_2px_4px_hsl(var(--shadow-tint)/0.35),0_10px_24px_-6px_hsl(var(--shadow-tint)/0.5)] active:translate-y-0",
+          "relative overflow-hidden btn-glint bg-primary text-primary-foreground shadow-[0_1px_2px_hsl(var(--shadow-tint)/0.3),0_4px_14px_-4px_hsl(var(--shadow-tint)/0.4)] hover:bg-primary/90 hover:-translate-y-0.5 hover:shadow-[0_2px_4px_hsl(var(--shadow-tint)/0.35),0_10px_24px_-6px_hsl(var(--shadow-tint)/0.5)] hover:duration-[220ms] hover:ease-[cubic-bezier(0.34,1.56,0.64,1)] active:translate-y-0",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
