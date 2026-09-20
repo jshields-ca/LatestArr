@@ -124,6 +124,22 @@ function shuffled<T>(items: T[]): T[] {
 // plain-link markup below.
 const ACCENT_COLOR = "#c31d4c";
 
+// Shared by the mediaList and ifAnyItems helpers below: which pool a given
+// sort reads from, and whether an item matches a (possibly absent, meaning
+// "no filter") contentType hash argument. Split out so ifAnyItems can ask
+// "would mediaList render anything for this contentType/sort" without
+// duplicating mediaList's own pool-selection/filter logic.
+function selectPool(
+  context: { items?: RenderableItem[]; popularItems?: RenderableItem[] },
+  sort: string | undefined,
+): RenderableItem[] {
+  return sort === "mostWatched" ? (context.popularItems ?? []) : (context.items ?? []);
+}
+
+function matchesContentType(item: RenderableItem, contentType: string | undefined): boolean {
+  return !contentType || item.kind === contentType;
+}
+
 // The GrapesJS "Media List" block exports its trait values as hash
 // arguments on this block helper rather than as a second templating
 // mechanism — {{#mediaList contentType="movie" sort="added" count="5"
@@ -151,10 +167,8 @@ Handlebars.registerHelper("mediaList", function mediaList(
       fallbackLinkLabel?: string;
     };
 
-  const matchesContentType = (item: RenderableItem) => !contentType || item.kind === contentType;
-
-  const pool = sort === "mostWatched" ? (this.popularItems ?? []) : (this.items ?? []);
-  let filtered = pool.filter(matchesContentType);
+  const pool = selectPool(this, sort);
+  let filtered = pool.filter((item) => matchesContentType(item, contentType));
   if (order === "random") filtered = shuffled(filtered);
 
   const isShowAll = showAll === true || showAll === "true";
@@ -164,7 +178,7 @@ Handlebars.registerHelper("mediaList", function mediaList(
     : filtered.slice(0, Number.isFinite(limit) && limit > 0 ? limit : filtered.length);
 
   if (selected.length === 0 && emptyFallback === "random") {
-    const fallbackPool = (this.fallbackItems ?? []).filter(matchesContentType);
+    const fallbackPool = (this.fallbackItems ?? []).filter((item) => matchesContentType(item, contentType));
     const fallbackLimit = Number(fallbackCount) || (Number.isFinite(limit) && limit > 0 ? limit : 5);
     selected = shuffled(fallbackPool)
       .slice(0, fallbackLimit)
@@ -189,6 +203,28 @@ Handlebars.registerHelper("mediaList", function mediaList(
   }
 
   return selected.map((item) => options.fn(item)).join("");
+});
+
+// Backs the GrapesJS "All New (This Period)" composite block
+// (grapesjs-blocks.ts), which stacks one heading + {{#mediaList}} pair per
+// adapter content kind and needs each kind's heading to disappear along
+// with its (empty) list rather than sitting above a blank section.
+// {{#mediaList}} itself can't answer "would I render anything" from outside
+// — it's a block helper whose body only ever runs once per matching item,
+// with no count exposed to the surrounding template — so this is a second,
+// read-only helper applying the exact same pool + contentType filter
+// mediaList uses, purely to decide whether to render its block at all.
+// Always called with the same contentType/sort as the {{#mediaList}}
+// immediately below it, so "would mediaList render anything" and "is this
+// filtered pool non-empty" are the same question.
+Handlebars.registerHelper("ifAnyItems", function ifAnyItems(
+  this: { items?: RenderableItem[]; popularItems?: RenderableItem[] },
+  options: Handlebars.HelperOptions,
+) {
+  const { contentType, sort } = options.hash as { contentType?: string; sort?: string };
+  const pool = selectPool(this, sort);
+  const hasAny = pool.some((item) => matchesContentType(item, contentType));
+  return hasAny ? options.fn(this) : options.inverse(this);
 });
 
 export async function renderMjmlTemplate(
