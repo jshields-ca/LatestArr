@@ -52,7 +52,31 @@ If you're proposing support for a source that isn't in the README's supported-so
 - Fill out the PR template — it includes a short checklist (tests, docs, accessibility) that reviewers will check for.
 - Link the issue your PR addresses, if any.
 - Be responsive to review feedback; PRs that go quiet for a long time may be closed and can always be reopened.
-- **If your change is user-facing** (a new feature, a fix, a behavior change — not internal refactors, tests-only changes, or docs typos), add a changeset: run `pnpm changeset`, pick a bump type (see below), and write a one- or two-sentence summary in plain language. Commit the generated `.changeset/*.md` file with your PR.
+- **If your change is user-facing** (a new feature, a fix, a behavior change — not internal refactors, tests-only changes, or docs typos), add a changeset: run `pnpm changeset`, pick a bump type (see below), and write it in two parts — see "Writing a changeset" below. Commit the generated `.changeset/*.md` file with your PR.
+
+### Writing a changeset
+
+A changeset's body becomes a `CHANGELOG.md` bullet and, unedited, the notes on the GitHub Release — so it needs to read for a self-hoster deciding whether to upgrade, not just for other contributors. Write it in two parts:
+
+1. **A one- or two-sentence plain-language lede**, prefixed with a bold category tag: `**New:**` for a feature, `**Improved:**` for a behavior/UI change, `**Fixed:**` for a bug fix. No file paths, code identifiers, or "why" reasoning — just what changed and why a user would care.
+2. **A `<details><summary>Technical details</summary>...</details>` block** underneath, for the implementation rationale, file references, and edge cases a contributor or future-you would want. As detailed as you like — it's collapsed by default, so it costs nothing for a reader who just wants the headline.
+
+```markdown
+---
+"@latestarr/web": minor
+---
+
+**New:** Add a single "All New (This Period)" block to the template editor — drop it in and it shows everything added recently, grouped by type, instead of six separate blocks.
+
+<details>
+<summary>Technical details</summary>
+
+Addresses production feedback that there was no way to show "everything new this period" across content kinds. Registered as its own GrapesJS component type reusing the standalone Media List block's card markup...
+
+</details>
+```
+
+This renders as a working collapsible section on GitHub (`CHANGELOG.md` and Release notes both support raw `<details>`/`<summary>`) with no extra tooling — `scripts/write-changelog.mjs` flattens the body's newlines into one line per bullet, which doesn't affect how the HTML renders.
 
 ## Versioning & releases
 
