@@ -271,6 +271,148 @@ describe("the mediaList block helper's showAll variant", () => {
   });
 });
 
+describe("the mediaList block helper's count handling", () => {
+  it("treats a non-numeric count (e.g. the GrapesJS-side 'all' sentinel) as unbounded, same as showAll", async () => {
+    // grapesjs-blocks.ts never sends a literal count="all" itself (it uses
+    // the showAll="true" hash arg instead — see the "showAll variant"
+    // describe block above), but the helper's own count coercion already
+    // falls back to "show everything" for any non-numeric count, so this
+    // is a plain regression guard on that fallback rather than a feature
+    // this PR added.
+    const mjml = MEDIA_LIST_MJML.replace('count="2"', 'count="all"');
+
+    const html = await renderMjmlTemplate(mjml, {
+      newsletterName: "Weekly Digest",
+      items: [
+        item({ title: "Movie One", kind: "movie" }),
+        item({ title: "Movie Two", kind: "movie" }),
+        item({ title: "Movie Three", kind: "movie" }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Movie One");
+    expect(html).toContain("Movie Two");
+    expect(html).toContain("Movie Three");
+  });
+});
+
+describe("the ifAnyItems block helper", () => {
+  // Backs the GrapesJS "All New (This Period)" composite block: a heading
+  // wrapped in {{#ifAnyItems}} right above a {{#mediaList}} call with the
+  // same contentType/sort, so the heading disappears along with an empty
+  // list instead of sitting above nothing.
+  const IF_ANY_ITEMS_MJML = `
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        {{#ifAnyItems contentType="movie" sort="added"}}
+        <mj-text>Movies heading</mj-text>
+        {{/ifAnyItems}}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+`;
+
+  it("renders its block when the filtered pool has at least one match", async () => {
+    const html = await renderMjmlTemplate(IF_ANY_ITEMS_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "A Movie", kind: "movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Movies heading");
+  });
+
+  it("renders nothing when the filtered pool is empty", async () => {
+    const html = await renderMjmlTemplate(IF_ANY_ITEMS_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "A Show", kind: "tv_episode" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("Movies heading");
+  });
+
+  it("reads from popularItems instead of items when sort is mostWatched", async () => {
+    const mjml = IF_ANY_ITEMS_MJML.replace('sort="added"', 'sort="mostWatched"');
+
+    const emptyHtml = await renderMjmlTemplate(mjml, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "A Movie", kind: "movie" })],
+      popularItems: [],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+    expect(emptyHtml).not.toContain("Movies heading");
+
+    const populatedHtml = await renderMjmlTemplate(mjml, {
+      newsletterName: "Weekly Digest",
+      items: [],
+      popularItems: [item({ title: "A Movie", kind: "movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+    expect(populatedHtml).toContain("Movies heading");
+  });
+});
+
+// Mirrors what apps/web/src/lib/grapesjs-blocks.ts's "All New (This Period)"
+// composite block actually exports: one {{#ifAnyItems}}-gated heading +
+// {{#mediaList ... showAll="true"}} pair per content kind, all sharing the
+// same lookback-scoped `items` pool. This is the end-to-end regression
+// guard that kinds with matches are grouped under their own heading and
+// kinds with none are skipped entirely — not just each helper in isolation.
+const ALL_NEW_MJML = `
+<mjml>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        {{#ifAnyItems contentType="movie" sort="added"}}<mj-text>Movies</mj-text>{{/ifAnyItems}}
+        {{#mediaList contentType="movie" sort="added" count="5" showAll="true"}}<mj-text>{{title}}</mj-text>{{/mediaList}}
+        {{#ifAnyItems contentType="game" sort="added"}}<mj-text>Games</mj-text>{{/ifAnyItems}}
+        {{#mediaList contentType="game" sort="added" count="5" showAll="true"}}<mj-text>{{title}}</mj-text>{{/mediaList}}
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
+`;
+
+describe("the All New (This Period) composite block's exported shape", () => {
+  it("groups every matching item under its kind's heading and shows all of them, uncapped", async () => {
+    const html = await renderMjmlTemplate(ALL_NEW_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [
+        item({ title: "Movie One", kind: "movie" }),
+        item({ title: "Movie Two", kind: "movie" }),
+        item({ title: "Movie Three", kind: "movie" }),
+        item({ title: "Movie Four", kind: "movie" }),
+        item({ title: "Movie Five", kind: "movie" }),
+        item({ title: "Movie Six", kind: "movie" }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Movies");
+    for (const title of ["Movie One", "Movie Two", "Movie Three", "Movie Four", "Movie Five", "Movie Six"]) {
+      expect(html).toContain(title);
+    }
+    expect(html).not.toContain("Games");
+  });
+
+  it("omits a content kind's heading entirely when nothing matches it this period", async () => {
+    const html = await renderMjmlTemplate(ALL_NEW_MJML, {
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "Movie One", kind: "movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain("Movies");
+    expect(html).toContain("Movie One");
+    expect(html).not.toContain("Games");
+  });
+});
+
 describe("the mediaList block helper's order=\"random\" variant", () => {
   it("still renders exactly `count` items, just not necessarily the first ones", async () => {
     const mjml = MEDIA_LIST_MJML.replace('count="2"', 'count="2" order="random"');

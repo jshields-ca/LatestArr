@@ -223,6 +223,96 @@ describe("the media-list component's updatePreview", () => {
   });
 });
 
+describe("the all-new composite component", () => {
+  function getModelDefinition() {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+    // media-list registers first (registerMediaListType), so the composite
+    // type — registered right after it in registerCustomBlocks — is the
+    // second addType call.
+    const [, definition] = editor.Components.addType.mock.calls[1] as [string, { model: Record<string, unknown> }];
+    return definition.model;
+  }
+
+  it("emits one {{#ifAnyItems}}-gated heading + {{#mediaList}} pair per adapter content kind", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call({});
+
+    const presets: [string, string][] = [
+      ["movie", "Movies"],
+      ["tv_episode", "TV episodes"],
+      ["tv_season", "TV seasons"],
+      ["book", "Books"],
+      ["audiobook", "Audiobooks"],
+      ["game", "Games"],
+    ];
+
+    for (const [contentType, label] of presets) {
+      expect(html).toContain(`{{#ifAnyItems contentType="${contentType}" sort="added"}}`);
+      expect(html).toContain(`{{/ifAnyItems}}`);
+      expect(html).toContain(`>${label}</mj-text>`);
+      expect(html).toContain(`{{#mediaList contentType="${contentType}" sort="added"`);
+    }
+  });
+
+  it("always sorts by added and shows every matching item, regardless of count", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call({});
+
+    // sort="mostWatched" never appears — "all new" has no most-watched
+    // equivalent, it's every kind's own added-this-period pool.
+    expect(html).not.toContain('sort="mostWatched"');
+    expect(html).toContain('showAll="true"');
+  });
+
+  it("reuses the exact same poster+text card markup as the standalone Media List block", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call({});
+
+    // One <mj-raw><table>...</table></mj-raw> card body per content kind —
+    // the same shared mediaListCardBody() the standalone block's toHTML()
+    // uses, not a re-typed copy.
+    expect(html.match(/<mj-raw>\n<table/g)).toHaveLength(6);
+    expect(html).toContain('alt="{{title}} cover art"');
+    expect(html).toContain("{{#if posterUrl}}");
+  });
+
+  it("has no configurable traits — it always covers every content kind", () => {
+    const model = getModelDefinition();
+    const traits = (model.defaults as { traits: unknown[] }).traits;
+    expect(traits).toEqual([]);
+  });
+
+  it("injects a friendly static summary listing every content kind and locks its child", () => {
+    const model = getModelDefinition();
+    const children: { set: ReturnType<typeof vi.fn> }[] = [];
+    let injectedHtml: string | undefined;
+    const component = {
+      components: (html?: string) => {
+        if (html === undefined) {
+          return { forEach: (fn: (child: { set: ReturnType<typeof vi.fn> }) => void) => children.forEach(fn) };
+        }
+        injectedHtml = html;
+        children.length = 0;
+        children.push({ set: vi.fn() });
+        return undefined;
+      },
+    };
+
+    (model.updatePreview as (this: unknown) => void).call(component);
+
+    expect(injectedHtml).toContain("All New (This Period)");
+    expect(injectedHtml).toContain("Movies");
+    expect(injectedHtml).toContain("Games");
+    expect(children[0].set).toHaveBeenCalledWith({
+      selectable: false,
+      hoverable: false,
+      editable: false,
+      locked: true,
+    });
+  });
+});
+
 describe("registerCustomBlocks + applyClickToAddFallback", () => {
   it("gives every LatestArr block a click-to-add handler that appends its content", () => {
     const editor = fakeEditor();
@@ -251,6 +341,19 @@ describe("registerCustomBlocks + applyClickToAddFallback", () => {
     for (const label of ["Movies", "TV episodes", "TV seasons", "Books", "Audiobooks", "Games"]) {
       expect(categoryOf(label)).toBe("Content");
     }
+    expect(categoryOf("All New (This Period)")).toBe("Content");
+  });
+
+  it("registers the All New (This Period) block as an instance of the all-new composite component type", () => {
+    const editor = fakeEditor();
+    registerCustomBlocks(editor as never);
+    const block = editor.BlockManager.getAll().find((b) => b.get("label") === "All New (This Period)")!;
+
+    expect(block.get("content")).toContain('data-gjs-type="media-list-all-new"');
+
+    const onClick = block.get("onClick") as (block: unknown, ed: unknown) => void;
+    onClick(block, editor);
+    expect(editor.append).toHaveBeenCalledWith(block.get("content"));
   });
 
   it("adds a Divider and a Spacer block using MJML's own mj-divider/mj-spacer tags", () => {
