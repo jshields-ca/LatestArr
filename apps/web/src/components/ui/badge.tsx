@@ -24,6 +24,14 @@ const badgeVariants = cva(
         // violet-700/violet-400 on this tint both clear 4.5:1 in their
         // respective themes.
         accent: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+        // The app's tertiary hue (see the "Tertiary" note in index.css) —
+        // solid rather than a translucent tint like the variants above,
+        // since --tertiary/--tertiary-foreground are already a full
+        // contrast-checked pair (the same pattern as --primary), so there's
+        // no need to re-derive a tinted background here. Reserved for calm
+        // informational labels (a version number, an "in development"
+        // status) rather than a semantic state.
+        tertiary: "bg-tertiary text-tertiary-foreground",
       },
     },
     defaultVariants: {

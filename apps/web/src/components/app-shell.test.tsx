@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { axe } from "jest-axe";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,48 +74,33 @@ describe("AppShell", () => {
     expect(starLink).toHaveAttribute("href", "https://github.com/jshields-ca/LatestArr");
   });
 
-  it("shows exactly one scootr.ca link, revealed from the About popover rather than a separate icon", async () => {
-    const user = userEvent.setup();
+  it("shows exactly one scootr.ca author link, visible in the page footer without needing a click", async () => {
     renderShell();
     await screen.findByRole("link", { name: "View on GitHub" });
 
-    await user.click(screen.getByRole("button", { name: "About LatestArr" }));
-    expect(await screen.findAllByRole("link", { name: "scootr.ca" })).toHaveLength(1);
+    // No info-icon popover to open any more — the footer's attribution
+    // links are visible on the page immediately.
+    expect(screen.queryByRole("button", { name: "About LatestArr" })).not.toBeInTheDocument();
+    expect(await screen.findAllByRole("link", { name: /Jeremy Shields/ })).toHaveLength(1);
   });
 
-  it("shows the attribution info with a GPLv3 license link and a scootr.ca link behind the About popover", async () => {
-    const user = userEvent.setup();
+  it("shows a footer with a GPLv3 license link, an issue-tracker link, and an In Active Development badge", async () => {
     renderShell();
     await screen.findByRole("link", { name: "View on GitHub" });
 
-    // Closed by default — this is the whole point of the compact footer.
-    expect(screen.queryByText(/Jeremy Shields/)).not.toBeInTheDocument();
+    const authorLink = screen.getByRole("link", { name: /Jeremy Shields/ });
+    expect(authorLink).toHaveAttribute("href", "https://www.scootr.ca");
 
-    await user.click(screen.getByRole("button", { name: "About LatestArr" }));
-
-    expect(await screen.findByText(/Jeremy Shields/)).toBeInTheDocument();
-    const licenseLink = screen.getByRole("link", { name: "GPLv3" });
+    const licenseLink = screen.getByRole("link", { name: /GPLv3 license/ });
     expect(licenseLink).toHaveAttribute(
       "href",
       "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE",
     );
-    const scootrLink = screen.getByRole("link", { name: "scootr.ca" });
-    expect(scootrLink).toHaveAttribute("href", "https://www.scootr.ca");
-  });
 
-  it("exposes the About trigger as an accessible, keyboard-operable button", async () => {
-    renderShell();
-    await screen.findByRole("link", { name: "View on GitHub" });
+    const issueLink = screen.getByRole("link", { name: /Report an issue/ });
+    expect(issueLink).toHaveAttribute("href", "https://github.com/jshields-ca/LatestArr/issues");
 
-    const trigger = screen.getByRole("button", { name: "About LatestArr" });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
-
-    const user = userEvent.setup();
-    trigger.focus();
-    await user.keyboard("{Enter}");
-
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(await screen.findByText(/Jeremy Shields/)).toBeInTheDocument();
+    expect(screen.getByText("In Active Development")).toBeInTheDocument();
   });
 
   it("shows the running version once loaded", async () => {
@@ -173,5 +159,12 @@ describe("AppShell", () => {
     expect(
       await within(dialog).findByText("Enter both your current password and a new password to change it."),
     ).toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderShell();
+    await screen.findByText("Admin");
+    await waitFor(() => expect(screen.getByText("v0.4.4")).toBeInTheDocument());
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
