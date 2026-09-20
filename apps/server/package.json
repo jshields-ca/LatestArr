@@ -25,7 +25,7 @@
     "@latestarr/crypto": "workspace:*",
     "@latestarr/db": "workspace:*",
     "@node-rs/argon2": "^2.0.0",
-    "croner": "^9.0.0",
+    "croner": "^10.0.1",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.1.0",
     "handlebars": "^4.7.0",
