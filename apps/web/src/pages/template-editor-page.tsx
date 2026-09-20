@@ -101,7 +101,19 @@ export function TemplateEditorPage() {
       editor.destroy();
       editorRef.current = null;
     };
-  }, [template]);
+    // Deliberately not `[template]`: handleSave's setTemplate(updated) on a
+    // successful save gives `template` a new object identity every time,
+    // which would retrigger this effect on every save despite the
+    // editorRef.current guard above — a dependency change always runs the
+    // *previous* run's cleanup before the new run's guard is even
+    // evaluated, so keying on the object itself tears down and rebuilds
+    // the whole GrapesJS canvas (losing scroll position, selection, undo
+    // history) after every single save. Keying on whether template data has
+    // arrived at all — true exactly once, on the null-to-loaded transition
+    // — means this only ever runs once per page visit, matching the effect's
+    // actual intent ("initialize when data first arrives"), while still
+    // reading the just-loaded `template` value from the closure below.
+  }, [Boolean(template)]);
 
   // Only registered while there's something to lose — warns on tab
   // close/refresh/external navigation, which React Router's plain
