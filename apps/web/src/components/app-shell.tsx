@@ -432,22 +432,23 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       {/*
-       * No `flex-1` here and no explicit viewport-relative height on
-       * `aside` below (it used to be `h-[calc(100vh-3.5rem)]`) — both
-       * used to force this row to at least fill the remaining viewport
-       * height on every page, which pushed `AppFooter` below the fold
-       * (and left a large gap above it) even on short-content pages,
-       * forcing a scroll just to reach it. Letting the row size to its
-       * actual content means the footer sits right after the content it
-       * follows; `aside`'s default flex `align-items: stretch` still
-       * makes its border-right divider span the full height of whichever
-       * of `aside`/`main` is taller, so the sidebar still reads as
-       * "full height" on any page with real content. `min-h-screen` on
-       * the root above still keeps short pages filling at least one
-       * viewport — any leftover space just falls below the footer
-       * instead of being forced in above it.
+       * `flex-1` here (with no explicit viewport-relative height on
+       * `aside` below — it used to be `h-[calc(100vh-3.5rem)]`) is what
+       * pins `AppFooter` to the bottom of the viewport on short-content
+       * pages instead of leaving it stranded mid-page above a stretch of
+       * empty background. The earlier bug that made a past version of
+       * this row drop `flex-1` wasn't caused by flex-grow itself — it was
+       * `aside`'s explicit `calc(100vh-3.5rem)` height ignoring the
+       * footer's own height, forcing the row alone to viewport height and
+       * pushing total page height past 100vh (header + full-viewport row
+       * + footer), which forced a scroll past dead space just to reach
+       * it. Leaving `aside` with no explicit height avoids that: `flex-1`
+       * only grows this row to fill whatever space the header and footer
+       * actually leave inside the root's `min-h-screen`, and `aside`'s
+       * default flex `align-items: stretch` still makes its border-right
+       * divider span the full row height either way.
        */}
-      <div className="mx-auto flex w-full max-w-7xl">
+      <div className="mx-auto flex w-full max-w-7xl flex-1">
         <aside className="sticky top-14 hidden w-60 shrink-0 flex-col border-r border-border p-4 md:flex">
           <NavList />
         </aside>

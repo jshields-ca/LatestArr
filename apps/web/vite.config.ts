@@ -20,7 +20,23 @@ export default defineConfig({
     // client-side route of the same name (e.g. "/sources" the page vs.
     // "/sources" the endpoint) — see apps/server/src/app.ts.
     proxy: {
-      "/api": { target: "http://localhost:3000", changeOrigin: true },
+      // changeOrigin rewrites the outgoing Host header to match the target,
+      // but leaves Origin as the browser's real (5173) value — which trips
+      // the server's same-origin CSRF check (requireSameOrigin in
+      // apps/server/src/http/require-same-origin.ts compares Origin's host
+      // against Host) on every mutating request in local dev. Rewriting
+      // Origin here too keeps that check meaningful in production (where
+      // web and API really do share an origin) while not requiring a dev
+      // special-case on the server itself.
+      "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("origin", "http://localhost:3000");
+          });
+        },
+      },
     },
   },
 });
