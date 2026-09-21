@@ -54,6 +54,20 @@ function buildEpisodeSubtitle(item: PlexMetadataItem): string | undefined {
   return `S${season}E${episode} - ${item.title}`;
 }
 
+// A `tv_season` item's own `title` is just the season's name (e.g.
+// "Season 1") with no indication which show it belongs to — same problem
+// as the bare episode title above. `parentTitle` is the direct-parent show
+// name here (one level up from a season, unlike `grandparentTitle`, which
+// is two levels up and only populated for episodes).
+function buildSeasonTitle(item: PlexMetadataItem): string {
+  return item.parentTitle ?? item.title;
+}
+
+function buildSeasonSubtitle(item: PlexMetadataItem): string | undefined {
+  if (!item.parentTitle) return undefined;
+  return item.title;
+}
+
 export const plexAdapter: SourceAdapter = {
   kind: "plex",
   capabilities: {
@@ -108,8 +122,18 @@ export const plexAdapter: SourceAdapter = {
           id: item.ratingKey,
           externalId: item.ratingKey,
           kind,
-          title: kind === "tv_episode" ? buildEpisodeTitle(item) : item.title,
-          subtitle: kind === "tv_episode" ? buildEpisodeSubtitle(item) : undefined,
+          title:
+            kind === "tv_episode"
+              ? buildEpisodeTitle(item)
+              : kind === "tv_season"
+                ? buildSeasonTitle(item)
+                : item.title,
+          subtitle:
+            kind === "tv_episode"
+              ? buildEpisodeSubtitle(item)
+              : kind === "tv_season"
+                ? buildSeasonSubtitle(item)
+                : undefined,
           overview: item.summary || undefined,
           addedAt,
           releaseDate: item.originallyAvailableAt ? new Date(item.originallyAvailableAt) : undefined,

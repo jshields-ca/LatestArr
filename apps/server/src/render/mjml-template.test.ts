@@ -562,4 +562,43 @@ describe("releaseDateFormatted and contentLabel on rendered items", () => {
     expect(html).toContain("released May 1, 2020");
     expect(html).toContain("Added January 15, 2026");
   });
+
+  it("falls back to a kind-based label when the item has no contentLabel", async () => {
+    const html = await renderMjmlTemplate(
+      `<mjml><mj-body><mj-section><mj-column>
+        {{#each items}}<mj-text>{{title}} [{{contentLabel}}]</mj-text>{{/each}}
+      </mj-column></mj-section></mj-body></mjml>`,
+      {
+        newsletterName: "Weekly Digest",
+        items: [
+          item({ title: "A Movie", kind: "movie" }),
+          item({ title: "An Episode", kind: "tv_episode" }),
+          item({ title: "A Season", kind: "tv_season" }),
+          item({ title: "A Game", kind: "game" }),
+        ],
+        generatedAt: new Date("2026-01-20T00:00:00Z"),
+      },
+    );
+
+    expect(html).toContain("[Movie]");
+    expect(html).toContain("[TV Episode]");
+    expect(html).toContain("[TV Season]");
+    expect(html).toContain("[Game]");
+  });
+
+  it("prefers an adapter-set contentLabel over the kind fallback", async () => {
+    const html = await renderMjmlTemplate(
+      `<mjml><mj-body><mj-section><mj-column>
+        {{#each items}}<mj-text>{{title}} [{{contentLabel}}]</mj-text>{{/each}}
+      </mj-column></mj-section></mj-body></mjml>`,
+      {
+        newsletterName: "Weekly Digest",
+        items: [item({ title: "A Podcast", kind: "audiobook", contentLabel: "Podcast" })],
+        generatedAt: new Date("2026-01-20T00:00:00Z"),
+      },
+    );
+
+    expect(html).toContain("[Podcast]");
+    expect(html).not.toContain("[Audiobook]");
+  });
 });

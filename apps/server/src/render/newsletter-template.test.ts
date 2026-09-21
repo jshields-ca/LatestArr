@@ -154,4 +154,47 @@ describe("renderDefaultNewsletterHtml", () => {
     expect(html).not.toContain("<li>");
     expect(html).toContain("<!doctype html");
   });
+
+  it("falls back to a kind-based badge (e.g. \"Movie\") when an item has no contentLabel", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item({ kind: "movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain(">Movie<");
+  });
+
+  it("shows a plain-language intro line naming the lookback window when lookbackDays is given", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item()],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      lookbackDays: 14,
+    });
+
+    expect(html).toContain("Here's what's new in the last 14 days.");
+  });
+
+  it("omits the intro line entirely when lookbackDays is not given", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item()],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("Here's what's new");
+  });
+
+  it("includes a GitHub link and an issue-reporting link in the footer", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item()],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain('href="https://github.com/jshields-ca/LatestArr"');
+    expect(html).toContain('href="https://github.com/jshields-ca/LatestArr/issues"');
+    expect(html).toContain("Report an issue");
+  });
 });
