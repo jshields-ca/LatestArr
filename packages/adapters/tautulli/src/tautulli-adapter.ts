@@ -78,6 +78,19 @@ function buildEpisodeSubtitle(item: TautulliRecentlyAddedItem): string {
   return `S${season}E${episode} - ${item.title}`;
 }
 
+// Same problem as the bare episode title above, but for a tv_season item:
+// its own `title` is just the season's name (e.g. "Season 1") with no
+// indication which show it belongs to. Only applied when Tautulli actually
+// gives a parent_title, so a season this doesn't apply to falls through to
+// the caller's own default.
+function buildSeasonTitle(item: TautulliRecentlyAddedItem): string {
+  return item.parent_title ?? item.title;
+}
+
+function buildSeasonSubtitle(item: TautulliRecentlyAddedItem): string {
+  return item.title;
+}
+
 function resolvePosterUrl(
   baseUrl: string,
   apiKey: string,
@@ -157,17 +170,24 @@ export const tautulliAdapter: SourceAdapter = {
         if (addedAt < params.since) continue;
 
         const isEpisodeWithSeriesInfo = kind === "tv_episode" && Boolean(item.grandparent_title);
+        const isSeasonWithShowInfo = kind === "tv_season" && Boolean(item.parent_title);
 
         results.push({
           id: item.rating_key,
           externalId: item.rating_key,
           kind,
-          title: isEpisodeWithSeriesInfo ? buildEpisodeTitle(item) : item.title,
+          title: isEpisodeWithSeriesInfo
+            ? buildEpisodeTitle(item)
+            : isSeasonWithShowInfo
+              ? buildSeasonTitle(item)
+              : item.title,
           subtitle: isEpisodeWithSeriesInfo
             ? buildEpisodeSubtitle(item)
-            : item.full_title !== item.title
-              ? item.full_title
-              : undefined,
+            : isSeasonWithShowInfo
+              ? buildSeasonSubtitle(item)
+              : item.full_title !== item.title
+                ? item.full_title
+                : undefined,
           overview: item.summary || undefined,
           addedAt,
           releaseDate: item.originally_available_at

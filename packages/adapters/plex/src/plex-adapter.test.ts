@@ -112,6 +112,48 @@ describe("fetchRecentItems", () => {
     expect(items[0]?.subtitle).toBeUndefined();
   });
 
+  it("uses the show name as title and the season name as subtitle when Plex gives a parentTitle", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            {
+              ...baseItem,
+              ratingKey: "1",
+              title: "Season 1",
+              type: "season",
+              parentTitle: "Show",
+              addedAt: 1700000000,
+            },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.kind).toBe("tv_season");
+    expect(items[0]?.title).toBe("Show");
+    expect(items[0]?.subtitle).toBe("Season 1");
+  });
+
+  it("falls back to the bare season title/no subtitle when Plex gives no parentTitle", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            { ...baseItem, ratingKey: "1", title: "Season 1", type: "season", addedAt: 1700000000 },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.title).toBe("Season 1");
+    expect(items[0]?.subtitle).toBeUndefined();
+  });
+
   it("builds an absolute, token-bearing posterUrl from a relative thumb path", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({

@@ -139,6 +139,64 @@ describe("fetchRecentItems", () => {
     expect(items[0]?.subtitle).toBe("S01E01 - Winter Is Coming");
   });
 
+  it("uses the show name as title and the season name as subtitle when Tautulli gives parent_title", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              {
+                ...baseItem,
+                rating_key: "1",
+                title: "Season 1",
+                full_title: "Show - Season 1",
+                media_type: "season",
+                added_at: "1700000000",
+                parent_title: "Show",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.kind).toBe("tv_season");
+    expect(items[0]?.title).toBe("Show");
+    expect(items[0]?.subtitle).toBe("Season 1");
+  });
+
+  it("falls back to the bare season title/full_title subtitle when Tautulli gives no parent_title", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              {
+                ...baseItem,
+                rating_key: "1",
+                title: "Season 1",
+                full_title: "Season 1",
+                media_type: "season",
+                added_at: "1700000000",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.title).toBe("Season 1");
+    expect(items[0]?.subtitle).toBeUndefined();
+  });
+
   it("maps thumb into a pms_image_proxy posterUrl", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
