@@ -7,7 +7,7 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { trimTrailingSlashes, withOrigin } from "@latestarr/adapter-core";
+import { isHttpUrl, sameOrigin, trimTrailingSlashes, withOrigin } from "@latestarr/adapter-core";
 import {
   fetchOpdsImage,
   getEntryAuthorName,
@@ -33,15 +33,40 @@ function resolveWebUrl(config: SourceConnectionConfig): string {
 }
 
 // An entry's own OPDS permalink (rel="alternate"/"self") is the most
-// specific link this feed can offer, but its href is resolved against
-// baseUrl — the internal address the feed itself was served from — so it's
-// rebased onto webUrl's origin before being handed out. Falls back to the
-// library root when the entry carries no permalink at all (some OPDS
-// servers omit it), which is still strictly better than no link.
+// specific link this feed can offer, but it's untrusted content from the
+// source server itself — a compromised/malicious OPDS feed could hand back
+// a `javascript:`/`data:` href, and Handlebars' default {{}} escaping
+// (used to render {{externalUrl}}) only guards markup-relevant characters,
+// not URL schemes, so nothing downstream would catch that before it landed
+// in a sent email's <a href>. Anything that doesn't resolve to a navigable
+// http(s) URL is treated the same as "no usable permalink" rather than
+// ever being handed to a template.
+//
+// A permalink that *is* a valid http(s) URL is rebased onto webUrl's
+// origin only when it resolves to baseUrl's own origin — a relative href
+// necessarily does, and so does an absolute one that just happens to
+// repeat the local server's address; both mean "this points at the local
+// server and needs republishing onto the public-facing address". An
+// absolute href that already points at a genuinely different, distinct
+// host (some catalogs point rel="alternate" at a publisher/mirror page,
+// not the local server) is left alone rather than force-rebased into a
+// broken URL with the wrong host and an unrelated path.
+//
+// Falls back to the library root when the entry carries no usable
+// permalink at all (omitted, or rejected by the scheme check above), which
+// is still strictly better than no link.
 function buildExternalUrl(entry: OpdsEntry, baseUrl: string, webUrl: string): string {
   const permalinkHref = getEntryPermalinkHref(entry);
   if (permalinkHref) {
-    return withOrigin(resolveOpdsUrl(baseUrl, permalinkHref), webUrl);
+    let resolved: string | undefined;
+    try {
+      resolved = resolveOpdsUrl(baseUrl, permalinkHref);
+    } catch {
+      resolved = undefined;
+    }
+    if (resolved && isHttpUrl(resolved)) {
+      return sameOrigin(resolved, baseUrl) ? withOrigin(resolved, webUrl) : resolved;
+    }
   }
   return trimTrailingSlashes(webUrl);
 }

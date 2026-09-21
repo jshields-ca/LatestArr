@@ -154,16 +154,13 @@ async function createNewsletter(smtpProfileId?: string) {
 
 // The Tautulli adapter's fetchRecentItems/fetchPopularItems each fetch
 // get_server_id once (to build a per-item Plex deep link) before their own
-// item request — every mock sequence below that exercises either queues
-// this response first.
-function mockServerId() {
-  mockFetch.mockResolvedValueOnce(
-    jsonResponse({ response: { result: "success", message: null, data: { pms_identifier: "srv-abc123" } } }),
-  );
-}
-
+// item request, but only when the source connection has a publicUrl
+// configured (Tautulli's own baseUrl is its API host, never a page a
+// recipient should be sent to, so without a publicUrl there's no link to
+// build and the lookup is skipped entirely) — createSourceConnection()
+// below never sets one, so none of the mock sequences in this file need
+// to queue a get_server_id response.
 function mockRecentlyAdded() {
-  mockServerId();
   mockFetch.mockResolvedValueOnce(
     jsonResponse({
       response: {
@@ -414,10 +411,7 @@ describe("POST /newsletters/:id/send-now", () => {
     );
 
     // Simulates the real "fetch failed" (ECONNREFUSED-style) error a
-    // genuinely unreachable source produces — mockRejectedValue (not
-    // -Once) so it's genuinely unreachable for every call the adapter
-    // makes, since the first (get_server_id) is caught and swallowed
-    // internally as a best-effort lookup rather than a fatal failure.
+    // genuinely unreachable source produces.
     mockFetch.mockRejectedValue(new TypeError("fetch failed"));
 
     const response = await app.inject(
@@ -547,9 +541,9 @@ describe("POST /newsletters/:id/send-now", () => {
     );
 
     mockRecentlyAdded();
-    // fetchPopularItems also does its own get_server_id lookup, then
-    // queries top_movies and top_tv separately.
-    mockServerId();
+    // No publicUrl on this newsletter's source connection, so
+    // fetchPopularItems skips its own get_server_id lookup too — just
+    // top_movies and top_tv.
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {

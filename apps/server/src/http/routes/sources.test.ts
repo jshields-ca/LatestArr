@@ -199,6 +199,42 @@ describe("POST /sources", () => {
     });
     expect(response.statusCode).toBe(400);
   });
+
+  // publicUrl flows into every adapter's per-item link construction and
+  // from there into a sent email's <a href> — a javascript:/data: URL
+  // here would reach the same place an untrusted source's own malicious
+  // content could, so it's rejected at the API boundary the same way.
+  it("rejects a javascript: publicUrl", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "x",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local",
+        publicUrl: "javascript:alert(1)",
+        credentials: {},
+      },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects a data: publicUrl", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "x",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local",
+        publicUrl: "data:text/html,<script>alert(1)</script>",
+        credentials: {},
+      },
+    });
+    expect(response.statusCode).toBe(400);
+  });
 });
 
 describe("full source lifecycle", () => {

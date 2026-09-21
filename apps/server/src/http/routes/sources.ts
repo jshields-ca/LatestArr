@@ -25,7 +25,18 @@ function decryptCredentials(row: SelectedSourceConnection): Record<string, strin
 // — the edit form's "leave blank to use the address above" affordance
 // needs a way to *clear* a previously-set publicUrl back to unset, and an
 // empty string is what a cleared text input submits.
-const publicUrlSchema = z.union([z.url("publicUrl must be a valid URL"), z.literal("")]).optional();
+//
+// Restricted to http(s) (plain z.url() would otherwise accept
+// javascript:/data: as "valid" too) — publicUrl flows straight into every
+// adapter's per-item link construction and from there into a sent email's
+// <a href>, so an admin setting a non-navigable scheme here would land the
+// same way an untrusted source's own malicious content could.
+const publicUrlSchema = z
+  .union([
+    z.url({ protocol: /^https?$/, message: "publicUrl must be an http or https URL" }),
+    z.literal(""),
+  ])
+  .optional();
 
 const createSourceSchema = z.object({
   name: z.string().trim().min(1, "name is required"),

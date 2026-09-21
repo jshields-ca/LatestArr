@@ -17,10 +17,12 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body };
 }
 
-// fetchRecentItems and fetchPopularItems both fetch get_server_id once,
-// before their own item requests, to resolve the underlying Plex server's
-// machineIdentifier a per-item deep link needs — every test below that
-// exercises either queues this response first.
+// fetchRecentItems and fetchPopularItems each fetch get_server_id once,
+// before their own item requests, but only when the connection has a
+// publicUrl configured (see buildExternalUrl's comment: without a
+// publicUrl there's no link to build regardless of machineIdentifier, so
+// the lookup is skipped entirely) — only the externalUrl tests below that
+// use a publicUrl-carrying config need this queued.
 function mockServerId(pmsIdentifier: string | undefined = "srv-abc123") {
   mockFetch.mockResolvedValueOnce(
     jsonResponse({ response: { result: "success", message: null, data: { pms_identifier: pmsIdentifier } } }),
@@ -83,7 +85,6 @@ describe("fetchRecentItems", () => {
   };
 
   it("maps movie/episode items and skips unmapped media types", async () => {
-    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -120,7 +121,6 @@ describe("fetchRecentItems", () => {
   });
 
   it("uses the series title and SxxExx when Tautulli gives grandparent/episode info", async () => {
-    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -152,7 +152,6 @@ describe("fetchRecentItems", () => {
   });
 
   it("maps thumb into a pms_image_proxy posterUrl", async () => {
-    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -176,7 +175,6 @@ describe("fetchRecentItems", () => {
   });
 
   it("falls back to art when there's no thumb", async () => {
-    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -196,7 +194,6 @@ describe("fetchRecentItems", () => {
   });
 
   it("filters out items added before the since cutoff", async () => {
-    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -221,7 +218,6 @@ describe("fetchRecentItems", () => {
   });
 
   it("filters by mediaKinds when provided", async () => {
-    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -247,7 +243,6 @@ describe("fetchRecentItems", () => {
   });
 
   it("issues one request per library id and merges the results", async () => {
-    mockServerId();
     mockFetch
       .mockResolvedValueOnce(
         jsonResponse({
@@ -281,13 +276,17 @@ describe("fetchRecentItems", () => {
       libraryIds: ["1", "2"],
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(items.map((item) => item.externalId).sort()).toEqual(["1", "2"]);
   });
 
   describe("externalUrl", () => {
-    it("builds a Plex web deep link from baseUrl when no publicUrl is configured", async () => {
-      mockServerId("srv-abc123");
+    it("omits externalUrl entirely (and skips the get_server_id lookup) when no publicUrl is configured", async () => {
+      // Unlike Plex/Audiobookshelf/RomM, Tautulli's own baseUrl is its API
+      // host, never a page a recipient should be sent to — so with no
+      // publicUrl there's no link to build at all, matching this
+      // adapter's pre-existing (no-link) behavior rather than pointing at
+      // a broken page on the Tautulli host.
       mockFetch.mockResolvedValueOnce(
         jsonResponse({
           response: {
@@ -302,9 +301,10 @@ describe("fetchRecentItems", () => {
 
       const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
 
-      expect(items[0]?.externalUrl).toBe(
-        "http://tautulli.local:8181/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F42",
-      );
+      expect(items[0]?.externalUrl).toBeUndefined();
+      // Only the recently_added request — get_server_id would be wasted
+      // work here since buildExternalUrl can't use it without a publicUrl.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it("builds the deep link from publicUrl (the real Plex address) instead of Tautulli's own baseUrl", async () => {
@@ -329,7 +329,7 @@ describe("fetchRecentItems", () => {
       );
     });
 
-    it("falls back to a plain library link when get_server_id fails", async () => {
+    it("falls back to a plain publicUrl-based library link when get_server_id fails", async () => {
       mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
       mockFetch.mockResolvedValueOnce(
         jsonResponse({
@@ -343,16 +343,16 @@ describe("fetchRecentItems", () => {
         }),
       );
 
-      const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+      const publicConfig: SourceConnectionConfig = { ...config, publicUrl: "https://plex.example.com" };
+      const items = await tautulliAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
 
-      expect(items[0]?.externalUrl).toBe("http://tautulli.local:8181/web/index.html");
+      expect(items[0]?.externalUrl).toBe("https://plex.example.com/web/index.html");
     });
   });
 });
 
 describe("fetchPopularItems", () => {
   it("maps top_movies rows and requests both movies and TV by default", async () => {
-    mockServerId();
     mockFetch
       .mockResolvedValueOnce(
         jsonResponse({
@@ -385,7 +385,7 @@ describe("fetchPopularItems", () => {
 
     const items = await tautulliAdapter.fetchPopularItems!(config, { since: new Date(0) });
 
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       externalId: "1",
@@ -397,7 +397,6 @@ describe("fetchPopularItems", () => {
   });
 
   it("only queries the stat matching the requested media kind", async () => {
-    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -420,8 +419,8 @@ describe("fetchPopularItems", () => {
       mediaKinds: ["tv_episode"],
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    const calledUrl = new URL(mockFetch.mock.calls[1]![0] as string);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
     expect(calledUrl.searchParams.get("stat_id")).toBe("top_tv");
     expect(items).toHaveLength(1);
     expect(items[0]?.kind).toBe("tv_episode");
@@ -438,14 +437,13 @@ describe("fetchPopularItems", () => {
       mediaKinds: ["movie"],
     });
 
-    // calls[0] is the get_server_id lookup — the home_stats request (the
-    // one that actually carries time_range) is the one after it.
-    const calledUrl = new URL(mockFetch.mock.calls[1]![0] as string);
+    // No get_server_id call here — config has no publicUrl, so it's
+    // skipped and the home_stats request is the only call made.
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
     expect(calledUrl.searchParams.get("time_range")).toBe("7");
   });
 
-  it("sets externalUrl on popular items using the same deep-link construction as fetchRecentItems", async () => {
-    mockServerId("srv-abc123");
+  it("omits externalUrl on popular items too when no publicUrl is configured", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -466,8 +464,34 @@ describe("fetchPopularItems", () => {
       mediaKinds: ["movie"],
     });
 
+    expect(items[0]?.externalUrl).toBeUndefined();
+  });
+
+  it("sets externalUrl on popular items using the same deep-link construction as fetchRecentItems, when publicUrl is configured", async () => {
+    mockServerId("srv-abc123");
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [
+            {
+              stat_id: "top_movies",
+              rows: [{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }],
+            },
+          ],
+        },
+      }),
+    );
+
+    const publicConfig: SourceConnectionConfig = { ...config, publicUrl: "https://plex.example.com" };
+    const items = await tautulliAdapter.fetchPopularItems!(publicConfig, {
+      since: new Date(0),
+      mediaKinds: ["movie"],
+    });
+
     expect(items[0]?.externalUrl).toBe(
-      "http://tautulli.local:8181/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F1",
+      "https://plex.example.com/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F1",
     );
   });
 });

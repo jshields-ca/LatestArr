@@ -184,6 +184,70 @@ describe("fetchRecentItems", () => {
 
       expect(items[0]?.externalUrl).toBe("https://books.example.com");
     });
+
+    // Regression test: an OPDS entry's own <link> is untrusted content
+    // from the source server itself. Handlebars' default {{}} escaping
+    // (used to render {{externalUrl}} in a sent email) only guards
+    // markup-relevant characters, not URL schemes — a compromised/
+    // malicious feed handing back a javascript:/data: href must be caught
+    // here, not left to the template layer.
+    it("falls back to the library root instead of propagating a javascript: permalink href", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(feedWithPermalink(`<link rel="alternate" href="javascript:alert(1)" type="text/html"/>`)),
+      );
+
+      const items = await bookloreAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("http://booklore.local:6060");
+    });
+
+    it("falls back to the library root instead of propagating a data: permalink href", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(
+          feedWithPermalink(`<link rel="alternate" href="data:text/html,&lt;script&gt;" type="text/html"/>`),
+        ),
+      );
+
+      const items = await bookloreAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("http://booklore.local:6060");
+    });
+
+    it("leaves an absolute permalink pointing at a genuinely different host untouched, rather than force-rebasing it", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(
+          feedWithPermalink(
+            `<link rel="alternate" href="https://publisher.example.com/books/linked" type="text/html"/>`,
+          ),
+        ),
+      );
+
+      const publicConfig: SourceConnectionConfig = {
+        ...config,
+        publicUrl: "https://books.example.com",
+      };
+      const items = await bookloreAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("https://publisher.example.com/books/linked");
+    });
+
+    it("republishes an absolute permalink onto publicUrl when it points at baseUrl's own origin", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(
+          feedWithPermalink(
+            `<link rel="alternate" href="http://booklore.local:6060/reader/book-linked" type="text/html"/>`,
+          ),
+        ),
+      );
+
+      const publicConfig: SourceConnectionConfig = {
+        ...config,
+        publicUrl: "https://books.example.com",
+      };
+      const items = await bookloreAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("https://books.example.com/reader/book-linked");
+    });
   });
 
   it("labels a comic acquisition link as Comic and falls back to Book with no acquisition link", async () => {
