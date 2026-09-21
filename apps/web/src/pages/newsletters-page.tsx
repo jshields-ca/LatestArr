@@ -36,6 +36,7 @@ import { Select } from "@/components/ui/select";
 import { SettingRow } from "@/components/ui/setting-row";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
@@ -647,7 +648,16 @@ function SendRunHistoryList({ runs, error }: { runs: SendRun[] | null; error: st
   );
 }
 
-function EditNewsletterDialog({
+// The newsletter's own editable fields (name, schedule, delivery, subject) —
+// what used to live in a separate "Edit newsletter" dialog, reached only via
+// a pencil icon that didn't include the Template/Sources/Groups pickers
+// below it. Moved inline into the Details tab so every configuration field
+// for a newsletter lives in one place instead of being split between a
+// modal and the expanded row (see Fix: newsletter edit consolidation).
+// Local state is seeded from `newsletter` once, when the section mounts
+// (i.e. whenever the row is expanded) — same "reset on open" behavior the
+// dialog had, since this section is itself unmounted on collapse.
+function NewsletterDetailsForm({
   newsletter,
   smtpProfiles,
   onSaved,
@@ -656,10 +666,13 @@ function EditNewsletterDialog({
   smtpProfiles: SmtpProfile[];
   onSaved: (newsletter: Newsletter) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(newsletter.name);
-  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("simple");
-  const [simpleSchedule, setSimpleSchedule] = useState<SimpleSchedule>(DEFAULT_SIMPLE_SCHEDULE);
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(
+    () => (parseCronToSimpleSchedule(newsletter.scheduleCron) ? "simple" : "advanced"),
+  );
+  const [simpleSchedule, setSimpleSchedule] = useState<SimpleSchedule>(
+    () => parseCronToSimpleSchedule(newsletter.scheduleCron) ?? DEFAULT_SIMPLE_SCHEDULE,
+  );
   const [advancedCron, setAdvancedCron] = useState(newsletter.scheduleCron);
   const [timezone, setTimezone] = useState(newsletter.timezone);
   const [lookbackDays, setLookbackDays] = useState(String(newsletter.lookbackDays));
@@ -668,21 +681,7 @@ function EditNewsletterDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function openWithCurrentValues(next: boolean) {
-    setOpen(next);
-    if (next) {
-      setName(newsletter.name);
-      const parsed = parseCronToSimpleSchedule(newsletter.scheduleCron);
-      setScheduleMode(parsed ? "simple" : "advanced");
-      setSimpleSchedule(parsed ?? DEFAULT_SIMPLE_SCHEDULE);
-      setAdvancedCron(newsletter.scheduleCron);
-      setTimezone(newsletter.timezone);
-      setLookbackDays(String(newsletter.lookbackDays));
-      setSubjectTemplate(newsletter.subjectTemplate ?? "");
-      setSmtpProfileId(newsletter.smtpProfileId ?? "");
-      setError(null);
-    }
-  }
+  const idPrefix = `newsletter-${newsletter.id}`;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -700,7 +699,6 @@ function EditNewsletterDialog({
       });
       onSaved(updated);
       toast({ variant: "success", title: "Newsletter updated" });
-      setOpen(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -709,101 +707,88 @@ function EditNewsletterDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={openWithCurrentValues}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Edit ${newsletter.name}`}>
-          <Pencil />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit newsletter</DialogTitle>
-          <DialogDescription>Update the schedule, lookback window, or sender details.</DialogDescription>
-        </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${idPrefix}-name`}>Name</Label>
+        <Input
+          id={`${idPrefix}-name`}
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={submitting}
+        />
+      </div>
+      <div className="rounded-md border border-border p-3">
+        <ScheduleField
+          idPrefix={idPrefix}
+          mode={scheduleMode}
+          onModeChange={setScheduleMode}
+          simple={simpleSchedule}
+          onSimpleChange={setSimpleSchedule}
+          scheduleCron={advancedCron}
+          onScheduleCronChange={setAdvancedCron}
+          timezone={timezone}
+          onTimezoneChange={setTimezone}
+          disabled={submitting}
+        />
+      </div>
+      <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+        <SubsectionHeading>Delivery</SubsectionHeading>
+        <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-newsletter-name">Name</Label>
+            <Label htmlFor={`${idPrefix}-lookback`}>Lookback (days)</Label>
             <Input
-              id="edit-newsletter-name"
+              id={`${idPrefix}-lookback`}
+              type="number"
+              min={1}
               required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={lookbackDays}
+              onChange={(e) => setLookbackDays(e.target.value)}
               disabled={submitting}
             />
-          </div>
-          <div className="rounded-md border border-border p-3">
-            <ScheduleField
-              idPrefix="edit-newsletter"
-              mode={scheduleMode}
-              onModeChange={setScheduleMode}
-              simple={simpleSchedule}
-              onSimpleChange={setSimpleSchedule}
-              scheduleCron={advancedCron}
-              onScheduleCronChange={setAdvancedCron}
-              timezone={timezone}
-              onTimezoneChange={setTimezone}
-              disabled={submitting}
-            />
-          </div>
-          <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-            <SubsectionHeading>Delivery</SubsectionHeading>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="edit-newsletter-lookback">Lookback (days)</Label>
-                <Input
-                  id="edit-newsletter-lookback"
-                  type="number"
-                  min={1}
-                  required
-                  value={lookbackDays}
-                  onChange={(e) => setLookbackDays(e.target.value)}
-                  disabled={submitting}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="edit-newsletter-smtp">SMTP profile</Label>
-                <Select
-                  id="edit-newsletter-smtp"
-                  value={smtpProfileId}
-                  onChange={(e) => setSmtpProfileId(e.target.value)}
-                  disabled={submitting}
-                >
-                  <option value="">None yet</option>
-                  {smtpProfiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-newsletter-subject">Subject template (optional)</Label>
-            <Input
-              id="edit-newsletter-subject"
-              placeholder="What's new this week"
-              value={subjectTemplate}
-              onChange={(e) => setSubjectTemplate(e.target.value)}
+            <Label htmlFor={`${idPrefix}-smtp`}>SMTP profile</Label>
+            <Select
+              id={`${idPrefix}-smtp`}
+              value={smtpProfileId}
+              onChange={(e) => setSmtpProfileId(e.target.value)}
               disabled={submitting}
-            />
+            >
+              <option value="">None yet</option>
+              {smtpProfiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}
+                </option>
+              ))}
+            </Select>
           </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${idPrefix}-subject`}>Subject template (optional)</Label>
+        <Input
+          id={`${idPrefix}-subject`}
+          placeholder="What's new this week"
+          value={subjectTemplate}
+          onChange={(e) => setSubjectTemplate(e.target.value)}
+          disabled={submitting}
+        />
+      </div>
 
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
-          <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              Save changes
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <div>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? <Loader2 className="animate-spin" /> : null}
+          Save changes
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -825,6 +810,7 @@ function NewsletterCard({
   onDeleted: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState("details");
   const [toggling, setToggling] = useState(false);
   const [detail, setDetail] = useState<NewsletterDetail | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -933,83 +919,99 @@ function NewsletterCard({
             </Button>
           </>
         ) : (
-          <>
-            <EditNewsletterDialog newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Delete ${newsletter.name}`}
-              onClick={() => setConfirmingDelete(true)}
-            >
-              <Trash2 />
-            </Button>
-          </>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Delete ${newsletter.name}`}
+            onClick={() => setConfirmingDelete(true)}
+          >
+            <Trash2 />
+          </Button>
         )
       }
     >
-      <SettingRow
-        label="Enabled"
-        description="Send this newsletter on its configured schedule."
-        htmlFor={`newsletter-enabled-${newsletter.id}`}
-        control={
-          <Switch
-            id={`newsletter-enabled-${newsletter.id}`}
-            checked={newsletter.isEnabled}
-            onCheckedChange={(checked) => void handleToggleEnabled(checked)}
-            disabled={toggling}
-          />
-        }
-      />
-
       {expanded ? (
-        <div className="flex flex-col gap-4 border-t border-border pt-3">
-          {detailError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {detailError}
-            </p>
-          ) : null}
+        <div className="flex flex-col border-t border-border pt-3">
+          {/* Everything editable about the newsletter — including the
+              Template/Sources/Groups pickers that used to live only here,
+              separate from the "Edit" dialog's name/schedule/delivery
+              fields — now lives together under Details. History is the
+              only thing left in what used to be this expanded section's
+              flat content (see Fix: newsletter edit consolidation). */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="history">History</TabsTrigger>
+            </TabsList>
 
-          {!detail && !detailError ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading details...
-            </div>
-          ) : null}
-
-          {detail ? (
-            <>
-              <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
-              <LinkedSources
-                newsletterId={newsletter.id}
-                sources={detail.sources}
-                allSources={allSources}
-                onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
+            <TabsContent value="details">
+              <SettingRow
+                label="Enabled"
+                description="Send this newsletter on its configured schedule."
+                htmlFor={`newsletter-enabled-${newsletter.id}`}
+                control={
+                  <Switch
+                    id={`newsletter-enabled-${newsletter.id}`}
+                    checked={newsletter.isEnabled}
+                    onCheckedChange={(checked) => void handleToggleEnabled(checked)}
+                    disabled={toggling}
+                  />
+                }
               />
-              <LinkedGroups
-                newsletterId={newsletter.id}
-                groups={detail.recipientGroups}
-                allGroups={allGroups}
-                onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
-              />
-            </>
-          ) : null}
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => void handleSendNow()} disabled={sending}>
-                {sending ? <Loader2 className="animate-spin" /> : <Send />}
-                Send now
-              </Button>
-              {sendResult ? <span className="text-sm text-muted-foreground">{sendResult}</span> : null}
-            </div>
-            {sendError ? (
-              <span role="alert" className="text-sm text-destructive">
-                {sendError}
-              </span>
-            ) : null}
-            <SubsectionHeading>Send history</SubsectionHeading>
-            <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
-          </div>
+              <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
+
+              {detailError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {detailError}
+                </p>
+              ) : null}
+
+              {!detail && !detailError ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading details...
+                </div>
+              ) : null}
+
+              {detail ? (
+                <>
+                  <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
+                  <LinkedSources
+                    newsletterId={newsletter.id}
+                    sources={detail.sources}
+                    allSources={allSources}
+                    onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
+                  />
+                  <LinkedGroups
+                    newsletterId={newsletter.id}
+                    groups={detail.recipientGroups}
+                    allGroups={allGroups}
+                    onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
+                  />
+                </>
+              ) : null}
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={() => void handleSendNow()} disabled={sending}>
+                    {sending ? <Loader2 className="animate-spin" /> : <Send />}
+                    Send now
+                  </Button>
+                  {sendResult ? <span className="text-sm text-muted-foreground">{sendResult}</span> : null}
+                </div>
+                {sendError ? (
+                  <span role="alert" className="text-sm text-destructive">
+                    {sendError}
+                  </span>
+                ) : null}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="history">
+              <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
+            </TabsContent>
+          </Tabs>
         </div>
       ) : null}
     </ListRow>
