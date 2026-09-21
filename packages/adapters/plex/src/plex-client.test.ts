@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildImageUrl, fetchImage, getLibraries, getRecentlyAdded } from "./plex-client.js";
+import {
+  buildImageUrl,
+  fetchImage,
+  getLibraries,
+  getRecentlyAdded,
+  getServerIdentity,
+} from "./plex-client.js";
 
 const mockFetch = vi.fn();
 
@@ -80,6 +86,31 @@ describe("getRecentlyAdded", () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: {} }));
     const items = await getRecentlyAdded("http://plex.local:32400", "tok123", 25);
     expect(items).toEqual([]);
+  });
+});
+
+describe("getServerIdentity", () => {
+  it("returns the server's machineIdentifier", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ MediaContainer: { machineIdentifier: "srv-abc123", version: "1.2.3" } }),
+    );
+
+    const machineIdentifier = await getServerIdentity("http://plex.local:32400", "tok123");
+
+    expect(machineIdentifier).toBe("srv-abc123");
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.pathname).toBe("/identity");
+  });
+
+  it("returns undefined when the response has no machineIdentifier", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: {} }));
+    const machineIdentifier = await getServerIdentity("http://plex.local:32400", "tok123");
+    expect(machineIdentifier).toBeUndefined();
+  });
+
+  it("throws on a non-2xx HTTP response", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, false, 401));
+    await expect(getServerIdentity("http://plex.local:32400", "tok123")).rejects.toThrow("HTTP 401");
   });
 });
 

@@ -67,6 +67,15 @@ export const sourceConnections = sqliteTable("source_connections", {
   name: text("name").notNull(),
   kind: text("kind").notNull(),
   baseUrl: text("base_url").notNull(),
+  // The user-reachable address for this source, when it differs from
+  // baseUrl (the address the adapter itself calls to fetch data) — e.g.
+  // Tautulli's baseUrl is its own API host, not a Plex-watchable URL, and a
+  // RomM/Plex baseUrl may be a Tailscale/LAN address unreachable by an
+  // email recipient on another network. Nullable and optional: every
+  // consumer (per-item deep links, the Media List block's empty-pool
+  // "browse the library" fallback) falls back to baseUrl when this is
+  // unset, so existing source connections are unaffected.
+  publicUrl: text("public_url"),
   credentialsEncrypted: text("credentials_encrypted").notNull(),
   config: text("config", { mode: "json" }).$type<Record<string, unknown>>(),
   status: text("status", { enum: ["ok", "error", "unconfigured"] })

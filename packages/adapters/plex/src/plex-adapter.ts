@@ -8,11 +8,13 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, trimTrailingSlashes } from "@latestarr/adapter-core";
 import {
   buildImageUrl,
   fetchImage,
   getLibraries,
   getRecentlyAdded,
+  getServerIdentity,
   type PlexMetadataItem,
 } from "./plex-client.js";
 
@@ -68,6 +70,28 @@ function buildSeasonSubtitle(item: PlexMetadataItem): string | undefined {
   return item.title;
 }
 
+// The address a recipient's browser should actually open — publicUrl when
+// the source connection has one configured (e.g. this Plex server's own
+// baseUrl is a Tailscale/LAN address), falling back to baseUrl otherwise,
+// which matches today's behavior for a fully-public single-Plex setup.
+function resolveWebUrl(config: SourceConnectionConfig): string {
+  return config.publicUrl ?? config.baseUrl;
+}
+
+// Builds the per-item deep link once the server's machineIdentifier is
+// known; falls back to a plain library-root link (still using publicUrl
+// when set) when it couldn't be fetched — better than no link at all, and
+// exactly what a template's {{#if externalUrl}} was already prepared to
+// handle for a source with no per-item linking at all.
+function buildExternalUrl(
+  webUrl: string,
+  machineIdentifier: string | undefined,
+  ratingKey: string,
+): string {
+  if (machineIdentifier) return buildPlexWebDeepLink(webUrl, machineIdentifier, ratingKey);
+  return `${trimTrailingSlashes(webUrl)}/web/index.html`;
+}
+
 export const plexAdapter: SourceAdapter = {
   kind: "plex",
   capabilities: {
@@ -105,6 +129,14 @@ export const plexAdapter: SourceAdapter = {
     const sectionKeys =
       params.libraryIds && params.libraryIds.length > 0 ? params.libraryIds : [undefined];
 
+    // Fetched once per call (not per section/item) and best-effort — an
+    // identity lookup failing (e.g. an older Plex server, or a transient
+    // network hiccup) shouldn't fail the whole fetch, just mean every
+    // item's externalUrl falls back to a plain library link instead of a
+    // real per-item deep link.
+    const webUrl = resolveWebUrl(config);
+    const machineIdentifier = await getServerIdentity(config.baseUrl, token).catch(() => undefined);
+
     const results: NewItem[] = [];
     for (const sectionKey of sectionKeys) {
       const items = await getRecentlyAdded(config.baseUrl, token, count, sectionKey);
@@ -138,6 +170,7 @@ export const plexAdapter: SourceAdapter = {
           addedAt,
           releaseDate: item.originallyAvailableAt ? new Date(item.originallyAvailableAt) : undefined,
           posterUrl: item.thumb ? buildImageUrl(config.baseUrl, token, item.thumb) : undefined,
+          externalUrl: buildExternalUrl(webUrl, machineIdentifier, item.ratingKey),
           raw: item,
         });
       }

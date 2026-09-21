@@ -105,6 +105,20 @@ export async function getLibraries(baseUrl: string, apiKey: string): Promise<Tau
   return callTautulli<TautulliLibrary[]>(baseUrl, apiKey, "get_libraries");
 }
 
+interface TautulliServerId {
+  pms_identifier?: string;
+}
+
+// The underlying Plex Media Server's own machineIdentifier, proxied
+// through Tautulli's own API — used to build the same Plex web app deep
+// link the Plex adapter builds directly (see @latestarr/adapter-core's
+// buildPlexWebDeepLink), since Tautulli's rating_key values are the same
+// Plex rating keys the server itself uses.
+export async function getServerId(baseUrl: string, apiKey: string): Promise<string | undefined> {
+  const data = await callTautulli<TautulliServerId>(baseUrl, apiKey, "get_server_id");
+  return data.pms_identifier;
+}
+
 /**
  * Wraps Tautulli's get_home_stats command for a single stat_id (e.g.
  * "top_movies", "top_tv" — ranked by play count over time_range days).

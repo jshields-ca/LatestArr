@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchImage, getPlatforms, getRoms } from "./romm-client.js";
+import { buildRomWebUrl, fetchImage, getPlatforms, getRoms } from "./romm-client.js";
 
 const mockFetch = vi.fn();
 
@@ -59,6 +59,12 @@ describe("getRoms", () => {
 
     const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(new URL(url).searchParams.getAll("platform_ids")).toEqual(["1", "2"]);
+  });
+});
+
+describe("buildRomWebUrl", () => {
+  it("builds a rom detail page URL and trims a trailing slash off the web URL", () => {
+    expect(buildRomWebUrl("http://romm.local:3000/", 42)).toBe("http://romm.local:3000/rom/42");
   });
 });
 

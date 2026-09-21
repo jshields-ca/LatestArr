@@ -80,6 +80,48 @@ describe("renderDefaultNewsletterHtml", () => {
     expect(html).toContain("7.8/10");
   });
 
+  it("wraps the title and poster in a link when the item has an externalUrl", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [
+        item({
+          title: "A Movie",
+          posterUrl: "https://example.com/poster.jpg",
+          externalUrl: "https://plex.example.com/web/index.html#!/server/abc/details?key=%2Flibrary%2Fmetadata%2F1",
+        }),
+      ],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    // {{externalUrl}} uses Handlebars' default {{}} HTML-escaping (like
+    // every other item field), which also escapes "=" as "&#x3D;" — so the
+    // rendered href isn't a byte-for-byte copy of the source URL.
+    const escapedHref =
+      "https://plex.example.com/web/index.html#!/server/abc/details?key&#x3D;%2Flibrary%2Fmetadata%2F1";
+    // The poster wraps in a plain <a>...<img/></a>; the title's <a> also
+    // carries the "inherit the surrounding text color, no underline" style
+    // so a title-as-link doesn't read as a default blue/underlined link.
+    expect(html).toContain(`<a href="${escapedHref}"><img`);
+    expect(html).toContain(
+      `<a href="${escapedHref}" style="color:inherit;text-decoration:none;">A Movie</a>`,
+    );
+  });
+
+  it("renders a plain (non-linked) title and poster when the item has no externalUrl", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item({ title: "No Link Movie", posterUrl: "https://example.com/poster.jpg" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    // The footer's own GitHub/"Report an issue" links are always present,
+    // so this checks the item's own title/poster markup specifically
+    // rather than asserting no <a href= appears anywhere in the document.
+    expect(html).toContain("No Link Movie");
+    expect(html).not.toContain('<a href="https://example.com/poster.jpg"');
+    expect(html).not.toContain(">No Link Movie</a>");
+  });
+
   it("omits the poster image entirely when an item has no posterUrl", async () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",

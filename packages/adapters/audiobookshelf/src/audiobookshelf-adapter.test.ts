@@ -191,6 +191,39 @@ describe("fetchRecentItems", () => {
 
     expect(items[0]?.posterUrl).toBeUndefined();
   });
+
+  describe("externalUrl", () => {
+    it("builds an item web link from baseUrl when no publicUrl is configured", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          results: [{ ...baseItem, id: "item1", addedAt: 1700000000000, updatedAt: 1700000000000 }],
+        }),
+      );
+
+      const items = await audiobookshelfAdapter.fetchRecentItems(config, {
+        since: new Date(0),
+        libraryIds: ["lib1"],
+      });
+
+      expect(items[0]?.externalUrl).toBe("http://abs.local:13378/item/item1");
+    });
+
+    it("builds the item web link from publicUrl instead of baseUrl when configured", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          results: [{ ...baseItem, id: "item1", addedAt: 1700000000000, updatedAt: 1700000000000 }],
+        }),
+      );
+
+      const publicConfig: SourceConnectionConfig = { ...config, publicUrl: "https://abs.example.com" };
+      const items = await audiobookshelfAdapter.fetchRecentItems(publicConfig, {
+        since: new Date(0),
+        libraryIds: ["lib1"],
+      });
+
+      expect(items[0]?.externalUrl).toBe("https://abs.example.com/item/item1");
+    });
+  });
 });
 
 describe("fetchImageBytes", () => {

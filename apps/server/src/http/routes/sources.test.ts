@@ -149,6 +149,92 @@ describe("POST /sources", () => {
     expect(body.source.credentialsEncrypted).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain("secret-key");
   });
+
+  it("accepts an optional publicUrl and persists it", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "Living Room Tautulli",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local:8181",
+        publicUrl: "https://plex.example.com",
+        credentials: { apiKey: "secret-key" },
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().source.publicUrl).toBe("https://plex.example.com");
+  });
+
+  it("creates a source with no publicUrl set", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "Living Room Tautulli",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local:8181",
+        credentials: { apiKey: "secret-key" },
+      },
+    });
+
+    expect(response.json().source.publicUrl).toBeNull();
+  });
+
+  it("rejects a publicUrl that isn't a valid URL", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "x",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local",
+        publicUrl: "not-a-url",
+        credentials: {},
+      },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  // publicUrl flows into every adapter's per-item link construction and
+  // from there into a sent email's <a href> — a javascript:/data: URL
+  // here would reach the same place an untrusted source's own malicious
+  // content could, so it's rejected at the API boundary the same way.
+  it("rejects a javascript: publicUrl", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "x",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local",
+        publicUrl: "javascript:alert(1)",
+        credentials: {},
+      },
+    });
+    expect(response.statusCode).toBe(400);
+  });
+
+  it("rejects a data: publicUrl", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "x",
+        kind: "tautulli",
+        baseUrl: "http://tautulli.local",
+        publicUrl: "data:text/html,<script>alert(1)</script>",
+        credentials: {},
+      },
+    });
+    expect(response.statusCode).toBe(400);
+  });
 });
 
 describe("full source lifecycle", () => {
@@ -281,6 +367,30 @@ describe("full source lifecycle", () => {
       baseUrl: "http://tautulli2.local:8181",
       kind: "tautulli",
     });
+  });
+
+  it("sets and then clears publicUrl on update", async () => {
+    const id = await createSource();
+
+    const setResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/sources/${id}`,
+      cookies: { latestarr_session: sessionCookie },
+      payload: { publicUrl: "https://plex.example.com" },
+    });
+    expect(setResponse.statusCode).toBe(200);
+    expect(setResponse.json().source.publicUrl).toBe("https://plex.example.com");
+
+    // An empty string (what a cleared text input submits) resets publicUrl
+    // back to unset rather than being rejected as an invalid URL.
+    const clearResponse = await app.inject({
+      method: "PATCH",
+      url: `/api/sources/${id}`,
+      cookies: { latestarr_session: sessionCookie },
+      payload: { publicUrl: "" },
+    });
+    expect(clearResponse.statusCode).toBe(200);
+    expect(clearResponse.json().source.publicUrl).toBeNull();
   });
 
   it("re-encrypts credentials on update and the new value reaches the adapter", async () => {

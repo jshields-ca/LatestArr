@@ -279,6 +279,9 @@ importers:
       '@latestarr/config':
         specifier: workspace:*
         version: link:../../config
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.2
       eslint:
         specifier: ^10.10.0
         version: 10.11.0(jiti@2.7.0)

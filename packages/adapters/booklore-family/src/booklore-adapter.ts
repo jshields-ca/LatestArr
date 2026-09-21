@@ -7,11 +7,13 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
+import { isHttpUrl, sameOrigin, trimTrailingSlashes, withOrigin } from "@latestarr/adapter-core";
 import {
   fetchOpdsImage,
   getEntryAuthorName,
   getEntryFormatLabel,
   getEntryImageHref,
+  getEntryPermalinkHref,
   getEntrySummaryText,
   getLibraries,
   getRecentEntries,
@@ -21,7 +23,55 @@ import {
 
 const DEFAULT_FETCH_COUNT = 100;
 
-function mapEntry(entry: OpdsEntry, baseUrl: string): NewItem {
+// The address a recipient's browser should actually open — publicUrl when
+// the source connection has one configured (this server's own baseUrl may
+// be a Tailscale/LAN address), falling back to baseUrl otherwise, which
+// matches this adapter's behavior before externalUrl existed at all (no
+// link rendered) as closely as a same-host link can.
+function resolveWebUrl(config: SourceConnectionConfig): string {
+  return config.publicUrl ?? config.baseUrl;
+}
+
+// An entry's own OPDS permalink (rel="alternate"/"self") is the most
+// specific link this feed can offer, but it's untrusted content from the
+// source server itself — a compromised/malicious OPDS feed could hand back
+// a `javascript:`/`data:` href, and Handlebars' default {{}} escaping
+// (used to render {{externalUrl}}) only guards markup-relevant characters,
+// not URL schemes, so nothing downstream would catch that before it landed
+// in a sent email's <a href>. Anything that doesn't resolve to a navigable
+// http(s) URL is treated the same as "no usable permalink" rather than
+// ever being handed to a template.
+//
+// A permalink that *is* a valid http(s) URL is rebased onto webUrl's
+// origin only when it resolves to baseUrl's own origin — a relative href
+// necessarily does, and so does an absolute one that just happens to
+// repeat the local server's address; both mean "this points at the local
+// server and needs republishing onto the public-facing address". An
+// absolute href that already points at a genuinely different, distinct
+// host (some catalogs point rel="alternate" at a publisher/mirror page,
+// not the local server) is left alone rather than force-rebased into a
+// broken URL with the wrong host and an unrelated path.
+//
+// Falls back to the library root when the entry carries no usable
+// permalink at all (omitted, or rejected by the scheme check above), which
+// is still strictly better than no link.
+function buildExternalUrl(entry: OpdsEntry, baseUrl: string, webUrl: string): string {
+  const permalinkHref = getEntryPermalinkHref(entry);
+  if (permalinkHref) {
+    let resolved: string | undefined;
+    try {
+      resolved = resolveOpdsUrl(baseUrl, permalinkHref);
+    } catch {
+      resolved = undefined;
+    }
+    if (resolved && isHttpUrl(resolved)) {
+      return sameOrigin(resolved, baseUrl) ? withOrigin(resolved, webUrl) : resolved;
+    }
+  }
+  return trimTrailingSlashes(webUrl);
+}
+
+function mapEntry(entry: OpdsEntry, baseUrl: string, webUrl: string): NewItem {
   // See the OpdsEntry["dc:issued"] type comment: this can arrive as a
   // number (e.g. a bare year like 2020) when the source text node is
   // purely numeric, and `new Date(2020)` would misinterpret that as a
@@ -47,6 +97,7 @@ function mapEntry(entry: OpdsEntry, baseUrl: string): NewItem {
     // Basic Auth as the feed itself, which fetchImageBytes below supplies
     // at fetch time rather than embedding it in the URL.
     posterUrl: imageHref ? resolveOpdsUrl(baseUrl, imageHref) : undefined,
+    externalUrl: buildExternalUrl(entry, baseUrl, webUrl),
     raw: entry,
   };
 }
@@ -104,8 +155,9 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
         params.limit ?? DEFAULT_FETCH_COUNT,
       );
 
+      const webUrl = resolveWebUrl(config);
       return entries
-        .map((entry) => mapEntry(entry, config.baseUrl))
+        .map((entry) => mapEntry(entry, config.baseUrl, webUrl))
         .filter((item) => item.addedAt >= params.since);
     },
 

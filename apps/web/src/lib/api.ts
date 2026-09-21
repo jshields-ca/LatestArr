@@ -106,6 +106,7 @@ export interface SourceConnection {
   name: string;
   kind: string;
   baseUrl: string;
+  publicUrl: string | null;
   status: "ok" | "error" | "unconfigured";
   lastCheckedAt: string | null;
   lastError: string | null;
@@ -117,6 +118,7 @@ export interface CreateSourceInput {
   name: string;
   kind: string;
   baseUrl: string;
+  publicUrl?: string;
   credentials: Record<string, string>;
 }
 
@@ -142,7 +144,7 @@ export function createSource(input: CreateSourceInput): Promise<{ source: Source
 
 export function updateSource(
   id: string,
-  input: { name?: string; baseUrl?: string; credentials?: Record<string, string> },
+  input: { name?: string; baseUrl?: string; publicUrl?: string; credentials?: Record<string, string> },
 ): Promise<{ source: SourceConnection }> {
   return apiFetch<{ source: SourceConnection }>(`/sources/${id}`, {
     method: "PATCH",

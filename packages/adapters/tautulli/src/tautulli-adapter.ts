@@ -9,12 +9,14 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, trimTrailingSlashes } from "@latestarr/adapter-core";
 import {
   buildImageProxyUrl,
   fetchImage,
   getHomeStats,
   getLibraries,
   getRecentlyAdded,
+  getServerId,
   type TautulliHomeStatRow,
   type TautulliRecentlyAddedItem,
 } from "./tautulli-client.js";
@@ -101,7 +103,35 @@ function resolvePosterUrl(
   return imagePath ? buildImageProxyUrl(baseUrl, apiKey, imagePath) : undefined;
 }
 
-function mapHomeStatRow(row: TautulliHomeStatRow, baseUrl: string, apiKey: string): NewItem | null {
+// Unlike Plex/Audiobookshelf/RomM, Tautulli's own `baseUrl` is its API
+// host, never a page a recipient should be sent to directly — so unset
+// `publicUrl` here means no usable link at all, not a fallback to
+// `baseUrl` the way every other adapter does. A link built from Tautulli's
+// own API host would look clickable but lead to a broken page, which is
+// worse than the no-link behavior this adapter had before externalUrl
+// existed at all.
+//
+// Builds the per-item deep link once the underlying Plex server's
+// machineIdentifier is known (via Tautulli's own get_server_id); falls
+// back to a plain library-root link (still built from publicUrl, never
+// baseUrl) when the identifier lookup failed.
+function buildExternalUrl(
+  publicUrl: string | undefined,
+  machineIdentifier: string | undefined,
+  ratingKey: string,
+): string | undefined {
+  if (!publicUrl) return undefined;
+  if (machineIdentifier) return buildPlexWebDeepLink(publicUrl, machineIdentifier, ratingKey);
+  return `${trimTrailingSlashes(publicUrl)}/web/index.html`;
+}
+
+function mapHomeStatRow(
+  row: TautulliHomeStatRow,
+  baseUrl: string,
+  apiKey: string,
+  publicUrl: string | undefined,
+  machineIdentifier: string | undefined,
+): NewItem | null {
   const kind = mapHomeStatMediaType(row.media_type);
   if (!kind) return null;
 
@@ -116,6 +146,7 @@ function mapHomeStatRow(row: TautulliHomeStatRow, baseUrl: string, apiKey: strin
     playCount: row.total_plays,
     uniqueViewerCount: row.users_watched,
     posterUrl: resolvePosterUrl(baseUrl, apiKey, row.thumb, row.art),
+    externalUrl: buildExternalUrl(publicUrl, machineIdentifier, row.rating_key),
     raw: row,
   };
 }
@@ -156,6 +187,18 @@ export const tautulliAdapter: SourceAdapter = {
     const sectionIds =
       params.libraryIds && params.libraryIds.length > 0 ? params.libraryIds : [undefined];
 
+    // Only worth looking up when there's a publicUrl to build a link
+    // from at all — buildExternalUrl returns undefined without one
+    // regardless of machineIdentifier, so skipping this call then saves a
+    // request most connections (no publicUrl set) would otherwise pay for
+    // on every fetch. Best-effort when it does run: a failed lookup (e.g.
+    // an older Tautulli version without get_server_id, or a transient
+    // network hiccup) shouldn't fail the whole fetch, just mean every
+    // item's externalUrl falls back to a plain library link.
+    const machineIdentifier = config.publicUrl
+      ? await getServerId(config.baseUrl, apiKey).catch(() => undefined)
+      : undefined;
+
     const results: NewItem[] = [];
     for (const sectionId of sectionIds) {
       const items = await getRecentlyAdded(config.baseUrl, apiKey, count, sectionId);
@@ -195,6 +238,7 @@ export const tautulliAdapter: SourceAdapter = {
             : undefined,
           genres: item.genres,
           posterUrl: resolvePosterUrl(config.baseUrl, apiKey, item.thumb, item.art),
+          externalUrl: buildExternalUrl(config.publicUrl, machineIdentifier, item.rating_key),
           raw: item,
         });
       }
@@ -223,11 +267,15 @@ export const tautulliAdapter: SourceAdapter = {
       ),
     ];
 
+    const machineIdentifier = config.publicUrl
+      ? await getServerId(config.baseUrl, apiKey).catch(() => undefined)
+      : undefined;
+
     const results: NewItem[] = [];
     for (const statId of statIds) {
       const rows = await getHomeStats(config.baseUrl, apiKey, statId, timeRangeDays, limit);
       for (const row of rows) {
-        const item = mapHomeStatRow(row, config.baseUrl, apiKey);
+        const item = mapHomeStatRow(row, config.baseUrl, apiKey, config.publicUrl, machineIdentifier);
         if (!item) continue;
         if (params.mediaKinds && !params.mediaKinds.includes(item.kind)) continue;
         results.push(item);

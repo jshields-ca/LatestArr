@@ -109,6 +109,29 @@ describe("fetchRecentItems", () => {
     expect(items).toEqual([]);
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  describe("externalUrl", () => {
+    it("builds a rom detail link from baseUrl when no publicUrl is configured", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ items: [{ ...baseRom, id: 42, name: "A Game", created_at: "2026-01-01T00:00:00Z" }] }),
+      );
+
+      const items = await rommAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("http://romm.local:3000/rom/42");
+    });
+
+    it("builds the rom detail link from publicUrl instead of baseUrl when configured", async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ items: [{ ...baseRom, id: 42, name: "A Game", created_at: "2026-01-01T00:00:00Z" }] }),
+      );
+
+      const publicConfig: SourceConnectionConfig = { ...config, publicUrl: "https://romm.example.com" };
+      const items = await rommAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("https://romm.example.com/rom/42");
+    });
+  });
 });
 
 describe("fetchImageBytes", () => {

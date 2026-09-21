@@ -35,6 +35,7 @@ const exampleSource = {
   name: "Home Tautulli",
   kind: "tautulli",
   baseUrl: "http://localhost:8181",
+  publicUrl: null,
   status: "unconfigured" as const,
   lastCheckedAt: null,
   lastError: null,
@@ -107,6 +108,37 @@ describe("SourcesPage", () => {
     });
   });
 
+  it("adds a new source with an optional publicUrl", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [] });
+    render(<SourcesPage />);
+    await screen.findByText("No sources yet");
+
+    await user.click(screen.getByRole("button", { name: "Add source" }));
+    const dialog = await screen.findByRole("dialog");
+
+    await user.type(within(dialog).getByLabelText("Name"), "Home Tautulli");
+    await user.type(within(dialog).getByLabelText("Base URL"), "http://localhost:8181");
+    await user.type(within(dialog).getByLabelText("Public URL (optional)"), "https://plex.example.com");
+    await user.type(within(dialog).getByLabelText("Tautulli API key"), "secret-key");
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(201, { source: { ...exampleSource, publicUrl: "https://plex.example.com" } }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Add source" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      name: "Home Tautulli",
+      kind: "tautulli",
+      baseUrl: "http://localhost:8181",
+      publicUrl: "https://plex.example.com",
+      credentials: { apiKey: "secret-key" },
+    });
+  });
+
   it("edits a source's name and base URL without touching credentials", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [exampleSource] });
@@ -134,7 +166,32 @@ describe("SourcesPage", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       name: "Renamed Tautulli",
       baseUrl: "http://localhost:8181",
+      // No publicUrl was ever set on this source and the field was left
+      // blank, so it's still sent (always included on save) but as an
+      // empty string rather than omitted.
+      publicUrl: "",
     });
+  });
+
+  it("edits a source's publicUrl and can clear it back out", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [{ ...exampleSource, publicUrl: "https://plex.example.com" }] });
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    await user.click(screen.getByRole("button", { name: "Edit Home Tautulli" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Public URL (optional)")).toHaveValue("https://plex.example.com");
+
+    await user.clear(within(dialog).getByLabelText("Public URL (optional)"));
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { source: { ...exampleSource, publicUrl: null } }));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ publicUrl: "" });
   });
 
   it("rejects partially-filled credentials on edit rather than sending an incomplete replace", async () => {
