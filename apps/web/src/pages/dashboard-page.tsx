@@ -388,7 +388,12 @@ export function DashboardPage() {
         {showFullChecklist ? checklistCard : checklistSummary}
 
         {requiredDone ? (
-          <Card>
+          // A tertiary-tinted glass surface (see the "Tertiary" note in
+          // index.css) — a deliberate accent for this one secondary-info
+          // panel (recent activity, not an action) so it reads as
+          // distinct from the actionable checklist card beside it,
+          // without competing with the rose-primary stat tiles above.
+          <Card className="border-tertiary/20 bg-tertiary/[0.04] backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Recent sends</CardTitle>
             </CardHeader>
