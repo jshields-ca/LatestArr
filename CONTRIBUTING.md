@@ -92,6 +92,14 @@ LatestArr follows [Semantic Versioning](https://semver.org/) and keeps a [Keep a
   2. For any release that touched `apps/web`, add a **Highlights** section with a screenshot or two of what's new below the theme line — the bullets say what changed, a screenshot shows it. Manual step; no tooling for it.
   3. Do a **quick full docs pass** — `README.md` (feature list, supported-sources table, screenshots), `CONTRIBUTING.md`, and anything under `docs/` — for anything the release makes stale, not just files the release's own PRs happened to touch.
 
+## Testing in-progress work without a release
+
+`ghcr.io/jshields-ca/latestarr:dev` is a floating image rebuilt on every push to the `dev` branch (`.github/workflows/dev-image.yml`), separate from the tagged `:latest`/`:vX.Y.Z` images `release.yml` cuts. It exists so in-progress work can be pulled onto a real box without going through the version/changelog/GitHub Release flow above.
+
+- To test a change: merge or push it onto `dev`, wait for the workflow to publish the image, then on the test box set `LATESTARR_VERSION=dev` in `.env` and `docker compose pull && docker compose up -d`. Existing `latestarr-data` volumes/appdata work unchanged — this only swaps the image tag.
+- `dev` is a working branch, not a release channel — it isn't kept in sync with `main` automatically and can be force-pushed or rebuilt from `main` at any time. Don't point a production instance at `:dev`.
+- Switch back to a real release with `LATESTARR_VERSION=latest` (or a pinned `vX.Y.Z`) and pull again.
+
 ## Reporting bugs / requesting features
 
 Use the issue templates (Bug report / Feature request / Adapter request) — they ask for the details needed to reproduce or evaluate the request. Please search existing issues first to avoid duplicates.
