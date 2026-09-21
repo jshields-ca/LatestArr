@@ -44,9 +44,9 @@ const DEFAULT_MJML_TEMPLATE = `
         {{#each items}}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
         <tr>
-        {{#if posterUrl}}<td width="80" style="vertical-align:top;padding-right:12px;"><img src="{{posterUrl}}" width="80" alt="{{title}} cover art" style="display:block;width:80px;max-width:80px;border-radius:6px;" /></td>{{/if}}
+        {{#if posterUrl}}<td width="80" style="vertical-align:top;padding-right:12px;">{{#if externalUrl}}<a href="{{externalUrl}}">{{/if}}<img src="{{posterUrl}}" width="80" alt="{{title}} cover art" style="display:block;width:80px;max-width:80px;border-radius:6px;" />{{#if externalUrl}}</a>{{/if}}</td>{{/if}}
         <td style="vertical-align:top;font-family:sans-serif;">
-          <div style="font-weight:600;font-size:16px;color:#0f172a;">{{title}}{{#if contentLabel}} <span style="display:inline-block;font-size:10px;font-weight:600;color:${ACCENT_COLOR};border:1px solid ${ACCENT_COLOR};border-radius:4px;padding:1px 5px;vertical-align:middle;">{{contentLabel}}</span>{{/if}}</div>
+          <div style="font-weight:600;font-size:16px;color:#0f172a;">{{#if externalUrl}}<a href="{{externalUrl}}" style="color:inherit;text-decoration:none;">{{title}}</a>{{else}}{{title}}{{/if}}{{#if contentLabel}} <span style="display:inline-block;font-size:10px;font-weight:600;color:${ACCENT_COLOR};border:1px solid ${ACCENT_COLOR};border-radius:4px;padding:1px 5px;vertical-align:middle;">{{contentLabel}}</span>{{/if}}</div>
           {{#if subtitle}}<div style="color:#64748b;font-size:13px;">{{subtitle}}</div>{{/if}}
           <div style="font-size:12px;font-weight:600;color:${ACCENT_COLOR};margin-top:2px;">{{#if runtimeFormatted}}{{runtimeFormatted}}{{/if}}{{#if pageCount}}{{pageCount}} pages{{/if}}{{#if durationFormatted}}{{durationFormatted}}{{/if}}{{#if platform}}{{platform}}{{/if}}{{#if rating}} · {{rating}}{{/if}}</div>
           {{#if overview}}<div style="font-size:13px;color:#334155;margin-top:4px;">{{overview}}</div>{{/if}}

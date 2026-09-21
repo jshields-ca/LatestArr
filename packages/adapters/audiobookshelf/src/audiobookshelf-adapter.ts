@@ -9,6 +9,7 @@ import type {
 } from "@latestarr/adapter-core";
 import {
   buildCoverUrl,
+  buildItemWebUrl,
   fetchImage,
   getLibraries,
   getLibraryItems,
@@ -26,7 +27,7 @@ function mapContentLabel(mediaType: string): string {
   return mediaType === "podcast" ? "Podcast" : "Audiobook";
 }
 
-function mapItem(item: AudiobookshelfLibraryItem, baseUrl: string, token: string): NewItem {
+function mapItem(item: AudiobookshelfLibraryItem, baseUrl: string, token: string, webUrl: string): NewItem {
   const metadata = item.media.metadata;
   return {
     id: item.id,
@@ -39,6 +40,7 @@ function mapItem(item: AudiobookshelfLibraryItem, baseUrl: string, token: string
     addedAt: new Date(item.addedAt),
     releaseDate: metadata.publishedYear ? new Date(metadata.publishedYear) : undefined,
     posterUrl: item.media.coverPath ? buildCoverUrl(baseUrl, token, item.id) : undefined,
+    externalUrl: buildItemWebUrl(webUrl, item.id),
     raw: item,
   };
 }
@@ -84,11 +86,13 @@ export const audiobookshelfAdapter: SourceAdapter = {
         ? params.libraryIds
         : (await getLibraries(config.baseUrl, token)).map((library) => library.id);
 
+    const webUrl = config.publicUrl ?? config.baseUrl;
+
     const results: NewItem[] = [];
     for (const libraryId of libraryIds) {
       const items = await getLibraryItems(config.baseUrl, token, libraryId, count);
       for (const item of items) {
-        const mapped = mapItem(item, config.baseUrl, token);
+        const mapped = mapItem(item, config.baseUrl, token, webUrl);
         if (mapped.addedAt >= params.since) {
           results.push(mapped);
         }

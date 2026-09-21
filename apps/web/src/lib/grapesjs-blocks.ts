@@ -156,10 +156,12 @@ function mediaListCardBody(contentType: string): string {
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">\n` +
     `<tr>\n` +
     `{{#if posterUrl}}<td width="80" style="vertical-align:top;padding-right:12px;">` +
+    `{{#if externalUrl}}<a href="{{externalUrl}}">{{/if}}` +
     `<img src="{{posterUrl}}" width="80" alt="{{title}} cover art" style="display:block;width:80px;max-width:80px;border-radius:6px;" />` +
+    `{{#if externalUrl}}</a>{{/if}}` +
     `</td>{{/if}}\n` +
     `<td style="vertical-align:top;font-family:sans-serif;">\n` +
-    `  <div style="font-weight:600;font-size:16px;color:#0f172a;">{{title}}${CONTENT_LABEL_BADGE}</div>\n` +
+    `  <div style="font-weight:600;font-size:16px;color:#0f172a;">{{#if externalUrl}}<a href="{{externalUrl}}" style="color:inherit;text-decoration:none;">{{title}}</a>{{else}}{{title}}{{/if}}${CONTENT_LABEL_BADGE}</div>\n` +
     `  {{#if subtitle}}<div style="color:#64748b;font-size:13px;">{{subtitle}}</div>{{/if}}\n` +
     `  <div style="font-size:12px;font-weight:600;color:${ACCENT_COLOR};margin-top:2px;">${metaLine}{{#if rating}} · {{rating}}{{/if}}</div>\n` +
     `  {{#if overview}}<div style="font-size:13px;color:#334155;margin-top:4px;">{{overview}}</div>{{/if}}\n` +

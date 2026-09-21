@@ -7,11 +7,11 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { fetchImage, getPlatforms, getRoms, type RommRom } from "./romm-client.js";
+import { buildRomWebUrl, fetchImage, getPlatforms, getRoms, type RommRom } from "./romm-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
 
-function mapRom(rom: RommRom): NewItem {
+function mapRom(rom: RommRom, webUrl: string): NewItem {
   return {
     id: String(rom.id),
     externalId: String(rom.id),
@@ -21,6 +21,7 @@ function mapRom(rom: RommRom): NewItem {
     overview: rom.summary ?? undefined,
     addedAt: new Date(rom.created_at),
     posterUrl: rom.url_cover ?? undefined,
+    externalUrl: buildRomWebUrl(webUrl, rom.id),
     raw: rom,
   };
 }
@@ -64,7 +65,8 @@ export const rommAdapter: SourceAdapter = {
       params.libraryIds,
     );
 
-    return roms.map(mapRom).filter((item) => item.addedAt >= params.since);
+    const webUrl = config.publicUrl ?? config.baseUrl;
+    return roms.map((rom) => mapRom(rom, webUrl)).filter((item) => item.addedAt >= params.since);
   },
 
   // config is unused — url_cover is RomM's own public static asset URL, no

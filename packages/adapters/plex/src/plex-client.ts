@@ -104,6 +104,18 @@ async function callPlex<T>(
   return body.MediaContainer;
 }
 
+// The Plex Media Server's own permanent identifier, used to build a Plex
+// web app deep link — {webUrl}/web/index.html#!/server/{machineIdentifier}
+// /details?key=... — which needs to name *which* server the item lives on
+// even once the browser is pointed at plex.tv/desktop rather than at the
+// server directly. /identity is unauthenticated on a real Plex server, but
+// the token is sent anyway (harmless) so this can reuse buildUrl/callPlex
+// like every other request here.
+export async function getServerIdentity(baseUrl: string, token: string): Promise<string | undefined> {
+  const container = await callPlex<{ machineIdentifier?: string }>(baseUrl, "/identity", token);
+  return container.machineIdentifier;
+}
+
 export async function getLibraries(baseUrl: string, token: string): Promise<PlexLibrary[]> {
   const container = await callPlex<{ Directory?: PlexLibrary[] }>(baseUrl, "/library/sections", token);
   return container.Directory ?? [];

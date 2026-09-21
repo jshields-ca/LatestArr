@@ -9,12 +9,14 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, trimTrailingSlashes } from "@latestarr/adapter-core";
 import {
   buildImageProxyUrl,
   fetchImage,
   getHomeStats,
   getLibraries,
   getRecentlyAdded,
+  getServerId,
   type TautulliHomeStatRow,
   type TautulliRecentlyAddedItem,
 } from "./tautulli-client.js";
@@ -88,7 +90,37 @@ function resolvePosterUrl(
   return imagePath ? buildImageProxyUrl(baseUrl, apiKey, imagePath) : undefined;
 }
 
-function mapHomeStatRow(row: TautulliHomeStatRow, baseUrl: string, apiKey: string): NewItem | null {
+// The address a recipient's browser should actually open — publicUrl when
+// the source connection has one configured (this matters *more* for
+// Tautulli than for Plex itself: baseUrl here is Tautulli's own API host,
+// never something a recipient should be sent to directly, so publicUrl is
+// expected to carry the underlying Plex server's actual reachable address).
+// Falling back to baseUrl still matches this adapter's pre-existing
+// behavior of never rendering a link at all — a plain link built from
+// Tautulli's own host is a strictly better fallback than nothing.
+function resolveWebUrl(config: SourceConnectionConfig): string {
+  return config.publicUrl ?? config.baseUrl;
+}
+
+// Builds the per-item deep link once the underlying Plex server's
+// machineIdentifier is known (via Tautulli's own get_server_id); falls
+// back to a plain library-root link when it couldn't be fetched.
+function buildExternalUrl(
+  webUrl: string,
+  machineIdentifier: string | undefined,
+  ratingKey: string,
+): string {
+  if (machineIdentifier) return buildPlexWebDeepLink(webUrl, machineIdentifier, ratingKey);
+  return `${trimTrailingSlashes(webUrl)}/web/index.html`;
+}
+
+function mapHomeStatRow(
+  row: TautulliHomeStatRow,
+  baseUrl: string,
+  apiKey: string,
+  webUrl: string,
+  machineIdentifier: string | undefined,
+): NewItem | null {
   const kind = mapHomeStatMediaType(row.media_type);
   if (!kind) return null;
 
@@ -103,6 +135,7 @@ function mapHomeStatRow(row: TautulliHomeStatRow, baseUrl: string, apiKey: strin
     playCount: row.total_plays,
     uniqueViewerCount: row.users_watched,
     posterUrl: resolvePosterUrl(baseUrl, apiKey, row.thumb, row.art),
+    externalUrl: buildExternalUrl(webUrl, machineIdentifier, row.rating_key),
     raw: row,
   };
 }
@@ -143,6 +176,13 @@ export const tautulliAdapter: SourceAdapter = {
     const sectionIds =
       params.libraryIds && params.libraryIds.length > 0 ? params.libraryIds : [undefined];
 
+    // Fetched once per call, best-effort — a failed lookup (e.g. an older
+    // Tautulli version without get_server_id, or a transient network
+    // hiccup) shouldn't fail the whole fetch, just mean every item's
+    // externalUrl falls back to a plain library link.
+    const webUrl = resolveWebUrl(config);
+    const machineIdentifier = await getServerId(config.baseUrl, apiKey).catch(() => undefined);
+
     const results: NewItem[] = [];
     for (const sectionId of sectionIds) {
       const items = await getRecentlyAdded(config.baseUrl, apiKey, count, sectionId);
@@ -175,6 +215,7 @@ export const tautulliAdapter: SourceAdapter = {
             : undefined,
           genres: item.genres,
           posterUrl: resolvePosterUrl(config.baseUrl, apiKey, item.thumb, item.art),
+          externalUrl: buildExternalUrl(webUrl, machineIdentifier, item.rating_key),
           raw: item,
         });
       }
@@ -203,11 +244,14 @@ export const tautulliAdapter: SourceAdapter = {
       ),
     ];
 
+    const webUrl = resolveWebUrl(config);
+    const machineIdentifier = await getServerId(config.baseUrl, apiKey).catch(() => undefined);
+
     const results: NewItem[] = [];
     for (const statId of statIds) {
       const rows = await getHomeStats(config.baseUrl, apiKey, statId, timeRangeDays, limit);
       for (const row of rows) {
-        const item = mapHomeStatRow(row, config.baseUrl, apiKey);
+        const item = mapHomeStatRow(row, config.baseUrl, apiKey, webUrl, machineIdentifier);
         if (!item) continue;
         if (params.mediaKinds && !params.mediaKinds.includes(item.kind)) continue;
         results.push(item);

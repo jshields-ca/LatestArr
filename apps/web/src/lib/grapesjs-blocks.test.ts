@@ -58,6 +58,16 @@ describe("the media-list component's toHTML card markup", () => {
     expect(html).toContain("{{#mediaList contentType=\"movie\"");
   });
 
+  it("wraps the title and poster in an {{#if externalUrl}}-guarded <a> so an item with no per-item link still renders plain text/image", () => {
+    const model = getModelDefinition();
+    const html = (model.toHTML as (this: unknown) => string).call(fakeComponent("movie"));
+
+    expect(html).toContain('{{#if externalUrl}}<a href="{{externalUrl}}">{{/if}}<img');
+    expect(html).toContain(
+      '{{#if externalUrl}}<a href="{{externalUrl}}" style="color:inherit;text-decoration:none;">{{title}}</a>{{else}}{{title}}{{/if}}',
+    );
+  });
+
   it("wraps its <table> markup in <mj-raw> so MJML's compiler passes it through instead of silently dropping it", () => {
     // Regression test: this component's parent in the exported MJML is
     // always an <mj-column>, which MJML's compiler only accepts its own

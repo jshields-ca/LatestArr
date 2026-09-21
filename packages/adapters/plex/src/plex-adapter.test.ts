@@ -17,6 +17,13 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body };
 }
 
+// fetchRecentItems fetches /identity once, before looping over sections, to
+// resolve the machineIdentifier a per-item deep link needs — every test
+// below that exercises fetchRecentItems queues this response first.
+function mockIdentity(machineIdentifier: string | undefined = "srv-abc123") {
+  mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: { machineIdentifier } }));
+}
+
 const config: SourceConnectionConfig = {
   baseUrl: "http://plex.local:32400",
   credentials: { token: "tok123" },
@@ -65,6 +72,7 @@ describe("fetchRecentItems", () => {
   };
 
   it("maps movie/episode items and skips unmapped media types", async () => {
+    mockIdentity();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -98,6 +106,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("falls back to the bare episode title/no subtitle when Plex gives no grandparentTitle", async () => {
+    mockIdentity();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -113,6 +122,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("builds an absolute, token-bearing posterUrl from a relative thumb path", async () => {
+    mockIdentity();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -137,6 +147,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("omits posterUrl when Plex gives no thumb", async () => {
+    mockIdentity();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -150,6 +161,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("filters out items added before the since cutoff", async () => {
+    mockIdentity();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -168,6 +180,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("filters by mediaKinds when provided", async () => {
+    mockIdentity();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -189,6 +202,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("issues one request per library id and merges the results", async () => {
+    mockIdentity();
     mockFetch
       .mockResolvedValueOnce(
         jsonResponse({
@@ -210,8 +224,54 @@ describe("fetchRecentItems", () => {
       libraryIds: ["1", "2"],
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(items.map((item) => item.externalId).sort()).toEqual(["1", "2"]);
+  });
+
+  describe("externalUrl", () => {
+    it("builds a Plex web deep link from baseUrl when no publicUrl is configured", async () => {
+      mockIdentity("srv-abc123");
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "42", type: "movie", addedAt: 1700000000 }] },
+        }),
+      );
+
+      const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe(
+        "http://plex.local:32400/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F42",
+      );
+    });
+
+    it("builds the deep link from publicUrl instead of baseUrl when configured", async () => {
+      mockIdentity("srv-abc123");
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "42", type: "movie", addedAt: 1700000000 }] },
+        }),
+      );
+
+      const publicConfig: SourceConnectionConfig = { ...config, publicUrl: "https://plex.example.com" };
+      const items = await plexAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe(
+        "https://plex.example.com/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F42",
+      );
+    });
+
+    it("falls back to a plain library link when the identity lookup fails", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "42", type: "movie", addedAt: 1700000000 }] },
+        }),
+      );
+
+      const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("http://plex.local:32400/web/index.html");
+    });
   });
 });
 

@@ -77,6 +77,27 @@ export function getEntryImageHref(entry: OpdsEntry): string | undefined {
   return thumbnail?.["@_href"];
 }
 
+// Atom's rel="alternate" is the spec's own convention for "the human-
+// readable page for this entry" (https://validator.w3.org/feed/docs/atom.html#link)
+// — an OPDS feed serving as both the machine catalog and (via this link) a
+// pointer to the same book's page in the source's own web reader. rel="self"
+// is a much weaker fallback (strictly the entry's own Atom XML, not a page
+// meant for a browser) but still resolves to *something* entry-specific
+// rather than falling all the way back to a bare library link.
+const OPDS_ALTERNATE_REL = "alternate";
+const OPDS_SELF_REL = "self";
+
+/** The href of an entry's own permalink, if the feed gives one — see the
+ * rel preference above. Resolve with resolveOpdsUrl before use, the same
+ * as getEntryImageHref's result. */
+export function getEntryPermalinkHref(entry: OpdsEntry): string | undefined {
+  const links = getEntryLinks(entry);
+  const alternate = links.find((link) => link["@_rel"] === OPDS_ALTERNATE_REL);
+  if (alternate?.["@_href"]) return alternate["@_href"];
+  const self = links.find((link) => link["@_rel"] === OPDS_SELF_REL);
+  return self?.["@_href"];
+}
+
 // Comic archive MIME types BookLore/BookOrbit/Grimmory serve their
 // acquisition link as when an entry is a comic rather than a prose ebook.
 const COMIC_MIME_TYPES = new Set([

@@ -21,10 +21,17 @@ function decryptCredentials(row: SelectedSourceConnection): Record<string, strin
   ) as Record<string, string>;
 }
 
+// publicUrl is optional and, unlike baseUrl, allowed to be an empty string
+// — the edit form's "leave blank to use the address above" affordance
+// needs a way to *clear* a previously-set publicUrl back to unset, and an
+// empty string is what a cleared text input submits.
+const publicUrlSchema = z.union([z.url("publicUrl must be a valid URL"), z.literal("")]).optional();
+
 const createSourceSchema = z.object({
   name: z.string().trim().min(1, "name is required"),
   kind: z.string().trim().min(1, "kind is required"),
   baseUrl: z.url("baseUrl must be a valid URL"),
+  publicUrl: publicUrlSchema,
   credentials: z.record(z.string(), z.string()),
 });
 
@@ -33,6 +40,7 @@ const createSourceSchema = z.object({
 const updateSourceSchema = z.object({
   name: z.string().trim().min(1).optional(),
   baseUrl: z.url("baseUrl must be a valid URL").optional(),
+  publicUrl: publicUrlSchema,
   credentials: z.record(z.string(), z.string()).optional(),
 });
 
@@ -50,7 +58,7 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
     scope.post("/sources", async (request, reply) => {
       const body = parseBody(createSourceSchema, request.body, reply);
       if (!body) return reply;
-      const { name, kind, baseUrl, credentials } = body;
+      const { name, kind, baseUrl, publicUrl, credentials } = body;
 
       if (!getAdapter(kind)) {
         return reply.code(400).send({ error: `Unknown source kind: ${kind}` });
@@ -59,7 +67,7 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
       const credentialsEncrypted = encrypt(JSON.stringify(credentials), getEncryptionKey());
       const [row] = await db
         .insert(sourceConnections)
-        .values({ name, kind, baseUrl, credentialsEncrypted })
+        .values({ name, kind, baseUrl, publicUrl: publicUrl || null, credentialsEncrypted })
         .returning();
 
       return reply.code(201).send({ source: sanitize(row!) });
@@ -90,13 +98,14 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
     scope.patch<{ Params: IdParams }>("/sources/:id", async (request, reply) => {
       const body = parseBody(updateSourceSchema, request.body, reply);
       if (!body) return reply;
-      const { name, baseUrl, credentials } = body;
+      const { name, baseUrl, publicUrl, credentials } = body;
 
       const [row] = await db
         .update(sourceConnections)
         .set({
           ...(name !== undefined && { name }),
           ...(baseUrl !== undefined && { baseUrl }),
+          ...(publicUrl !== undefined && { publicUrl: publicUrl || null }),
           ...(credentials !== undefined && {
             credentialsEncrypted: encrypt(JSON.stringify(credentials), getEncryptionKey()),
           }),
@@ -131,6 +140,7 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
 
       const result = await adapter.testConnection({
         baseUrl: row.baseUrl,
+        publicUrl: row.publicUrl ?? undefined,
         credentials: decryptCredentials(row),
       });
 
@@ -162,6 +172,7 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
 
       const libraries = await adapter.listLibraries({
         baseUrl: row.baseUrl,
+        publicUrl: row.publicUrl ?? undefined,
         credentials: decryptCredentials(row),
       });
 

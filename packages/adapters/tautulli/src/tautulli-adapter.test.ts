@@ -17,6 +17,16 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body };
 }
 
+// fetchRecentItems and fetchPopularItems both fetch get_server_id once,
+// before their own item requests, to resolve the underlying Plex server's
+// machineIdentifier a per-item deep link needs — every test below that
+// exercises either queues this response first.
+function mockServerId(pmsIdentifier: string | undefined = "srv-abc123") {
+  mockFetch.mockResolvedValueOnce(
+    jsonResponse({ response: { result: "success", message: null, data: { pms_identifier: pmsIdentifier } } }),
+  );
+}
+
 const config: SourceConnectionConfig = {
   baseUrl: "http://tautulli.local:8181",
   credentials: { apiKey: "key123" },
@@ -73,6 +83,7 @@ describe("fetchRecentItems", () => {
   };
 
   it("maps movie/episode items and skips unmapped media types", async () => {
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -109,6 +120,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("uses the series title and SxxExx when Tautulli gives grandparent/episode info", async () => {
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -140,6 +152,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("maps thumb into a pms_image_proxy posterUrl", async () => {
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -163,6 +176,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("falls back to art when there's no thumb", async () => {
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -182,6 +196,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("filters out items added before the since cutoff", async () => {
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -206,6 +221,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("filters by mediaKinds when provided", async () => {
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -231,6 +247,7 @@ describe("fetchRecentItems", () => {
   });
 
   it("issues one request per library id and merges the results", async () => {
+    mockServerId();
     mockFetch
       .mockResolvedValueOnce(
         jsonResponse({
@@ -264,13 +281,78 @@ describe("fetchRecentItems", () => {
       libraryIds: ["1", "2"],
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(items.map((item) => item.externalId).sort()).toEqual(["1", "2"]);
+  });
+
+  describe("externalUrl", () => {
+    it("builds a Plex web deep link from baseUrl when no publicUrl is configured", async () => {
+      mockServerId("srv-abc123");
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          response: {
+            result: "success",
+            message: null,
+            data: {
+              recently_added: [{ ...baseItem, rating_key: "42", media_type: "movie", added_at: "1700000000" }],
+            },
+          },
+        }),
+      );
+
+      const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe(
+        "http://tautulli.local:8181/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F42",
+      );
+    });
+
+    it("builds the deep link from publicUrl (the real Plex address) instead of Tautulli's own baseUrl", async () => {
+      mockServerId("srv-abc123");
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          response: {
+            result: "success",
+            message: null,
+            data: {
+              recently_added: [{ ...baseItem, rating_key: "42", media_type: "movie", added_at: "1700000000" }],
+            },
+          },
+        }),
+      );
+
+      const publicConfig: SourceConnectionConfig = { ...config, publicUrl: "https://plex.example.com" };
+      const items = await tautulliAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe(
+        "https://plex.example.com/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F42",
+      );
+    });
+
+    it("falls back to a plain library link when get_server_id fails", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          response: {
+            result: "success",
+            message: null,
+            data: {
+              recently_added: [{ ...baseItem, rating_key: "42", media_type: "movie", added_at: "1700000000" }],
+            },
+          },
+        }),
+      );
+
+      const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("http://tautulli.local:8181/web/index.html");
+    });
   });
 });
 
 describe("fetchPopularItems", () => {
   it("maps top_movies rows and requests both movies and TV by default", async () => {
+    mockServerId();
     mockFetch
       .mockResolvedValueOnce(
         jsonResponse({
@@ -303,7 +385,7 @@ describe("fetchPopularItems", () => {
 
     const items = await tautulliAdapter.fetchPopularItems!(config, { since: new Date(0) });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       externalId: "1",
@@ -315,6 +397,7 @@ describe("fetchPopularItems", () => {
   });
 
   it("only queries the stat matching the requested media kind", async () => {
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -337,8 +420,8 @@ describe("fetchPopularItems", () => {
       mediaKinds: ["tv_episode"],
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const calledUrl = new URL(mockFetch.mock.calls[1]![0] as string);
     expect(calledUrl.searchParams.get("stat_id")).toBe("top_tv");
     expect(items).toHaveLength(1);
     expect(items[0]?.kind).toBe("tv_episode");
@@ -355,8 +438,37 @@ describe("fetchPopularItems", () => {
       mediaKinds: ["movie"],
     });
 
-    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    // calls[0] is the get_server_id lookup — the home_stats request (the
+    // one that actually carries time_range) is the one after it.
+    const calledUrl = new URL(mockFetch.mock.calls[1]![0] as string);
     expect(calledUrl.searchParams.get("time_range")).toBe("7");
+  });
+
+  it("sets externalUrl on popular items using the same deep-link construction as fetchRecentItems", async () => {
+    mockServerId("srv-abc123");
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [
+            {
+              stat_id: "top_movies",
+              rows: [{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }],
+            },
+          ],
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchPopularItems!(config, {
+      since: new Date(0),
+      mediaKinds: ["movie"],
+    });
+
+    expect(items[0]?.externalUrl).toBe(
+      "http://tautulli.local:8181/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F1",
+    );
   });
 });
 

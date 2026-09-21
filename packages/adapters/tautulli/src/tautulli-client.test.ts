@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildImageProxyUrl, fetchImage, getHomeStats, getLibraries, getRecentlyAdded } from "./tautulli-client.js";
+import {
+  buildImageProxyUrl,
+  fetchImage,
+  getHomeStats,
+  getLibraries,
+  getRecentlyAdded,
+  getServerId,
+} from "./tautulli-client.js";
 
 const mockFetch = vi.fn();
 
@@ -62,6 +69,37 @@ describe("getLibraries", () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, false, 500));
 
     await expect(getLibraries("http://tautulli.local:8181", "key123")).rejects.toThrow("HTTP 500");
+  });
+});
+
+describe("getServerId", () => {
+  it("returns the underlying Plex server's pms_identifier", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: { result: "success", message: null, data: { pms_identifier: "srv-abc123" } },
+      }),
+    );
+
+    const machineIdentifier = await getServerId("http://tautulli.local:8181", "key123");
+
+    expect(machineIdentifier).toBe("srv-abc123");
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.searchParams.get("cmd")).toBe("get_server_id");
+  });
+
+  it("returns undefined when the response has no pms_identifier", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "success", message: null, data: {} } }),
+    );
+    const machineIdentifier = await getServerId("http://tautulli.local:8181", "key123");
+    expect(machineIdentifier).toBeUndefined();
+  });
+
+  it("throws when Tautulli reports an error result", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "error", message: "Invalid apikey", data: null } }),
+    );
+    await expect(getServerId("http://tautulli.local:8181", "bad-key")).rejects.toThrow("Invalid apikey");
   });
 });
 

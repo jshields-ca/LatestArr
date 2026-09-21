@@ -76,6 +76,14 @@ export function buildCoverUrl(baseUrl: string, token: string, itemId: string): s
   return buildUrl(baseUrl, `/api/items/${itemId}/cover`, { token }).toString();
 }
 
+// Audiobookshelf's web client resolves a library item's detail page at this
+// route (no auth needed in the URL itself — the app's own session/login
+// handles that once opened in a browser), unlike the API/cover URLs above
+// which need a token to be fetched directly.
+export function buildItemWebUrl(webUrl: string, itemId: string): string {
+  return `${trimTrailingSlashes(webUrl)}/item/${itemId}`;
+}
+
 // resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
 // awaits every referenced item's image via Promise.all, so a source that's
 // gone unreachable in a way that just hangs (rather than erroring — no

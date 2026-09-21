@@ -152,7 +152,18 @@ async function createNewsletter(smtpProfileId?: string) {
   return response.json().newsletter.id as string;
 }
 
+// The Tautulli adapter's fetchRecentItems/fetchPopularItems each fetch
+// get_server_id once (to build a per-item Plex deep link) before their own
+// item request — every mock sequence below that exercises either queues
+// this response first.
+function mockServerId() {
+  mockFetch.mockResolvedValueOnce(
+    jsonResponse({ response: { result: "success", message: null, data: { pms_identifier: "srv-abc123" } } }),
+  );
+}
+
 function mockRecentlyAdded() {
+  mockServerId();
   mockFetch.mockResolvedValueOnce(
     jsonResponse({
       response: {
@@ -403,8 +414,11 @@ describe("POST /newsletters/:id/send-now", () => {
     );
 
     // Simulates the real "fetch failed" (ECONNREFUSED-style) error a
-    // genuinely unreachable source produces.
-    mockFetch.mockRejectedValueOnce(new TypeError("fetch failed"));
+    // genuinely unreachable source produces — mockRejectedValue (not
+    // -Once) so it's genuinely unreachable for every call the adapter
+    // makes, since the first (get_server_id) is caught and swallowed
+    // internally as a best-effort lookup rather than a fatal failure.
+    mockFetch.mockRejectedValue(new TypeError("fetch failed"));
 
     const response = await app.inject(
       authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
@@ -533,7 +547,9 @@ describe("POST /newsletters/:id/send-now", () => {
     );
 
     mockRecentlyAdded();
-    // fetchPopularItems queries top_movies and top_tv separately.
+    // fetchPopularItems also does its own get_server_id lookup, then
+    // queries top_movies and top_tv separately.
+    mockServerId();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {

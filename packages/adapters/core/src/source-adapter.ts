@@ -55,6 +55,15 @@ export interface SourceLibrary {
 
 export interface SourceConnectionConfig {
   baseUrl: string;
+  /** The user-reachable address for this source, when it differs from
+   * baseUrl (the address an adapter's own API calls target) — e.g.
+   * Tautulli's baseUrl is its own API host, not a Plex-watchable URL, and a
+   * RomM/Plex baseUrl may be a Tailscale/LAN address unreachable by an
+   * email recipient on another network. An adapter that builds a per-item
+   * NewItem.externalUrl should build it from `publicUrl ?? baseUrl`, so a
+   * connection with no publicUrl set keeps building links from baseUrl —
+   * today's behavior for a fully-public single-server setup. */
+  publicUrl?: string;
   credentials: Record<string, string>;
   options?: Record<string, unknown>;
 }

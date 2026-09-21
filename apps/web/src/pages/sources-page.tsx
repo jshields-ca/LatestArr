@@ -146,6 +146,16 @@ function OpdsHint({ id, label }: { id: string; label: string }) {
   );
 }
 
+function PublicUrlHint({ id }: { id: string }) {
+  return (
+    <p id={id} className="text-xs text-muted-foreground">
+      The address your recipients can actually reach — leave blank to use the address above. Useful when
+      the address above is internal-only (e.g. a Tailscale IP or an API host like Tautulli that isn&apos;t
+      itself the link you want people to click).
+    </p>
+  );
+}
+
 function StatusBadge({ status }: { status: SourceConnection["status"] }) {
   if (status === "ok") return <Badge variant="success" dot>Connected</Badge>;
   if (status === "error") return <Badge variant="destructive">Error</Badge>;
@@ -162,6 +172,7 @@ function AddSourceDialog({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [publicUrl, setPublicUrl] = useState("");
   const [kind, setKind] = useState(kinds[0] ?? "tautulli");
   const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -172,6 +183,7 @@ function AddSourceDialog({
   function reset() {
     setName("");
     setBaseUrl("");
+    setPublicUrl("");
     setKind(kinds[0] ?? "tautulli");
     setCredentialValues({});
     setError(null);
@@ -191,6 +203,7 @@ function AddSourceDialog({
         name,
         kind,
         baseUrl,
+        ...(publicUrl.trim() && { publicUrl: publicUrl.trim() }),
         credentials: credentialValues,
       });
       onCreated(source);
@@ -265,6 +278,19 @@ function AddSourceDialog({
               disabled={submitting}
             />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="source-public-url">Public URL (optional)</Label>
+            <Input
+              id="source-public-url"
+              type="url"
+              placeholder="https://plex.example.com"
+              value={publicUrl}
+              onChange={(e) => setPublicUrl(e.target.value)}
+              disabled={submitting}
+              aria-describedby="source-public-url-hint"
+            />
+            <PublicUrlHint id="source-public-url-hint" />
+          </div>
           {config.fields.map((field) => (
             <div className="flex flex-col gap-1.5" key={field.key}>
               <Label htmlFor={`source-field-${field.key}`}>{field.label}</Label>
@@ -311,6 +337,7 @@ function EditSourceDialog({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(source.name);
   const [baseUrl, setBaseUrl] = useState(source.baseUrl);
+  const [publicUrl, setPublicUrl] = useState(source.publicUrl ?? "");
   const [credentialValues, setCredentialValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -322,6 +349,7 @@ function EditSourceDialog({
     if (next) {
       setName(source.name);
       setBaseUrl(source.baseUrl);
+      setPublicUrl(source.publicUrl ?? "");
       setCredentialValues({});
       setError(null);
     }
@@ -345,6 +373,7 @@ function EditSourceDialog({
       const { source: updated } = await updateSource(source.id, {
         name,
         baseUrl,
+        publicUrl: publicUrl.trim(),
         ...(filledCount > 0 && { credentials: credentialValues }),
       });
       onSaved(updated);
@@ -390,6 +419,19 @@ function EditSourceDialog({
               onChange={(e) => setBaseUrl(e.target.value)}
               disabled={submitting}
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`edit-source-public-url-${source.id}`}>Public URL (optional)</Label>
+            <Input
+              id={`edit-source-public-url-${source.id}`}
+              type="url"
+              placeholder="https://plex.example.com"
+              value={publicUrl}
+              onChange={(e) => setPublicUrl(e.target.value)}
+              disabled={submitting}
+              aria-describedby={`edit-source-public-url-hint-${source.id}`}
+            />
+            <PublicUrlHint id={`edit-source-public-url-hint-${source.id}`} />
           </div>
           {config.fields.map((field) => (
             <div className="flex flex-col gap-1.5" key={field.key}>

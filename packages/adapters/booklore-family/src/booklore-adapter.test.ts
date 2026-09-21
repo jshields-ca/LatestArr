@@ -111,8 +111,79 @@ describe("fetchRecentItems", () => {
       overview: "A newer book.",
       contentLabel: "Ebook",
       posterUrl: "http://booklore.local:6060/api/v1/opds/cover/book-new",
+      // No rel="alternate"/"self" link on this entry, so externalUrl falls
+      // back to the library root built from baseUrl (no publicUrl here).
+      externalUrl: "http://booklore.local:6060",
     });
     expect(items[0]?.releaseDate?.getFullYear()).toBe(2020);
+  });
+
+  describe("externalUrl", () => {
+    const feedWithPermalink = (linkTag: string) => `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>urn:uuid:recent</id>
+  <title>Recently Added</title>
+  <updated>2026-01-20T00:00:00Z</updated>
+  <entry>
+    <title>Linked Book</title>
+    <id>urn:uuid:book-linked</id>
+    <updated>2026-01-15T00:00:00Z</updated>
+    ${linkTag}
+  </entry>
+</feed>`;
+
+    it("prefers rel=\"alternate\" over rel=\"self\" and resolves it against baseUrl", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(
+          feedWithPermalink(
+            `<link rel="self" href="/api/v1/opds/entry/book-linked"/>` +
+              `<link rel="alternate" href="/reader/book-linked" type="text/html"/>`,
+          ),
+        ),
+      );
+
+      const items = await bookloreAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("http://booklore.local:6060/reader/book-linked");
+    });
+
+    it("falls back to rel=\"self\" when there's no rel=\"alternate\"", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(feedWithPermalink(`<link rel="self" href="/api/v1/opds/entry/book-linked"/>`)),
+      );
+
+      const items = await bookloreAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("http://booklore.local:6060/api/v1/opds/entry/book-linked");
+    });
+
+    it("rebases the permalink onto publicUrl's origin instead of baseUrl's when configured", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(feedWithPermalink(`<link rel="alternate" href="/reader/book-linked" type="text/html"/>`)),
+      );
+
+      const publicConfig: SourceConnectionConfig = {
+        ...config,
+        publicUrl: "https://books.example.com",
+      };
+      const items = await bookloreAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+
+      expect(items[0]?.externalUrl).toBe("https://books.example.com/reader/book-linked");
+    });
+
+    it("falls back to the (public, when configured) library root when the entry has no permalink at all", async () => {
+      mockFetch.mockResolvedValueOnce(xmlResponse(RECENT_FEED));
+
+      const publicConfig: SourceConnectionConfig = {
+        ...config,
+        publicUrl: "https://books.example.com",
+      };
+      const items = await bookloreAdapter.fetchRecentItems(publicConfig, {
+        since: new Date("2026-01-10T00:00:00Z"),
+      });
+
+      expect(items[0]?.externalUrl).toBe("https://books.example.com");
+    });
   });
 
   it("labels a comic acquisition link as Comic and falls back to Book with no acquisition link", async () => {

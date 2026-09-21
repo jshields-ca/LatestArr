@@ -4,6 +4,7 @@ import {
   getEntryAuthorName,
   getEntryFormatLabel,
   getEntryImageHref,
+  getEntryPermalinkHref,
   getEntrySummaryText,
   getLibraries,
   getRecentEntries,
@@ -129,6 +130,34 @@ describe("getEntryImageHref", () => {
 
   it("returns undefined when there's no image link at all", () => {
     expect(getEntryImageHref({ id: "1", title: "Book" })).toBeUndefined();
+  });
+});
+
+describe("getEntryPermalinkHref", () => {
+  it("prefers rel=\"alternate\" over rel=\"self\"", () => {
+    const entry = {
+      id: "1",
+      title: "Book",
+      link: [
+        { "@_rel": "self", "@_href": "/api/v1/opds/entry/1" },
+        { "@_rel": "alternate", "@_href": "/reader/1", "@_type": "text/html" },
+      ],
+    };
+    expect(getEntryPermalinkHref(entry)).toBe("/reader/1");
+  });
+
+  it("falls back to rel=\"self\" when there's no rel=\"alternate\"", () => {
+    const entry = { id: "1", title: "Book", link: { "@_rel": "self", "@_href": "/api/v1/opds/entry/1" } };
+    expect(getEntryPermalinkHref(entry)).toBe("/api/v1/opds/entry/1");
+  });
+
+  it("returns undefined when the entry has neither link", () => {
+    const entry = {
+      id: "1",
+      title: "Book",
+      link: { "@_rel": "http://opds-spec.org/image", "@_href": "/cover/1" },
+    };
+    expect(getEntryPermalinkHref(entry)).toBeUndefined();
   });
 });
 

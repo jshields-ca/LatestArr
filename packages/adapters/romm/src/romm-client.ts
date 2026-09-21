@@ -85,6 +85,13 @@ export async function fetchImage(
   }
 }
 
+// RomM's web frontend resolves a rom's detail page at this route — no auth
+// needed in the URL itself, unlike the /api/... calls this client makes,
+// since opening it in a browser goes through the frontend's own session.
+export function buildRomWebUrl(webUrl: string, romId: number): string {
+  return `${trimTrailingSlashes(webUrl)}/rom/${romId}`;
+}
+
 export async function getPlatforms(baseUrl: string, token: string): Promise<RommPlatform[]> {
   return callRomm<RommPlatform[]>(baseUrl, "/api/platforms", token);
 }

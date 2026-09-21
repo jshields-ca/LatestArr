@@ -129,7 +129,11 @@ async function fetchRecentItemsFromSources(
   const sourceByItem = new Map<NewItem, ItemImageSource>();
 
   for (const { link, source, adapter, credentials } of linkedSources) {
-    const config: SourceConnectionConfig = { baseUrl: source.baseUrl, credentials };
+    const config: SourceConnectionConfig = {
+      baseUrl: source.baseUrl,
+      publicUrl: source.publicUrl ?? undefined,
+      credentials,
+    };
     const sourceItems = await adapter.fetchRecentItems(config, {
       since,
       mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
@@ -154,7 +158,11 @@ async function fetchPopularItemsFromSources(
 
   for (const { link, source, adapter, credentials } of linkedSources) {
     if (!adapter.fetchPopularItems) continue;
-    const config: SourceConnectionConfig = { baseUrl: source.baseUrl, credentials };
+    const config: SourceConnectionConfig = {
+      baseUrl: source.baseUrl,
+      publicUrl: source.publicUrl ?? undefined,
+      credentials,
+    };
     const sourceItems = await adapter.fetchPopularItems(config, {
       since,
       mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
@@ -173,8 +181,12 @@ function buildSourceLinksByContentType(linkedSources: LinkedSource[]): Record<st
   const result: Record<string, string> = {};
   for (const { link, source, adapter } of linkedSources) {
     const kinds = (link.mediaTypeFilter as MediaKind[] | undefined) ?? adapter.capabilities.supportsMediaKinds;
+    // publicUrl (when set) is the address a recipient can actually reach —
+    // baseUrl may be an internal/API-only host (see the source_connections
+    // schema comment), so it's only the fallback here, not the default.
+    const href = source.publicUrl ?? source.baseUrl;
     for (const kind of kinds) {
-      if (!(kind in result)) result[kind] = source.baseUrl;
+      if (!(kind in result)) result[kind] = href;
     }
   }
   return result;

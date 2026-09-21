@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildCoverUrl, fetchImage, getLibraries, getLibraryItems } from "./audiobookshelf-client.js";
+import {
+  buildCoverUrl,
+  buildItemWebUrl,
+  fetchImage,
+  getLibraries,
+  getLibraryItems,
+} from "./audiobookshelf-client.js";
 
 const mockFetch = vi.fn();
 
@@ -69,6 +75,12 @@ describe("buildCoverUrl", () => {
   it("builds an absolute cover URL with the token as a query param", () => {
     const url = buildCoverUrl("http://abs.local:13378", "tok123", "item1");
     expect(url).toBe("http://abs.local:13378/api/items/item1/cover?token=tok123");
+  });
+});
+
+describe("buildItemWebUrl", () => {
+  it("builds an item detail page URL and trims a trailing slash off the web URL", () => {
+    expect(buildItemWebUrl("http://abs.local:13378/", "item1")).toBe("http://abs.local:13378/item/item1");
   });
 });
 
