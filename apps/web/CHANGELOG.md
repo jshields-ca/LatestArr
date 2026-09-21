@@ -1,5 +1,81 @@
 # @latestarr/web
 
+## 0.9.0
+
+### Minor Changes
+
+- f630fd5: **Improved:** Editing a newsletter is now a clear Details/History split — Details holds every configuration field (name, schedule, delivery, subject, and now the Template, Sources, and Recipient groups pickers too), and History shows only its send runs.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that the Template/Sources/Groups pickers lived only in the newsletter row's expanded "accordion" section, separate from the pencil-icon "Edit newsletter" dialog that held name/schedule/lookback/SMTP profile/subject — so a user opening a newsletter to configure it wouldn't find the Template dropdown where they'd expect it, and the accordion looked purely informational.
+
+  Restructures each `NewsletterCard`'s expanded content (`apps/web/src/pages/newsletters-page.tsx`) into a new `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` primitive (`apps/web/src/components/ui/tabs.tsx`, wrapping `@radix-ui/react-tabs` — newly added to `apps/web/package.json`, following the same forwardRef/`cn` wrapping convention as `select.tsx` and `dialog.tsx`) with two tabs: **Details** and **History**. The former "Edit newsletter" dialog is gone — its fields (now `NewsletterDetailsForm`, same `updateNewsletter` call and validation, just rendered inline instead of inside a `Dialog`) live in the Details tab alongside the existing `TemplatePicker`, `LinkedSources`, and `LinkedGroups` components (unchanged). "Send now" stays in Details since it's an action tied to that configuration, not history. History is now just the `SendRunHistoryList`, nothing else. The "Enabled" toggle is untouched by this restructure — it stays on the always-visible collapsed row exactly as before, so it can still be flipped without expanding a newsletter at all. Field ids across the moved-in form are namespaced per newsletter (`newsletter-<id>-name`, etc.) to stay unique with multiple rows expanded at once. Radix's Tabs gives this ARIA `tablist`/`tab`/`tabpanel` roles and roving-focus arrow-key navigation for free, matching the accessibility this app already relies on elsewhere.
+
+  </details>
+
+- 0e4c89a: **New:** Sources now have an optional "Public URL" field, for when a source's own address isn't one you'd want a recipient clicking into — e.g. Tautulli's address is its own API host, not the Plex link people actually want, or a source's address is a Tailscale/LAN address unreachable from outside your network.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Adds a "Public URL (optional)" input to both the Add-source and Edit-source dialogs (`apps/web/src/pages/sources-page.tsx`), right under the existing Base URL field, with helper text explaining when a self-hoster would want it: "The address your recipients can actually reach — leave blank to use the address above. Useful when this source's address above is internal-only (e.g. a Tailscale IP or an API host like Tautulli that isn't itself the link you want people to click)." Wired into the same create/update API calls as `baseUrl` (`createSource`/`updateSource` in `apps/web/src/lib/api.ts`); left blank, it's simply omitted on create and clears any previously-set value on update. Server-side support (the `publicUrl` column and its use in building per-item links) ships alongside this in `@latestarr/server`.
+
+  Also makes items in a GrapesJS-authored Media List block (and the composite "All New (This Period)" block, which reuses the same card markup) clickable: `mediaListCardBody` in `apps/web/src/lib/grapesjs-blocks.ts` now wraps an item's title and poster in `<a href="{{externalUrl}}">` when the rendered item has one, styled to inherit the surrounding title color with no underline, falling back to plain text/image when it doesn't — mirroring the same treatment the default (non-custom) newsletter layout got in `@latestarr/server`.
+
+  </details>
+
+### Patch Changes
+
+- f3bc425: **Improved:** Button hovers and the "Star on GitHub" icon now feel smoother and easier to notice at the same time — a longer, gentler light sweep on buttons, and a clear pop-and-glow on the star when you hover it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that round 1's button animation was "clunky and abrupt" while the GitHub-star hover was "too subtle" — two different problems, not opposite fixes.
+
+  Buttons: the primary variant's hover lift (`button.tsx`) swaps its bouncy `cubic-bezier(0.34, 1.56, 0.64, 1)` easing (56% overshoot) for a gentle spring, `cubic-bezier(0.22, 1.08, 0.36, 1)` (~8% overshoot) at 240ms — enough life to feel intentional without the bounce that read as jittery on a 2px lift. `.btn-glint`'s light-sweep pseudo-element (`index.css`) gets the same easing swap (a pure ease-out-expo curve, `cubic-bezier(0.22, 1, 0.36, 1)`, since a straight-line translateX sweep has no business overshooting) plus a wider/brighter gradient band (30–70% stops instead of 40–60%, 0.45 alpha instead of 0.35) and a longer 0.85s duration (was 0.6s) so it reads as a deliberate, visible sweep rather than a quick flicker.
+
+  GitHub star (`app-shell.tsx`'s `ProjectInfoCard`): previously just `text-amber-500` → `hover:text-amber-400`. Now a `.star-glow` class scales the star up (`scale(1.22)`) and adds a warm amber `drop-shadow` glow on hover/focus, plus a one-shot `.star-glow-intro` keyframe pulse (scale + glow, ~1.1s, 0.5s after mount, `both` fill mode so it never replays) to catch the eye once on first paint without becoming a nagging loop. Both respect `prefers-reduced-motion` (animations/transitions disabled, falling back to a plain color change).
+
+  </details>
+
+- f3bc425: **Fixed:** On pages with little content, the page footer no longer gets pushed off the bottom of the screen behind a wall of empty space — it now sits right after the content, without needing to scroll to find it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that there was "a lot of dead space between the bottom of content and the footer" and that short pages forced a scroll just to reach it. The root cause (`app-shell.tsx`): the content row (`flex-1`, between the sidebar and `<main>`) and the sidebar (`h-[calc(100vh-3.5rem)]`, a viewport-relative fixed height) were both independently forcing that row to be at least one full viewport tall on every page, regardless of how much actual content there was — pushing the footer to just past the fold on every page, not only long ones.
+
+  Fix: drop `flex-1` from the content row and the sidebar's explicit `h-[calc(100vh-3.5rem)]`. The sidebar now sizes via the row's default `align-items: stretch`, so its `border-r` divider still spans the full height of whichever of the sidebar/main is taller on any page with real content — no visual change there. The root `<div>`'s `min-h-screen` is left as-is, so short pages still fill at least one viewport; any leftover space now falls _below_ the footer (ordinary bottom-of-page whitespace) instead of being forced in _above_ it. Verified visually (headless Chromium against the dev build): a minimal page's `document.documentElement.scrollHeight` now equals `window.innerHeight` with no scrollbar, and the footer is visible immediately below the content.
+
+  </details>
+
+- f3bc425: **Improved:** The "LatestArr" wordmark in the header is bigger and plain white/foreground-colored instead of a rose gradient, with "Latest" in bold and "Arr" in a lighter weight for a clearer two-part logo.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that the wordmark's `bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent` treatment (`logo.tsx`) read as too loud next to the mark, and should instead match how the rest of the header's text behaves. Removes the gradient/clip-text entirely in favor of plain `text-foreground`, bumps the size from `text-xl` to `text-2xl` to hold its own next to the mark without the gradient, and splits the text into two `<span>`s — `font-bold` for "Latest", `font-normal` for "Arr" — for a deliberate two-weight wordmark instead of one uniformly-bold word. The `textClassName` prop (used by the login/setup pages for a smaller variant) still overrides the size via `cn`/tailwind-merge on the wrapping span, which the two inner spans inherit.
+
+  </details>
+
+- f3bc425: **Improved:** The tertiary blue accent now shows up in a few more places — a frosted-glass look on the header's version/GitHub cluster and a couple of secondary info panels, and a distinct blue tint on the footer's attribution links — instead of being limited to just the version badge.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Expands the tertiary token (`--tertiary`/`--tertiary-foreground`, see the "Tertiary" note in `index.css`) past its previous badge-only use, per production feedback that it was introduced but under-used. Picked 3 deliberately secondary-info surfaces rather than a global reskin, so it stays an accent, not competing with the rose primary:
+
+  - `ProjectInfoCard` (`app-shell.tsx`, the version/GitHub/Star cluster in both the desktop header and mobile nav sheet): `bg-muted/40` → a translucent tertiary-tinted glass surface (`bg-tertiary/10`, `border-tertiary/25`, `backdrop-blur-sm`), consistent with it sitting inside the already-blurred sticky header.
+  - `AppFooter`: a faint `bg-tertiary/[0.03]` wash and `border-tertiary/15` top border, tying the footer visually to the header's glass cluster.
+  - Dashboard's "Recent sends" card (`dashboard-page.tsx`): `border-tertiary/20 bg-tertiary/[0.04] backdrop-blur-sm`, since it's a secondary activity-feed panel next to the actionable checklist card, not a primary CTA.
+
+  Footer links (`app-shell.tsx`): the author/license/issue-tracker links move from plain `text-muted-foreground` to a new `footerLinkClassName` using `text-tertiary` (with a dimmed `hover:text-tertiary/75`), the same pattern the app's `link` button variant already uses for `text-primary` — reserved for these three secondary links, not applied to the header's own GitHub icon link, which stays muted so the two clusters don't visually clash.
+
+  </details>
+
 ## 0.8.0
 
 ### Minor Changes

@@ -1,5 +1,79 @@
 # @latestarr/server
 
+## 0.9.0
+
+### Minor Changes
+
+- 0e4c89a: **New:** Newsletter items are now clickable — a movie, show, book, audiobook, or game in a sent newsletter links straight to that item on its source (Plex, Tautulli, Audiobookshelf, RomM, or a BookLore-family reader), instead of being plain unlinked text.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Two gaps combined to make nothing in a sent newsletter clickable before this: `sourceConnections` had only one URL column (`baseUrl`), used both for an adapter's own API calls and as the one place a link was ever rendered (the Media List block's `emptyFallback="link"` fallback) — which breaks for Tautulli (`baseUrl` is the Tautulli API host, not a Plex-watchable URL) and for a source whose `baseUrl` is a Tailscale/LAN address unreachable by an email recipient. And `NewItem.externalUrl` (`packages/adapters/core/src/source-adapter.ts`), though already threaded through the render pipeline (`RenderableItem.externalUrl` in `apps/server/src/render/mjml-template.ts`), was never actually set by any adapter.
+
+  Adds an optional `publicUrl` column to `source_connections` (`packages/db/src/schema.ts`, migration `packages/db/drizzle/0001_nostalgic_ulik.sql`, generated with `drizzle-kit generate`) — the address a recipient can actually reach, falling back to `baseUrl` when unset so every existing source connection keeps behaving exactly as it does today. Threaded through `SourceConnectionConfig` (`packages/adapters/core/src/source-adapter.ts`) and the Sources API (`apps/server/src/http/routes/sources.ts`, validated as a URL when present, or an empty string to clear it).
+
+  Every adapter now builds a real per-item deep link where the source's URL scheme supports it:
+  - **Plex**: `{publicUrl}/web/index.html#!/server/{machineIdentifier}/details?key=%2Flibrary%2Fmetadata%2F{ratingKey}` — fetches the server's `machineIdentifier` from `/identity` (new `getServerIdentity` in `plex-client.ts`) once per fetch, falling back to a plain library link if that lookup fails. An unset `publicUrl` falls back to building the same link from `baseUrl`, matching today's behavior for a fully-public single-Plex setup.
+  - **Tautulli**: the same Plex web deep-link format, built from Tautulli's own `get_server_id` API (proxying the underlying Plex server's `machineIdentifier`) and `rating_key` — shares `buildPlexWebDeepLink` with the Plex adapter (new export in `packages/adapters/core/src/url-utils.ts`). Unlike every other adapter here, an unset `publicUrl` means **no** `externalUrl` is set at all (not a `baseUrl` fallback) — Tautulli's own `baseUrl` is its API host, never a page a recipient should be sent to, so building a link from it would produce a plausible-looking link to a page that doesn't exist there; this exactly matches Tautulli-linked items' behavior before this release (no link) rather than introducing a new broken one. The `get_server_id` lookup itself is skipped entirely (not just its result discarded) when there's no `publicUrl` to build a link from, so a Tautulli connection with no `publicUrl` set makes no additional API calls at all.
+  - **BookLore family** (BookLore/BookOrbit/Grimmory): reads an OPDS entry's own `rel="alternate"`/`rel="self"` link (new `getEntryPermalinkHref` in `booklore-client.ts`) and rebases it onto `publicUrl`'s origin (new `withOrigin` helper) instead of the internal host the feed itself was served from — but only when the permalink resolves to `baseUrl`'s own origin; a permalink that already points at a genuinely different, distinct host (some catalogs point `rel="alternate"` at a publisher/mirror page) is left untouched instead of being force-rebased into a broken URL. Falls back to the library root when an entry carries no usable permalink at all. An entry's OPDS `<link>` is untrusted content from the source server itself, so its scheme is validated (`isHttpUrl`, new export alongside `withOrigin`) before ever being used — a `javascript:`/`data:` href is treated as "no usable permalink" rather than reaching a sent email's `<a href>` (Handlebars' default `{{}}` escaping used to render `{{externalUrl}}` guards markup characters, not URL schemes, so nothing downstream would otherwise have caught this). An unset `publicUrl` falls back to `baseUrl`.
+  - **Audiobookshelf**: `{publicUrl}/item/{itemId}`, falling back to `baseUrl` when unset.
+  - **RomM**: `{publicUrl}/rom/{id}`, falling back to `baseUrl` when unset.
+
+  The Sources API's `publicUrl` field is itself restricted to `http`/`https` (`apps/server/src/http/routes/sources.ts`), for the same reason: it flows straight into every adapter's link construction.
+
+  The default (non-custom-template) newsletter layout (`apps/server/src/render/newsletter-template.ts`) now wraps an item's title and poster in `<a href="{{externalUrl}}">` when present, styled to inherit the surrounding text color with no underline so a linked title doesn't read differently from an unlinked one; falls back to plain text/image otherwise. The Media List block's `emptyFallback="link"` "browse the library" link (`apps/server/src/pipeline/run-newsletter.ts`'s `buildSourceLinksByContentType`, consumed by `mjml-template.ts`) now prefers `publicUrl` over `baseUrl` too.
+
+  </details>
+
+### Patch Changes
+
+- 9dcab81: **Fixed:** Every item in a sent newsletter now shows a small badge naming what it is — "Movie", "TV Episode", "TV Season", "Game", "Book", or "Audiobook". Previously only Ebooks, Comics, Audiobooks and Podcasts (from BookLore-family and Audiobookshelf) got a badge; movies, TV episodes, TV seasons and games showed no badge at all.
+
+  <details>
+  <summary>Technical details</summary>
+
+  The badge markup in both the default template (`apps/server/src/render/newsletter-template.ts`) and the GrapesJS-authored one (`apps/web/src/lib/grapesjs-blocks.ts`'s `CONTENT_LABEL_BADGE`) has always rendered `{{contentLabel}}`, an optional, adapter-set free-text field on `NewItem` — only BookLore-family and Audiobookshelf ever set it (to distinguish Ebook/Comic within "book" or Audiobook/Podcast within "audiobook"). The `kind` field itself (movie/tv_episode/tv_season/book/audiobook/game) was never mapped to a display label anywhere in the render path.
+
+  Rather than duplicating a label map in both consumers, the fallback is resolved once, upstream of both: `apps/server/src/render/mjml-template.ts`'s `toRenderable()` (the single function both the default and custom/GrapesJS-authored templates' items pass through before either ever sees them) now resolves `contentLabel` via a new `KIND_LABELS` map when the adapter didn't set one, so `RenderableItem.contentLabel` is always populated. Both templates already just read `{{contentLabel}}`, so neither needed any change — `grapesjs-blocks.ts`'s badge markup works unmodified. An adapter-set `contentLabel` (Comic, Podcast, etc.) still takes priority over the kind fallback.
+
+  </details>
+
+- 9dcab81: **Improved:** The default newsletter layout now opens with a short line under the title ("Here's what's new in the last 7 days.", using your newsletter's own lookback setting) and its footer now links to LatestArr's GitHub repo and to where you can report an issue.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Both changes are in the default MJML template (`apps/server/src/render/newsletter-template.ts`), the layout a newsletter falls back to when no custom template is picked.
+
+  Intro line: `NewsletterRenderContext` and `MjmlRenderContext` (`apps/server/src/render/mjml-template.ts`) both gained an optional `lookbackDays?: number`, threaded from `newsletter.lookbackDays` (`packages/db/src/schema.ts`) through `renderNewsletterContent` in `apps/server/src/pipeline/run-newsletter.ts`'s call to `renderDefaultNewsletterHtml`, and bound as `{{lookbackDays}}` in the Handlebars data `renderMjmlTemplate` passes to `Handlebars.compile`. Guarded by `{{#if lookbackDays}}` so the line is simply omitted for a caller that doesn't pass it (e.g. existing tests). A custom, GrapesJS-authored template has no built-in use for this today, but can reference `{{lookbackDays}}` directly since it's now part of the general render context.
+
+  Footer links: two plain `<a>` tags added inside the existing footer `<mj-text>`, pointing at `https://github.com/jshields-ca/LatestArr` and `https://github.com/jshields-ca/LatestArr/issues`, styled inline to match the existing muted footer text (no external CSS, consistent with the rest of this template's email-safe conventions).
+
+  </details>
+
+- 9dcab81: **Fixed:** A newly added TV season now shows the show's name (e.g. "Breaking Bad") as its title, with the season itself (e.g. "Season 1") as the subtitle — previously it just showed "Season 1" with no indication of which show it belonged to, the same problem episodes had before an earlier fix.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Both `packages/adapters/plex/src/plex-adapter.ts` and `packages/adapters/tautulli/src/tautulli-adapter.ts` already had this fix for `tv_episode` items (promoting the show name from `grandparentTitle`/`grandparent_title` into the primary title, demoting the episode's own name to the subtitle via `buildEpisodeTitle`/`buildEpisodeSubtitle`), but had no equivalent for `tv_season` items.
+
+  Added mirrored `buildSeasonTitle`/`buildSeasonSubtitle` helpers to both adapters. Plex's `PlexMetadataItem` already declared `parentTitle` (the direct-parent show name, one level up from a season — not `grandparentTitle`, which is two levels up and only populated for episodes) but it was never read; it's now used the same way `grandparentTitle` is for episodes. Tautulli's `TautulliRecentlyAddedItem` had no equivalent field, so a `parent_title?: string` field was added to it (mirroring the existing `grandparent_title`/`parent_media_index` fields already proxied through from the underlying Plex server).
+
+  Both fixes fall back to the season's own bare title with no subtitle when the parent-title field is absent, matching the existing defensive pattern for episodes without a `grandparentTitle`/`grandparent_title`. Test cases covering both the happy path and the fallback were added to `plex-adapter.test.ts` and `tautulli-adapter.test.ts`.
+
+  </details>
+
+- @latestarr/adapter-audiobookshelf@0.9.0
+  - @latestarr/adapter-booklore-family@0.9.0
+  - @latestarr/adapter-core@0.9.0
+  - @latestarr/adapter-plex@0.9.0
+  - @latestarr/adapter-romm@0.9.0
+  - @latestarr/adapter-tautulli@0.9.0
+  - @latestarr/crypto@0.9.0
+  - @latestarr/db@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes
