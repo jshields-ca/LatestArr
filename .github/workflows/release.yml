@@ -42,9 +42,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # GITHUB_TOKEN here (as an env var, not just the action's own
+      # `github-token` input) is what `pnpm version-packages` needs at
+      # runtime — it's read by scripts/write-changelog.mjs's use of
+      # @changesets/get-github-info to resolve each changeset's PR link,
+      # and by `changeset version` itself for the per-package changelogs
+      # (.changeset/config.json's changelog-github formatter). Both
+      # degrade gracefully to "no link" without it, so this isn't
+      # load-bearing for the release itself — just for the links.
       - name: Create/update Version Packages PR
         id: changesets
         uses: changesets/action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           version-script: pnpm version-packages
           commit-message: "chore: version packages"

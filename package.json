@@ -17,7 +17,9 @@
     "version-packages": "node scripts/write-changelog.mjs && changeset version && node scripts/sync-root-version.mjs"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
+    "@changesets/get-github-info": "^1.0.1",
     "prettier": "^3.3.0",
     "turbo": "^2.10.13"
   },
