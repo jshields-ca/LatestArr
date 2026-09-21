@@ -17,9 +17,12 @@ interface RenderableItem {
   addedAtFormatted: string;
   releaseDateFormatted?: string;
   posterUrl?: string;
-  /** A short badge for a kind MediaKind itself doesn't distinguish, e.g.
-   * "Ebook" vs "Comic", or "Audiobook" vs "Podcast" — see NewItem.contentLabel. */
-  contentLabel?: string;
+  /** A short badge for the item. Adapter-set NewItem.contentLabel (e.g.
+   * "Ebook" vs "Comic", or "Audiobook" vs "Podcast") takes priority when
+   * present; otherwise this falls back to a label for item.kind itself
+   * (see KIND_LABELS below), so every item gets some badge — Movie, TV
+   * Episode, TV Season, Game, Book, or Audiobook. Always set. */
+  contentLabel: string;
   genres?: string;
   rating?: string;
   runtimeFormatted?: string;
@@ -53,6 +56,12 @@ export interface MjmlRenderContext {
    * than one linked source resolves to whichever was resolved first. */
   sourceLinksByContentType?: Record<string, string>;
   generatedAt: Date;
+  /** The newsletter's configured lookback-window length, for the default
+   * template's "Here's what's new in the last N days" intro line
+   * (newsletter-template.ts). Optional since a custom, GrapesJS-authored
+   * template has no built-in use for it — it's still bound as
+   * {{lookbackDays}} for any custom template that references it directly. */
+  lookbackDays?: number;
 }
 
 function formatDate(date: Date): string {
@@ -74,6 +83,28 @@ function formatRating(rating: NewItem["rating"]): string | undefined {
   return `${rating.value}/${rating.scale}`;
 }
 
+// A display label for every MediaKind, used as the badge shown when an
+// item has no adapter-set contentLabel (Plex/Tautulli/RomM movies, TV
+// episodes/seasons and games never set one — only BookLore-family and
+// Audiobookshelf do, to distinguish Ebook/Comic/Audiobook/Podcast within
+// their shared "book"/"audiobook" kinds). Keeping this map here, and
+// resolving it into contentLabel once in toRenderable below, means the
+// badge markup itself (apps/web/src/lib/grapesjs-blocks.ts's
+// CONTENT_LABEL_BADGE) only ever has to read {{contentLabel}} — it never
+// needs its own copy of this map or to know about `kind` at all.
+const KIND_LABELS: Record<NewItem["kind"], string> = {
+  movie: "Movie",
+  tv_episode: "TV Episode",
+  tv_season: "TV Season",
+  game: "Game",
+  book: "Book",
+  audiobook: "Audiobook",
+};
+
+function resolveContentLabel(item: NewItem): string {
+  return item.contentLabel ?? KIND_LABELS[item.kind];
+}
+
 // isFallback is never set here — the mediaList helper below is the only
 // place that flags an item as a fallback suggestion, by spreading it onto
 // an already-mapped RenderableItem once it's decided to use it that way.
@@ -92,7 +123,7 @@ function toRenderable(item: NewItem): RenderableItem {
     // plain URL, which is fine for testing the template mechanics in
     // isolation.
     posterUrl: item.posterUrl,
-    contentLabel: item.contentLabel,
+    contentLabel: resolveContentLabel(item),
     genres: item.genres?.length ? item.genres.join(", ") : undefined,
     rating: formatRating(item.rating),
     runtimeFormatted: item.runtimeMinutes ? formatMinutes(item.runtimeMinutes) : undefined,
@@ -238,6 +269,7 @@ export async function renderMjmlTemplate(
     fallbackItems: (context.fallbackItems ?? []).map(toRenderable),
     sourceLinksByContentType: context.sourceLinksByContentType ?? {},
     generatedAtFormatted: formatDate(context.generatedAt),
+    lookbackDays: context.lookbackDays,
   });
 
   // A template saved from the builder before it's ever had an initial

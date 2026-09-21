@@ -121,6 +121,57 @@ describe("fetchRecentItems", () => {
     expect(items[0]?.subtitle).toBeUndefined();
   });
 
+  it("uses the show name as title and the season name as subtitle when Plex gives a parentTitle, alongside a real externalUrl", async () => {
+    // Regression test for the tv_season title fix and the clickable-links
+    // feature landing in the same function: a season item needs both its
+    // show-name title/subtitle mapping AND a real per-item deep link built
+    // from the same fetch's machineIdentifier lookup.
+    mockIdentity("srv-abc123");
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            {
+              ...baseItem,
+              ratingKey: "1",
+              title: "Season 1",
+              type: "season",
+              parentTitle: "Show",
+              addedAt: 1700000000,
+            },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.kind).toBe("tv_season");
+    expect(items[0]?.title).toBe("Show");
+    expect(items[0]?.subtitle).toBe("Season 1");
+    expect(items[0]?.externalUrl).toBe(
+      "http://plex.local:32400/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F1",
+    );
+  });
+
+  it("falls back to the bare season title/no subtitle when Plex gives no parentTitle", async () => {
+    mockIdentity();
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            { ...baseItem, ratingKey: "1", title: "Season 1", type: "season", addedAt: 1700000000 },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.title).toBe("Season 1");
+    expect(items[0]?.subtitle).toBeUndefined();
+  });
+
   it("builds an absolute, token-bearing posterUrl from a relative thumb path", async () => {
     mockIdentity();
     mockFetch.mockResolvedValueOnce(

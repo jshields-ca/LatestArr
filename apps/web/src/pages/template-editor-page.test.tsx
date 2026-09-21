@@ -27,7 +27,20 @@ const mockInit = vi.fn(() => mockEditor);
 // act() since, unlike a user-event click, this calls the handler (and thus
 // the state update it triggers) directly rather than through React's own
 // event system.
-function simulateEditorContentChange() {
+//
+// Waits for that handler to actually exist first. The page registers it
+// inside the GrapesJS-init effect, a *separate* passive effect from
+// whatever DOM update a preceding `findByText`/`waitFor` was watching for
+// (e.g. the template's name appearing once `template` loads) — a
+// MutationObserver-driven query can resolve before every passive effect
+// from that same commit has flushed, so calling this immediately after
+// one can race ahead of the editor ever registering a handler at all.
+// Without this wait, `contentChangeHandlers` is silently still empty and
+// the loop below is a no-op — the exact, previously-unguarded race behind
+// this file's two flakiest tests (confirmed by reproducing it locally:
+// `dirty` never became true because no handler had been registered yet).
+async function simulateEditorContentChange() {
+  await waitFor(() => expect(contentChangeHandlers.length).toBeGreaterThan(0));
   act(() => {
     for (const handler of contentChangeHandlers) handler();
   });
@@ -143,6 +156,13 @@ describe("TemplateEditorPage", () => {
       designJson: { pages: ["mock-project-data"] },
       compiledMjml: "<mjml><mj-body></mj-body></mjml>",
     });
+
+    // Regression guard: a save used to give `template` a new object
+    // identity (via setTemplate(updated)), which retriggered the editor
+    // init effect's cleanup+re-run despite its editorRef.current guard —
+    // destroying and rebuilding the whole GrapesJS canvas on every save.
+    expect(mockEditor.destroy).not.toHaveBeenCalled();
+    expect(mockInit).toHaveBeenCalledTimes(1);
   });
 
   it("navigates back to the templates list", async () => {
@@ -174,7 +194,7 @@ describe("TemplateEditorPage", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { template: exampleTemplate }));
     renderPage();
     await screen.findByText("Weekly Digest");
-    simulateEditorContentChange();
+    await simulateEditorContentChange();
 
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     await user.click(screen.getByRole("button", { name: "Back to templates" }));
@@ -196,9 +216,17 @@ describe("TemplateEditorPage", () => {
     const event = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
     expect(window.dispatchEvent(event)).toBe(true); // not prevented: nothing unsaved yet
 
-    simulateEditorContentChange();
-    const dirtyEvent = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
-    expect(window.dispatchEvent(dirtyEvent)).toBe(false); // prevented: unsaved changes
+    await simulateEditorContentChange();
+    // `act()` flushes this effect synchronously in practice, but asserting
+    // on exact effect-commit timing is inherently fragile (React/jsdom/CI
+    // scheduling nuances outside this test's control) — waitFor retries
+    // the dispatch itself until the listener is attached, which is safe
+    // here since dispatching a synthetic beforeunload event has no side
+    // effects beyond exercising the handler under test.
+    await waitFor(() => {
+      const dirtyEvent = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
+      expect(window.dispatchEvent(dirtyEvent)).toBe(false); // prevented: unsaved changes
+    });
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, { template: { ...exampleTemplate, compiledMjml: "<mjml><mj-body></mj-body></mjml>" } }),
@@ -206,8 +234,10 @@ describe("TemplateEditorPage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.getByText("Saved")).toBeInTheDocument());
 
-    const eventAfterSave = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
-    expect(window.dispatchEvent(eventAfterSave)).toBe(true); // not prevented again after saving
+    await waitFor(() => {
+      const eventAfterSave = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
+      expect(window.dispatchEvent(eventAfterSave)).toBe(true); // not prevented again after saving
+    });
   });
 
   it("has no accessibility violations in the page chrome around the editor", async () => {

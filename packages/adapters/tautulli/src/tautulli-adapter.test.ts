@@ -151,6 +151,74 @@ describe("fetchRecentItems", () => {
     expect(items[0]?.subtitle).toBe("S01E01 - Winter Is Coming");
   });
 
+  it("uses the show name as title and the season name as subtitle when Tautulli gives parent_title, alongside a real externalUrl", async () => {
+    // Regression test for the tv_season title fix and the clickable-links
+    // feature landing in the same function: a season item needs both its
+    // show-name title/subtitle mapping AND a real per-item deep link built
+    // from the same fetch's get_server_id lookup (only made here because
+    // publicConfig below carries a publicUrl).
+    mockServerId("srv-abc123");
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              {
+                ...baseItem,
+                rating_key: "1",
+                title: "Season 1",
+                full_title: "Show - Season 1",
+                media_type: "season",
+                added_at: "1700000000",
+                parent_title: "Show",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const publicConfig: SourceConnectionConfig = { ...config, publicUrl: "https://plex.example.com" };
+    const items = await tautulliAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+
+    expect(items[0]?.kind).toBe("tv_season");
+    expect(items[0]?.title).toBe("Show");
+    expect(items[0]?.subtitle).toBe("Season 1");
+    expect(items[0]?.externalUrl).toBe(
+      "https://plex.example.com/web/index.html#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F1",
+    );
+  });
+
+  it("falls back to the bare season title/full_title subtitle when Tautulli gives no parent_title", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              {
+                ...baseItem,
+                rating_key: "1",
+                title: "Season 1",
+                full_title: "Season 1",
+                media_type: "season",
+                added_at: "1700000000",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items[0]?.title).toBe("Season 1");
+    expect(items[0]?.subtitle).toBeUndefined();
+  });
+
   it("maps thumb into a pms_image_proxy posterUrl", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({

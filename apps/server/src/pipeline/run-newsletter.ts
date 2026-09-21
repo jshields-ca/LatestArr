@@ -278,6 +278,7 @@ async function renderNewsletterContent(
     newsletterName: newsletter.name,
     items: addedPlaceholders.items,
     generatedAt,
+    lookbackDays: newsletter.lookbackDays,
   });
   const resolved = await resolvePosterPlaceholders(html, addedPlaceholders.placeholders, (item) =>
     sourceByItem.get(item),

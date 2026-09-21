@@ -114,8 +114,12 @@ describe("renderDefaultNewsletterHtml", () => {
       generatedAt: new Date("2026-01-20T00:00:00Z"),
     });
 
-    expect(html).not.toContain("<a href=");
+    // The footer's own GitHub/"Report an issue" links are always present,
+    // so this checks the item's own title/poster markup specifically
+    // rather than asserting no <a href= appears anywhere in the document.
     expect(html).toContain("No Link Movie");
+    expect(html).not.toContain('<a href="https://example.com/poster.jpg"');
+    expect(html).not.toContain(">No Link Movie</a>");
   });
 
   it("omits the poster image entirely when an item has no posterUrl", async () => {
@@ -191,5 +195,48 @@ describe("renderDefaultNewsletterHtml", () => {
     expect(html).not.toContain("<ul>");
     expect(html).not.toContain("<li>");
     expect(html).toContain("<!doctype html");
+  });
+
+  it("falls back to a kind-based badge (e.g. \"Movie\") when an item has no contentLabel", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item({ kind: "movie" })],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain(">Movie<");
+  });
+
+  it("shows a plain-language intro line naming the lookback window when lookbackDays is given", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item()],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      lookbackDays: 14,
+    });
+
+    expect(html).toContain("Here's what's new in the last 14 days.");
+  });
+
+  it("omits the intro line entirely when lookbackDays is not given", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item()],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).not.toContain("Here's what's new");
+  });
+
+  it("includes a GitHub link and an issue-reporting link in the footer", async () => {
+    const html = await renderDefaultNewsletterHtml({
+      newsletterName: "Weekly Digest",
+      items: [item()],
+      generatedAt: new Date("2026-01-20T00:00:00Z"),
+    });
+
+    expect(html).toContain('href="https://github.com/jshields-ca/LatestArr"');
+    expect(html).toContain('href="https://github.com/jshields-ca/LatestArr/issues"');
+    expect(html).toContain("Report an issue");
   });
 });

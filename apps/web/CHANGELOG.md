@@ -1,5 +1,73 @@
 # @latestarr/web
 
+## 0.8.0
+
+### Minor Changes
+
+- 8b65554: **New:** Add a single "All New (This Period)" block to the template editor — drop it into a newsletter and it shows everything added recently, grouped by type (movies, TV episodes, TV seasons, books, audiobooks, games), instead of needing to drag in and configure six separate blocks by hand.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses the most common request in production feedback on the Media List blocks: "there isn't any options for 'all new' based on the lookback settings in the Newsletter itself... they would expect all of the latest media (audiobooks, tv shows, movies, books, etc) for that lookback period." Getting that today meant dragging in all six content-kind presets one at a time and turning on each one's "Show all items in the period" trait by hand — this is the same result as one block.
+
+  Dragging in "All New (This Period)" exports one heading + Media List pair per adapter content kind, each reading from the same lookback-scoped `items` pool a per-kind block already does and each already using the existing, shipped `showAll="true"` mechanism (from a previous release's "Show all items in the period" trait) rather than a capped count. A kind with nothing added this period is skipped entirely — heading included, not just its (empty) list — via a new `ifAnyItems` Handlebars block helper (`apps/server/src/render/mjml-template.ts`) that applies the exact same pool + content-type filter `mediaList` itself does, purely to decide whether to render a heading. Without it, a newsletter with e.g. no new games this week would still show a bare "Games" heading over nothing.
+
+  It's registered as its own GrapesJS component type (`media-list-all-new`), not a second implementation of the card markup: the poster+text `<table>` layout and the `{{#mediaList ...}}` hash-argument tag are now both extracted into shared functions (`mediaListCardBody`/`mediaListOpenTag` in `apps/web/src/lib/grapesjs-blocks.ts`) that the standalone Media List block's own `toHTML()` also calls, so the two can't drift apart. Like the standalone block, its canvas preview is a friendly static summary (real per-kind grouping only happens at MJML export time, against real item data at send time) and has no configurable traits — narrowing to one kind is what the existing per-kind presets are for.
+
+  </details>
+
+### Patch Changes
+
+- a386217: **Improved:** Buttons now feel smoother and more premium to hover over — a subtle light sweep and an easier lift, instead of an abrupt bump.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that the primary button's hover lift felt "bumpy" rather than premium. The hover-triggered lift/shadow now transitions on a slower, spring-like `cubic-bezier(0.34, 1.56, 0.64, 1)` curve at 220ms (up from the shared 150ms linear-ish default), scoped to the `default` variant only via `hover:` utilities so every other button's snappy press-state timing is untouched. A one-shot diagonal light sweep (`.btn-glint` in `index.css`, a `::after` gradient translated across the button and clipped by `overflow-hidden`) plays once per hover-enter rather than looping, and is disabled under `prefers-reduced-motion`.
+
+  </details>
+
+- a386217: **Improved:** The LatestArr logo is more prominent, the version/GitHub/Star links now sit right next to it on mobile too (matching how they already looked on desktop), and the old hidden "About" info icon has been replaced with a real page footer showing the license, the author, and a link to report an issue.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Makes the wordmark more prominent (a larger `LogoMark`, larger tracked-out text with a subtle rose gradient fill) and moves the version/GitHub/Star cluster up next to the `Logo` in the mobile nav sheet, matching where it already sits in the desktop header — the two surfaces now read as one consistent design. Removes the sidebar's "About" info-icon popover (author/license/site) entirely and replaces it with a real page footer, visible on every page instead of hidden behind a click: author link, GPLv3 license link, a "Report an issue" link to the GitHub issue tracker, and an "In Active Development" badge.
+
+  </details>
+
+- c5e8616: **Fixed:** Saving a template no longer briefly rebuilds the entire editor canvas behind the scenes (harmless today, but wasteful and a source of subtle glitches down the line).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Root-caused while investigating a test that failed intermittently on CI (`template-editor-page.test.tsx`'s "warns on tab close/refresh..." test, "expected true to be false"). Two separate issues, found via instrumented reproduction rather than assumed:
+
+  1. **Real production bug**: `handleSave`'s `setTemplate(updated)` on a successful save gives `template` a new object identity every time. The GrapesJS-init `useEffect` was keyed on `[template]`, so this retriggered it — and a dependency-array change always runs the _previous_ run's cleanup (`editor.destroy()`, `editorRef.current = null`) before the new run's own `editorRef.current` guard is even evaluated, so the guard couldn't prevent it. Every save destroyed and fully reinitialized the GrapesJS editor (confirmed via an instrumented test run: `mockInit` called twice, `destroy` called once, for a single save). Fixed by keying the effect on `Boolean(template)` instead — true exactly once, on the null-to-loaded transition — which matches the effect's actual intent ("initialize once, when data first arrives") without discarding the canvas on every subsequent save. Added a regression assertion (`mockInit`/`mockEditor.destroy` call counts) to the existing save test.
+
+  2. **Real test-helper race** (this was the CI flake's actual cause, confirmed by reproducing it locally — 2 failures in 60 runs before the fix, 0 in 80 after): `simulateEditorContentChange()` fired GrapesJS's mocked content-change handlers immediately after `await screen.findByText("Weekly Digest")` resolved. But `findByText`'s MutationObserver-based resolution isn't guaranteed to happen after _every_ passive effect from the same commit has flushed — the GrapesJS-init effect (which registers the content-change handler at all) is a separate, independently-scheduled effect, so `contentChangeHandlers` could still be empty at that point, making the simulated "edit" a silent no-op. Fixed by having the shared test helper itself wait for a handler to actually be registered before firing it, rather than relying on each call site to remember to check — the same synchronization other tests in this file already used for `mockInit`, just not applied here.
+
+  </details>
+
+- a386217: **Improved:** It's now easier to see which page you're on — the active item in the sidebar gets a clear accent bar, not just a subtle color change.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Gives the sidebar/nav-sheet's active nav item a left-edge accent bar (a 3px `bg-primary` pill) on top of its existing background tint, and gives the hover state a slightly slower, clearer background transition — production feedback was that the active state alone was easy to miss at a glance. `navItems` remains a flat list (no section grouping was added, since the current six items don't split into a natural, non-arbitrary category split).
+
+  </details>
+
+- a386217: **Improved:** Added a new accent color (a calm blue) used for informational badges like the version number and the "In Active Development" label, giving the app's look a bit more depth.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Adds a third palette hue — `--tertiary`/`--tertiary-foreground` (indigo/blue, hue ~228) — as a genuine design token alongside `--primary`, following production feedback that the "Bloom" palette had nowhere to go for calm, informational UI beyond the rose primary and the ad hoc violet secondary accent. Indigo/blue was picked as the clearest complementary/triadic partner to rose while staying clear of green (already success) and red/orange (already destructive, and Plex's own brand color); both the light and dark pairs clear 4.5:1+ text contrast the same way every other token pair in `index.css` does. Wired into Tailwind as `bg-tertiary`/`text-tertiary-foreground` and exposed as a new `Badge` `tertiary` variant, used for the header's running-version badge and the new footer's "In Active Development" badge — reserved for informational labels, never a semantic success/warning/destructive state.
+
+  </details>
+
 ## 0.7.1
 
 ### Patch Changes

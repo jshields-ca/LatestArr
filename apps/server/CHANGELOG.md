@@ -1,5 +1,18 @@
 # @latestarr/server
 
+## 0.8.0
+
+### Patch Changes
+
+- @latestarr/adapter-audiobookshelf@0.8.0
+  - @latestarr/adapter-booklore-family@0.8.0
+  - @latestarr/adapter-core@0.8.0
+  - @latestarr/adapter-plex@0.8.0
+  - @latestarr/adapter-romm@0.8.0
+  - @latestarr/adapter-tautulli@0.8.0
+  - @latestarr/crypto@0.8.0
+  - @latestarr/db@0.8.0
+
 ## 0.7.1
 
 ### Patch Changes

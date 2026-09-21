@@ -366,6 +366,8 @@ describe("NewslettersPage", () => {
     renderPage();
     await screen.findByText("Weekly digest");
 
+    // The Enabled switch stays on the collapsed row, unrelated to the
+    // Details/History tabs — no need to expand the newsletter first.
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, isEnabled: false } }));
     await user.click(screen.getByRole("switch"));
 
@@ -396,7 +398,11 @@ describe("NewslettersPage", () => {
 
       await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
       expect(await screen.findByText("No sources linked yet.")).toBeInTheDocument();
+
+      // History is a separate tab now, holding only the send-run list.
+      await user.click(screen.getByRole("tab", { name: "History" }));
       expect(await screen.findByText("No sends yet.")).toBeInTheDocument();
+      await user.click(screen.getByRole("tab", { name: "Details" }));
 
       fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
       selectOption(screen.getByLabelText("Add a source to this newsletter"), "Home Tautulli");
@@ -434,7 +440,7 @@ describe("NewslettersPage", () => {
     renderPage();
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-    await screen.findByText("No sends yet.");
+    await screen.findByLabelText("Name");
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse(400, { error: "Newsletter has no SMTP profile configured" }),
@@ -460,7 +466,7 @@ describe("NewslettersPage", () => {
     renderPage();
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-    await screen.findByText("No sends yet.");
+    await screen.findByLabelText("Name");
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse(502, {
@@ -491,7 +497,7 @@ describe("NewslettersPage", () => {
     renderPage();
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-    await screen.findByText("No sends yet.");
+    await screen.findByLabelText("Name");
 
     let resolveSend!: (value: unknown) => void;
     fetchMock.mockImplementationOnce(
@@ -524,7 +530,7 @@ describe("NewslettersPage", () => {
     renderPage();
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-    await screen.findByText("No sends yet.");
+    await screen.findByLabelText("Name");
 
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRunId: "run1" }));
     fetchMock.mockResolvedValueOnce(
@@ -543,7 +549,10 @@ describe("NewslettersPage", () => {
         ],
       }),
     );
+    // "Send now" lives in the Details tab; the refreshed run it triggers
+    // shows up in the separate History tab.
     await user.click(screen.getByRole("button", { name: "Send now" }));
+    await user.click(screen.getByRole("tab", { name: "History" }));
 
     expect(await screen.findByText(/3 items/)).toBeInTheDocument();
     expect(screen.queryByText("No sends yet.")).not.toBeInTheDocument();
@@ -578,6 +587,7 @@ describe("NewslettersPage", () => {
     renderPage();
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    await user.click(screen.getByRole("tab", { name: "History" }));
 
     expect(await screen.findByText("Sent (empty)")).toBeInTheDocument();
     expect(screen.queryByText("success")).not.toBeInTheDocument();
@@ -647,54 +657,78 @@ describe("NewslettersPage", () => {
     240000,
   );
 
-  it("prefills the edit dialog with the existing schedule parsed into simple mode", async () => {
+  it("prefills the Details tab with the existing schedule parsed into simple mode", async () => {
     const user = userEvent.setup();
-    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [], recipientGroups: [] }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
     renderPage();
     await screen.findByText("Weekly digest");
 
-    await user.click(screen.getByRole("button", { name: "Edit Weekly digest" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Name")).toHaveValue("Weekly digest");
+    // Opening a newsletter (expanding its row) lands on the Details tab,
+    // which now holds the name/schedule fields that used to live only in
+    // a separate "Edit newsletter" dialog.
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    expect(await screen.findByLabelText("Name")).toHaveValue("Weekly digest");
     // weeklyDigest.scheduleCron is "0 8 * * 1" — weekly, Monday, 08:00.
-    expect(within(dialog).getByLabelText("Repeats")).toHaveTextContent("Every week");
-    expect(within(dialog).getByLabelText("At")).toHaveValue("08:00");
-    expect(within(dialog).getByLabelText("On")).toHaveTextContent("Monday");
-    expect(within(dialog).getByLabelText("Timezone")).toHaveTextContent("UTC");
-    expect(within(dialog).queryByLabelText("Cron expression")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Repeats")).toHaveTextContent("Every week");
+    expect(screen.getByLabelText("At")).toHaveValue("08:00");
+    expect(screen.getByLabelText("On")).toHaveTextContent("Monday");
+    expect(screen.getByLabelText("Timezone")).toHaveTextContent("UTC");
+    expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
   });
 
-  it("falls back to advanced mode in the edit dialog for a cron pattern the simple picker can't express", async () => {
+  it("falls back to advanced mode in the Details tab for a cron pattern the simple picker can't express", async () => {
     const user = userEvent.setup();
     const customSchedule = { ...weeklyDigest, scheduleCron: "*/15 * * * *" };
-    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [customSchedule] }) }));
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [customSchedule] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: customSchedule,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
     renderPage();
     await screen.findByText("Weekly digest");
 
-    await user.click(screen.getByRole("button", { name: "Edit Weekly digest" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("Cron expression")).toHaveValue("*/15 * * * *");
-    expect(within(dialog).queryByLabelText("Repeats")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    expect(await screen.findByLabelText("Cron expression")).toHaveValue("*/15 * * * *");
+    expect(screen.queryByLabelText("Repeats")).not.toBeInTheDocument();
   });
 
   it(
-    "edits a newsletter's schedule and saves",
+    "edits a newsletter's schedule and saves from the Details tab",
     async () => {
       const user = userEvent.setup();
-      mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
+      mockRoutes(
+        baseRoutes({
+          "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+          "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [], recipientGroups: [] }),
+          "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+        }),
+      );
       renderPage();
       await screen.findByText("Weekly digest");
 
-      await user.click(screen.getByRole("button", { name: "Edit Weekly digest" }));
-      const dialog = await screen.findByRole("dialog");
-      selectOption(within(dialog).getByLabelText("Repeats"), "Every day");
-      fireEvent.change(within(dialog).getByLabelText("At"), { target: { value: "10:30" } });
+      await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+      await screen.findByLabelText("Name");
+      selectOption(screen.getByLabelText("Repeats"), "Every day");
+      fireEvent.change(screen.getByLabelText("At"), { target: { value: "10:30" } });
 
       fetchMock.mockResolvedValueOnce(
         jsonResponse(200, { newsletter: { ...weeklyDigest, scheduleCron: "30 10 * * *" } }),
       );
-      await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      const saveButton = screen.getByRole("button", { name: "Save changes" });
+      await user.click(saveButton);
+      await waitFor(() => expect(saveButton).not.toBeDisabled());
 
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(init.method).toBe("PATCH");
@@ -749,6 +783,58 @@ describe("NewslettersPage", () => {
     await screen.findByLabelText("Template");
 
     expect(await axe(container)).toHaveNoViolations();
+
+    // The History tab has its own content (the send-run list); check it too.
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    await screen.findByText("No sends yet.");
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("switches between the Details and History tabs by click", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [], recipientGroups: [] }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+
+    // Details is the default tab and holds every editable field — the
+    // send-run list stays out of it entirely.
+    expect(await screen.findByLabelText("Name")).toBeInTheDocument();
+    expect(screen.queryByText("No sends yet.")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    expect(await screen.findByText("No sends yet.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Details" }));
+    expect(await screen.findByLabelText("Name")).toBeInTheDocument();
+  });
+
+  it("moves between the Details and History tabs with the arrow keys", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [], recipientGroups: [] }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    await screen.findByLabelText("Name");
+
+    await user.click(screen.getByRole("tab", { name: "Details" }));
+    await user.keyboard("{ArrowRight}");
+
+    expect(screen.getByRole("tab", { name: "History" })).toHaveFocus();
+    expect(await screen.findByText("No sends yet.")).toBeInTheDocument();
   });
 
   it(

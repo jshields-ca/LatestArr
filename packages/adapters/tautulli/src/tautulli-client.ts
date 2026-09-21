@@ -20,6 +20,12 @@ export interface TautulliRecentlyAddedItem {
   // Plex server. Used to compose a real "Series - SxxExx - Episode" title
   // instead of just the bare episode title full_title alone would give.
   grandparent_title?: string;
+  // Present on season entries — the show's own title, one level up from a
+  // season (unlike grandparent_title, which is two levels up and only
+  // populated for episodes). Used the same way grandparent_title is for
+  // episodes: promoted into the primary title, with the season's own name
+  // (e.g. "Season 1") demoted to the subtitle.
+  parent_title?: string;
   parent_media_index?: number;
   media_index?: number;
   // Paths relative to the underlying Plex server (Tautulli proxies Plex),
