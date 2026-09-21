@@ -32,6 +32,15 @@ const AUTHOR_URL = "https://www.scootr.ca";
 const iconLinkClassName =
   "text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
 
+// The footer's attribution links get the tertiary informational-blue
+// treatment instead of plain muted-foreground (see the "Tertiary" note in
+// index.css) — they're secondary, non-navigational links (author site,
+// license, issue tracker), a good fit for tertiary's "calm, informational"
+// role, and a deliberately different color from the header's GitHub icon
+// link above so the two clusters stay visually distinct.
+const footerLinkClassName =
+  "text-tertiary transition-colors hover:text-tertiary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
+
 // lucide-react ships no GitHub mark — this is the standard octocat glyph
 // used across the ecosystem for "view/star on GitHub" links (e.g. GitHub's
 // own badges, simple-icons).
@@ -91,7 +100,12 @@ function ProjectInfoCard() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5">
+    // Tertiary-tinted glass surface (see the "Tertiary" note in index.css):
+    // a low-opacity tertiary background, a thin tertiary-tinted border, and
+    // backdrop-blur so it reads as a frosted chip floating in the sticky,
+    // blurred header rather than a flat gray box — a deliberate accent for
+    // this one cluster, not applied to cards generally.
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-tertiary/25 bg-tertiary/10 px-2.5 py-1.5 backdrop-blur-sm">
       <div className="min-w-0">
         {version ? (
           <Badge variant="tertiary" className="font-mono text-xs tracking-tight">
@@ -116,7 +130,7 @@ function ProjectInfoCard() {
               type="button"
               aria-label="Star on GitHub"
               title="Star on GitHub"
-              className="text-amber-500 transition-colors hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+              className="star-glow star-glow-intro text-amber-500 hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
             >
               <Star className="size-4 fill-current" />
             </button>
@@ -140,14 +154,19 @@ function ProjectInfoCard() {
  */
 function AppFooter() {
   return (
-    <footer className="border-t border-border">
+    // A faint tertiary tint on the footer's own background (on top of the
+    // existing top border) ties it to the header's tertiary-glass
+    // ProjectInfoCard without competing with the rose primary used
+    // elsewhere on the page — the footer is a secondary-info surface, not
+    // a primary action area.
+    <footer className="border-t border-tertiary/15 bg-tertiary/[0.03]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           <a
             href={AUTHOR_URL}
             target="_blank"
             rel="noreferrer"
-            className={cn(iconLinkClassName, "flex items-center gap-1.5")}
+            className={cn(footerLinkClassName, "flex items-center gap-1.5")}
           >
             <Globe className="size-3.5 shrink-0" aria-hidden="true" />
             Jeremy Shields
@@ -156,7 +175,7 @@ function AppFooter() {
             href={LICENSE_URL}
             target="_blank"
             rel="noreferrer"
-            className={cn(iconLinkClassName, "flex items-center gap-1.5")}
+            className={cn(footerLinkClassName, "flex items-center gap-1.5")}
           >
             <Scale className="size-3.5 shrink-0" aria-hidden="true" />
             GPLv3 license
@@ -165,7 +184,7 @@ function AppFooter() {
             href={`${REPO_URL}/issues`}
             target="_blank"
             rel="noreferrer"
-            className={cn(iconLinkClassName, "flex items-center gap-1.5")}
+            className={cn(footerLinkClassName, "flex items-center gap-1.5")}
           >
             <Bug className="size-3.5 shrink-0" aria-hidden="true" />
             Report an issue
@@ -412,8 +431,24 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1">
-        <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 flex-col border-r border-border p-4 md:flex">
+      {/*
+       * No `flex-1` here and no explicit viewport-relative height on
+       * `aside` below (it used to be `h-[calc(100vh-3.5rem)]`) — both
+       * used to force this row to at least fill the remaining viewport
+       * height on every page, which pushed `AppFooter` below the fold
+       * (and left a large gap above it) even on short-content pages,
+       * forcing a scroll just to reach it. Letting the row size to its
+       * actual content means the footer sits right after the content it
+       * follows; `aside`'s default flex `align-items: stretch` still
+       * makes its border-right divider span the full height of whichever
+       * of `aside`/`main` is taller, so the sidebar still reads as
+       * "full height" on any page with real content. `min-h-screen` on
+       * the root above still keeps short pages filling at least one
+       * viewport — any leftover space just falls below the footer
+       * instead of being forced in above it.
+       */}
+      <div className="mx-auto flex w-full max-w-7xl">
+        <aside className="sticky top-14 hidden w-60 shrink-0 flex-col border-r border-border p-4 md:flex">
           <NavList />
         </aside>
 

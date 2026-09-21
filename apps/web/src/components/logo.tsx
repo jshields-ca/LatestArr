@@ -57,17 +57,21 @@ export function Logo({ className, iconClassName, textClassName }: LogoProps) {
   return (
     <span className={cn("flex items-center gap-2", className)}>
       <LogoMark className={iconClassName} />
-      {/* A subtle two-stop gradient (same hue, just a lighter tint of
-       * itself) on the wordmark — reads as a soft sheen rather than a
-       * loud rainbow effect, the same restraint as .shadow-elevated's
-       * tinted-not-flashy shadow. */}
-      <span
-        className={cn(
-          "font-brand text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent",
-          textClassName,
-        )}
-      >
-        LatestArr
+      {/* Plain foreground text, not a rose gradient — production feedback
+       * was that the gradient/clip-text treatment read as too "loud" next
+       * to the mark itself, and that the wordmark should match how the
+       * rest of the header's text behaves (`text-foreground`: white in
+       * dark mode). Split into two spans so "Latest" (bold) and "Arr"
+       * (regular weight) read as a deliberate two-part wordmark rather
+       * than one uniformly-bold word — and sized up from `text-xl` since
+       * a plain-color wordmark needs the extra size to hold its own next
+       * to the mark the way the gradient used to. `textClassName` (used
+       * by the login/setup pages for a smaller variant) still overrides
+       * this size via `cn`/tailwind-merge; the two inner spans inherit
+       * whatever size ends up on this wrapper. */}
+      <span className={cn("font-brand text-2xl tracking-tight text-foreground", textClassName)}>
+        <span className="font-bold">Latest</span>
+        <span className="font-normal">Arr</span>
       </span>
     </span>
   );
