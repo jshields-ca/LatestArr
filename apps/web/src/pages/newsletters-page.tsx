@@ -930,9 +930,26 @@ function NewsletterCard({
         )
       }
     >
+      {/* Stays outside the expand/Tabs block so it's toggleable from the
+          collapsed row too, without needing to open the newsletter first —
+          unchanged from before the Details/History restructure. */}
+      <SettingRow
+        label="Enabled"
+        description="Send this newsletter on its configured schedule."
+        htmlFor={`newsletter-enabled-${newsletter.id}`}
+        control={
+          <Switch
+            id={`newsletter-enabled-${newsletter.id}`}
+            checked={newsletter.isEnabled}
+            onCheckedChange={(checked) => void handleToggleEnabled(checked)}
+            disabled={toggling}
+          />
+        }
+      />
+
       {expanded ? (
         <div className="flex flex-col border-t border-border pt-3">
-          {/* Everything editable about the newsletter — including the
+          {/* Everything else editable about the newsletter — including the
               Template/Sources/Groups pickers that used to live only here,
               separate from the "Edit" dialog's name/schedule/delivery
               fields — now lives together under Details. History is the
@@ -945,20 +962,6 @@ function NewsletterCard({
             </TabsList>
 
             <TabsContent value="details">
-              <SettingRow
-                label="Enabled"
-                description="Send this newsletter on its configured schedule."
-                htmlFor={`newsletter-enabled-${newsletter.id}`}
-                control={
-                  <Switch
-                    id={`newsletter-enabled-${newsletter.id}`}
-                    checked={newsletter.isEnabled}
-                    onCheckedChange={(checked) => void handleToggleEnabled(checked)}
-                    disabled={toggling}
-                  />
-                }
-              />
-
               <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
 
               {detailError ? (

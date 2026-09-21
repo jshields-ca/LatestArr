@@ -362,21 +362,12 @@ describe("NewslettersPage", () => {
 
   it("toggles enabled via the switch", async () => {
     const user = userEvent.setup();
-    mockRoutes(
-      baseRoutes({
-        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
-        "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [], recipientGroups: [] }),
-        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
-      }),
-    );
+    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
     renderPage();
     await screen.findByText("Weekly digest");
 
-    // The Enabled switch now lives in the Details tab, alongside the rest
-    // of the newsletter's configuration, rather than always being visible.
-    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-    await screen.findByRole("switch");
-
+    // The Enabled switch stays on the collapsed row, unrelated to the
+    // Details/History tabs — no need to expand the newsletter first.
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, isEnabled: false } }));
     await user.click(screen.getByRole("switch"));
 
