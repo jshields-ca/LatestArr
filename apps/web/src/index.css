@@ -116,6 +116,8 @@
    * page-header.tsx) — not every heading and not body/UI text, which stay
    * on --font-sans above. */
   --font-brand: "Newsreader", ui-serif, Georgia, serif;
+  /* Code/log face — used by the Logs page's console view. */
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);

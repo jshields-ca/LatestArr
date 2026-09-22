@@ -96,6 +96,29 @@ describe("LogsPage", () => {
     expect(await screen.findByText("A source sync came back empty")).toBeInTheDocument();
   });
 
+  it("polls for new entries on an interval once Live is toggled on", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [warnEntry] }));
+    render(<LogsPage />);
+    await screen.findByText("A source sync came back empty");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [errorEntry, warnEntry] }));
+    await user.click(screen.getByRole("button", { name: "Live" }));
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await screen.findByText("Newsletter send failed")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [errorEntry, warnEntry] }));
+    await user.click(screen.getByRole("button", { name: "Live" }));
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
   it("shows an error message when loading fails", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(500, { error: "Something broke" }));
     render(<LogsPage />);
