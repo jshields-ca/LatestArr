@@ -41,6 +41,7 @@ const weeklyDigest = {
   timezone: "UTC",
   isEnabled: true,
   lookbackDays: 7,
+  emailFont: "ubuntu",
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -715,6 +716,39 @@ describe("NewslettersPage", () => {
     },
     // Two selectOption calls, each followed by an async `findBy`/`waitFor`
     // — see the testTimeout comment in vitest.config.ts.
+    240000,
+  );
+
+  it(
+    "changes the default template's font, and hides the Font picker once a custom template is picked",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(
+        baseRoutes({
+          "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+          "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }),
+          "/api/newsletters/n1": jsonResponse(200, {
+            newsletter: weeklyDigest,
+            sources: [],
+            recipientGroups: [],
+          }),
+          "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+        }),
+      );
+      renderPage();
+      await screen.findByText("Weekly digest");
+      await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+      await screen.findByLabelText("Font");
+
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, emailFont: "georgia" } }));
+      selectOption(screen.getByLabelText("Font"), "Georgia (serif)");
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toEqual({ emailFont: "georgia" });
+
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
+      selectOption(screen.getByLabelText("Template"), "Weekly Layout");
+      await waitFor(() => expect(screen.queryByLabelText("Font")).not.toBeInTheDocument());
+    },
     240000,
   );
 

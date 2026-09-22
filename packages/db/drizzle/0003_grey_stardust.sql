@@ -1,0 +1,1 @@
+ALTER TABLE `newsletters` ADD `email_font` text DEFAULT 'ubuntu' NOT NULL;

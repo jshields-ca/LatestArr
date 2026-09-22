@@ -143,6 +143,7 @@ describe("newsletter relationships", () => {
 
     expect(newsletter.timezone).toBe("UTC");
     expect(newsletter.lookbackDays).toBe(7);
+    expect(newsletter.emailFont).toBe("ubuntu");
 
     const linkedGroups = await db
       .select()
