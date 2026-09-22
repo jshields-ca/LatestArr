@@ -8,7 +8,7 @@ function item(overrides: Partial<NewItem> = {}): NewItem {
     externalId: "1",
     kind: "movie",
     title: "Some Movie",
-    addedAt: new Date("2026-01-15T00:00:00Z"),
+    addedAt: new Date("2026-01-15T12:00:00Z"),
     ...overrides,
   };
 }
@@ -33,7 +33,7 @@ describe("renderMjmlTemplate", () => {
     const html = await renderMjmlTemplate(MJML_SOURCE, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "A Movie" }), item({ title: "Another Movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("<!doctype html");
@@ -46,7 +46,7 @@ describe("renderMjmlTemplate", () => {
     const html = await renderMjmlTemplate(MJML_SOURCE, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "<script>alert(1)</script>" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("<script>alert(1)</script>");
@@ -59,7 +59,7 @@ describe("renderMjmlTemplate", () => {
     const html = await renderMjmlTemplate(malformed, {
       newsletterName: "Weekly Digest",
       items: [],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(typeof html).toBe("string");
@@ -71,7 +71,7 @@ describe("renderMjmlTemplate", () => {
     const html = await renderMjmlTemplate(bareFragment, {
       newsletterName: "Weekly Digest",
       items: [],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("<!doctype html");
@@ -124,7 +124,7 @@ describe("poster and metadata fields on rendered items", () => {
           rating: { source: "tmdb", value: 7.8, scale: 10 },
         }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain('src="https://example.com/poster.jpg"');
@@ -137,7 +137,7 @@ describe("poster and metadata fields on rendered items", () => {
     const html = await renderMjmlTemplate(CARD_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "No Poster Movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("<img");
@@ -148,7 +148,7 @@ describe("poster and metadata fields on rendered items", () => {
     const html = await renderMjmlTemplate(CARD_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "Short Film", runtimeMinutes: 45 })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("45m");
@@ -190,7 +190,7 @@ describe("mediaList output must survive real MJML compilation, not just look rig
     const html = await renderMjmlTemplate(UNWRAPPED_TABLE_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "Ghost Movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("Ghost Movie");
@@ -200,7 +200,7 @@ describe("mediaList output must survive real MJML compilation, not just look rig
     const html = await renderMjmlTemplate(MJ_RAW_WRAPPED_TABLE_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "Real Movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Real Movie");
@@ -217,7 +217,7 @@ describe("the mediaList block helper", () => {
         item({ title: "Movie Two", kind: "movie" }),
         item({ title: "Movie Three", kind: "movie" }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Movie One");
@@ -233,7 +233,7 @@ describe("the mediaList block helper", () => {
       newsletterName: "Weekly Digest",
       items: [item({ title: "Recently Added Movie", kind: "movie" })],
       popularItems: [item({ title: "Most Watched Movie", kind: "movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Most Watched Movie");
@@ -244,7 +244,7 @@ describe("the mediaList block helper", () => {
     const html = await renderMjmlTemplate(MEDIA_LIST_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "A Show", kind: "tv_episode" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("A Show");
@@ -262,7 +262,7 @@ describe("the mediaList block helper's showAll variant", () => {
         item({ title: "Movie Two", kind: "movie" }),
         item({ title: "Movie Three", kind: "movie" }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Movie One");
@@ -288,7 +288,7 @@ describe("the mediaList block helper's count handling", () => {
         item({ title: "Movie Two", kind: "movie" }),
         item({ title: "Movie Three", kind: "movie" }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Movie One");
@@ -320,7 +320,7 @@ describe("the ifAnyItems block helper", () => {
     const html = await renderMjmlTemplate(IF_ANY_ITEMS_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "A Movie", kind: "movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Movies heading");
@@ -330,7 +330,7 @@ describe("the ifAnyItems block helper", () => {
     const html = await renderMjmlTemplate(IF_ANY_ITEMS_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "A Show", kind: "tv_episode" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("Movies heading");
@@ -343,7 +343,7 @@ describe("the ifAnyItems block helper", () => {
       newsletterName: "Weekly Digest",
       items: [item({ title: "A Movie", kind: "movie" })],
       popularItems: [],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
     expect(emptyHtml).not.toContain("Movies heading");
 
@@ -351,7 +351,7 @@ describe("the ifAnyItems block helper", () => {
       newsletterName: "Weekly Digest",
       items: [],
       popularItems: [item({ title: "A Movie", kind: "movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
     expect(populatedHtml).toContain("Movies heading");
   });
@@ -390,7 +390,7 @@ describe("the All New (This Period) composite block's exported shape", () => {
         item({ title: "Movie Five", kind: "movie" }),
         item({ title: "Movie Six", kind: "movie" }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Movies");
@@ -404,7 +404,7 @@ describe("the All New (This Period) composite block's exported shape", () => {
     const html = await renderMjmlTemplate(ALL_NEW_MJML, {
       newsletterName: "Weekly Digest",
       items: [item({ title: "Movie One", kind: "movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Movies");
@@ -424,7 +424,7 @@ describe("the mediaList block helper's order=\"random\" variant", () => {
         item({ title: "Movie Two", kind: "movie" }),
         item({ title: "Movie Three", kind: "movie" }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     const renderedCount = ["Movie One", "Movie Two", "Movie Three"].filter((title) =>
@@ -458,7 +458,7 @@ describe("the mediaList block helper's emptyFallback variant", () => {
         item({ title: "Old Game Two", kind: "game" }),
         item({ title: "Old Game Three", kind: "game" }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     const renderedCount = ["Old Game One", "Old Game Two", "Old Game Three"].filter((title) =>
@@ -473,7 +473,7 @@ describe("the mediaList block helper's emptyFallback variant", () => {
       newsletterName: "Weekly Digest",
       items: [item({ title: "New Game", kind: "game" })],
       fallbackItems: [item({ title: "Old Game", kind: "game" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("New Game");
@@ -486,7 +486,7 @@ describe("the mediaList block helper's emptyFallback variant", () => {
       newsletterName: "Weekly Digest",
       items: [],
       fallbackItems: [],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("(suggested)");
@@ -511,7 +511,7 @@ describe("the mediaList block helper's emptyFallback variant", () => {
       newsletterName: "Weekly Digest",
       items: [],
       sourceLinksByContentType: { game: "http://romm.local:3000" },
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain('href="http://romm.local:3000"');
@@ -522,7 +522,7 @@ describe("the mediaList block helper's emptyFallback variant", () => {
     const html = await renderMjmlTemplate(LINK_MJML, {
       newsletterName: "Weekly Digest",
       items: [],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("<a href");
@@ -552,10 +552,10 @@ describe("releaseDateFormatted and contentLabel on rendered items", () => {
           title: "Some Comic",
           kind: "book",
           contentLabel: "Comic",
-          releaseDate: new Date("2020-05-01T00:00:00Z"),
+          releaseDate: new Date("2020-05-01T12:00:00Z"),
         }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("[Comic]");
@@ -576,7 +576,7 @@ describe("releaseDateFormatted and contentLabel on rendered items", () => {
           item({ title: "A Season", kind: "tv_season" }),
           item({ title: "A Game", kind: "game" }),
         ],
-        generatedAt: new Date("2026-01-20T00:00:00Z"),
+        generatedAt: new Date("2026-01-20T12:00:00Z"),
       },
     );
 
@@ -594,7 +594,7 @@ describe("releaseDateFormatted and contentLabel on rendered items", () => {
       {
         newsletterName: "Weekly Digest",
         items: [item({ title: "A Podcast", kind: "audiobook", contentLabel: "Podcast" })],
-        generatedAt: new Date("2026-01-20T00:00:00Z"),
+        generatedAt: new Date("2026-01-20T12:00:00Z"),
       },
     );
 

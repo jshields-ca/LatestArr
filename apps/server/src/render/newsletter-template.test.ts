@@ -8,7 +8,7 @@ function item(overrides: Partial<NewItem> = {}): NewItem {
     externalId: "1",
     kind: "movie",
     title: "Some Movie",
-    addedAt: new Date("2026-01-15T00:00:00Z"),
+    addedAt: new Date("2026-01-15T12:00:00Z"),
     ...overrides,
   };
 }
@@ -18,7 +18,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item({ subtitle: "A subtitle", overview: "An overview." })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Weekly Digest");
@@ -33,7 +33,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("No new items in this period.");
@@ -43,7 +43,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item()],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("undefined");
@@ -53,7 +53,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item({ title: "<script>alert(1)</script>" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("<script>alert(1)</script>");
@@ -71,7 +71,7 @@ describe("renderDefaultNewsletterHtml", () => {
           rating: { source: "tmdb", value: 7.8, scale: 10 },
         }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain('src="https://example.com/poster.jpg"');
@@ -90,7 +90,7 @@ describe("renderDefaultNewsletterHtml", () => {
           externalUrl: "https://plex.example.com/web/index.html#!/server/abc/details?key=%2Flibrary%2Fmetadata%2F1",
         }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     // {{externalUrl}} uses Handlebars' default {{}} HTML-escaping (like
@@ -111,7 +111,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item({ title: "No Link Movie", posterUrl: "https://example.com/poster.jpg" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     // The footer's own GitHub/"Report an issue" links are always present,
@@ -126,7 +126,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item({ title: "No Poster Movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("<img");
@@ -146,7 +146,7 @@ describe("renderDefaultNewsletterHtml", () => {
           durationSeconds: 5400,
         }),
       ],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("320 pages");
@@ -157,7 +157,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item({ kind: "book", title: "Some Comic", contentLabel: "Comic" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Comic");
@@ -167,7 +167,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item()],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("undefined");
@@ -176,8 +176,8 @@ describe("renderDefaultNewsletterHtml", () => {
   it("shows both the added date and a formatted release date when present", async () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
-      items: [item({ releaseDate: new Date("2020-05-01T00:00:00Z") })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      items: [item({ releaseDate: new Date("2020-05-01T12:00:00Z") })],
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain("Added January 15, 2026");
@@ -188,7 +188,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item()],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("<ul ");
@@ -201,7 +201,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item({ kind: "movie" })],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain(">Movie<");
@@ -211,7 +211,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item()],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
       lookbackDays: 14,
     });
 
@@ -222,7 +222,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item()],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).not.toContain("Here's what's new");
@@ -232,7 +232,7 @@ describe("renderDefaultNewsletterHtml", () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item()],
-      generatedAt: new Date("2026-01-20T00:00:00Z"),
+      generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
     expect(html).toContain('href="https://github.com/jshields-ca/LatestArr"');
