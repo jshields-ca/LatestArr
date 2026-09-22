@@ -8,6 +8,7 @@ import type {
   SourceAdapter,
   SourceConnectionConfig,
   SourceLibrary,
+  SourceUser,
 } from "@latestarr/adapter-core";
 import { buildPlexWebDeepLink, trimTrailingSlashes } from "@latestarr/adapter-core";
 import {
@@ -17,6 +18,7 @@ import {
   getLibraries,
   getRecentlyAdded,
   getServerId,
+  getUsers,
   type TautulliHomeStatRow,
   type TautulliRecentlyAddedItem,
 } from "./tautulli-client.js";
@@ -174,6 +176,22 @@ export const tautulliAdapter: SourceAdapter = {
       name: library.section_name,
       kind: mapLibraryType(library.section_type),
     }));
+  },
+
+  // Tautulli's user list mirrors the underlying Plex server's shared
+  // users, including their plex.tv email when the server owner can see
+  // it — user_id 0 is Tautulli's own "Local" pseudo-user (direct/
+  // unauthenticated plays), not a real person, so it's filtered out here
+  // rather than left for the caller to notice and exclude.
+  async listUsers(config: SourceConnectionConfig): Promise<SourceUser[]> {
+    const users = await getUsers(config.baseUrl, config.credentials.apiKey ?? "");
+    return users
+      .filter((user) => user.user_id !== 0)
+      .map((user) => ({
+        externalId: String(user.user_id),
+        username: user.friendly_name || user.username,
+        email: user.email || undefined,
+      }));
   },
 
   async fetchRecentItems(

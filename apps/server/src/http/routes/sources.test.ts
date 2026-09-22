@@ -352,6 +352,51 @@ describe("full source lifecycle", () => {
     expect(response.json().libraries).toEqual([{ id: "1", name: "Movies", kind: "movie" }]);
   });
 
+  it("lists users via the adapter", async () => {
+    const id = await createSource();
+
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [{ user_id: 1, username: "alice", email: "alice@example.com" }],
+        },
+      }),
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/sources/${id}/users`,
+      cookies: { latestarr_session: sessionCookie },
+    });
+    expect(response.json().users).toEqual([
+      { externalId: "1", username: "alice", email: "alice@example.com" },
+    ]);
+  });
+
+  it("404s listing users for a source kind that doesn't support it", async () => {
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/sources",
+      cookies: { latestarr_session: sessionCookie },
+      payload: {
+        name: "Game Library",
+        kind: "romm",
+        baseUrl: "http://romm.local:8080",
+        credentials: { token: "secret-token" },
+      },
+    });
+    const id = createResponse.json().source.id as string;
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/sources/${id}/users`,
+      cookies: { latestarr_session: sessionCookie },
+    });
+    expect(response.statusCode).toBe(404);
+  });
+
   it("updates name and baseUrl without requiring credentials", async () => {
     const id = await createSource();
 

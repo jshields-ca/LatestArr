@@ -119,6 +119,22 @@ export async function getServerId(baseUrl: string, apiKey: string): Promise<stri
   return data.pms_identifier;
 }
 
+export interface TautulliUser {
+  user_id: number;
+  username: string;
+  friendly_name?: string;
+  email?: string;
+  // Tautulli keeps a "Local" pseudo-user (server owner's own admin
+  // account, id 0) and can retain rows for users removed from the Plex
+  // server — filtered out by the adapter, not here, so this stays a thin
+  // wrapper around the raw API response.
+  is_active?: number;
+}
+
+export async function getUsers(baseUrl: string, apiKey: string): Promise<TautulliUser[]> {
+  return callTautulli<TautulliUser[]>(baseUrl, apiKey, "get_users");
+}
+
 /**
  * Wraps Tautulli's get_home_stats command for a single stat_id (e.g.
  * "top_movies", "top_tv" — ranked by play count over time_range days).

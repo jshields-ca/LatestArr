@@ -53,6 +53,20 @@ export interface SourceLibrary {
   kind: MediaKind;
 }
 
+export interface SourceUser {
+  /** Adapter-local identifier — stable per user on that source, not
+   * globally unique (namespace with the SourceConnection's id if
+   * persisting). */
+  externalId: string;
+  username: string;
+  /** Not every source exposes an email for a known user (e.g. a Plex
+   * server's local `/accounts` listing gives usernames only, not the
+   * email of a plex.tv-managed shared user) — a caller offering these as
+   * recipient candidates needs to handle the no-email case, since a
+   * recipient can't be created without one. */
+  email?: string;
+}
+
 export interface SourceConnectionConfig {
   baseUrl: string;
   /** The user-reachable address for this source, when it differs from
@@ -94,6 +108,13 @@ export interface SourceAdapter {
   testConnection(config: SourceConnectionConfig): Promise<ConnectionTestResult>;
 
   listLibraries(config: SourceConnectionConfig): Promise<SourceLibrary[]>;
+
+  /** Lists the source's own known users, for offering as recipient-import
+   * candidates (see POST /sources/:id/users on the server) — optional,
+   * the same way fetchPopularItems/fetchImageBytes are, since only a
+   * source that actually tracks distinct users (Plex, Tautulli) can
+   * implement it. */
+  listUsers?(config: SourceConnectionConfig): Promise<SourceUser[]>;
 
   fetchRecentItems(config: SourceConnectionConfig, params: FetchRecentItemsParams): Promise<NewItem[]>;
 

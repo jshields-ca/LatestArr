@@ -189,5 +189,36 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
 
       return reply.send({ libraries });
     });
+
+    // 404s (not a 200 with an empty array) when the adapter doesn't
+    // implement listUsers at all, so the web UI can tell "this source
+    // type has no known users" apart from "it has zero users right now"
+    // — the former hides the whole Import action, the latter would show
+    // it with an empty result.
+    scope.get<{ Params: IdParams }>("/sources/:id/users", async (request, reply) => {
+      const [row] = await db
+        .select()
+        .from(sourceConnections)
+        .where(eq(sourceConnections.id, request.params.id));
+      if (!row) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+
+      const adapter = getAdapter(row.kind);
+      if (!adapter) {
+        return reply.code(400).send({ error: `Unknown source kind: ${row.kind}` });
+      }
+      if (!adapter.listUsers) {
+        return reply.code(404).send({ error: `${row.kind} sources don't support listing users` });
+      }
+
+      const users = await adapter.listUsers({
+        baseUrl: row.baseUrl,
+        publicUrl: row.publicUrl ?? undefined,
+        credentials: decryptCredentials(row),
+      });
+
+      return reply.send({ users });
+    });
   });
 }

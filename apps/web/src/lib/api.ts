@@ -160,6 +160,20 @@ export function testSourceConnection(id: string): Promise<TestConnectionResult> 
   return apiFetch<TestConnectionResult>(`/sources/${id}/test`, { method: "POST" });
 }
 
+export interface SourceUser {
+  externalId: string;
+  username: string;
+  email?: string;
+}
+
+// Rejects with a 404 ApiError when the source's kind doesn't support
+// listing users at all (see the route's own comment in
+// apps/server/src/http/routes/sources.ts) — callers should only show an
+// "Import users" action for a source kind known to support this.
+export function listSourceUsers(id: string): Promise<{ users: SourceUser[] }> {
+  return apiFetch<{ users: SourceUser[] }>(`/sources/${id}/users`);
+}
+
 export interface Recipient {
   id: string;
   email: string;

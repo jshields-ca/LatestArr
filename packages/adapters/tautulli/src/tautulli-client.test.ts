@@ -6,6 +6,7 @@ import {
   getLibraries,
   getRecentlyAdded,
   getServerId,
+  getUsers,
 } from "./tautulli-client.js";
 
 const mockFetch = vi.fn();
@@ -100,6 +101,40 @@ describe("getServerId", () => {
       jsonResponse({ response: { result: "error", message: "Invalid apikey", data: null } }),
     );
     await expect(getServerId("http://tautulli.local:8181", "bad-key")).rejects.toThrow("Invalid apikey");
+  });
+});
+
+describe("getUsers", () => {
+  it("returns the user list on success", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [
+            { user_id: 1, username: "alice", friendly_name: "Alice", email: "alice@example.com" },
+            { user_id: 2, username: "bob" },
+          ],
+        },
+      }),
+    );
+
+    const users = await getUsers("http://tautulli.local:8181", "key123");
+    expect(users).toEqual([
+      { user_id: 1, username: "alice", friendly_name: "Alice", email: "alice@example.com" },
+      { user_id: 2, username: "bob" },
+    ]);
+
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.searchParams.get("cmd")).toBe("get_users");
+  });
+
+  it("throws when Tautulli reports an API error", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "error", message: "Invalid apikey", data: null } }),
+    );
+
+    await expect(getUsers("http://tautulli.local:8181", "bad-key")).rejects.toThrow("Invalid apikey");
   });
 });
 

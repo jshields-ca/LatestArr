@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildImageUrl,
   fetchImage,
+  getAccounts,
   getLibraries,
   getRecentlyAdded,
   getServerIdentity,
@@ -59,6 +60,28 @@ describe("getLibraries", () => {
   it("throws on a non-2xx HTTP response", async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, false, 401));
     await expect(getLibraries("http://plex.local:32400", "bad-token")).rejects.toThrow("HTTP 401");
+  });
+});
+
+describe("getAccounts", () => {
+  it("returns the account list on success", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: { Account: [{ id: 1, name: "alice" }, { id: 2, name: "bob" }] },
+      }),
+    );
+
+    const accounts = await getAccounts("http://plex.local:32400", "tok123");
+    expect(accounts).toEqual([{ id: 1, name: "alice" }, { id: 2, name: "bob" }]);
+
+    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
+    expect(calledUrl.pathname).toBe("/accounts");
+  });
+
+  it("returns an empty array when Account is absent", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: {} }));
+    const accounts = await getAccounts("http://plex.local:32400", "tok123");
+    expect(accounts).toEqual([]);
   });
 });
 
