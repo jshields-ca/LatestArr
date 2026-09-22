@@ -88,10 +88,13 @@ describe("SmtpProfilesPage", () => {
     await user.click(screen.getByRole("button", { name: "Edit Primary" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText("Name")).toHaveValue("Primary");
+    // Connection is the default tab.
     expect(within(dialog).getByLabelText("Host")).toHaveValue("smtp.example.com");
     expect(within(dialog).getByLabelText("Port")).toHaveValue(587);
+
     // hasAuth: true on the fixture — username/password stay blank (never
     // returned decrypted) with a "leave blank to keep current" label.
+    await user.click(within(dialog).getByRole("tab", { name: "Authentication" }));
     expect(within(dialog).getByLabelText("Username (leave blank to keep current)")).toHaveValue("");
 
     await user.clear(within(dialog).getByLabelText("Name"));
