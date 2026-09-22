@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { SendRunHistoryList } from "@/components/send-run-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,6 @@ import {
   type SourceConnection,
   type Template,
 } from "@/lib/api";
-import { sendRunBadgeLabel, sendRunBadgeVariant } from "@/lib/send-run";
 import { cn } from "@/lib/utils";
 
 // Whether the setup checklist should default to its compact "Setup
@@ -184,29 +184,6 @@ function StatCard({
 }
 
 type RecentRun = SendRun & { newsletterName: string };
-
-function RecentRunRow({ run }: { run: RecentRun }) {
-  return (
-    <li className="flex flex-col gap-1.5 rounded-md border border-border p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="truncate text-sm font-medium">{run.newsletterName}</span>
-        <Badge variant={sendRunBadgeVariant(run)}>{sendRunBadgeLabel(run)}</Badge>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        <span>{run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}</span>
-        <span aria-hidden="true">&middot;</span>
-        <span>
-          {run.itemCountIncluded} item{run.itemCountIncluded === 1 ? "" : "s"}
-        </span>
-        <span aria-hidden="true">&middot;</span>
-        <span>
-          {run.recipientCount} recipient{run.recipientCount === 1 ? "" : "s"}
-        </span>
-      </div>
-      {run.error ? <p className="text-xs text-destructive">{run.error}</p> : null}
-    </li>
-  );
-}
 
 export function DashboardPage() {
   const [sources, setSources] = useState<SourceConnection[] | null>(null);
@@ -448,20 +425,7 @@ export function DashboardPage() {
             <CardTitle>Recent sends</CardTitle>
           </CardHeader>
           <CardContent>
-            {recentRuns === null ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Loading recent sends...
-              </div>
-            ) : recentRuns.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No sends yet.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {recentRuns.map((run) => (
-                  <RecentRunRow key={run.id} run={run} />
-                ))}
-              </ul>
-            )}
+            <SendRunHistoryList runs={recentRuns} error={null} />
           </CardContent>
         </Card>
       ) : null}
