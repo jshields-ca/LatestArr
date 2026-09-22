@@ -4,6 +4,8 @@ import {
   newsletterSources,
   newsletters,
   recipientGroups,
+  recipients,
+  sendRunRecipientResults,
   sendRuns,
   sourceConnections,
 } from "@latestarr/db";
@@ -74,6 +76,11 @@ interface NewsletterSourceParams {
 interface NewsletterGroupParams {
   id: string;
   groupId: string;
+}
+
+interface SendRunParams {
+  id: string;
+  runId: string;
 }
 
 export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler?: SchedulerHandle): void {
@@ -333,13 +340,71 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       }
     });
 
+    // renderedHtml is excluded here — it can be tens to hundreds of KB per
+    // run, and this list can return many runs at once. Fetch it
+    // individually via GET /send-runs/:runId/html instead.
     scope.get<{ Params: IdParams }>("/newsletters/:id/send-runs", async (request, reply) => {
       const rows = await db
-        .select()
+        .select({
+          id: sendRuns.id,
+          newsletterId: sendRuns.newsletterId,
+          status: sendRuns.status,
+          startedAt: sendRuns.startedAt,
+          finishedAt: sendRuns.finishedAt,
+          itemCountIncluded: sendRuns.itemCountIncluded,
+          recipientCount: sendRuns.recipientCount,
+          error: sendRuns.error,
+          itemsSnapshot: sendRuns.itemsSnapshot,
+        })
         .from(sendRuns)
         .where(eq(sendRuns.newsletterId, request.params.id))
         .orderBy(desc(sendRuns.startedAt));
       return reply.send({ sendRuns: rows });
     });
+
+    scope.get<{ Params: SendRunParams }>(
+      "/newsletters/:id/send-runs/:runId/recipients",
+      async (request, reply) => {
+        const rows = await db
+          .select({
+            recipientId: sendRunRecipientResults.recipientId,
+            email: recipients.email,
+            displayName: recipients.displayName,
+            status: sendRunRecipientResults.status,
+            error: sendRunRecipientResults.error,
+          })
+          .from(sendRunRecipientResults)
+          .innerJoin(recipients, eq(sendRunRecipientResults.recipientId, recipients.id))
+          .innerJoin(sendRuns, eq(sendRunRecipientResults.sendRunId, sendRuns.id))
+          .where(
+            and(
+              eq(sendRunRecipientResults.sendRunId, request.params.runId),
+              eq(sendRuns.newsletterId, request.params.id),
+            ),
+          );
+        return reply.send({ recipients: rows });
+      },
+    );
+
+    // Plain text/html, not JSON — this is meant to be opened directly (a
+    // link target, not fetched and parsed), the same copy that was
+    // actually sent (see SendRuns.renderedHtml's own comment for why it's
+    // stored verbatim rather than re-rendered on demand).
+    scope.get<{ Params: SendRunParams }>(
+      "/newsletters/:id/send-runs/:runId/html",
+      async (request, reply) => {
+        const [row] = await db
+          .select({ renderedHtml: sendRuns.renderedHtml, newsletterId: sendRuns.newsletterId })
+          .from(sendRuns)
+          .where(eq(sendRuns.id, request.params.runId));
+        if (!row || row.newsletterId !== request.params.id) {
+          return reply.code(404).send({ error: "Not found" });
+        }
+        if (!row.renderedHtml) {
+          return reply.code(404).send({ error: "No rendered copy available for this send" });
+        }
+        return reply.type("text/html").send(row.renderedHtml);
+      },
+    );
   });
 }

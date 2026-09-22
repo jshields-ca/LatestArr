@@ -195,7 +195,14 @@ function buildSourceLinksByContentType(linkedSources: LinkedSource[]): Record<st
 interface RenderedNewsletter {
   html: string;
   attachments: EmailAttachment[];
-  itemCount: number;
+  /** The fetched pool this render drew from — same set `itemCountIncluded`
+   * has always counted (its `.length`), now also captured as a
+   * {title, kind} snapshot for send-run detail. For a custom template
+   * with per-block selection (Media List's count/sort/emptyFallback), this
+   * can be a superset of what the template actually rendered — an
+   * existing characteristic of itemCountIncluded this doesn't change,
+   * just extends to also record titles. */
+  items: NewItem[];
 }
 
 const EMPTY_FETCHED_ITEMS: FetchedItems = { items: [], sourceByItem: new Map() };
@@ -265,7 +272,7 @@ async function renderNewsletterContent(
         allSourceByItem.get(item),
       );
 
-      return { html: resolved.html, attachments: resolved.attachments, itemCount: items.length };
+      return { html: resolved.html, attachments: resolved.attachments, items };
     }
   }
 
@@ -283,7 +290,7 @@ async function renderNewsletterContent(
   const resolved = await resolvePosterPlaceholders(html, addedPlaceholders.placeholders, (item) =>
     sourceByItem.get(item),
   );
-  return { html: resolved.html, attachments: resolved.attachments, itemCount: items.length };
+  return { html: resolved.html, attachments: resolved.attachments, items };
 }
 
 async function resolveRecipients(db: Db, newsletterId: string) {
@@ -339,8 +346,20 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
   const sendRunId = sendRun!.id;
 
   try {
-    const { html, attachments, itemCount } = await renderNewsletterContent(db, newsletter, new Date());
+    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date());
     const subject = newsletter.subjectTemplate || newsletter.name;
+
+    // Persisted as soon as rendering succeeds, independent of whether the
+    // send-loop below ends up sent/partial_failure/failed for individual
+    // recipients — "what was sent" is meaningful even if delivery to some
+    // (or all) recipients later failed.
+    await db
+      .update(sendRuns)
+      .set({
+        itemsSnapshot: items.map((item) => ({ title: item.title, kind: item.kind })),
+        renderedHtml: html,
+      })
+      .where(eq(sendRuns.id, sendRunId));
 
     const recipientRows = await resolveRecipients(db, newsletterId);
     const activeRecipients = recipientRows.filter((recipient) => recipient.isActive);
@@ -395,7 +414,7 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
       .set({
         status: finalStatus,
         finishedAt: new Date(),
-        itemCountIncluded: itemCount,
+        itemCountIncluded: items.length,
         recipientCount: activeRecipients.length,
       })
       .where(eq(sendRuns.id, sendRunId));

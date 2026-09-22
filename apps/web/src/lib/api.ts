@@ -404,6 +404,15 @@ export interface SendRun {
   itemCountIncluded: number;
   recipientCount: number;
   error: string | null;
+  itemsSnapshot: { title: string; kind: string }[] | null;
+}
+
+export interface SendRunRecipientResult {
+  recipientId: string;
+  email: string;
+  displayName: string | null;
+  status: "sent" | "bounced" | "failed" | "skipped_unsubscribed";
+  error: string | null;
 }
 
 export function listNewsletters(): Promise<{ newsletters: Newsletter[] }> {
@@ -471,6 +480,22 @@ export function sendNewsletterNow(id: string): Promise<{ sendRunId: string }> {
 
 export function listSendRuns(newsletterId: string): Promise<{ sendRuns: SendRun[] }> {
   return apiFetch<{ sendRuns: SendRun[] }>(`/newsletters/${newsletterId}/send-runs`);
+}
+
+export function listSendRunRecipients(
+  newsletterId: string,
+  sendRunId: string,
+): Promise<{ recipients: SendRunRecipientResult[] }> {
+  return apiFetch<{ recipients: SendRunRecipientResult[] }>(
+    `/newsletters/${newsletterId}/send-runs/${sendRunId}/recipients`,
+  );
+}
+
+// Not JSON — the endpoint returns the sent HTML itself
+// (Content-Type: text/html), meant to be opened directly rather than
+// fetched through apiFetch's JSON parsing.
+export function sendRunHtmlUrl(newsletterId: string, sendRunId: string): string {
+  return `/api/newsletters/${newsletterId}/send-runs/${sendRunId}/html`;
 }
 
 export interface Template {

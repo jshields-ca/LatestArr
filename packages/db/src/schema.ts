@@ -207,6 +207,21 @@ export const sendRuns = sqliteTable("send_runs", {
   itemCountIncluded: integer("item_count_included").notNull().default(0),
   recipientCount: integer("recipient_count").notNull().default(0),
   error: text("error"),
+  // A lightweight snapshot of what was actually included — title/kind
+  // only, not the full NewItem shape — set once rendering succeeds, even
+  // if the send itself later fails partway through recipients. Null for
+  // any send-run from before this column existed, and for one that failed
+  // before rendering got far enough to produce content.
+  itemsSnapshot: text("items_snapshot", { mode: "json" }).$type<{ title: string; kind: string }[]>(),
+  // The actual rendered HTML sent, so "what did this newsletter look
+  // like" doesn't require re-rendering (which could differ from what was
+  // actually sent if templates/sources changed since). Same
+  // set-once-rendering-succeeds timing as itemsSnapshot. Stored inline
+  // rather than as a file — newsletter HTML is a few KB to at most a few
+  // hundred KB with embedded images stripped to CID refs (the images
+  // themselves are sent as attachments, not inlined into this column) —
+  // not large enough to justify separate blob storage.
+  renderedHtml: text("rendered_html"),
 });
 
 export const sendRunRecipientResults = sqliteTable("send_run_recipient_results", {

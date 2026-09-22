@@ -15,6 +15,13 @@
       "when": 1790014147125,
       "tag": "0001_nostalgic_ulik",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790040784089,
+      "tag": "0002_early_randall_flagg",
+      "breakpoints": true
     }
   ]
 }
