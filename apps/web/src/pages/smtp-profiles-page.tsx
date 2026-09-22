@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Switch } from "@/components/ui/switch";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
@@ -299,6 +300,7 @@ function EditSmtpProfileDialog({
   const [defaultFromEmail, setDefaultFromEmail] = useState(profile.defaultFromEmail);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("connection");
 
   function openWithCurrentValues(next: boolean) {
     setOpen(next);
@@ -313,6 +315,7 @@ function EditSmtpProfileDialog({
       setDefaultFromName(profile.defaultFromName);
       setDefaultFromEmail(profile.defaultFromEmail);
       setError(null);
+      setActiveTab("connection");
     }
   }
 
@@ -369,99 +372,119 @@ function EditSmtpProfileDialog({
               disabled={submitting}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-smtp-host">Host</Label>
-            <Input
-              id="edit-smtp-host"
-              required
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              disabled={submitting}
-            />
-          </div>
-          <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-            <SubsectionHeading>Port &amp; encryption</SubsectionHeading>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-smtp-port">Port</Label>
-              <Input
-                id="edit-smtp-port"
-                type="number"
-                required
-                value={port}
-                onChange={(e) => handlePortChange(e.target.value)}
-                disabled={submitting}
-                aria-describedby="edit-smtp-port-guide"
-              />
-            </div>
-            <PortGuide id="edit-smtp-port-guide" />
-            <div className="flex items-center justify-between border-t border-border pt-3">
-              <div>
-                <Label htmlFor="edit-smtp-secure">Use implicit TLS (port 465)</Label>
-                <p id="edit-smtp-secure-hint" className="text-xs text-muted-foreground">
-                  Set for you based on the port above. Only change it if your provider says
-                  otherwise.
-                </p>
+
+          {/* Connection/Authentication/Sender identity as tabs instead of one
+              long stacked form — same pattern as the newsletter edit page's
+              Details/History split (see newsletters-page.tsx). The Port &
+              encryption group in particular (port field, the always-visible
+              PORT_GUIDE reference, and the implicit-TLS switch) took up a lot
+              of vertical space on its own, which is what made this feel
+              cramped as a single scrolling view. */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="connection">Connection</TabsTrigger>
+              <TabsTrigger value="auth">Authentication</TabsTrigger>
+              <TabsTrigger value="sender">Sender identity</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="connection">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-smtp-host">Host</Label>
+                <Input
+                  id="edit-smtp-host"
+                  required
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  disabled={submitting}
+                />
               </div>
-              <Switch
-                id="edit-smtp-secure"
-                checked={secure}
-                onCheckedChange={(next) => {
-                  setSecure(next);
-                  setSecureTouched(true);
-                }}
-                disabled={submitting}
-                aria-describedby="edit-smtp-secure-hint"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-smtp-username">
-                Username {profile.hasAuth ? "(leave blank to keep current)" : "(optional)"}
-              </Label>
-              <Input
-                id="edit-smtp-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-smtp-password">
-                Password {profile.hasAuth ? "(leave blank to keep current)" : "(optional)"}
-              </Label>
-              <Input
-                id="edit-smtp-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-smtp-from-name">From name</Label>
-              <Input
-                id="edit-smtp-from-name"
-                required
-                value={defaultFromName}
-                onChange={(e) => setDefaultFromName(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-smtp-from-email">From email</Label>
-              <Input
-                id="edit-smtp-from-email"
-                type="email"
-                required
-                value={defaultFromEmail}
-                onChange={(e) => setDefaultFromEmail(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-          </div>
+              <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+                <SubsectionHeading>Port &amp; encryption</SubsectionHeading>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="edit-smtp-port">Port</Label>
+                  <Input
+                    id="edit-smtp-port"
+                    type="number"
+                    required
+                    value={port}
+                    onChange={(e) => handlePortChange(e.target.value)}
+                    disabled={submitting}
+                    aria-describedby="edit-smtp-port-guide"
+                  />
+                </div>
+                <PortGuide id="edit-smtp-port-guide" />
+                <div className="flex items-center justify-between border-t border-border pt-3">
+                  <div>
+                    <Label htmlFor="edit-smtp-secure">Use implicit TLS (port 465)</Label>
+                    <p id="edit-smtp-secure-hint" className="text-xs text-muted-foreground">
+                      Set for you based on the port above. Only change it if your provider says
+                      otherwise.
+                    </p>
+                  </div>
+                  <Switch
+                    id="edit-smtp-secure"
+                    checked={secure}
+                    onCheckedChange={(next) => {
+                      setSecure(next);
+                      setSecureTouched(true);
+                    }}
+                    disabled={submitting}
+                    aria-describedby="edit-smtp-secure-hint"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="auth">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-smtp-username">
+                  Username {profile.hasAuth ? "(leave blank to keep current)" : "(optional)"}
+                </Label>
+                <Input
+                  id="edit-smtp-username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-smtp-password">
+                  Password {profile.hasAuth ? "(leave blank to keep current)" : "(optional)"}
+                </Label>
+                <Input
+                  id="edit-smtp-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sender">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-smtp-from-name">From name</Label>
+                <Input
+                  id="edit-smtp-from-name"
+                  required
+                  value={defaultFromName}
+                  onChange={(e) => setDefaultFromName(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-smtp-from-email">From email</Label>
+                <Input
+                  id="edit-smtp-from-email"
+                  type="email"
+                  required
+                  value={defaultFromEmail}
+                  onChange={(e) => setDefaultFromEmail(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
