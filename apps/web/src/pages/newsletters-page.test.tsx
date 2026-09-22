@@ -158,9 +158,10 @@ describe("NewslettersPage", () => {
 
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       const body = JSON.parse(init.body as string);
-      // Default simple schedule: weekly, Monday, 08:00, UTC.
+      // Default simple schedule: weekly, Monday, 08:00, the browser's own
+      // timezone (whatever that resolves to on the machine running the test).
       expect(body.scheduleCron).toBe("0 8 * * 1");
-      expect(body.timezone).toBe("UTC");
+      expect(body.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     },
     60000,
   );
