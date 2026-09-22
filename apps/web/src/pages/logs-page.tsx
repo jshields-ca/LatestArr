@@ -1,22 +1,21 @@
-import { useEffect, useState } from "react";
-import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { ApiError, listLogs, type LogEntry } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type BadgeVariant = "neutral" | "success" | "destructive" | "warning";
+const LIVE_POLL_MS = 3000;
 
-const LEVEL_VARIANT: Record<LogEntry["levelLabel"], BadgeVariant> = {
-  fatal: "destructive",
-  error: "destructive",
-  warn: "warning",
-  info: "neutral",
-  debug: "neutral",
-  trace: "neutral",
+const LEVEL_STYLES: Record<LogEntry["levelLabel"], string> = {
+  fatal: "text-destructive",
+  error: "text-destructive",
+  warn: "text-amber-400",
+  info: "text-sky-300",
+  debug: "text-zinc-400",
+  trace: "text-zinc-500",
 };
 
 const LEVEL_FILTERS: { value: string; label: string }[] = [
@@ -27,14 +26,18 @@ const LEVEL_FILTERS: { value: string; label: string }[] = [
 
 // Fields already surfaced directly (time, level, levelLabel, msg) or too
 // noisy to be worth a raw-details dump (pid, hostname, reqId — the same on
-// nearly every line) are left out of what "Details" expands into.
+// nearly every line) are left out of what expanding a line reveals.
 const HIDDEN_DETAIL_KEYS = new Set(["time", "level", "levelLabel", "msg", "pid", "hostname", "reqId"]);
 
-function formatTime(time: number): string {
+function formatClock(time: number): string {
+  return new Date(time).toLocaleTimeString(undefined, { hour12: false });
+}
+
+function formatFullTime(time: number): string {
   return new Date(time).toLocaleString();
 }
 
-function LogRow({ entry }: { entry: LogEntry }) {
+function LogLine({ entry }: { entry: LogEntry }) {
   const [expanded, setExpanded] = useState(false);
   const details = Object.fromEntries(
     Object.entries(entry).filter(([key, value]) => !HIDDEN_DETAIL_KEYS.has(key) && value !== undefined),
@@ -42,38 +45,45 @@ function LogRow({ entry }: { entry: LogEntry }) {
   const hasDetails = Object.keys(details).length > 0;
 
   return (
-    <li
+    <div
       className={cn(
-        "flex flex-col gap-1.5 rounded-md border border-border bg-muted/30 p-3",
-        (entry.levelLabel === "error" || entry.levelLabel === "fatal") &&
-          "border-l-4 border-l-destructive bg-destructive/5",
+        "border-l-2 border-l-transparent px-3 py-1",
+        (entry.levelLabel === "error" || entry.levelLabel === "fatal") && "border-l-destructive bg-destructive/10",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <Badge variant={LEVEL_VARIANT[entry.levelLabel]}>{entry.levelLabel}</Badge>
-          <span className="text-xs text-muted-foreground">{formatTime(entry.time)}</span>
-        </div>
+      <button
+        type="button"
+        onClick={() => hasDetails && setExpanded((e) => !e)}
+        aria-expanded={hasDetails ? expanded : undefined}
+        aria-label={hasDetails ? (expanded ? "Hide details" : "Show details") : undefined}
+        disabled={!hasDetails}
+        className={cn(
+          "flex w-full items-start gap-2 text-left disabled:cursor-default",
+          hasDetails && "cursor-pointer",
+        )}
+      >
         {hasDetails ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setExpanded((e) => !e)}
-            aria-expanded={expanded}
-            aria-label={expanded ? "Hide details" : "Show details"}
-          >
-            Details
-            <ChevronDown className={cn("transition-transform", expanded && "rotate-180")} aria-hidden="true" />
-          </Button>
-        ) : null}
-      </div>
-      <p className="break-words text-sm">{entry.msg}</p>
+          <ChevronRight
+            className={cn("mt-0.5 size-3 shrink-0 text-zinc-600 transition-transform", expanded && "rotate-90")}
+            aria-hidden="true"
+          />
+        ) : (
+          <span className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+        )}
+        <span className="shrink-0 text-zinc-500" title={formatFullTime(entry.time)}>
+          {formatClock(entry.time)}
+        </span>
+        <span className={cn("w-12 shrink-0 font-semibold uppercase", LEVEL_STYLES[entry.levelLabel])}>
+          {entry.levelLabel}
+        </span>
+        <span className="min-w-0 flex-1 break-words text-zinc-200">{entry.msg}</span>
+      </button>
       {expanded ? (
-        <pre className="overflow-x-auto rounded-md border border-border bg-background p-2 text-xs">
+        <pre className="ml-9 mt-1 overflow-x-auto whitespace-pre-wrap break-words text-zinc-400">
           {JSON.stringify(details, null, 2)}
         </pre>
       ) : null}
-    </li>
+    </div>
   );
 }
 
@@ -82,14 +92,21 @@ export function LogsPage() {
   const [level, setLevel] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+  const levelRef = useRef(level);
+  levelRef.current = level;
 
-  function load() {
-    setLoading(true);
-    setError(null);
-    listLogs({ level: (level || undefined) as LogEntry["levelLabel"] | undefined })
-      .then(({ logs: loaded }) => setLogs(loaded))
+  function load(options: { silent?: boolean } = {}) {
+    if (!options.silent) setLoading(true);
+    listLogs({ level: (levelRef.current || undefined) as LogEntry["levelLabel"] | undefined })
+      .then(({ logs: loaded }) => {
+        setLogs(loaded);
+        setError(null);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load logs."))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!options.silent) setLoading(false);
+      });
   }
 
   useEffect(() => {
@@ -99,6 +116,12 @@ export function LogsPage() {
     // here would just re-trigger on every render instead of only on a
     // filter change.
   }, [level]);
+
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => load({ silent: true }), LIVE_POLL_MS);
+    return () => clearInterval(id);
+  }, [live]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -119,7 +142,23 @@ export function LogsPage() {
                 </option>
               ))}
             </Select>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <Button
+              type="button"
+              variant={live ? "default" : "outline"}
+              size="sm"
+              onClick={() => setLive((l) => !l)}
+              aria-pressed={live}
+            >
+              <span
+                className={cn(
+                  "size-2 rounded-full",
+                  live ? "animate-pulse bg-primary-foreground" : "bg-muted-foreground",
+                )}
+                aria-hidden="true"
+              />
+              Live
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => load()} disabled={loading}>
               {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
               Refresh
             </Button>
@@ -145,11 +184,13 @@ export function LogsPage() {
       ) : null}
 
       {logs && logs.length > 0 ? (
-        <ul className="flex flex-col gap-2">
-          {logs.map((entry, index) => (
-            <LogRow key={`${entry.time}-${index}`} entry={entry} />
-          ))}
-        </ul>
+        <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 font-mono text-xs shadow-inner">
+          <div className="max-h-[70vh] divide-y divide-zinc-900 overflow-y-auto py-1">
+            {logs.map((entry, index) => (
+              <LogLine key={`${entry.time}-${index}`} entry={entry} />
+            ))}
+          </div>
+        </div>
       ) : null}
     </div>
   );
