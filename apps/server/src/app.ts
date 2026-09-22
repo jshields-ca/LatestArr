@@ -13,9 +13,11 @@ import { rommAdapter } from "@latestarr/adapter-romm";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
+import pino from "pino";
 import { loadOidcConfigFromEnv } from "./auth/oidc-config.js";
 import { requireSameOrigin } from "./http/require-same-origin.js";
 import { registerAuthRoutes } from "./http/routes/auth.js";
+import { registerLogRoutes } from "./http/routes/logs.js";
 import { registerNewsletterRoutes } from "./http/routes/newsletters.js";
 import { registerOidcRoutes } from "./http/routes/oidc.js";
 import { registerRecipientGroupRoutes } from "./http/routes/recipient-groups.js";
@@ -23,6 +25,7 @@ import { registerRecipientRoutes } from "./http/routes/recipients.js";
 import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
 import { registerTemplateRoutes } from "./http/routes/templates.js";
+import { logBufferStream } from "./log-buffer.js";
 import type { SchedulerHandle } from "./scheduler/engine.js";
 
 // Read once at module load rather than per-request — the version can't
@@ -67,7 +70,30 @@ export async function buildApp(
   // proxy setups opt in via TRUST_PROXY=true (see docs/self-hosting.md);
   // this is also what makes the session cookie's Secure flag correct in
   // both modes (see auth.ts/oidc.ts, which key off request.protocol).
-  const app = Fastify({ logger: true, trustProxy: process.env.TRUST_PROXY === "true" });
+  // A named logger instance (rather than `logger: true`, which builds one
+  // internally with no way to attach an extra destination) writing to both
+  // stdout — unchanged from before, still what `docker logs` shows — and
+  // logBufferStream, so GET /logs (registered below) has recent entries to
+  // read without standing up a real log aggregator.
+  // pino's destination is its *second* argument — pino(multistreamResult)
+  // alone silently falls back to its own default stdout destination and
+  // never actually writes to any custom stream in the multistream array
+  // (confirmed by direct repro), even though a bare pino(customStream)
+  // with a single non-multistream destination works fine as the sole
+  // argument.
+  const logger = pino({}, pino.multistream([{ stream: process.stdout }, { stream: logBufferStream }]));
+  // `as unknown as FastifyInstance`: passing a concrete pino instance via
+  // loggerInstance makes Fastify() infer its return type parameterized
+  // over that exact pino Logger<...> type, which structurally isn't
+  // assignable to/from buildApp's own declared return type
+  // (FastifyInstance, using Fastify's own FastifyBaseLogger interface) —
+  // a known friction point of TypeScript + a custom pino logger instance,
+  // not a real runtime mismatch (this is still a completely ordinary
+  // Fastify instance).
+  const app = Fastify({
+    loggerInstance: logger,
+    trustProxy: process.env.TRUST_PROXY === "true",
+  }) as unknown as FastifyInstance;
 
   await app.register(cookie);
 
@@ -147,6 +173,7 @@ export async function buildApp(
       registerRecipientGroupRoutes(api, db);
       registerNewsletterRoutes(api, db, scheduler);
       registerTemplateRoutes(api, db);
+      registerLogRoutes(api, db);
     },
     { prefix: "/api" },
   );

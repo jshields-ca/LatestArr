@@ -89,6 +89,9 @@ importers:
       openid-client:
         specifier: ^6.1.0
         version: 6.8.8
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
       sharp:
         specifier: ^0.35.4
         version: 0.35.4(@types/node@22.20.2)

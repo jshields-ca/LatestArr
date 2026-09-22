@@ -6,6 +6,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LoginPage } from "@/pages/login-page";
+import { LogsPage } from "@/pages/logs-page";
 import { NewslettersPage } from "@/pages/newsletters-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { RecipientsPage } from "@/pages/recipients-page";
@@ -38,6 +39,7 @@ export default function App() {
                   <Route path="/smtp" element={<SmtpProfilesPage />} />
                   <Route path="/newsletters" element={<NewslettersPage />} />
                   <Route path="/templates" element={<TemplatesPage />} />
+                  <Route path="/logs" element={<LogsPage />} />
                   <Route
                     path="/templates/:id/edit"
                     element={

@@ -536,3 +536,25 @@ export function updateTemplate(
     body: JSON.stringify(input),
   });
 }
+
+export interface LogEntry {
+  time: number;
+  level: number;
+  levelLabel: "trace" | "debug" | "info" | "warn" | "error" | "fatal";
+  msg: string;
+  err?: { type?: string; message?: string };
+  req?: { method?: string; url?: string };
+  res?: { statusCode?: number };
+  [key: string]: unknown;
+}
+
+export function listLogs(params?: {
+  limit?: number;
+  level?: LogEntry["levelLabel"];
+}): Promise<{ logs: LogEntry[] }> {
+  const search = new URLSearchParams();
+  if (params?.limit) search.set("limit", String(params.limit));
+  if (params?.level) search.set("level", params.level);
+  const query = search.toString();
+  return apiFetch<{ logs: LogEntry[] }>(`/logs${query ? `?${query}` : ""}`);
+}
