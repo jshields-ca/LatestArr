@@ -42,6 +42,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app.close();
+  db.$client.close();
   if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
   delete process.env.ENCRYPTION_KEY;
 });

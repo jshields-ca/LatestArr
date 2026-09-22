@@ -65,6 +65,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app.close();
+  db.$client.close();
   if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
   vi.unstubAllGlobals();
   mockFetch.mockReset();
