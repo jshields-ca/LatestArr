@@ -23,11 +23,26 @@ function jsonResponse(status: number, body: unknown) {
 
 const ALL_KINDS = ["tautulli", "plex", "booklore", "bookorbit", "grimmory", "audiobookshelf", "romm"];
 
-// SourcesPage fetches the sources list and the available adapter kinds in
-// parallel on mount, so every render in these tests needs both queued.
+// SourcesPage fetches the sources list, the available adapter kinds, and
+// the recipient groups list (for ImportSourceUsersDialog's "reuse an
+// existing group" check) in parallel on mount, so every render in these
+// tests needs all three queued.
 function mockLoad(sourcesBody: unknown, kinds: string[] = ALL_KINDS) {
   fetchMock.mockResolvedValueOnce(jsonResponse(200, sourcesBody));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { kinds }));
+  fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
+}
+
+// Finds a POST/PATCH call by URL instead of a fixed array index, so an
+// unrelated fetch added earlier in SourcesPage's mount sequence (or
+// queued in a different order — Promise.all resolution order isn't
+// guaranteed) doesn't silently break every mutating-call assertion here.
+function findMutatingCall(url: string): [string, RequestInit] {
+  const call = fetchMock.mock.calls.find(
+    ([calledUrl, init]) => calledUrl === url && (init as RequestInit | undefined)?.method !== undefined,
+  );
+  if (!call) throw new Error(`No mutating call found for ${url}`);
+  return call as [string, RequestInit];
 }
 
 const exampleSource = {
@@ -99,7 +114,7 @@ describe("SourcesPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText("Home Tautulli")).toBeInTheDocument();
 
-    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    const [, init] = findMutatingCall("/api/sources");
     expect(JSON.parse(init.body as string)).toEqual({
       name: "Home Tautulli",
       kind: "tautulli",
@@ -129,7 +144,7 @@ describe("SourcesPage", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    const [, init] = findMutatingCall("/api/sources");
     expect(JSON.parse(init.body as string)).toEqual({
       name: "Home Tautulli",
       kind: "tautulli",
@@ -162,7 +177,7 @@ describe("SourcesPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await screen.findByText("Renamed Tautulli")).toBeInTheDocument();
 
-    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    const [, init] = findMutatingCall("/api/sources/1");
     expect(JSON.parse(init.body as string)).toEqual({
       name: "Renamed Tautulli",
       baseUrl: "http://localhost:8181",
@@ -190,7 +205,7 @@ describe("SourcesPage", () => {
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
-    const [, init] = fetchMock.mock.calls[2] as [string, RequestInit];
+    const [, init] = findMutatingCall("/api/sources/1");
     expect(JSON.parse(init.body as string)).toMatchObject({ publicUrl: "" });
   });
 
@@ -211,8 +226,10 @@ describe("SourcesPage", () => {
         "Fill in every credential field, or leave them all blank to keep the current ones.",
       ),
     ).toBeInTheDocument();
-    // No PATCH request was ever sent (still only the two initial GETs).
-    expect(fetchMock.mock.calls).toHaveLength(2);
+    // No PATCH request was ever sent.
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PATCH")).toBe(
+      false,
+    );
   });
 
   // Exercised via the Edit dialog rather than the Add dialog's Source-type
@@ -338,6 +355,98 @@ describe("SourcesPage", () => {
     await screen.findByText("No sources yet");
 
     await user.click(screen.getByRole("button", { name: "Add source" }));
+    await screen.findByRole("dialog");
+
+    expect(await axe(document.body)).toHaveNoViolations();
+  });
+});
+
+describe("ImportSourceUsersDialog", () => {
+  it("only offers Import users for source kinds that support it", async () => {
+    mockLoad({
+      sources: [exampleSource, { ...exampleSource, id: "2", name: "Game Library", kind: "romm" }],
+    });
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+    await screen.findByText("Game Library");
+
+    expect(screen.getAllByRole("button", { name: "Import users" })).toHaveLength(1);
+  });
+
+  it("previews users, pre-checking those with an email, and imports the selected ones into a new group", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [exampleSource] });
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve(
+        jsonResponse(200, {
+          users: [
+            { externalId: "1", username: "alice", email: "alice@example.com" },
+            { externalId: "2", username: "bob" },
+          ],
+        }),
+      ),
+    );
+
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+
+    await user.click(screen.getByRole("button", { name: "Import users" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("alice@example.com");
+
+    const aliceCheckbox = within(dialog).getByRole("checkbox", { name: /alice/ });
+    const bobCheckbox = within(dialog).getByRole("checkbox", { name: /bob/ });
+    expect(aliceCheckbox).toBeChecked();
+    expect(bobCheckbox).toBeDisabled();
+    expect(within(dialog).getByText("No email")).toBeInTheDocument();
+
+    expect(within(dialog).getByLabelText("Add to group")).toHaveValue("Home Tautulli");
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(201, {
+        created: [{ id: "r1", email: "alice@example.com", displayName: "alice", isActive: true }],
+        skipped: [],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(201, { group: { id: "g1", name: "Home Tautulli", description: null } }),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
+
+    await user.click(within(dialog).getByRole("button", { name: /Import 1 recipient/ }));
+
+    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1\s*recipient.*Home Tautulli/));
+
+    const importCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipients/import") as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(importCall[1].body as string)).toEqual({
+      rows: [{ email: "alice@example.com", displayName: "alice" }],
+    });
+
+    const createGroupCall = fetchMock.mock.calls.find(
+      ([url, init]) => url === "/api/recipient-groups" && (init as RequestInit | undefined)?.method === "POST",
+    ) as [string, RequestInit];
+    expect(JSON.parse(createGroupCall[1].body as string)).toEqual({ name: "Home Tautulli" });
+
+    const addMemberCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipient-groups/g1/members") as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(addMemberCall[1].body as string)).toEqual({ recipientId: "r1" });
+  });
+
+  it("has no accessibility violations with the import-users dialog open", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [exampleSource] });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { users: [{ externalId: "1", username: "alice", email: "alice@example.com" }] }),
+    );
+
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+    await user.click(screen.getByRole("button", { name: "Import users" }));
     await screen.findByRole("dialog");
 
     expect(await axe(document.body)).toHaveNoViolations();

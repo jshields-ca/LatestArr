@@ -11,6 +11,7 @@ import {
   Plus,
   Server,
   Trash2,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,14 +36,27 @@ import { ListRow } from "@/components/list-row";
 import { SourceLogo } from "@/components/source-logo";
 import {
   ApiError,
+  addGroupMember,
+  createGroup,
   createSource,
   deleteSource,
+  importRecipients,
+  listGroups,
   listSourceKinds,
   listSources,
+  listSourceUsers,
   testSourceConnection,
   updateSource,
+  type RecipientGroup,
   type SourceConnection,
+  type SourceUser,
 } from "@/lib/api";
+
+// Only these source kinds' adapters implement listUsers (see
+// packages/adapters/*/src/*-adapter.ts) — checked here too so the
+// "Import users" action only appears where it can actually work, rather
+// than every row offering it and most of them 404ing.
+const KINDS_WITH_USER_IMPORT = new Set(["plex", "tautulli"]);
 
 interface SourceKindField {
   key: string;
@@ -470,6 +484,220 @@ function EditSourceDialog({
   );
 }
 
+// Fetches the source's known users, lets the admin pick which ones (only
+// those with a known email — a recipient can't exist without one) to
+// import as recipients, and adds them to a group named after the source
+// — reusing that name across repeat imports rather than creating a new
+// group every time, the same way `importRecipients` itself skips a
+// recipient whose email already exists rather than duplicating it.
+function ImportSourceUsersDialog({
+  source,
+  groups,
+  onGroupsChange,
+}: {
+  source: SourceConnection;
+  groups: RecipientGroup[];
+  onGroupsChange: (updater: (prev: RecipientGroup[]) => RecipientGroup[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [users, setUsers] = useState<SourceUser[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [groupName, setGroupName] = useState(source.name);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ created: number; addedToGroup: number; noEmail: number } | null>(
+    null,
+  );
+
+  function openChange(next: boolean) {
+    setOpen(next);
+    if (!next) return;
+    setLoadError(null);
+    setResult(null);
+    setGroupName(source.name);
+    setUsers(null);
+    setLoading(true);
+    listSourceUsers(source.id)
+      .then(({ users: loaded }) => {
+        setUsers(loaded);
+        setSelected(new Set(loaded.filter((u) => u.email).map((u) => u.externalId)));
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load users."))
+      .finally(() => setLoading(false));
+  }
+
+  function toggle(externalId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(externalId)) next.delete(externalId);
+      else next.add(externalId);
+      return next;
+    });
+  }
+
+  async function handleImport() {
+    if (!users) return;
+    const rows = users
+      .filter((u) => u.email && selected.has(u.externalId))
+      .map((u) => ({ email: u.email!, displayName: u.username }));
+    if (rows.length === 0) return;
+
+    setSubmitting(true);
+    try {
+      const importResult = await importRecipients(rows);
+
+      const trimmedGroupName = groupName.trim();
+      let group = groups.find((g) => g.name === trimmedGroupName);
+      if (!group && trimmedGroupName) {
+        const { group: created } = await createGroup({ name: trimmedGroupName });
+        group = created;
+        onGroupsChange((prev) => [...prev, created]);
+      }
+
+      let addedToGroup = 0;
+      if (group) {
+        for (const recipient of importResult.created) {
+          await addGroupMember(group.id, recipient.id);
+          addedToGroup += 1;
+        }
+      }
+
+      setResult({
+        created: importResult.created.length,
+        addedToGroup,
+        noEmail: users.filter((u) => !u.email).length,
+      });
+      toast({
+        variant: "success",
+        title: `Imported ${importResult.created.length} recipient${importResult.created.length === 1 ? "" : "s"}`,
+      });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Import failed",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const selectedWithEmailCount = users
+    ? users.filter((u) => u.email && selected.has(u.externalId)).length
+    : 0;
+  const groupExists = groups.some((g) => g.name === groupName.trim());
+
+  return (
+    <Dialog open={open} onOpenChange={openChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <UserPlus />
+          Import users
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Import users from {source.name}</DialogTitle>
+          <DialogDescription>Add its known users as recipients, grouped together.</DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Loading users...
+          </div>
+        ) : loadError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {loadError}
+          </p>
+        ) : result ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm">
+              Added <strong>{result.created}</strong> recipient{result.created === 1 ? "" : "s"}
+              {result.addedToGroup > 0 ? (
+                <>
+                  {" "}
+                  to <strong>{groupName.trim()}</strong>
+                </>
+              ) : null}
+              .{" "}
+              {result.noEmail > 0
+                ? `${result.noEmail} user${result.noEmail === 1 ? " has" : "s have"} no known email and couldn't be imported.`
+                : ""}
+            </p>
+            <DialogFooter>
+              <Button type="button" onClick={() => setOpen(false)}>
+                Done
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : users ? (
+          users.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{source.name} has no known users yet.</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
+                {users.map((user) => (
+                  <li key={user.externalId} className="flex items-center gap-2 rounded px-1.5 py-1">
+                    <input
+                      type="checkbox"
+                      id={`import-user-${source.id}-${user.externalId}`}
+                      checked={selected.has(user.externalId)}
+                      disabled={!user.email}
+                      onChange={() => toggle(user.externalId)}
+                      className="size-4 shrink-0 accent-primary disabled:opacity-50"
+                    />
+                    <label
+                      htmlFor={`import-user-${source.id}-${user.externalId}`}
+                      className="flex min-w-0 flex-1 items-center justify-between gap-2 text-sm"
+                    >
+                      <span className="truncate">{user.username}</span>
+                      {user.email ? (
+                        <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+                      ) : (
+                        <Badge variant="neutral" className="shrink-0">
+                          No email
+                        </Badge>
+                      )}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="import-users-group">Add to group</Label>
+                <Input
+                  id="import-users-group"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  disabled={submitting}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {groupExists
+                    ? "Existing group — imported recipients will be added to it."
+                    : "A new group will be created."}
+                </p>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  onClick={() => void handleImport()}
+                  disabled={submitting || selectedWithEmailCount === 0}
+                >
+                  {submitting ? <Loader2 className="animate-spin" /> : null}
+                  Import {selectedWithEmailCount || ""} recipient{selectedWithEmailCount === 1 ? "" : "s"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface RowState {
   testing: boolean;
   testResult: string | null;
@@ -479,11 +707,15 @@ interface RowState {
 
 function SourceRow({
   source,
+  groups,
+  onGroupsChange,
   onChanged,
   onDeleted,
   onStatusChange,
 }: {
   source: SourceConnection;
+  groups: RecipientGroup[];
+  onGroupsChange: (updater: (prev: RecipientGroup[]) => RecipientGroup[]) => void;
   onChanged: (source: SourceConnection) => void;
   onDeleted: (id: string) => void;
   onStatusChange: (id: string, status: SourceConnection["status"], lastError: string | null) => void;
@@ -586,6 +818,9 @@ function SourceRow({
               {state.testing ? <Loader2 className="animate-spin" /> : null}
               Test connection
             </Button>
+            {KINDS_WITH_USER_IMPORT.has(source.kind) ? (
+              <ImportSourceUsersDialog source={source} groups={groups} onGroupsChange={onGroupsChange} />
+            ) : null}
             <EditSourceDialog source={source} onSaved={onChanged} />
             <Button
               variant="ghost"
@@ -605,6 +840,7 @@ function SourceRow({
 export function SourcesPage() {
   const [sources, setSources] = useState<SourceConnection[] | null>(null);
   const [kinds, setKinds] = useState<string[]>(FALLBACK_KINDS);
+  const [groups, setGroups] = useState<RecipientGroup[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -618,6 +854,12 @@ export function SourcesPage() {
       .then(({ kinds: loaded }) => {
         if (loaded.length > 0) setKinds(loaded);
       })
+      .catch(() => undefined);
+    // Only needed for ImportSourceUsersDialog's "reuse an existing group"
+    // check — a failure here just means every import creates a fresh
+    // group instead of reusing one, not worth its own error state.
+    listGroups()
+      .then(({ groups: loaded }) => setGroups(loaded))
       .catch(() => undefined);
   }, []);
 
@@ -664,6 +906,8 @@ export function SourcesPage() {
             <SourceRow
               key={source.id}
               source={source}
+              groups={groups}
+              onGroupsChange={(updater) => setGroups(updater)}
               onChanged={(updated) =>
                 setSources((prev) => (prev ?? []).map((s) => (s.id === updated.id ? updated : s)))
               }

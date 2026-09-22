@@ -75,6 +75,30 @@ describe("listLibraries", () => {
   });
 });
 
+describe("listUsers", () => {
+  it("maps users, preferring friendly_name over username, and drops the Local pseudo-user", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: [
+            { user_id: 0, username: "Local" },
+            { user_id: 1, username: "alice123", friendly_name: "Alice", email: "alice@example.com" },
+            { user_id: 2, username: "bob" },
+          ],
+        },
+      }),
+    );
+
+    const users = await tautulliAdapter.listUsers!(config);
+    expect(users).toEqual([
+      { externalId: "1", username: "Alice", email: "alice@example.com" },
+      { externalId: "2", username: "bob", email: undefined },
+    ]);
+  });
+});
+
 describe("fetchRecentItems", () => {
   const baseItem = {
     rating_key: "100",

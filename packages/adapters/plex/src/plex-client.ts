@@ -121,6 +121,27 @@ export async function getLibraries(baseUrl: string, token: string): Promise<Plex
   return container.Directory ?? [];
 }
 
+export interface PlexAccount {
+  id: number;
+  name: string;
+  // The local server's own /accounts listing doesn't carry a shared
+  // user's email — that's only visible via plex.tv's own account API
+  // using a plex.tv-linked account token, which this adapter (server-
+  // token only) doesn't have. Kept optional here rather than omitted
+  // entirely so a future plex.tv-aware lookup can populate it without an
+  // interface change.
+  email?: string;
+}
+
+// /accounts lists every account that has ever authenticated to this
+// server (the owner plus every shared/managed user) — id 0 is always the
+// server's own implicit "local" account (unauthenticated/direct access),
+// not a real person, filtered out by the adapter rather than here.
+export async function getAccounts(baseUrl: string, token: string): Promise<PlexAccount[]> {
+  const container = await callPlex<{ Account?: PlexAccount[] }>(baseUrl, "/accounts", token);
+  return container.Account ?? [];
+}
+
 export async function getRecentlyAdded(
   baseUrl: string,
   token: string,

@@ -7,11 +7,13 @@ import type {
   SourceAdapter,
   SourceConnectionConfig,
   SourceLibrary,
+  SourceUser,
 } from "@latestarr/adapter-core";
 import { buildPlexWebDeepLink, trimTrailingSlashes } from "@latestarr/adapter-core";
 import {
   buildImageUrl,
   fetchImage,
+  getAccounts,
   getLibraries,
   getRecentlyAdded,
   getServerIdentity,
@@ -115,6 +117,21 @@ export const plexAdapter: SourceAdapter = {
       name: library.title,
       kind: mapLibraryType(library.type),
     }));
+  },
+
+  // The local server's /accounts listing gives usernames for everyone
+  // who's ever authenticated (owner plus every shared/managed user), but
+  // not their plex.tv email — that's only visible via plex.tv's own
+  // account API, which needs a plex.tv-linked token this adapter (server-
+  // token only) doesn't have. So every entry here comes back with no
+  // email; a caller offering these as recipient-import candidates needs
+  // to handle that (see SourceUser's own doc comment). id 0 is the
+  // server's own implicit "local" account, not a real person.
+  async listUsers(config: SourceConnectionConfig): Promise<SourceUser[]> {
+    const accounts = await getAccounts(config.baseUrl, config.credentials.token ?? "");
+    return accounts
+      .filter((account) => account.id !== 0)
+      .map((account) => ({ externalId: String(account.id), username: account.name }));
   },
 
   async fetchRecentItems(

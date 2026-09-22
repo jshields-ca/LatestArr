@@ -64,6 +64,28 @@ describe("listLibraries", () => {
   });
 });
 
+describe("listUsers", () => {
+  it("maps accounts to SourceUser with no email, and drops the local account (id 0)", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Account: [
+            { id: 0, name: "local" },
+            { id: 1, name: "alice" },
+            { id: 2, name: "bob" },
+          ],
+        },
+      }),
+    );
+
+    const users = await plexAdapter.listUsers!(config);
+    expect(users).toEqual([
+      { externalId: "1", username: "alice" },
+      { externalId: "2", username: "bob" },
+    ]);
+  });
+});
+
 describe("fetchRecentItems", () => {
   const baseItem = {
     ratingKey: "100",
