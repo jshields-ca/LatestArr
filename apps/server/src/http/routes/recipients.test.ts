@@ -79,6 +79,52 @@ describe("POST /recipients", () => {
   });
 });
 
+describe("POST /recipients/import", () => {
+  it("creates every valid row and reports skipped rows with a reason", async () => {
+    await app.inject(
+      authed({ method: "POST", url: "/api/recipients", payload: { email: "existing@example.com" } }),
+    );
+
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/recipients/import",
+        payload: {
+          rows: [
+            { email: "new1@example.com", displayName: "New One" },
+            { email: "new2@example.com" },
+            { email: "not-an-email" },
+            { email: "existing@example.com" },
+            { email: "New1@Example.com" }, // same as new1, different case
+          ],
+        },
+      }),
+    );
+
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as {
+      created: { email: string }[];
+      skipped: { email: string; reason: string }[];
+    };
+    expect(body.created.map((r) => r.email).sort()).toEqual(["new1@example.com", "new2@example.com"]);
+    expect(body.skipped).toEqual([
+      { email: "not-an-email", reason: "Invalid email address" },
+      { email: "existing@example.com", reason: "Already exists" },
+      { email: "New1@Example.com", reason: "Duplicate in this import" },
+    ]);
+
+    const listResponse = await app.inject(authed({ method: "GET", url: "/api/recipients" }));
+    expect(listResponse.json().recipients).toHaveLength(3);
+  });
+
+  it("rejects an empty rows array", async () => {
+    const response = await app.inject(
+      authed({ method: "POST", url: "/api/recipients/import", payload: { rows: [] } }),
+    );
+    expect(response.statusCode).toBe(400);
+  });
+});
+
 describe("recipient lifecycle", () => {
   async function createRecipient() {
     const response = await app.inject(

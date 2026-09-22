@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
-import { Loader2, Pencil, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { Loader2, Pencil, Plus, Upload, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
@@ -29,6 +30,7 @@ import {
   deleteGroup,
   deleteRecipient,
   getGroupMembers,
+  importRecipients,
   listGroups,
   listRecipients,
   removeGroupMember,
@@ -36,7 +38,9 @@ import {
   updateRecipient,
   type Recipient,
   type RecipientGroup,
+  type RecipientImportResult,
 } from "@/lib/api";
+import { parseRecipientImportText } from "@/lib/recipient-import";
 
 function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) => void }) {
   const [open, setOpen] = useState(false);
@@ -114,6 +118,190 @@ function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) =
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Paste a block of text or upload a CSV of recipients, see a parsed
+// preview before committing, then submit the whole batch to
+// POST /recipients/import in one request — see apps/web/src/lib/
+// recipient-import.ts for the formats the parser understands (bare
+// emails, "email,Name" pairs either order, "Name <email>", or a flat
+// comma/semicolon list).
+function ImportRecipientsDialog({ onImported }: { onImported: (recipients: Recipient[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [rawText, setRawText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<RecipientImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const parsed = useMemo(() => parseRecipientImportText(rawText), [rawText]);
+
+  function reset() {
+    setRawText("");
+    setError(null);
+    setResult(null);
+  }
+
+  function openChange(next: boolean) {
+    setOpen(next);
+    if (next) reset();
+  }
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const text = await file.text();
+    setRawText(text);
+    setResult(null);
+  }
+
+  async function handleImport() {
+    setError(null);
+    setSubmitting(true);
+    try {
+      const importResult = await importRecipients(parsed.rows);
+      setResult(importResult);
+      if (importResult.created.length > 0) {
+        onImported(importResult.created);
+      }
+      toast({
+        variant: importResult.skipped.length === 0 ? "success" : "default",
+        title: `Imported ${importResult.created.length} recipient${importResult.created.length === 1 ? "" : "s"}`,
+        description:
+          importResult.skipped.length > 0
+            ? `${importResult.skipped.length} row${importResult.skipped.length === 1 ? "" : "s"} skipped — see details below.`
+            : undefined,
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={openChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Upload />
+          Import
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Import recipients</DialogTitle>
+          <DialogDescription>
+            Paste a list of emails, or upload a CSV. One per line, or "email, Name" — we'll figure out the
+            rest.
+          </DialogDescription>
+        </DialogHeader>
+
+        {result ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm">
+              Added <strong>{result.created.length}</strong> recipient
+              {result.created.length === 1 ? "" : "s"}
+              {result.skipped.length > 0 ? (
+                <>
+                  , skipped <strong>{result.skipped.length}</strong>
+                </>
+              ) : null}
+              .
+            </p>
+            {result.skipped.length > 0 ? (
+              <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2 text-sm">
+                {result.skipped.map((row, index) => (
+                  <li key={`${row.email}-${index}`} className="flex items-center justify-between gap-2">
+                    <span className="truncate">{row.email}</span>
+                    <Badge variant="warning" className="shrink-0">
+                      {row.reason}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <DialogFooter>
+              <Button type="button" onClick={() => setOpen(false)}>
+                Done
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="recipient-import-text">Paste recipients</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={submitting}
+                >
+                  <Upload className="size-3.5" />
+                  Upload CSV
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  aria-label="Upload a CSV of recipients"
+                  accept=".csv,text/csv,text/plain"
+                  className="hidden"
+                  onChange={(e) => void handleFileChange(e)}
+                />
+              </div>
+              <Textarea
+                id="recipient-import-text"
+                rows={8}
+                placeholder={"jane@example.com\njohn@example.com, John Smith"}
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+
+            {rawText.trim() ? (
+              <p className="text-sm text-muted-foreground">
+                {parsed.rows.length} recipient{parsed.rows.length === 1 ? "" : "s"} ready to import
+                {parsed.unparsedLines.length > 0
+                  ? `, ${parsed.unparsedLines.length} line${parsed.unparsedLines.length === 1 ? "" : "s"} couldn't be parsed`
+                  : ""}
+                .
+              </p>
+            ) : null}
+
+            {parsed.unparsedLines.length > 0 ? (
+              <ul className="flex max-h-24 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2 text-xs text-muted-foreground">
+                {parsed.unparsedLines.map((line, index) => (
+                  <li key={index} className="truncate">
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                onClick={() => void handleImport()}
+                disabled={submitting || parsed.rows.length === 0}
+              >
+                {submitting ? <Loader2 className="animate-spin" /> : null}
+                Import {parsed.rows.length || ""} recipient{parsed.rows.length === 1 ? "" : "s"}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -300,7 +488,14 @@ function RecipientsSection({
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">Recipients</h2>
-        {recipients ? <AddRecipientDialog onCreated={(r) => onRecipientsChange((prev) => [...prev, r])} /> : null}
+        {recipients ? (
+          <div className="flex items-center gap-2">
+            <ImportRecipientsDialog
+              onImported={(imported) => onRecipientsChange((prev) => [...prev, ...imported])}
+            />
+            <AddRecipientDialog onCreated={(r) => onRecipientsChange((prev) => [...prev, r])} />
+          </div>
+        ) : null}
       </div>
 
       {loadError ? (

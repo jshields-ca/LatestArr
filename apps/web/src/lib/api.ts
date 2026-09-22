@@ -205,6 +205,20 @@ export function deleteRecipient(id: string): Promise<void> {
   return apiFetch<void>(`/recipients/${id}`, { method: "DELETE" });
 }
 
+export interface RecipientImportResult {
+  created: Recipient[];
+  skipped: { email: string; displayName?: string; reason: string }[];
+}
+
+export function importRecipients(
+  rows: { email: string; displayName?: string }[],
+): Promise<RecipientImportResult> {
+  return apiFetch<RecipientImportResult>("/recipients/import", {
+    method: "POST",
+    body: JSON.stringify({ rows }),
+  });
+}
+
 export function listGroups(): Promise<{ groups: RecipientGroup[] }> {
   return apiFetch<{ groups: RecipientGroup[] }>("/recipient-groups");
 }
