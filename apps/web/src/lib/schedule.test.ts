@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  describeScheduleParts,
   detectBrowserTimezone,
   formatHourMinute,
   formatScheduleForDisplay,
@@ -122,6 +123,40 @@ describe("formatScheduleForDisplay", () => {
 
   it("falls back to the raw cron string for a schedule the simple picker can't express", () => {
     expect(formatScheduleForDisplay("*/15 * * * *", "UTC")).toBe("*/15 * * * * (UTC)");
+  });
+});
+
+describe("describeScheduleParts", () => {
+  it("splits a daily schedule into frequency and time", () => {
+    expect(describeScheduleParts("30 8 * * *", "UTC")).toEqual({
+      frequency: "Daily",
+      when: "8:30 AM",
+      timezone: "UTC",
+    });
+  });
+
+  it("splits a weekly schedule into frequency and 'day, time'", () => {
+    expect(describeScheduleParts("0 8 * * 1", "America/Winnipeg")).toEqual({
+      frequency: "Weekly",
+      when: "Monday, 8:00 AM",
+      timezone: "America/Winnipeg",
+    });
+  });
+
+  it("splits a monthly schedule into frequency and 'the Nth, time'", () => {
+    expect(describeScheduleParts("0 8 15 * *", "UTC")).toEqual({
+      frequency: "Monthly",
+      when: "the 15th, 8:00 AM",
+      timezone: "UTC",
+    });
+  });
+
+  it("labels an unrecognized cron as Custom and keeps the raw expression", () => {
+    expect(describeScheduleParts("*/15 * * * *", "UTC")).toEqual({
+      frequency: "Custom",
+      when: "*/15 * * * *",
+      timezone: "UTC",
+    });
   });
 });
 

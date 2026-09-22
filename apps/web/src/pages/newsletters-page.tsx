@@ -55,8 +55,8 @@ import {
 } from "@/lib/api";
 import {
   DEFAULT_SIMPLE_SCHEDULE,
+  describeScheduleParts,
   detectBrowserTimezone,
-  formatScheduleForDisplay,
   parseCronToSimpleSchedule,
   simpleScheduleToCron,
   type SimpleSchedule,
@@ -612,7 +612,14 @@ function NewsletterDetailsForm({
           disabled={submitting}
         />
       </div>
-      <div className="rounded-md border border-border p-3">
+
+      {/* Schedule, Delivery, and Subject line grouped under one "Schedule"
+          panel — previously three separate boxes stacked the full width of
+          the expanded row; narrowing them into one column (see the
+          Content-panel sibling this sits next to in NewsletterCard) also
+          fixes how sparse the schedule grid looked stretched that wide. */}
+      <div className="flex flex-col gap-4 rounded-md border border-border p-3">
+        <SubsectionHeading>Schedule</SubsectionHeading>
         <ScheduleField
           idPrefix={idPrefix}
           mode={scheduleMode}
@@ -625,49 +632,49 @@ function NewsletterDetailsForm({
           onTimezoneChange={setTimezone}
           disabled={submitting}
         />
-      </div>
-      <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-        <SubsectionHeading>Delivery</SubsectionHeading>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-3 border-t border-border pt-3">
+          <SubsectionHeading>Delivery</SubsectionHeading>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`${idPrefix}-lookback`}>Lookback (days)</Label>
+              <Input
+                id={`${idPrefix}-lookback`}
+                type="number"
+                min={1}
+                required
+                value={lookbackDays}
+                onChange={(e) => setLookbackDays(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`${idPrefix}-smtp`}>SMTP profile</Label>
+              <Select
+                id={`${idPrefix}-smtp`}
+                value={smtpProfileId}
+                onChange={(e) => setSmtpProfileId(e.target.value)}
+                disabled={submitting}
+              >
+                <option value="">None yet</option>
+                {smtpProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${idPrefix}-lookback`}>Lookback (days)</Label>
+            <Label htmlFor={`${idPrefix}-subject`}>Subject template (optional)</Label>
             <Input
-              id={`${idPrefix}-lookback`}
-              type="number"
-              min={1}
-              required
-              value={lookbackDays}
-              onChange={(e) => setLookbackDays(e.target.value)}
+              id={`${idPrefix}-subject`}
+              placeholder="What's new this week"
+              value={subjectTemplate}
+              onChange={(e) => setSubjectTemplate(e.target.value)}
               disabled={submitting}
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${idPrefix}-smtp`}>SMTP profile</Label>
-            <Select
-              id={`${idPrefix}-smtp`}
-              value={smtpProfileId}
-              onChange={(e) => setSmtpProfileId(e.target.value)}
-              disabled={submitting}
-            >
-              <option value="">None yet</option>
-              {smtpProfiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.name}
-                </option>
-              ))}
-            </Select>
-          </div>
         </div>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`${idPrefix}-subject`}>Subject template (optional)</Label>
-        <Input
-          id={`${idPrefix}-subject`}
-          placeholder="What's new this week"
-          value={subjectTemplate}
-          onChange={(e) => setSubjectTemplate(e.target.value)}
-          disabled={submitting}
-        />
       </div>
 
       {error ? (
@@ -790,13 +797,27 @@ function NewsletterCard({
     }
   }
 
+  const scheduleParts = describeScheduleParts(newsletter.scheduleCron, newsletter.timezone);
+
   return (
     <ListRow
       primary={<span className="truncate font-medium">{newsletter.name}</span>}
       secondary={
-        <span className="block truncate text-sm text-muted-foreground">
-          {formatScheduleForDisplay(newsletter.scheduleCron, newsletter.timezone)} &middot;{" "}
-          {newsletter.lookbackDays}-day lookback
+        // Split into a frequency badge, a bolder "when", and muted
+        // timezone/lookback detail instead of one flat muted-gray sentence
+        // — the pieces someone scans for (how often, when) stand out from
+        // the pieces that are just context.
+        <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <Badge variant="neutral">{scheduleParts.frequency}</Badge>
+          <span className="text-sm text-foreground">{scheduleParts.when}</span>
+          <span className="text-xs text-muted-foreground" aria-hidden="true">
+            &middot;
+          </span>
+          <span className="text-xs text-muted-foreground">{scheduleParts.timezone}</span>
+          <span className="text-xs text-muted-foreground" aria-hidden="true">
+            &middot;
+          </span>
+          <span className="text-xs text-muted-foreground">{newsletter.lookbackDays}-day lookback</span>
         </span>
       }
       expand={{ expanded, onToggle: () => setExpanded((e) => !e) }}
@@ -856,38 +877,49 @@ function NewsletterCard({
             </TabsList>
 
             <TabsContent value="details">
-              <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
+              {/* Two columns once there's room — Schedule (the form, left)
+                  and Content (Template/Sources/Groups, right) grouped as
+                  their own panels instead of one long flat stack of boxes.
+                  Below sm they stack, same as every other two-column form
+                  section in this app. */}
+              <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
+                <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
 
-              {detailError ? (
-                <p role="alert" className="text-sm text-destructive">
-                  {detailError}
-                </p>
-              ) : null}
+                <div className="flex flex-col gap-4 rounded-md border border-border p-3">
+                  <SubsectionHeading>Content</SubsectionHeading>
 
-              {!detail && !detailError ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Loading details...
+                  {detailError ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      {detailError}
+                    </p>
+                  ) : null}
+
+                  {!detail && !detailError ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                      Loading details...
+                    </div>
+                  ) : null}
+
+                  {detail ? (
+                    <>
+                      <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
+                      <LinkedSources
+                        newsletterId={newsletter.id}
+                        sources={detail.sources}
+                        allSources={allSources}
+                        onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
+                      />
+                      <LinkedGroups
+                        newsletterId={newsletter.id}
+                        groups={detail.recipientGroups}
+                        allGroups={allGroups}
+                        onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
+                      />
+                    </>
+                  ) : null}
                 </div>
-              ) : null}
-
-              {detail ? (
-                <>
-                  <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
-                  <LinkedSources
-                    newsletterId={newsletter.id}
-                    sources={detail.sources}
-                    allSources={allSources}
-                    onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
-                  />
-                  <LinkedGroups
-                    newsletterId={newsletter.id}
-                    groups={detail.recipientGroups}
-                    allGroups={allGroups}
-                    onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
-                  />
-                </>
-              ) : null}
+              </div>
 
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
