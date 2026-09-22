@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Loader2, Pencil, Plus, Upload, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Search, Upload, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -475,6 +475,20 @@ function RecipientRow({
   );
 }
 
+// How many rows render initially/per "Show more" click. Large imported
+// lists (see issue #153 — a Tautulli/Plex user import can easily add
+// several dozen recipients at once) turned the page into one long scroll
+// with nothing to orient by; this plus the search box below keep the page
+// navigable regardless of list size without needing real pagination on
+// the API side.
+const RECIPIENTS_PAGE_SIZE = 25;
+
+function matchesRecipientQuery(recipient: Recipient, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return recipient.email.toLowerCase().includes(q) || (recipient.displayName ?? "").toLowerCase().includes(q);
+}
+
 function RecipientsSection({
   recipients,
   loadError,
@@ -484,6 +498,16 @@ function RecipientsSection({
   loadError: string | null;
   onRecipientsChange: (updater: (prev: Recipient[]) => Recipient[]) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(RECIPIENTS_PAGE_SIZE);
+
+  const filtered = useMemo(
+    () => (recipients ?? []).filter((r) => matchesRecipientQuery(r, query)),
+    [recipients, query],
+  );
+  const visible = filtered.slice(0, visibleCount);
+  const remaining = filtered.length - visible.length;
+
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
@@ -522,16 +546,57 @@ function RecipientsSection({
 
       {recipients && recipients.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {recipients.map((recipient) => (
-            <RecipientRow
-              key={recipient.id}
-              recipient={recipient}
-              onChanged={(updated) =>
-                onRecipientsChange((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
-              }
-              onDeleted={(id) => onRecipientsChange((prev) => prev.filter((r) => r.id !== id))}
-            />
-          ))}
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div className="relative sm:max-w-xs sm:flex-1">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                type="search"
+                aria-label="Search recipients by name or email"
+                placeholder="Search by name or email..."
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setVisibleCount(RECIPIENTS_PAGE_SIZE);
+                }}
+                className="pl-9"
+              />
+            </div>
+            <p className="shrink-0 text-sm text-muted-foreground">
+              {query.trim()
+                ? `${filtered.length} of ${recipients.length} match`
+                : `${recipients.length} recipient${recipients.length === 1 ? "" : "s"}`}
+            </p>
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recipients match "{query.trim()}".</p>
+          ) : (
+            <>
+              {visible.map((recipient) => (
+                <RecipientRow
+                  key={recipient.id}
+                  recipient={recipient}
+                  onChanged={(updated) =>
+                    onRecipientsChange((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+                  }
+                  onDeleted={(id) => onRecipientsChange((prev) => prev.filter((r) => r.id !== id))}
+                />
+              ))}
+              {remaining > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="self-center"
+                  onClick={() => setVisibleCount((c) => c + RECIPIENTS_PAGE_SIZE)}
+                >
+                  Show {Math.min(remaining, RECIPIENTS_PAGE_SIZE)} more
+                </Button>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
     </section>
