@@ -45,8 +45,28 @@ describe("SmtpProfilesPage", () => {
     render(<SmtpProfilesPage />);
 
     expect(await screen.findByText("Primary")).toBeInTheDocument();
-    expect(screen.getByText("TLS")).toBeInTheDocument();
+    expect(screen.getByText("Implicit TLS")).toBeInTheDocument();
     expect(screen.getByText("Authenticated")).toBeInTheDocument();
+  });
+
+  it("labels a STARTTLS profile (secure: false, port 587) distinctly from an unencrypted one", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { smtpProfiles: [{ ...exampleProfile, secure: false, port: 587 }] }),
+    );
+    render(<SmtpProfilesPage />);
+
+    expect(await screen.findByText("Primary")).toBeInTheDocument();
+    expect(screen.getByText("STARTTLS")).toBeInTheDocument();
+  });
+
+  it("labels a profile with no TLS convention on its port as No TLS", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { smtpProfiles: [{ ...exampleProfile, secure: false, port: 25 }] }),
+    );
+    render(<SmtpProfilesPage />);
+
+    expect(await screen.findByText("Primary")).toBeInTheDocument();
+    expect(screen.getByText("No TLS")).toBeInTheDocument();
   });
 
   it("edits a profile through the edit dialog, prefilled with its current values", async () => {
