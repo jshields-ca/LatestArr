@@ -12,6 +12,7 @@ import {
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { EMAIL_FONTS } from "../../render/email-fonts.js";
 import {
   describeSendFailure,
   NewsletterMisconfiguredError,
@@ -31,6 +32,8 @@ const senderIdentitySchema = z.object({
   replyTo: z.email().optional(),
 });
 
+const emailFontSchema = z.enum(Object.keys(EMAIL_FONTS) as [string, ...string[]]);
+
 const createNewsletterSchema = z.object({
   name: z.string().trim().min(1, "name and scheduleCron are required"),
   scheduleCron: z.string().trim().min(1, "name and scheduleCron are required"),
@@ -40,6 +43,7 @@ const createNewsletterSchema = z.object({
   smtpProfileId: z.string().min(1).optional(),
   templateId: z.string().min(1).optional(),
   senderIdentity: senderIdentitySchema.optional(),
+  emailFont: emailFontSchema.optional(),
 });
 
 const updateNewsletterSchema = z.object({
@@ -52,6 +56,7 @@ const updateNewsletterSchema = z.object({
   smtpProfileId: z.string().min(1).nullable().optional(),
   templateId: z.string().min(1).nullable().optional(),
   senderIdentity: senderIdentitySchema.optional(),
+  emailFont: emailFontSchema.optional(),
 });
 
 const addSourceSchema = z.object({
@@ -105,6 +110,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         smtpProfileId,
         templateId,
         senderIdentity,
+        emailFont,
       } = body;
 
       const [newsletter] = await db
@@ -118,6 +124,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           ...(smtpProfileId !== undefined && { smtpProfileId }),
           ...(templateId !== undefined && { templateId }),
           ...(senderIdentity !== undefined && { senderIdentity }),
+          ...(emailFont !== undefined && { emailFont }),
         })
         .returning();
 
@@ -175,6 +182,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         smtpProfileId,
         templateId,
         senderIdentity,
+        emailFont,
       } = body;
 
       const [newsletter] = await db
@@ -189,6 +197,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           ...(smtpProfileId !== undefined && { smtpProfileId }),
           ...(templateId !== undefined && { templateId }),
           ...(senderIdentity !== undefined && { senderIdentity }),
+          ...(emailFont !== undefined && { emailFont }),
           updatedAt: new Date(),
         })
         .where(eq(newsletters.id, request.params.id))

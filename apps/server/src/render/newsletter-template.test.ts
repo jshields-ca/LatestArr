@@ -129,7 +129,11 @@ describe("renderDefaultNewsletterHtml", () => {
       generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
-    expect(html).not.toContain("<img");
+    // The footer's own GitHub/"Report an issue" icons are always present,
+    // so this checks specifically for a poster <img> (width="88", matching
+    // the item card's own poster markup) rather than asserting no <img>
+    // appears anywhere in the document.
+    expect(html).not.toContain('width="88"');
     expect(html).toContain("No Poster Movie");
   });
 
@@ -238,5 +242,40 @@ describe("renderDefaultNewsletterHtml", () => {
     expect(html).toContain('href="https://github.com/jshields-ca/LatestArr"');
     expect(html).toContain('href="https://github.com/jshields-ca/LatestArr/issues"');
     expect(html).toContain("Report an issue");
+  });
+
+  describe("emailFont", () => {
+    it("defaults to the Ubuntu stack when emailFont is omitted", async () => {
+      const html = await renderDefaultNewsletterHtml({
+        newsletterName: "Weekly Digest",
+        items: [item()],
+        generatedAt: new Date("2026-01-20T12:00:00Z"),
+      });
+
+      expect(html).toContain("font-family:Ubuntu, Helvetica, Arial, sans-serif;");
+    });
+
+    it("renders with the requested font stack", async () => {
+      const html = await renderDefaultNewsletterHtml({
+        newsletterName: "Weekly Digest",
+        items: [item()],
+        generatedAt: new Date("2026-01-20T12:00:00Z"),
+        emailFont: "georgia",
+      });
+
+      expect(html).toContain("font-family:Georgia, 'Times New Roman', serif;");
+      expect(html).not.toContain("font-family:Ubuntu, Helvetica, Arial, sans-serif;");
+    });
+
+    it("falls back to the default font for an unrecognized emailFont value", async () => {
+      const html = await renderDefaultNewsletterHtml({
+        newsletterName: "Weekly Digest",
+        items: [item()],
+        generatedAt: new Date("2026-01-20T12:00:00Z"),
+        emailFont: "comic-sans",
+      });
+
+      expect(html).toContain("font-family:Ubuntu, Helvetica, Arial, sans-serif;");
+    });
   });
 });

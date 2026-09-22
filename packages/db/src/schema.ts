@@ -157,6 +157,12 @@ export const newsletters = sqliteTable("newsletters", {
   timezone: text("timezone").notNull().default("UTC"),
   isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(true),
   lookbackDays: integer("lookback_days").notNull().default(7),
+  // Which of the default template's built-in font stacks to render with —
+  // only meaningful when this newsletter has no custom templateId (see
+  // apps/server/src/render/email-fonts.ts for the catalog). A custom
+  // GrapesJS-authored template defines its own fonts, so this is ignored
+  // once templateId is set.
+  emailFont: text("email_font").notNull().default("ubuntu"),
   ...timestamps,
 });
 

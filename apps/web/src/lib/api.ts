@@ -374,6 +374,10 @@ export interface Newsletter {
   timezone: string;
   isEnabled: boolean;
   lookbackDays: number;
+  /** Which of the default template's built-in font stacks to render with —
+   * only meaningful while templateId is unset. See lib/email-fonts.ts for
+   * the picker options. */
+  emailFont: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -387,6 +391,7 @@ export interface CreateNewsletterInput {
   smtpProfileId?: string;
   templateId?: string;
   senderIdentity?: SenderIdentity;
+  emailFont?: string;
 }
 
 export interface NewsletterDetail {

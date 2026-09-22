@@ -53,6 +53,7 @@ import {
   type SourceConnection,
   type Template,
 } from "@/lib/api";
+import { EMAIL_FONT_OPTIONS } from "@/lib/email-fonts";
 import {
   DEFAULT_SIMPLE_SCHEDULE,
   describeScheduleParts,
@@ -542,6 +543,61 @@ function TemplatePicker({
   );
 }
 
+// Only meaningful for the default layout — a custom GrapesJS template
+// defines its own fonts, so this is hidden once a template is picked above
+// rather than shown-but-inert, which would just invite "why didn't this do
+// anything" confusion.
+function EmailFontPicker({
+  newsletter,
+  onChanged,
+}: {
+  newsletter: Newsletter;
+  onChanged: (newsletter: Newsletter) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(nextFont: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      const { newsletter: updated } = await updateNewsletter(newsletter.id, { emailFont: nextFont });
+      onChanged(updated);
+      toast({ variant: "success", title: "Font updated" });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to update font.";
+      setError(message);
+      toast({ variant: "destructive", title: "Failed to update font", description: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <SubsectionHeading>Font</SubsectionHeading>
+      <Select
+        aria-label="Font"
+        value={newsletter.emailFont}
+        onChange={(e) => void handleChange(e.target.value)}
+        disabled={saving}
+        className="max-w-xs"
+      >
+        {EMAIL_FONT_OPTIONS.map((font) => (
+          <option key={font.value} value={font.value}>
+            {font.label}
+          </option>
+        ))}
+      </Select>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 // The newsletter's own editable fields (name, schedule, delivery, subject) —
 // what used to live in a separate "Edit newsletter" dialog, reached only via
 // a pencil icon that didn't include the Template/Sources/Groups pickers
@@ -904,6 +960,9 @@ function NewsletterCard({
                   {detail ? (
                     <>
                       <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
+                      {!newsletter.templateId ? (
+                        <EmailFontPicker newsletter={newsletter} onChanged={onChanged} />
+                      ) : null}
                       <LinkedSources
                         newsletterId={newsletter.id}
                         sources={detail.sources}

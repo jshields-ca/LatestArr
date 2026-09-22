@@ -113,6 +113,28 @@ describe("POST /newsletters", () => {
     expect(newsletter.timezone).toBe("UTC");
     expect(newsletter.lookbackDays).toBe(7);
     expect(newsletter.isEnabled).toBe(true);
+    expect(newsletter.emailFont).toBe("ubuntu");
+  });
+
+  it("accepts a recognized emailFont on create and rejects an unrecognized one", async () => {
+    const accepted = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1", emailFont: "georgia" },
+      }),
+    );
+    expect(accepted.statusCode).toBe(201);
+    expect(accepted.json().newsletter.emailFont).toBe("georgia");
+
+    const rejected = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1", emailFont: "comic-sans" },
+      }),
+    );
+    expect(rejected.statusCode).toBe(400);
   });
 });
 

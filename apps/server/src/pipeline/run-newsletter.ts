@@ -286,6 +286,7 @@ async function renderNewsletterContent(
     items: addedPlaceholders.items,
     generatedAt,
     lookbackDays: newsletter.lookbackDays,
+    emailFont: newsletter.emailFont,
   });
   const resolved = await resolvePosterPlaceholders(html, addedPlaceholders.placeholders, (item) =>
     sourceByItem.get(item),
