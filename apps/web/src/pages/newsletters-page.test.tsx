@@ -120,8 +120,10 @@ describe("NewslettersPage", () => {
 
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
     // weeklyDigest.scheduleCron is "0 8 * * 1" — weekly, Monday, 08:00 UTC —
-    // and should read as a sentence, not the literal cron string.
-    expect(screen.getByText(/Weekly on Monday at 8:00 AM \(UTC\)/)).toBeInTheDocument();
+    // and should read as a frequency badge plus a "day, time" sentence, not
+    // the literal cron string.
+    expect(screen.getByText("Weekly")).toBeInTheDocument();
+    expect(screen.getByText("Monday, 8:00 AM")).toBeInTheDocument();
     expect(screen.queryByText(/0 8 \* \* 1/)).not.toBeInTheDocument();
   });
 
@@ -131,7 +133,8 @@ describe("NewslettersPage", () => {
     renderPage();
 
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
-    expect(screen.getByText(/\*\/15 \* \* \* \* \(UTC\)/)).toBeInTheDocument();
+    expect(screen.getByText("Custom")).toBeInTheDocument();
+    expect(screen.getByText("*/15 * * * *")).toBeInTheDocument();
   });
 
   // The Add newsletter dialog mounts several real Radix Selects (Repeats,

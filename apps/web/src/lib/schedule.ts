@@ -132,6 +132,39 @@ export function formatScheduleForDisplay(cron: string, timezone: string): string
   return `${sentence} (${timezone})`;
 }
 
+export interface ScheduleParts {
+  /** Short badge text — "Daily" / "Weekly" / "Monthly" / "Custom". */
+  frequency: string;
+  /** The rest of the sentence: day + time for a recognized schedule, the
+   *  raw cron string for a custom one. */
+  when: string;
+  timezone: string;
+}
+
+// Same parsing as formatScheduleForDisplay, but split into separate parts
+// instead of one sentence — lets the newsletter list style the frequency as
+// a badge and the rest as plain text instead of one undifferentiated
+// muted-gray line.
+export function describeScheduleParts(cron: string, timezone: string): ScheduleParts {
+  const parsed = parseCronToSimpleSchedule(cron);
+  if (!parsed) return { frequency: "Custom", when: cron, timezone };
+
+  const time = formatTime12h(parsed.hour, parsed.minute);
+  let when: string;
+  let frequency: string;
+  if (parsed.frequency === "daily") {
+    frequency = "Daily";
+    when = time;
+  } else if (parsed.frequency === "weekly") {
+    frequency = "Weekly";
+    when = `${DAY_NAMES[parsed.dayOfWeek]}, ${time}`;
+  } else {
+    frequency = "Monthly";
+    when = `the ${ordinal(parsed.dayOfMonth)}, ${time}`;
+  }
+  return { frequency, when, timezone };
+}
+
 // The "Add newsletter" dialog used to default Timezone to "UTC" no matter
 // what the browser actually reports, silently mismatching the schedule for
 // anyone not in UTC. Guarded against an environment reporting a timezone
