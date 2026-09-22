@@ -102,9 +102,12 @@ LatestArr follows [Semantic Versioning](https://semver.org/) and keeps a [Keep a
 
 `ghcr.io/jshields-ca/latestarr:dev` is a floating image rebuilt on every push to the `dev` branch (`.github/workflows/dev-image.yml`), separate from the tagged `:latest`/`:vX.Y.Z` images `release.yml` cuts. It exists so in-progress work can be pulled onto a real box without going through the version/changelog/GitHub Release flow above.
 
-- To test a change: merge or push it onto `dev`, wait for the workflow to publish the image, then on the test box set `LATESTARR_VERSION=dev` in `.env` and `docker compose pull && docker compose up -d`. Existing `latestarr-data` volumes/appdata work unchanged — this only swaps the image tag.
+- **Land PRs on `main` as normal, not on `dev`.** CI (lint/typecheck/build/CodeQL), review, and changeset accumulation all happen against `main` — that's the only place those gates run. `dev` is just a floating pointer for testing, not a second line of development; committing straight to it would fork history and mean redoing the same work to get it into `main` later.
+- **To get a fresh `:dev` image**, fast-forward the branch to whatever's on `main`: `git push origin main:dev`. This triggers `dev-image.yml`, which publishes `ghcr.io/jshields-ca/latestarr:dev`. Do this whenever there's new work on `main` worth testing — after one PR or after a batch, whichever fits.
+- On the test box: set `LATESTARR_VERSION=dev` in `.env`, then `docker compose pull && docker compose up -d`. Existing `latestarr-data` volumes/appdata work unchanged — this only swaps the image tag.
 - `dev` is a working branch, not a release channel — it isn't kept in sync with `main` automatically and can be force-pushed or rebuilt from `main` at any time. Don't point a production instance at `:dev`.
 - Switch back to a real release with `LATESTARR_VERSION=latest` (or a pinned `vX.Y.Z`) and pull again.
+- **There's no separate changelog for what's on `:dev`** — it's whatever `main` currently has, unreleased. To see what that is: `git log <last-tag>..main --oneline` (or read the pending `.changeset/*.md` files for the polished per-change write-ups already drafted for the eventual release).
 
 ## Reporting bugs / requesting features
 
