@@ -593,6 +593,63 @@ describe("NewslettersPage", () => {
     expect(screen.queryByText("success")).not.toBeInTheDocument();
   });
 
+  it("shows a real send's included items and per-recipient results when Details is opened", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, {
+          sendRuns: [
+            {
+              id: "run1",
+              newsletterId: "n1",
+              status: "success",
+              startedAt: "2026-01-01T00:00:00.000Z",
+              finishedAt: "2026-01-01T00:00:01.000Z",
+              itemCountIncluded: 1,
+              recipientCount: 1,
+              error: null,
+              itemsSnapshot: [{ title: "Some Movie", kind: "movie" }],
+            },
+          ],
+        }),
+        "/api/newsletters/n1/send-runs/run1/recipients": jsonResponse(200, {
+          recipients: [
+            {
+              recipientId: "r1",
+              email: "person@example.com",
+              displayName: "Person",
+              status: "sent",
+              error: null,
+            },
+          ],
+        }),
+      }),
+    );
+    const { container } = renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    await screen.findByText("success");
+
+    await user.click(screen.getByRole("button", { name: "Show send details" }));
+
+    expect(await screen.findByText("Some Movie")).toBeInTheDocument();
+    expect(await screen.findByText("Person")).toBeInTheDocument();
+    expect(screen.getByText("sent")).toBeInTheDocument();
+
+    const viewCopyLink = screen.getByRole("link", { name: "View a copy of this send" });
+    expect(viewCopyLink).toHaveAttribute("href", "/api/newsletters/n1/send-runs/run1/html");
+    expect(viewCopyLink).toHaveAttribute("target", "_blank");
+
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
   it(
     "creates a newsletter with a template selected in the dialog",
     async () => {

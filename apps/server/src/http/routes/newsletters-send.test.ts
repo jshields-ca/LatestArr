@@ -293,6 +293,8 @@ describe("POST /newsletters/:id/send-now", () => {
     expect(run?.status).toBe("success");
     expect(run?.itemCountIncluded).toBe(1);
     expect(run?.recipientCount).toBe(1);
+    expect(run?.itemsSnapshot).toEqual([{ title: "Some Movie", kind: "movie" }]);
+    expect(run?.renderedHtml).toContain("Some Movie");
 
     const results = await db
       .select()
@@ -302,6 +304,41 @@ describe("POST /newsletters/:id/send-now", () => {
     expect(results[0]?.recipientId).toBe(recipientId);
     expect(results[0]?.status).toBe("sent");
     expect(results[0]?.providerMessageId).toBe("msg-1");
+
+    // GET .../send-runs/:runId/recipients joins in the recipient's own
+    // email/displayName rather than just the bare recipientId.
+    const recipientsResponse = await app.inject(
+      authed({
+        method: "GET",
+        url: `/api/newsletters/${newsletterId}/send-runs/${sendRunId}/recipients`,
+      }),
+    );
+    expect(recipientsResponse.statusCode).toBe(200);
+    expect(recipientsResponse.json().recipients).toEqual([
+      {
+        recipientId,
+        email: "person@example.com",
+        displayName: null,
+        status: "sent",
+        error: null,
+      },
+    ]);
+
+    // GET .../send-runs/:runId/html returns the actual sent copy as raw
+    // HTML, not JSON.
+    const htmlResponse = await app.inject(
+      authed({ method: "GET", url: `/api/newsletters/${newsletterId}/send-runs/${sendRunId}/html` }),
+    );
+    expect(htmlResponse.statusCode).toBe(200);
+    expect(htmlResponse.headers["content-type"]).toContain("text/html");
+    expect(htmlResponse.body).toContain("Some Movie");
+
+    // The send-runs list itself doesn't carry the (potentially large)
+    // renderedHtml column.
+    const listResponse = await app.inject(
+      authed({ method: "GET", url: `/api/newsletters/${newsletterId}/send-runs` }),
+    );
+    expect(listResponse.json().sendRuns[0]).not.toHaveProperty("renderedHtml");
   });
 
   it("marks the run partial_failure when some sends succeed and others fail", async () => {

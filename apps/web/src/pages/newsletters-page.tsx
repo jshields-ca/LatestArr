@@ -3,7 +3,9 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   CheckCircle2,
+  ChevronDown,
   Clock,
+  ExternalLink,
   Loader2,
   Pencil,
   Plus,
@@ -47,6 +49,7 @@ import {
   getNewsletterDetail,
   listGroups,
   listNewsletters,
+  listSendRunRecipients,
   listSendRuns,
   listSmtpProfiles,
   listSources,
@@ -54,11 +57,13 @@ import {
   removeNewsletterGroup,
   removeNewsletterSource,
   sendNewsletterNow,
+  sendRunHtmlUrl,
   updateNewsletter,
   type Newsletter,
   type NewsletterDetail,
   type RecipientGroup,
   type SendRun,
+  type SendRunRecipientResult,
   type SmtpProfile,
   type SourceConnection,
   type Template,
@@ -583,11 +588,112 @@ function sendRunIconClass(variant: ReturnType<typeof sendRunBadgeVariant>) {
   }
 }
 
+// Per-recipient send result badge — separate from sendRunBadgeVariant
+// (which reads the whole SendRun) since these are the four
+// sendRunRecipientResults.status values, not the run-level status enum.
+function recipientStatusVariant(
+  status: SendRunRecipientResult["status"],
+): "success" | "destructive" | "neutral" {
+  switch (status) {
+    case "sent":
+      return "success";
+    case "bounced":
+    case "failed":
+      return "destructive";
+    case "skipped_unsubscribed":
+      return "neutral";
+  }
+}
+
+// Fetches per-recipient results lazily, only once expanded — the list view
+// above already shows aggregate counts, so this detail (who exactly, what
+// was included, a link to the actual rendered copy) is only worth the
+// extra request when someone asks to see it.
+function SendRunDetails({ newsletterId, run }: { newsletterId: string; run: SendRun }) {
+  const [recipients, setRecipients] = useState<SendRunRecipientResult[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listSendRunRecipients(newsletterId, run.id)
+      .then(({ recipients: loaded }) => setRecipients(loaded))
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load recipients."));
+  }, [newsletterId, run.id]);
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border pt-3">
+      {run.itemsSnapshot && run.itemsSnapshot.length > 0 ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Included
+          </span>
+          <ul className="flex flex-wrap gap-1.5">
+            {run.itemsSnapshot.map((item, index) => (
+              <li key={index}>
+                <Badge variant="neutral">{item.title}</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Recipients
+        </span>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : recipients === null ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Loading recipients...
+          </div>
+        ) : recipients.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recipients recorded for this send.</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {recipients.map((recipient) => (
+              <li
+                key={recipient.recipientId}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <span className="truncate">{recipient.displayName || recipient.email}</span>
+                <Badge variant={recipientStatusVariant(recipient.status)}>{recipient.status}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <a
+        href={sendRunHtmlUrl(newsletterId, run.id)}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex w-fit items-center gap-1.5 text-sm text-tertiary transition-colors hover:text-tertiary/75"
+      >
+        <ExternalLink className="size-3.5" aria-hidden="true" />
+        View a copy of this send
+      </a>
+    </div>
+  );
+}
+
 // A dumb renderer over already-fetched runs — NewsletterCard owns the
 // fetching so it can both load history on expand and refresh it right after
 // a "Send now" click resolves (see Fix 6: the list used to only update on a
 // manual page reload).
-function SendRunHistoryList({ runs, error }: { runs: SendRun[] | null; error: string | null }) {
+function SendRunHistoryList({
+  newsletterId,
+  runs,
+  error,
+}: {
+  newsletterId: string;
+  runs: SendRun[] | null;
+  error: string | null;
+}) {
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+
   if (error) {
     return (
       <p role="alert" className="text-sm text-destructive">
@@ -615,32 +721,56 @@ function SendRunHistoryList({ runs, error }: { runs: SendRun[] | null; error: st
         const variant = sendRunBadgeVariant(run);
         const isFailed = variant === "destructive";
         const StatusIcon = sendRunStatusIcon(variant);
+        const expanded = expandedRunId === run.id;
+        // Nothing to show detail on for a run that never got as far as
+        // recording anything — same "was there real activity" check
+        // isEmptySendRun uses, plus a still-running/pending run (no
+        // startedAt yet finished).
+        const hasDetail = run.recipientCount > 0 || (run.itemsSnapshot?.length ?? 0) > 0;
 
         return (
           <li
             key={run.id}
             className={cn(
-              "flex items-start gap-2.5 rounded-md border border-border bg-muted/30 p-3",
+              "flex flex-col gap-2.5 rounded-md border border-border bg-muted/30 p-3",
               isFailed && "border-l-4 border-l-destructive bg-destructive/5",
             )}
           >
-            <StatusIcon className={cn("mt-0.5 size-4 shrink-0", sendRunIconClass(variant))} aria-hidden="true" />
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium">
-                  {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
+            <div className="flex items-start gap-2.5">
+              <StatusIcon
+                className={cn("mt-0.5 size-4 shrink-0", sendRunIconClass(variant))}
+                aria-hidden="true"
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">
+                    {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
+                  </span>
+                  <Badge variant={variant}>{sendRunBadgeLabel(run)}</Badge>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {run.itemCountIncluded} items &middot; {run.recipientCount} recipients
                 </span>
-                <Badge variant={variant}>{sendRunBadgeLabel(run)}</Badge>
+                {run.error ? (
+                  <span role="alert" className="text-sm text-destructive">
+                    {run.error}
+                  </span>
+                ) : null}
               </div>
-              <span className="text-sm text-muted-foreground">
-                {run.itemCountIncluded} items &middot; {run.recipientCount} recipients
-              </span>
-              {run.error ? (
-                <span role="alert" className="text-sm text-destructive">
-                  {run.error}
-                </span>
+              {hasDetail ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setExpandedRunId(expanded ? null : run.id)}
+                  aria-expanded={expanded}
+                  aria-label={expanded ? "Hide send details" : "Show send details"}
+                >
+                  Details
+                  <ChevronDown className={cn("transition-transform", expanded && "rotate-180")} aria-hidden="true" />
+                </Button>
               ) : null}
             </div>
+            {expanded ? <SendRunDetails newsletterId={newsletterId} run={run} /> : null}
           </li>
         );
       })}
@@ -1012,7 +1142,7 @@ function NewsletterCard({
             </TabsContent>
 
             <TabsContent value="history">
-              <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
+              <SendRunHistoryList newsletterId={newsletter.id} runs={sendRuns} error={sendRunsError} />
             </TabsContent>
           </Tabs>
         </div>
