@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Circle,
+  ListChecks,
   Loader2,
   Mail,
   Send,
@@ -92,36 +93,64 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
   );
 }
 
-// Per-tile accent so the four stat cards read as distinct at a glance
-// instead of four identical gray boxes. Text/icon shades are picked (not
-// the raw 500-weight swatch) so each clears WCAG AA/non-text contrast
-// against its own tinted chip background in both themes — same approach
-// as the Badge variants above.
-const STAT_ACCENTS = {
-  primary: {
-    chip: "bg-primary/15 text-primary",
-    glow: "group-hover:border-primary/40",
-  },
-  sky: {
-    chip: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
-    glow: "group-hover:border-sky-500/40",
-  },
-  violet: {
-    chip: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-    glow: "group-hover:border-violet-500/40",
-  },
-  amber: {
-    chip: "bg-amber-500/15 text-amber-800 dark:text-amber-400",
-    glow: "group-hover:border-amber-500/40",
-  },
+// Shared accent palette for every icon chip on this page — the four stat
+// tiles, the checklist header, and the Recent sends header — so "an icon in
+// a colored circle" reads as one consistent pattern across the dashboard
+// instead of each card inventing its own icon treatment (a bare Lucide
+// icon here, a filled circle there). Text/icon shades are picked (not the
+// raw 500-weight swatch) so each clears WCAG AA/non-text contrast against
+// its own tinted chip background in both themes — same approach as the
+// Badge variants elsewhere in the app.
+const CARD_ICON_ACCENTS = {
+  primary: "bg-primary/15 text-primary",
+  sky: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
+  violet: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  amber: "bg-amber-500/15 text-amber-800 dark:text-amber-400",
+  emerald: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  // Matches the Recent sends card's own tertiary-glass tint (see its
+  // `className` below) rather than one of the stat-tile hues, so the icon
+  // chip reads as part of that card's existing accent instead of a fifth
+  // unrelated color.
+  tertiary: "bg-tertiary/15 text-tertiary",
 } as const;
+
+const STAT_GLOWS = {
+  primary: "group-hover:border-primary/40",
+  sky: "group-hover:border-sky-500/40",
+  violet: "group-hover:border-violet-500/40",
+  amber: "group-hover:border-amber-500/40",
+} as const;
+
+function CardIconChip({
+  icon: Icon,
+  accent,
+  size = "size-9",
+  iconSize = "size-4",
+}: {
+  icon: LucideIcon;
+  accent: keyof typeof CARD_ICON_ACCENTS;
+  size?: string;
+  iconSize?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center rounded-full",
+        size,
+        CARD_ICON_ACCENTS[accent],
+      )}
+    >
+      <Icon className={iconSize} aria-hidden="true" />
+    </span>
+  );
+}
 
 function StatCard({
   label,
   value,
   secondary,
   href,
-  icon: Icon,
+  icon,
   accent,
 }: {
   label: string;
@@ -129,21 +158,18 @@ function StatCard({
   secondary?: string;
   href: string;
   icon: LucideIcon;
-  accent: keyof typeof STAT_ACCENTS;
+  accent: keyof typeof STAT_GLOWS;
 }) {
-  const { chip, glow } = STAT_ACCENTS[accent];
   return (
     <Link to={href} className="group block">
       <Card
         className={cn(
           "h-full transition-all hover:-translate-y-0.5 hover:shadow-elevated",
-          glow,
+          STAT_GLOWS[accent],
         )}
       >
         <CardContent className="flex items-center gap-4 p-4">
-          <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-full", chip)}>
-            <Icon className="size-5" aria-hidden="true" />
-          </span>
+          <CardIconChip icon={icon} accent={accent} size="size-11" iconSize="size-5" />
           <div className="min-w-0">
             <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
             <p className="truncate text-sm text-muted-foreground">{label}</p>
@@ -304,42 +330,64 @@ export function DashboardPage() {
   const sourcesWithErrors = sources?.filter((s) => s.status === "error").length ?? 0;
   const enabledNewsletters = newsletters?.filter((n) => n.isEnabled).length ?? 0;
 
-  const checklistCard = (
+  // A single card that's a true accordion (one header, conditionally
+  // rendered content) rather than swapping between two differently-shaped
+  // Cards — collapsed, it's just the header row (icon chip + title +
+  // toggle), full width and one row tall, positioned above the stat tiles
+  // (not squeezed into half of a two-column row next to Recent sends) so a
+  // returning user's next action — or its completion — is the first thing
+  // under the page header. Before setup is done there's nothing to
+  // collapse to, so the toggle button and the icon's "done" color only
+  // show once `requiredDone`.
+  const checklistSection = (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle>{requiredDone ? "Setup checklist" : "Getting started"}</CardTitle>
+      <CardHeader
+        className={cn(
+          "flex flex-row items-center justify-between gap-3 space-y-0",
+          !showFullChecklist && "py-4",
+        )}
+      >
+        <div className="flex items-center gap-3">
+          {/* The collapsed "Setup complete" summary gets the emerald
+              checkmark chip; both in-progress states ("Getting started"
+              and the re-expanded "Setup checklist") get the neutral
+              ListChecks chip — the icon reflects "is this the itemized
+              list or the completion confirmation", independent of
+              `requiredDone` alone. */}
+          <CardIconChip
+            icon={requiredDone && !showFullChecklist ? CheckCircle2 : ListChecks}
+            accent={requiredDone && !showFullChecklist ? "emerald" : "primary"}
+          />
+          <CardTitle>
+            {!requiredDone ? "Getting started" : showFullChecklist ? "Setup checklist" : "Setup complete"}
+          </CardTitle>
+        </div>
         {requiredDone ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setChecklistExpanded(false)}
-            aria-label="Collapse setup checklist"
-          >
-            Collapse
-            <ChevronDown className="rotate-180" aria-hidden="true" />
-          </Button>
+          showFullChecklist ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setChecklistExpanded(false)}
+              aria-label="Collapse setup checklist"
+            >
+              Collapse
+              <ChevronDown className="rotate-180" aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setChecklistExpanded(true)}>
+              Review checklist
+              <ChevronDown aria-hidden="true" />
+            </Button>
+          )
         ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col divide-y divide-border">
-        {checklist.map((item) => (
-          <ChecklistRow key={item.key} item={item} />
-        ))}
-      </CardContent>
-    </Card>
-  );
-
-  const checklistSummary = (
-    <Card>
-      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-          Setup complete
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => setChecklistExpanded(true)}>
-          Review checklist
-          <ChevronDown aria-hidden="true" />
-        </Button>
-      </CardContent>
+      {showFullChecklist ? (
+        <CardContent className="flex flex-col divide-y divide-border">
+          {checklist.map((item) => (
+            <ChecklistRow key={item.key} item={item} />
+          ))}
+        </CardContent>
+      ) : null}
     </Card>
   );
 
@@ -353,6 +401,8 @@ export function DashboardPage() {
             : "Finish setting up LatestArr to send your first newsletter."
         }
       />
+
+      {checklistSection}
 
       {requiredDone ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -384,38 +434,37 @@ export function DashboardPage() {
         </div>
       ) : null}
 
-      <div className={cn("grid gap-4", requiredDone ? "lg:grid-cols-2" : "max-w-2xl")}>
-        {showFullChecklist ? checklistCard : checklistSummary}
-
-        {requiredDone ? (
-          // A tertiary-tinted glass surface (see the "Tertiary" note in
-          // index.css) — a deliberate accent for this one secondary-info
-          // panel (recent activity, not an action) so it reads as
-          // distinct from the actionable checklist card beside it,
-          // without competing with the rose-primary stat tiles above.
-          <Card className="border-tertiary/20 bg-tertiary/[0.04] backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle>Recent sends</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recentRuns === null ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" />
-                  Loading recent sends...
-                </div>
-              ) : recentRuns.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No sends yet.</p>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {recentRuns.map((run) => (
-                    <RecentRunRow key={run.id} run={run} />
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+      {requiredDone ? (
+        // A tertiary-tinted glass surface (see the "Tertiary" note in
+        // index.css) — a deliberate accent for this secondary-info panel
+        // (recent activity, not an action) so it reads as distinct from
+        // the checklist card above and the rose-primary stat tiles,
+        // without competing with either. Its own icon chip picks up the
+        // same tertiary hue (see CARD_ICON_ACCENTS.tertiary above) so the
+        // header reads as one accent rather than an unrelated color.
+        <Card className="border-tertiary/20 bg-tertiary/[0.04] backdrop-blur-sm">
+          <CardHeader className="flex flex-row items-center gap-3 space-y-0">
+            <CardIconChip icon={Send} accent="tertiary" />
+            <CardTitle>Recent sends</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentRuns === null ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Loading recent sends...
+              </div>
+            ) : recentRuns.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No sends yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {recentRuns.map((run) => (
+                  <RecentRunRow key={run.id} run={run} />
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }
