@@ -22,6 +22,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  db.$client.close();
   if (existsSync(dbDir)) rmSync(dbDir, { recursive: true, force: true });
   if (existsSync(staticRoot)) rmSync(staticRoot, { recursive: true, force: true });
 });
