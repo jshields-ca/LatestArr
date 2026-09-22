@@ -112,6 +112,11 @@ describe("DashboardPage", () => {
     expect(screen.getByText("SMTP Profiles")).toBeInTheDocument();
     expect(screen.getByText("Newsletters")).toBeInTheDocument();
 
+    // The checklist sits above the stat tiles as its own full-width row,
+    // not squeezed into half of a two-column row beside Recent sends.
+    const position = screen.getByText("Setup complete").compareDocumentPosition(screen.getByText("Sources"));
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
     // Recent send detail: which newsletter, item/recipient counts, outcome.
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
     expect(screen.getByText("success")).toBeInTheDocument();
