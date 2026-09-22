@@ -43,6 +43,22 @@ function impliesSecure(port: string): boolean {
   return port.trim() === "465";
 }
 
+// Mirrors PORT_GUIDE below: port 465 is implicit TLS (the `secure` flag),
+// port 587 is conventionally STARTTLS (a plain connection that upgrades to
+// TLS after the handshake — still encrypted, just not "implicit"), and
+// anything else (25/2525, or a non-standard port) has no such convention to
+// lean on, so it's labeled plainly rather than guessed at. This used to
+// collapse every non-465 profile to "No TLS", which misrepresented the very
+// common port-587-STARTTLS setup (e.g. Dreamhost) as unencrypted.
+function connectionSecurityLabel(
+  port: number,
+  secure: boolean,
+): { label: string; variant: "success" | "neutral" } {
+  if (secure) return { label: "Implicit TLS", variant: "success" };
+  if (port === 587) return { label: "STARTTLS", variant: "success" };
+  return { label: "No TLS", variant: "neutral" };
+}
+
 // A compact, always-visible reference for the three port conventions, shown
 // next to the Port field so users can pick a port without first learning
 // what a TLS handshake is. One short line per port instead of a paragraph.
@@ -575,13 +591,17 @@ function SmtpProfileRow({
     }
   }
 
+  const connectionSecurity = connectionSecurityLabel(profile.port, profile.secure);
+
   return (
     <ListRow
       primary={
         <>
           <p className="truncate font-medium">{profile.name}</p>
-          <Badge variant={profile.secure ? "success" : "neutral"}>{profile.secure ? "TLS" : "No TLS"}</Badge>
-          <Badge variant="neutral">{profile.hasAuth ? "Authenticated" : "No auth"}</Badge>
+          <Badge variant={connectionSecurity.variant}>{connectionSecurity.label}</Badge>
+          <Badge variant={profile.hasAuth ? "success" : "neutral"}>
+            {profile.hasAuth ? "Authenticated" : "No auth"}
+          </Badge>
         </>
       }
       secondary={

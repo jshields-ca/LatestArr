@@ -22,10 +22,16 @@ docker/                   Container build files
 Requirements: Node.js (see `.nvmrc`/`engines` for the version) and [pnpm](https://pnpm.io/).
 
 ```bash
+cp .env.example .env    # fill in ENCRYPTION_KEY at minimum — see the file's own comments
+set -a && source .env && set +a   # apps/server reads process.env directly; nothing loads .env for you outside Docker
 pnpm install
-pnpm turbo run dev      # runs apps/server and apps/web in watch mode
+pnpm turbo run dev --env-mode=loose   # runs apps/server and apps/web in watch mode
 pnpm turbo run lint typecheck build   # what CI runs on every PR
 ```
+
+`--env-mode=loose` matters: Turborepo's default `strict` env mode only passes through variables it's told about, which silently drops `ENCRYPTION_KEY` and makes every mutating request 500 with "ENCRYPTION_KEY environment variable is required" — confusing since `pnpm turbo run dev` alone looks like it started cleanly. `apps/web`'s Vite dev server proxies `/api` to `apps/server` on port 3000 (`apps/web/vite.config.ts`); the proxy also rewrites the outgoing `Origin` header to match, which the server's same-origin CSRF check needs to accept requests from Vite's own port.
+
+First run: visiting `http://localhost:5173` prompts you to create the first admin account, same as a fresh Docker deployment.
 
 ## Adding a new source adapter
 
