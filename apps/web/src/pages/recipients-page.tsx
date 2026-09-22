@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { Loader2, Pencil, Plus, Search, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Plus, Search, Upload, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import {
   type RecipientImportResult,
 } from "@/lib/api";
 import { parseRecipientImportText } from "@/lib/recipient-import";
+import { cn } from "@/lib/utils";
 
 function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) => void }) {
   const [open, setOpen] = useState(false);
@@ -400,7 +401,7 @@ function EditRecipientDialog({
   );
 }
 
-function RecipientRow({
+function RecipientTableRow({
   recipient,
   onChanged,
   onDeleted,
@@ -429,27 +430,31 @@ function RecipientRow({
   }
 
   return (
-    <ListRow
-      primary={<p className="truncate font-medium">{recipient.displayName || recipient.email}</p>}
-      secondary={
-        recipient.displayName ? (
-          <p className="truncate text-sm text-muted-foreground">{recipient.email}</p>
-        ) : null
-      }
-      actions={
-        <>
-          <div className="flex items-center gap-2">
-            <Switch
-              id={`recipient-active-${recipient.id}`}
-              checked={recipient.isActive}
-              onCheckedChange={(checked) => void handleToggle(checked)}
-              disabled={toggling}
-              aria-label={recipient.isActive ? "Active" : "Inactive"}
-            />
-            <Label htmlFor={`recipient-active-${recipient.id}`} className="text-sm text-muted-foreground">
-              {recipient.isActive ? "Active" : "Inactive"}
-            </Label>
-          </div>
+    <tr className="border-b border-border last:border-0 hover:bg-accent/30">
+      <td className="max-w-0 py-2.5 pr-4">
+        <p className="truncate font-medium">
+          {recipient.displayName || <span className="text-muted-foreground">&mdash;</span>}
+        </p>
+      </td>
+      <td className="max-w-0 py-2.5 pr-4">
+        <p className="truncate text-muted-foreground">{recipient.email}</p>
+      </td>
+      <td className="py-2.5 pr-4">
+        <div className="flex items-center gap-2">
+          <Switch
+            id={`recipient-active-${recipient.id}`}
+            checked={recipient.isActive}
+            onCheckedChange={(checked) => void handleToggle(checked)}
+            disabled={toggling}
+            aria-label={recipient.isActive ? "Active" : "Inactive"}
+          />
+          <Label htmlFor={`recipient-active-${recipient.id}`} className="text-muted-foreground">
+            {recipient.isActive ? "Active" : "Inactive"}
+          </Label>
+        </div>
+      </td>
+      <td className="py-2.5">
+        <div className="flex items-center justify-end gap-1">
           <EditRecipientDialog recipient={recipient} onSaved={onChanged} />
           <ConfirmDeleteButton
             label={`Delete ${recipient.email}`}
@@ -469,16 +474,16 @@ function RecipientRow({
                 })
             }
           />
-        </>
-      }
-    />
+        </div>
+      </td>
+    </tr>
   );
 }
 
-// How many rows render initially/per "Show more" click. Large imported
-// lists (see issue #153 — a Tautulli/Plex user import can easily add
-// several dozen recipients at once) turned the page into one long scroll
-// with nothing to orient by; this plus the search box below keep the page
+// How many rows render per page. Large imported lists (see issue #153 —
+// a Tautulli/Plex user import can easily add several dozen recipients at
+// once) turned the page into one long scroll with nothing to orient by;
+// this plus the search box and sortable columns below keep the page
 // navigable regardless of list size without needing real pagination on
 // the API side.
 const RECIPIENTS_PAGE_SIZE = 25;
@@ -487,6 +492,54 @@ function matchesRecipientQuery(recipient: Recipient, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   return recipient.email.toLowerCase().includes(q) || (recipient.displayName ?? "").toLowerCase().includes(q);
+}
+
+type RecipientSortKey = "name" | "email" | "status";
+
+function recipientSortValue(recipient: Recipient, key: RecipientSortKey): string | number {
+  switch (key) {
+    case "name":
+      return (recipient.displayName || recipient.email).toLowerCase();
+    case "email":
+      return recipient.email.toLowerCase();
+    case "status":
+      return recipient.isActive ? 1 : 0;
+  }
+}
+
+function SortableColumnHeader({
+  label,
+  sortKey,
+  activeSortKey,
+  sortDir,
+  onSort,
+  className,
+}: {
+  label: string;
+  sortKey: RecipientSortKey;
+  activeSortKey: RecipientSortKey;
+  sortDir: "asc" | "desc";
+  onSort: (key: RecipientSortKey) => void;
+  className?: string;
+}) {
+  const active = activeSortKey === sortKey;
+  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <th
+      scope="col"
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+      className={className}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+      >
+        {label}
+        <Icon className={cn("size-3.5", !active && "opacity-40")} aria-hidden="true" />
+      </button>
+    </th>
+  );
 }
 
 function RecipientsSection({
@@ -499,14 +552,38 @@ function RecipientsSection({
   onRecipientsChange: (updater: (prev: Recipient[]) => Recipient[]) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [visibleCount, setVisibleCount] = useState(RECIPIENTS_PAGE_SIZE);
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState<RecipientSortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function handleSort(key: RecipientSortKey) {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const filtered = useMemo(
     () => (recipients ?? []).filter((r) => matchesRecipientQuery(r, query)),
     [recipients, query],
   );
-  const visible = filtered.slice(0, visibleCount);
-  const remaining = filtered.length - visible.length;
+  const sorted = useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const av = recipientSortValue(a, sortKey);
+      const bv = recipientSortValue(b, sortKey);
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / RECIPIENTS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * RECIPIENTS_PAGE_SIZE;
+  const pageItems = sorted.slice(pageStart, pageStart + RECIPIENTS_PAGE_SIZE);
 
   return (
     <section className="flex flex-col gap-4">
@@ -559,7 +636,7 @@ function RecipientsSection({
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
-                  setVisibleCount(RECIPIENTS_PAGE_SIZE);
+                  setPage(1);
                 }}
                 className="pl-9"
               />
@@ -575,25 +652,81 @@ function RecipientsSection({
             <p className="text-sm text-muted-foreground">No recipients match "{query.trim()}".</p>
           ) : (
             <>
-              {visible.map((recipient) => (
-                <RecipientRow
-                  key={recipient.id}
-                  recipient={recipient}
-                  onChanged={(updated) =>
-                    onRecipientsChange((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
-                  }
-                  onDeleted={(id) => onRecipientsChange((prev) => prev.filter((r) => r.id !== id))}
-                />
-              ))}
-              {remaining > 0 ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="self-center"
-                  onClick={() => setVisibleCount((c) => c + RECIPIENTS_PAGE_SIZE)}
-                >
-                  Show {Math.min(remaining, RECIPIENTS_PAGE_SIZE)} more
-                </Button>
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full text-left text-sm">
+                  <caption className="sr-only">Recipients</caption>
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30 text-xs">
+                      <SortableColumnHeader
+                        label="Name"
+                        sortKey="name"
+                        activeSortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={handleSort}
+                        className="w-2/5 px-4 py-2.5"
+                      />
+                      <SortableColumnHeader
+                        label="Email"
+                        sortKey="email"
+                        activeSortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={handleSort}
+                        className="w-2/5 py-2.5"
+                      />
+                      <SortableColumnHeader
+                        label="Status"
+                        sortKey="status"
+                        activeSortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={handleSort}
+                        className="py-2.5"
+                      />
+                      <th scope="col" className="py-2.5 pr-4">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((recipient) => (
+                      <RecipientTableRow
+                        key={recipient.id}
+                        recipient={recipient}
+                        onChanged={(updated) =>
+                          onRecipientsChange((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+                        }
+                        onDeleted={(id) => onRecipientsChange((prev) => prev.filter((r) => r.id !== id))}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Page {safePage} of {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={safePage <= 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={safePage >= totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               ) : null}
             </>
           )}

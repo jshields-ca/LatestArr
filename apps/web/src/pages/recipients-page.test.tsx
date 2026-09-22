@@ -126,12 +126,13 @@ describe("RecipientsPage", () => {
     expect(await screen.findByText(/No recipients match/)).toBeInTheDocument();
   });
 
-  it("paginates a large recipient list with a Show more button", async () => {
+  it("paginates a large recipient list with Previous/Next controls", async () => {
     const user = userEvent.setup();
+    // Zero-padded so alphabetical (the default Name sort) matches numeric order.
     const many = Array.from({ length: 30 }, (_, i) => ({
       id: `r${i}`,
-      email: `person${i}@example.com`,
-      displayName: `Person ${i}`,
+      email: `person${String(i).padStart(2, "0")}@example.com`,
+      displayName: `Person ${String(i).padStart(2, "0")}`,
       isActive: true,
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -143,15 +144,56 @@ describe("RecipientsPage", () => {
     });
 
     render(<RecipientsPage />);
-    await screen.findByText("Person 0");
+    await screen.findByText("Person 00");
 
     expect(screen.getByText("Person 24")).toBeInTheDocument();
     expect(screen.queryByText("Person 25")).not.toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Show 5 more" }));
+    await user.click(screen.getByRole("button", { name: "Next" }));
 
     expect(await screen.findByText("Person 29")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Show .* more/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Person 00")).not.toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+  });
+
+  it("sorts recipients by clicking a column header, toggling direction on repeat clicks", async () => {
+    const user = userEvent.setup();
+    const bob = {
+      id: "r2",
+      email: "bob@example.com",
+      displayName: "Bob",
+      isActive: false,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice, bob] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    function names() {
+      return screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0]!.textContent);
+    }
+
+    render(<RecipientsPage />);
+    await screen.findByText("Alice");
+
+    // Default sort is by name ascending: Alice, then Bob.
+    expect(names()).toEqual(["Alice", "Bob"]);
+
+    const nameHeader = screen.getByRole("columnheader", { name: "Name" });
+    expect(nameHeader).toHaveAttribute("aria-sort", "ascending");
+
+    await user.click(within(nameHeader).getByRole("button", { name: "Name" }));
+    expect(nameHeader).toHaveAttribute("aria-sort", "descending");
+    expect(names()).toEqual(["Bob", "Alice"]);
+
+    await user.click(screen.getByRole("button", { name: "Status" }));
+    expect(names()).toEqual(["Bob", "Alice"]);
   });
 
   it("edits a recipient's email and name through the edit dialog", async () => {
