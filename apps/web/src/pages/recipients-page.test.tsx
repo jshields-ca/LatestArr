@@ -94,6 +94,66 @@ describe("RecipientsPage", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
   });
 
+  it("filters recipients by name or email as the search box changes", async () => {
+    const user = userEvent.setup();
+    const bob = {
+      id: "r2",
+      email: "bob@example.com",
+      displayName: "Bob",
+      isActive: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice, bob] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Alice");
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+    expect(screen.getByText("2 recipients")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search recipients by name or email"), "bob@");
+
+    expect(screen.queryByText("Alice")).not.toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 match")).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("Search recipients by name or email"));
+    await user.type(screen.getByLabelText("Search recipients by name or email"), "nobody-matches-this");
+    expect(await screen.findByText(/No recipients match/)).toBeInTheDocument();
+  });
+
+  it("paginates a large recipient list with a Show more button", async () => {
+    const user = userEvent.setup();
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: `r${i}`,
+      email: `person${i}@example.com`,
+      displayName: `Person ${i}`,
+      isActive: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    }));
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: many }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Person 0");
+
+    expect(screen.getByText("Person 24")).toBeInTheDocument();
+    expect(screen.queryByText("Person 25")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show 5 more" }));
+
+    expect(await screen.findByText("Person 29")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Show .* more/ })).not.toBeInTheDocument();
+  });
+
   it("edits a recipient's email and name through the edit dialog", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
