@@ -77,6 +77,17 @@ function mapEntry(entry: OpdsEntry, baseUrl: string, webUrl: string): NewItem {
   // purely numeric, and `new Date(2020)` would misinterpret that as a
   // millisecond timestamp rather than the year 2020.
   const issued = entry["dc:issued"] !== undefined ? String(entry["dc:issued"]) : undefined;
+  // A bare 4-digit year (the only shape dc:issued actually appears in) is
+  // parsed as UTC midnight by `new Date("2020")`, which rolls back to the
+  // previous year once read back with local-time getters (getFullYear) in
+  // any negative-UTC-offset timezone — construct it in local time instead
+  // so the year survives the round trip everywhere. A full date string
+  // (should one ever appear) still goes through the plain Date parser.
+  const releaseDate = issued
+    ? /^\d{4}$/.test(issued)
+      ? new Date(Number(issued), 0, 1)
+      : new Date(issued)
+    : undefined;
   const imageHref = getEntryImageHref(entry);
   return {
     id: entry.id,
@@ -91,7 +102,7 @@ function mapEntry(entry: OpdsEntry, baseUrl: string, webUrl: string): NewItem {
     // the closest reliable proxy, and it's exactly what populates the
     // dedicated /recent feed we read from.
     addedAt: entry.updated ? new Date(entry.updated) : new Date(0),
-    releaseDate: issued ? new Date(issued) : undefined,
+    releaseDate,
     // Resolved to an absolute URL, but unlike Plex/Tautulli/Audiobookshelf
     // this carries no credentials — OPDS covers sit behind the same HTTP
     // Basic Auth as the feed itself, which fetchImageBytes below supplies
