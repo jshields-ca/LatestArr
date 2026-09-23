@@ -265,6 +265,10 @@ export function getGroupMembers(id: string): Promise<{ group: RecipientGroup; me
   return apiFetch<{ group: RecipientGroup; members: Recipient[] }>(`/recipient-groups/${id}`);
 }
 
+export function getRecipientGroups(recipientId: string): Promise<{ groups: RecipientGroup[] }> {
+  return apiFetch<{ groups: RecipientGroup[] }>(`/recipients/${recipientId}/groups`);
+}
+
 export function addGroupMember(groupId: string, recipientId: string): Promise<void> {
   return apiFetch<void>(`/recipient-groups/${groupId}/members`, {
     method: "POST",
