@@ -1,5 +1,114 @@
 # @latestarr/server
 
+## 0.10.0
+
+### Minor Changes
+
+- [#147](https://github.com/jshields-ca/LatestArr/pull/147) [`d2c7c33`](https://github.com/jshields-ca/LatestArr/commit/d2c7c33833d4ab6a2eb802e7270b51a9a83113be) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Import a Plex or Tautulli source's known users as recipients, grouped together, from the Sources page.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `SourceAdapter` (`packages/adapters/core/src/source-adapter.ts`) gains an optional `listUsers?(config): Promise<SourceUser[]>`, the same optional-capability pattern as `fetchPopularItems`/`fetchImageBytes`. Implemented for:
+
+  - **Tautulli**, via its `get_users` API (`getUsers` in `tautulli-client.ts`) — includes each user's `email` when Tautulli has it (synced from the underlying Plex server's shared-user list), filtering out its "Local" pseudo-user (id 0).
+  - **Plex**, via the local server's own `/accounts` endpoint (`getAccounts` in `plex-client.ts`) — usernames only, no email. A local server token can't reach plex.tv's own account API, which is the only place a shared user's email is visible; `SourceUser.email` is optional specifically to let a caller (and `NewItem`'s doc comment) handle this per-source gap rather than assuming every source can supply one.
+
+  New `GET /sources/:id/users` (`apps/server/src/http/routes/sources.ts`) 404s (not a 200 with an empty array) when the adapter doesn't implement `listUsers`, so the web UI can tell "unsupported" apart from "zero users right now."
+
+  New "Import users" action on a Plex/Tautulli source row (`apps/web/src/pages/sources-page.tsx`) opens a dialog listing the source's users — pre-checked when they have an email, disabled when they don't (a recipient can't exist without one) — and imports the selected ones via the existing bulk-import endpoint (`POST /recipients/import`, from the CSV/text-paste import feature), then adds each newly-created recipient to a group named after the source, reusing an existing group of that name on a repeat import rather than creating a duplicate.
+
+  </details>
+
+- [#165](https://github.com/jshields-ca/LatestArr/pull/165) [`05eba36`](https://github.com/jshields-ca/LatestArr/commit/05eba36b8e3c431443a7e2b9179b7e366d8592fd) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** The default newsletter template now looks more like LatestArr — bigger, more readable text, warmer Bloom-tinted colors instead of generic gray, a restyled footer with small GitHub/Report-an-issue icons — and each newsletter can now pick which font it sends with (Ubuntu, Arial, Georgia, or Verdana).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback after reviewing a real test send's raw .eml: font sizes felt too small for comfortable/accessible reading, the palette (`#0f172a`/`#64748b`/`#94a3b8`/`[#999999](https://github.com/jshields-ca/LatestArr/issues/999999)`) read as generic rather than Bloom, and the footer was two bare text links.
+
+  - `apps/server/src/render/newsletter-template.ts`: bumped font sizes across the per-item card and header/footer (title 24→28px, item title 16→18px, subtitle 13→14px, overview 13→14px, meta lines 11-12→12-13px), replaced the generic slate palette with the app's own Bloom neutrals (`TEXT_COLOR`/`MUTED_COLOR`/`SUBTLE_COLOR`, derived from `--foreground`/`--muted-foreground`), added a soft tinted fill to the content-kind badge, and rebuilt the footer as a bordered row with small inline-SVG (data: URI) GitHub/report icons next to the existing links — `ACCENT_COLOR` itself was already exactly the app's `--primary`, unchanged.
+  - Added a small **Font** picker (`apps/server/src/render/email-fonts.ts`'s `EMAIL_FONTS` catalog: Ubuntu, Arial, Georgia, Verdana — curated web-safe stacks, not arbitrary font upload, which email clients don't support reliably) as a new `newsletters.email_font` column (`packages/db/src/schema.ts`, migration `0003_grey_stardust.sql`, default `"ubuntu"`), validated server-side via a zod enum in `apps/server/src/http/routes/newsletters.ts`, and exposed in the web UI as `EmailFontPicker` next to the existing Template picker in the Newsletters page's Content panel — hidden once a custom template is picked, since a GrapesJS-authored template defines its own fonts.
+  - Found along the way: MJML's `<mj-attributes>`/`<mj-all>` defaults aren't honored by the installed `mjml` version for `<mj-text>`'s `font-family` — worked around by setting `font-family` explicitly on every `<mj-text>` tag and in the raw per-item/footer markup instead of relying on template-wide defaults.
+  - Scoped to the default template only — the GrapesJS "Media List" block (`apps/web/src/lib/grapesjs-blocks.ts`) that a custom template can use keeps its existing appearance; restyling it was out of scope for this pass.
+
+  </details>
+
+- [#173](https://github.com/jshields-ca/LatestArr/pull/173) [`28ff9e1`](https://github.com/jshields-ca/LatestArr/commit/28ff9e138aeec841c33aecc68539550e9ef77001) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Newsletters can now include an intro note, a footer note, and up to 4 call-to-action buttons (e.g. a link to your Plex/Jellyfin app, a donation link, "browse the library") in the default template.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses the feature request in [#163](https://github.com/jshields-ca/LatestArr/issues/163), folded in alongside the default-template visual refresh ([#162](https://github.com/jshields-ca/LatestArr/issues/162)).
+
+  - Three new `newsletters` columns — `intro_text`, `footer_note` (both nullable text), `ctas` (nullable JSON `{label, url}[]`, migration `0004_busy_ares.sql`) — validated server-side via zod in `apps/server/src/http/routes/newsletters.ts` (`ctas` capped at 4, `url` must be a valid URL, `label` 1-40 chars).
+  - `apps/server/src/render/newsletter-template.ts`: intro text renders as a line under the "Here's what's new" intro; CTAs render as a row of `<mj-button>` elements (native MJML, so Outlook VML fallbacks come for free) right below that; the footer note renders as its own line above the existing "Generated by LatestArr" credit. All three are also passed through generically to `renderMjmlTemplate` (`apps/server/src/render/mjml-template.ts`) so a custom GrapesJS-authored template could reference `{{introText}}`/`{{footerNote}}`/`{{#each ctas}}` directly, though only the default template does today.
+  - Web UI: two new components on the Newsletters page's Content panel (`apps/web/src/pages/newsletters-page.tsx`) — `NewsletterTextField` (shared by Intro and Footer note, saves on blur only when the value actually changed) and `CtaButtonsField` (a row-editor list with an explicit "Save buttons" button, since a half-typed URL blurring mid-edit shouldn't silently commit). Both hidden once a custom template is picked, same as the existing Font picker.
+  - Icon support per CTA (raised in the original request) was intentionally left out of this pass — email-safe icon rendering (inline SVG/data-URI, per the footer icons added in [#162](https://github.com/jshields-ca/LatestArr/issues/162)) adds real scope for a picker UI, and label+URL alone already covers the core use case.
+
+  </details>
+
+- [#169](https://github.com/jshields-ca/LatestArr/pull/169) [`da01590`](https://github.com/jshields-ca/LatestArr/commit/da015906952997d63dfa90a424882471f9554c06) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** The Recipients table's Name column no longer reads as cramped against the left border.
+
+  **New:** The Edit recipient dialog now lets you add or remove group membership — and create a brand-new group — without leaving the dialog.
+
+  <details>
+  <summary>Technical details</summary>
+  - `apps/web/src/pages/recipients-page.tsx`: the Name `<td>` was missing the left padding its `<th>` had (`px-4` vs `pr-4`-only), so header text sat indented while row text sat flush against the border.
+  - Added `GET /recipients/:id/groups` (`apps/server/src/http/routes/recipients.ts`) — the reverse of the existing `GET /recipient-groups/:id`'s `members`, so a recipient-centric UI doesn't need to fetch every group's member list to figure out which ones a given recipient is already in.
+  - Added `RecipientGroupsField` to `EditRecipientDialog`, mirroring the Newsletters page's `LinkedGroups` pattern (add-via-dropdown, remove-via-chip) plus an inline "create a new group" shortcut that creates and adds in one action. Reuses the existing `POST/DELETE /recipient-groups/:id/members` endpoints — no new mutation endpoints needed.
+
+  </details>
+
+- [#149](https://github.com/jshields-ca/LatestArr/pull/149) [`7c67462`](https://github.com/jshields-ca/LatestArr/commit/7c674628a7b432739f379d6b5a2fb7dc72928ac5) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** A Logs page in the web UI shows recent server activity — failed sends, source sync errors, auth events, and anything else worth troubleshooting — without needing to `docker logs` the container.
+
+  <details>
+  <summary>Technical details</summary>
+
+  The server's pino logger now writes to two destinations via `pino.multistream`: stdout (unchanged — still what `docker logs` shows) and a new in-memory ring buffer (`apps/server/src/log-buffer.ts`, capped at 500 entries), which drops Fastify's routine per-request "incoming request"/"request completed" pair so the buffer holds actual events instead of being drowned out by ordinary traffic. New `GET /logs` (`?level=warn|error|...` and `?limit=`) serves recent entries with a human-readable level label.
+
+  The new Logs page polls this on load/refresh/filter-change, showing each entry's level (color-coded), timestamp, and message, with a "Details" toggle that expands the entry's full raw context (request info, error type/message/stack) for whichever ones carry it.
+
+  Note for anyone extending `apps/server/src/app.ts`: pino's actual destination is its _second_ constructor argument — `pino(multistreamResult)` alone silently falls back to pino's own default stdout destination and never writes to any custom stream in the multistream array; it has to be `pino(options, multistreamResult)`. Confirmed via a minimal repro while building this — easy to get wrong and have it look like it's working (the primary stdout destination still logs normally) while the second destination silently receives nothing.
+
+  </details>
+
+- [#146](https://github.com/jshields-ca/LatestArr/pull/146) [`91e6ad5`](https://github.com/jshields-ca/LatestArr/commit/91e6ad55f87329fd0b4ce833b8dc170565e613b2) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Bulk-import recipients by pasting a list of emails or uploading a CSV, instead of adding people one at a time.
+
+  <details>
+  <summary>Technical details</summary>
+
+  New "Import" button on the Recipients page opens a dialog with a paste area (or an "Upload CSV" button that reads a file's text into the same field). `apps/web/src/lib/recipient-import.ts` parses the pasted/uploaded text tolerating the formats people actually paste: one bare email per line, `email,Name` or `Name,email` CSV-style pairs (either order), `Name <email>` mailto-style entries, and a flat comma/semicolon-separated address list copied straight from a mail client's To field — with a live "N recipients ready to import, M lines couldn't be parsed" preview and the unparseable lines shown before anything is submitted.
+
+  New `POST /recipients/import` (`apps/server/src/http/routes/recipients.ts`) accepts the parsed rows and processes them one at a time rather than as a single multi-row insert, so one bad or duplicate row doesn't fail the whole batch — it returns which rows were `created` and which were `skipped` with a reason (invalid email, already exists, or duplicate within the same import), which the dialog displays after submitting.
+
+  </details>
+
+- [#148](https://github.com/jshields-ca/LatestArr/pull/148) [`832eebc`](https://github.com/jshields-ca/LatestArr/commit/832eebc286ee6a8116ced59e1ec58a32788f8108) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Recent Sends history now shows exactly who a send went to and what it included, with a link to the actual rendered copy — not just aggregate counts.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `send_runs` gains two columns, set once rendering succeeds (independent of whether individual recipient deliveries later fail): `items_snapshot` (a lightweight `{title, kind}[]` JSON snapshot — the same set `item_count_included` has always counted, now also captured with titles) and `rendered_html` (the actual HTML that was sent, stored verbatim rather than re-rendered on demand, so it reflects exactly what a recipient received even if templates/sources changed since).
+
+  Per-recipient detail already existed in `send_run_recipient_results` (populated by the send pipeline, but never exposed) — new `GET /newsletters/:id/send-runs/:runId/recipients` joins it with `recipients` for each row's email/displayName. New `GET /newsletters/:id/send-runs/:runId/html` serves the stored `rendered_html` directly as `text/html` (a link target, not a JSON-fetched value). The existing list endpoint (`GET /newsletters/:id/send-runs`) explicitly excludes `rendered_html` from each row — it can be tens to hundreds of KB and the list can return many runs at once.
+
+  The newsletter History tab's send-run rows gain a "Details" toggle (only shown when there's something to show) that lazily fetches recipients and renders included-item badges, a per-recipient status list, and a "View a copy of this send" link to the raw HTML endpoint.
+
+  </details>
+
+### Patch Changes
+
+- Updated dependencies [[`d2c7c33`](https://github.com/jshields-ca/LatestArr/commit/d2c7c33833d4ab6a2eb802e7270b51a9a83113be), [`59845f4`](https://github.com/jshields-ca/LatestArr/commit/59845f425654c5363990dbaaa4d06807bbac17c7), [`05eba36`](https://github.com/jshields-ca/LatestArr/commit/05eba36b8e3c431443a7e2b9179b7e366d8592fd), [`28ff9e1`](https://github.com/jshields-ca/LatestArr/commit/28ff9e138aeec841c33aecc68539550e9ef77001), [`1484a0c`](https://github.com/jshields-ca/LatestArr/commit/1484a0cd44987df71261be17bbb4429fe20d1e4a), [`832eebc`](https://github.com/jshields-ca/LatestArr/commit/832eebc286ee6a8116ced59e1ec58a32788f8108)]:
+  - @latestarr/adapter-core@0.10.0
+  - @latestarr/adapter-plex@0.10.0
+  - @latestarr/adapter-tautulli@0.10.0
+  - @latestarr/adapter-booklore-family@0.10.0
+  - @latestarr/db@0.10.0
+  - @latestarr/adapter-audiobookshelf@0.10.0
+  - @latestarr/adapter-romm@0.10.0
+  - @latestarr/crypto@0.10.0
+
 ## 0.9.0
 
 ### Minor Changes
