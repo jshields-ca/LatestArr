@@ -1,5 +1,25 @@
 # @latestarr/adapter-booklore-family
 
+## 0.10.0
+
+### Patch Changes
+
+- [#170](https://github.com/jshields-ca/LatestArr/pull/170) [`59845f4`](https://github.com/jshields-ca/LatestArr/commit/59845f425654c5363990dbaaa4d06807bbac17c7) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** A book's release year from Book Orbit/BookLore could show one year earlier than its actual publication year, for anyone self-hosting in a timezone west of UTC.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `mapEntry()` in `packages/adapters/booklore-family/src/booklore-adapter.ts` built `releaseDate` from OPDS's `dc:issued` field via `new Date(issued)`. `dc:issued` only ever appears as a bare 4-digit year (e.g. `"2020"`), and `new Date("2020")` parses that as UTC midnight — reading it back with local-time getters (`getFullYear()`, `toLocaleDateString()`, ...) in any negative-UTC-offset timezone rolls it back to December 31 of the previous year.
+
+  Also the root cause of a flaky test (`booklore-adapter.test.ts`'s "maps entries and filters by the since cutoff", filed as [#164](https://github.com/jshields-ca/LatestArr/issues/164)) that only failed on a non-UTC-configured machine.
+
+  Fixed by constructing the date in local time (`new Date(Number(issued), 0, 1)`) when `dc:issued` is a bare year, so the year survives the round trip regardless of the host's timezone. A full date string, should one ever appear, still goes through the plain `Date` parser unchanged.
+
+  </details>
+
+- Updated dependencies [[`d2c7c33`](https://github.com/jshields-ca/LatestArr/commit/d2c7c33833d4ab6a2eb802e7270b51a9a83113be)]:
+  - @latestarr/adapter-core@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
