@@ -523,7 +523,12 @@ describe("fetchPopularItems", () => {
       jsonResponse({ response: { result: "success", message: null, data: [] } }),
     );
 
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // The adapter computes Math.ceil((Date.now() - since) / oneDay) at call
+    // time, a moment after `since` is computed here — on a slow CI runner
+    // that gap can itself cross a whole day, rounding 7 up to 8. A minute
+    // of slack keeps the elapsed time comfortably under the next day
+    // boundary regardless of scheduling delay between the two lines.
+    const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000 - 60_000));
     await tautulliAdapter.fetchPopularItems!(config, {
       since: sevenDaysAgo,
       mediaKinds: ["movie"],
