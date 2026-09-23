@@ -432,6 +432,21 @@ describe("NewslettersPage", () => {
     240000,
   );
 
+  it("sends now from the collapsed row, without expanding it first", async () => {
+    const user = userEvent.setup();
+    mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
+    renderPage();
+    await screen.findByText("Weekly digest");
+
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRunId: "run1" }));
+    await user.click(screen.getByRole("button", { name: "Send now" }));
+
+    expect(await screen.findByText("Send started.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+  });
+
   it("shows the send-now error when the newsletter is misconfigured", async () => {
     const user = userEvent.setup();
     mockRoutes(
