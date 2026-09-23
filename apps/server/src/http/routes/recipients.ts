@@ -1,4 +1,4 @@
-import { type Db, recipients } from "@latestarr/db";
+import { type Db, recipientGroupMembers, recipientGroups, recipients } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -116,6 +116,28 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         return reply.code(404).send({ error: "Not found" });
       }
       return reply.send({ recipient });
+    });
+
+    // The reverse of GET /recipient-groups/:id's `members` — lets the
+    // recipient-centric Edit dialog show (and toggle) which groups a
+    // recipient already belongs to without fetching every group's member
+    // list to find out.
+    scope.get<{ Params: IdParams }>("/recipients/:id/groups", async (request, reply) => {
+      const [recipient] = await db
+        .select()
+        .from(recipients)
+        .where(eq(recipients.id, request.params.id));
+      if (!recipient) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+
+      const groups = await db
+        .select({ group: recipientGroups })
+        .from(recipientGroupMembers)
+        .innerJoin(recipientGroups, eq(recipientGroupMembers.groupId, recipientGroups.id))
+        .where(eq(recipientGroupMembers.recipientId, recipient.id));
+
+      return reply.send({ groups: groups.map((row) => row.group) });
     });
 
     scope.patch<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {

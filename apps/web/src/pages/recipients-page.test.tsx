@@ -201,7 +201,9 @@ describe("RecipientsPage", () => {
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       if (url === "/api/recipients" && (!init || init.method === undefined))
         return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
-      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipient-groups" && (!init || init.method === undefined))
+        return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients/r1/groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
       if (url === "/api/recipients/r1" && init?.method === "PATCH") {
         return Promise.resolve(
           jsonResponse(200, {
@@ -236,6 +238,60 @@ describe("RecipientsPage", () => {
       email: "alice2@example.com",
       displayName: "Alice Two",
     });
+  });
+
+  it("manages a recipient's group membership from the edit dialog, including creating a new group", async () => {
+    const user = userEvent.setup();
+    const newGroup = {
+      id: "g2",
+      name: "VIPs",
+      description: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/recipients" && (!init || init.method === undefined))
+        return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/api/recipient-groups" && (!init || init.method === undefined))
+        return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      if (url === "/api/recipients/r1/groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Edit alice@example.com" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("Not in any groups yet.")).toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    selectOption(within(dialog).getByLabelText("Add to a group"), "Everyone");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+
+    expect(await within(dialog).findByText("Everyone")).toBeInTheDocument();
+    const addCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipient-groups/g1/members") as [
+      string,
+      RequestInit,
+    ];
+    expect(JSON.parse(addCall[1].body as string)).toEqual({ recipientId: "r1" });
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { group: newGroup }));
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await user.type(within(dialog).getByLabelText("New group name"), "VIPs");
+    await user.click(within(dialog).getByRole("button", { name: "Create group" }));
+
+    expect(await within(dialog).findByText("VIPs")).toBeInTheDocument();
+    const createCall = fetchMock.mock.calls.find(
+      ([url, reqInit]) => url === "/api/recipient-groups" && reqInit?.method === "POST",
+    ) as [string, RequestInit];
+    expect(JSON.parse(createCall[1].body as string)).toEqual({ name: "VIPs" });
+
+    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+    await user.click(within(dialog).getByRole("button", { name: "Remove from Everyone" }));
+    await waitFor(() =>
+      expect(within(dialog).queryByRole("button", { name: "Remove from Everyone" })).not.toBeInTheDocument(),
+    );
   });
 
   // The "Add a recipient to this group" control is a real Radix Select
