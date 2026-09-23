@@ -27,6 +27,7 @@ import { SettingRow } from "@/components/ui/setting-row";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
@@ -46,6 +47,7 @@ import {
   sendNewsletterNow,
   updateNewsletter,
   type Newsletter,
+  type NewsletterCta,
   type NewsletterDetail,
   type RecipientGroup,
   type SendRun,
@@ -598,6 +600,168 @@ function EmailFontPicker({
   );
 }
 
+// Shared by IntroTextField/FooterNoteField below — a free-text field that
+// saves on blur (only when the value actually changed) rather than a
+// dedicated Save button, since each is a single independent field with no
+// other fields it needs to batch with. Only meaningful for the default
+// layout, same as EmailFontPicker above.
+function NewsletterTextField({
+  newsletter,
+  field,
+  label,
+  placeholder,
+  onChanged,
+}: {
+  newsletter: Newsletter;
+  field: "introText" | "footerNote";
+  label: string;
+  placeholder: string;
+  onChanged: (newsletter: Newsletter) => void;
+}) {
+  const [value, setValue] = useState(newsletter[field] ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const idPrefix = `newsletter-${field}-${newsletter.id}`;
+
+  async function handleBlur() {
+    if (value === (newsletter[field] ?? "")) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const { newsletter: updated } = await updateNewsletter(newsletter.id, { [field]: value || null });
+      onChanged(updated);
+      toast({ variant: "success", title: `${label} updated` });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : `Failed to update ${label.toLowerCase()}.`;
+      setError(message);
+      toast({ variant: "destructive", title: `Failed to update ${label.toLowerCase()}`, description: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={idPrefix}>{label} (optional)</Label>
+      <Textarea
+        id={idPrefix}
+        rows={2}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => void handleBlur()}
+        disabled={saving}
+      />
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+// Up to 4 {label, url} buttons rendered in the default template — see
+// apps/server/src/render/newsletter-template.ts. Unlike the single-field
+// autosave-on-blur pattern above, this batches every row into one explicit
+// Save, since a half-typed URL blurring mid-edit shouldn't silently commit.
+function CtaButtonsField({
+  newsletter,
+  onChanged,
+}: {
+  newsletter: Newsletter;
+  onChanged: (newsletter: Newsletter) => void;
+}) {
+  const [ctas, setCtas] = useState<NewsletterCta[]>(newsletter.ctas ?? []);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const idPrefix = `newsletter-ctas-${newsletter.id}`;
+
+  function updateRow(index: number, patch: Partial<NewsletterCta>) {
+    setCtas((prev) => prev.map((cta, i) => (i === index ? { ...cta, ...patch } : cta)));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      const { newsletter: updated } = await updateNewsletter(newsletter.id, { ctas });
+      onChanged(updated);
+      toast({ variant: "success", title: "Buttons updated" });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to update buttons.";
+      setError(message);
+      toast({ variant: "destructive", title: "Failed to update buttons", description: message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <SubsectionHeading>Buttons</SubsectionHeading>
+      {ctas.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No buttons yet — e.g. a link to your Plex app.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {ctas.map((cta, index) => (
+            <li key={index} className="flex items-center gap-2">
+              <Input
+                aria-label={`Button ${index + 1} label`}
+                placeholder="Label"
+                value={cta.label}
+                onChange={(e) => updateRow(index, { label: e.target.value })}
+                disabled={saving}
+                className="max-w-[9rem]"
+              />
+              <Input
+                aria-label={`Button ${index + 1} URL`}
+                placeholder="https://..."
+                value={cta.url}
+                onChange={(e) => updateRow(index, { url: e.target.value })}
+                disabled={saving}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove button ${index + 1}`}
+                onClick={() => setCtas((prev) => prev.filter((_, i) => i !== index))}
+                disabled={saving}
+              >
+                <X />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-center gap-2">
+        {ctas.length < 4 ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setCtas((prev) => [...prev, { label: "", url: "" }])}
+            disabled={saving}
+          >
+            <Plus />
+            Add button
+          </Button>
+        ) : null}
+        <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving} id={idPrefix}>
+          {saving ? <Loader2 className="animate-spin" /> : null}
+          Save buttons
+        </Button>
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 // The newsletter's own editable fields (name, schedule, delivery, subject) —
 // what used to live in a separate "Edit newsletter" dialog, reached only via
 // a pencil icon that didn't include the Template/Sources/Groups pickers
@@ -961,7 +1125,17 @@ function NewsletterCard({
                     <>
                       <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
                       {!newsletter.templateId ? (
-                        <EmailFontPicker newsletter={newsletter} onChanged={onChanged} />
+                        <>
+                          <EmailFontPicker newsletter={newsletter} onChanged={onChanged} />
+                          <NewsletterTextField
+                            newsletter={newsletter}
+                            field="introText"
+                            label="Intro"
+                            placeholder="A note to include above the items, e.g. a quick update."
+                            onChanged={onChanged}
+                          />
+                          <CtaButtonsField newsletter={newsletter} onChanged={onChanged} />
+                        </>
                       ) : null}
                       <LinkedSources
                         newsletterId={newsletter.id}
@@ -975,6 +1149,15 @@ function NewsletterCard({
                         allGroups={allGroups}
                         onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
                       />
+                      {!newsletter.templateId ? (
+                        <NewsletterTextField
+                          newsletter={newsletter}
+                          field="footerNote"
+                          label="Footer note"
+                          placeholder="A note to include near the bottom, above the LatestArr credit line."
+                          onChanged={onChanged}
+                        />
+                      ) : null}
                     </>
                   ) : null}
                 </div>

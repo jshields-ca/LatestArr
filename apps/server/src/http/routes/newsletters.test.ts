@@ -136,6 +136,86 @@ describe("POST /newsletters", () => {
     );
     expect(rejected.statusCode).toBe(400);
   });
+
+  it("accepts introText, footerNote, and up to 4 ctas, rejecting a 5th and an invalid CTA url", async () => {
+    const fourCtas = [
+      { label: "Open Plex", url: "https://app.plex.tv/desktop" },
+      { label: "Donate", url: "https://example.com/donate" },
+      { label: "Browse", url: "https://example.com/browse" },
+      { label: "Discord", url: "https://example.com/discord" },
+    ];
+
+    const accepted = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: {
+          name: "Weekly Digest",
+          scheduleCron: "0 9 * * 1",
+          introText: "Hey folks!",
+          footerNote: "See you next week.",
+          ctas: fourCtas,
+        },
+      }),
+    );
+    expect(accepted.statusCode).toBe(201);
+    expect(accepted.json().newsletter.introText).toBe("Hey folks!");
+    expect(accepted.json().newsletter.footerNote).toBe("See you next week.");
+    expect(accepted.json().newsletter.ctas).toEqual(fourCtas);
+
+    const tooMany = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: {
+          name: "Weekly Digest",
+          scheduleCron: "0 9 * * 1",
+          ctas: [...fourCtas, { label: "One too many", url: "https://example.com/extra" }],
+        },
+      }),
+    );
+    expect(tooMany.statusCode).toBe(400);
+
+    const invalidUrl = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: {
+          name: "Weekly Digest",
+          scheduleCron: "0 9 * * 1",
+          ctas: [{ label: "Broken", url: "not-a-url" }],
+        },
+      }),
+    );
+    expect(invalidUrl.statusCode).toBe(400);
+  });
+
+  it("clears introText and footerNote by setting them to null on update", async () => {
+    const createResponse = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: {
+          name: "Weekly Digest",
+          scheduleCron: "0 9 * * 1",
+          introText: "Hey folks!",
+          footerNote: "See you next week.",
+        },
+      }),
+    );
+    const id = createResponse.json().newsletter.id as string;
+
+    const response = await app.inject(
+      authed({
+        method: "PATCH",
+        url: `/api/newsletters/${id}`,
+        payload: { introText: null, footerNote: null },
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json().newsletter.introText).toBeNull();
+    expect(response.json().newsletter.footerNote).toBeNull();
+  });
 });
 
 describe("newsletter lifecycle", () => {

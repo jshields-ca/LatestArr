@@ -257,6 +257,9 @@ async function renderNewsletterContent(
         fallbackItems: fallbackPlaceholders.items,
         sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
         generatedAt,
+        introText: newsletter.introText ?? undefined,
+        footerNote: newsletter.footerNote ?? undefined,
+        ctas: newsletter.ctas ?? undefined,
       });
 
       // Only *now*, once the template has already decided which items it
@@ -287,6 +290,9 @@ async function renderNewsletterContent(
     generatedAt,
     lookbackDays: newsletter.lookbackDays,
     emailFont: newsletter.emailFont,
+    introText: newsletter.introText ?? undefined,
+    footerNote: newsletter.footerNote ?? undefined,
+    ctas: newsletter.ctas ?? undefined,
   });
   const resolved = await resolvePosterPlaceholders(html, addedPlaceholders.placeholders, (item) =>
     sourceByItem.get(item),
