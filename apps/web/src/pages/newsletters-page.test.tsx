@@ -42,6 +42,9 @@ const weeklyDigest = {
   isEnabled: true,
   lookbackDays: 7,
   emailFont: "ubuntu",
+  introText: null,
+  footerNote: null,
+  ctas: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -751,6 +754,90 @@ describe("NewslettersPage", () => {
     },
     240000,
   );
+
+  it("saves the intro text on blur, only when it actually changed", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+
+    const introField = await screen.findByLabelText("Intro (optional)");
+    await user.click(introField);
+    await user.tab();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/newsletters/n1",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { newsletter: { ...weeklyDigest, introText: "Hey folks!" } }),
+    );
+    await user.type(introField, "Hey folks!");
+    await user.tab();
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
+      expect(call).toBeTruthy();
+      expect(JSON.parse((call as [string, RequestInit])[1].body as string)).toEqual({
+        introText: "Hey folks!",
+      });
+    });
+  });
+
+  it("adds, edits, and removes CTA buttons, capping at 4", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, {
+          newsletter: weeklyDigest,
+          sources: [],
+          recipientGroups: [],
+        }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+
+    expect(await screen.findByText(/No buttons yet/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    await user.type(screen.getByLabelText("Button 1 label"), "Open Plex");
+    await user.type(screen.getByLabelText("Button 1 URL"), "https://app.plex.tv/desktop");
+
+    const savedCta = { label: "Open Plex", url: "https://app.plex.tv/desktop" };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { newsletter: { ...weeklyDigest, ctas: [savedCta] } }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save buttons" }));
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
+      expect(JSON.parse((call as [string, RequestInit])[1].body as string)).toEqual({ ctas: [savedCta] });
+    });
+
+    // Add 3 more to hit the cap of 4, then confirm "Add button" disappears.
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    expect(screen.queryByRole("button", { name: "Add button" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Remove button 2" }));
+    expect(await screen.findByRole("button", { name: "Add button" })).toBeInTheDocument();
+  });
 
   it("prefills the Details tab with the existing schedule parsed into simple mode", async () => {
     const user = userEvent.setup();
