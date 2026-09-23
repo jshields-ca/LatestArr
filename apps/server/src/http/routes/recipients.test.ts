@@ -215,6 +215,43 @@ describe("recipient lifecycle", () => {
   });
 });
 
+describe("GET /recipients/:id/groups", () => {
+  it("returns 404 for an unknown recipient", async () => {
+    const response = await app.inject(authed({ method: "GET", url: "/api/recipients/nope/groups" }));
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("returns only the groups this recipient actually belongs to", async () => {
+    const recipientResponse = await app.inject(
+      authed({ method: "POST", url: "/api/recipients", payload: { email: "person@example.com" } }),
+    );
+    const recipientId = recipientResponse.json().recipient.id as string;
+
+    const groupAResponse = await app.inject(
+      authed({ method: "POST", url: "/api/recipient-groups", payload: { name: "Group A" } }),
+    );
+    const groupA = groupAResponse.json().group.id as string;
+    await app.inject(
+      authed({ method: "POST", url: "/api/recipient-groups", payload: { name: "Group B (not joined)" } }),
+    );
+
+    await app.inject(
+      authed({
+        method: "POST",
+        url: `/api/recipient-groups/${groupA}/members`,
+        payload: { recipientId },
+      }),
+    );
+
+    const response = await app.inject(
+      authed({ method: "GET", url: `/api/recipients/${recipientId}/groups` }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json().groups).toHaveLength(1);
+    expect(response.json().groups[0].name).toBe("Group A");
+  });
+});
+
 describe("auth gating", () => {
   it("rejects unauthenticated requests", async () => {
     const response = await app.inject({ method: "GET", url: "/api/recipients" });

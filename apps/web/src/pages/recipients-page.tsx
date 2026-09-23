@@ -30,6 +30,7 @@ import {
   deleteGroup,
   deleteRecipient,
   getGroupMembers,
+  getRecipientGroups,
   importRecipients,
   listGroups,
   listRecipients,
@@ -308,6 +309,188 @@ function ImportRecipientsDialog({ onImported }: { onImported: (recipients: Recip
   );
 }
 
+// Recipient-centric mirror of the Newsletters page's LinkedGroups pattern
+// (add-via-dropdown, remove-via-chip), plus an inline "create a new group"
+// shortcut — so adding someone to a (possibly brand-new) group doesn't
+// require leaving the Edit dialog to visit the Groups section separately.
+// Every button here needs an explicit type="button": this renders inside
+// EditRecipientDialog's <form>, whose submit already does something else
+// (save email/name), and a native <button> with no type defaults to
+// type="submit" inside a form.
+function RecipientGroupsField({ recipientId }: { recipientId: string }) {
+  const [allGroups, setAllGroups] = useState<RecipientGroup[] | null>(null);
+  const [memberGroups, setMemberGroups] = useState<RecipientGroup[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [creatingGroup, setCreatingGroup] = useState(false);
+
+  useEffect(() => {
+    Promise.all([listGroups(), getRecipientGroups(recipientId)])
+      .then(([{ groups }, { groups: member }]) => {
+        setAllGroups(groups);
+        setMemberGroups(member);
+      })
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load groups."));
+  }, [recipientId]);
+
+  const availableToAdd = (allGroups ?? []).filter((g) => !memberGroups?.some((m) => m.id === g.id));
+
+  async function handleAdd() {
+    if (!selectedId) return;
+    setAdding(true);
+    try {
+      await addGroupMember(selectedId, recipientId);
+      const added = allGroups?.find((g) => g.id === selectedId);
+      if (added) setMemberGroups((prev) => [...(prev ?? []), added]);
+      setSelectedId("");
+      toast({ variant: "success", title: "Added to group", description: added?.name });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to add to group",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleRemove(group: RecipientGroup) {
+    setRemovingId(group.id);
+    try {
+      await removeGroupMember(group.id, recipientId);
+      setMemberGroups((prev) => (prev ?? []).filter((g) => g.id !== group.id));
+      toast({ variant: "success", title: "Removed from group", description: group.name });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to remove from group",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  async function handleCreateGroup() {
+    const name = newGroupName.trim();
+    if (!name) return;
+    setCreatingGroup(true);
+    try {
+      const { group } = await createGroup({ name });
+      await addGroupMember(group.id, recipientId);
+      setAllGroups((prev) => [...(prev ?? []), group]);
+      setMemberGroups((prev) => [...(prev ?? []), group]);
+      setNewGroupName("");
+      toast({ variant: "success", title: "Group created and added", description: group.name });
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to create group",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setCreatingGroup(false);
+    }
+  }
+
+  if (loadError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {loadError}
+      </p>
+    );
+  }
+
+  if (allGroups === null || memberGroups === null) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" />
+        Loading groups...
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>Groups</Label>
+      {memberGroups.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Not in any groups yet.</p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {memberGroups.map((group) => (
+            <li key={group.id}>
+              <Badge variant="neutral" className="gap-1.5 py-1 pl-2.5 pr-1">
+                {group.name}
+                <button
+                  type="button"
+                  aria-label={`Remove from ${group.name}`}
+                  onClick={() => void handleRemove(group)}
+                  disabled={removingId === group.id}
+                  className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+      {availableToAdd.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <Select
+            aria-label="Add to a group"
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            disabled={adding}
+            className="max-w-xs"
+          >
+            <option value="">Select a group...</option>
+            {availableToAdd.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void handleAdd()}
+            disabled={!selectedId || adding}
+          >
+            {adding ? <Loader2 className="animate-spin" /> : null}
+            Add
+          </Button>
+        </div>
+      ) : null}
+      <div className="flex items-center gap-2">
+        <Input
+          aria-label="New group name"
+          placeholder="New group name"
+          value={newGroupName}
+          onChange={(e) => setNewGroupName(e.target.value)}
+          disabled={creatingGroup}
+          className="max-w-xs"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => void handleCreateGroup()}
+          disabled={!newGroupName.trim() || creatingGroup}
+        >
+          {creatingGroup ? <Loader2 className="animate-spin" /> : <Plus />}
+          Create group
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function EditRecipientDialog({
   recipient,
   onSaved,
@@ -359,7 +542,7 @@ function EditRecipientDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit recipient</DialogTitle>
-          <DialogDescription>Update this recipient's email or display name.</DialogDescription>
+          <DialogDescription>Update their details and manage which groups they belong to.</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <div className="flex flex-col gap-1.5">
@@ -382,6 +565,8 @@ function EditRecipientDialog({
               disabled={submitting}
             />
           </div>
+
+          <RecipientGroupsField recipientId={recipient.id} />
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
@@ -431,7 +616,7 @@ function RecipientTableRow({
 
   return (
     <tr className="border-b border-border last:border-0 hover:bg-accent/30">
-      <td className="max-w-0 py-2.5 pr-4">
+      <td className="max-w-0 py-2.5 pl-4 pr-4">
         <p className="truncate font-medium">
           {recipient.displayName || <span className="text-muted-foreground">&mdash;</span>}
         </p>
@@ -453,7 +638,7 @@ function RecipientTableRow({
           </Label>
         </div>
       </td>
-      <td className="py-2.5">
+      <td className="py-2.5 pr-4">
         <div className="flex items-center justify-end gap-1">
           <EditRecipientDialog recipient={recipient} onSaved={onChanged} />
           <ConfirmDeleteButton
