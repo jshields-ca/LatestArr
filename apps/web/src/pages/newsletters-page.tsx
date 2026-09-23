@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
-import { SettingRow } from "@/components/ui/setting-row";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -879,6 +878,22 @@ function NewsletterCard({
       expand={{ expanded, onToggle: () => setExpanded((e) => !e) }}
       actions={
         <>
+          {/* Folded into the header row instead of a standalone full-width
+              SettingRow below — the switch itself is no wider than the
+              other header actions, so giving it its own row wasted space
+              for a control this small. */}
+          <label
+            htmlFor={`newsletter-enabled-${newsletter.id}`}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground"
+          >
+            <Switch
+              id={`newsletter-enabled-${newsletter.id}`}
+              checked={newsletter.isEnabled}
+              onCheckedChange={(checked) => void handleToggleEnabled(checked)}
+              disabled={toggling}
+            />
+            Enabled
+          </label>
           {/* Reachable without expanding the row — previously only lived
               inside the Details tab, right next to Save changes, which
               read as two unrelated actions crowded together. */}
@@ -915,23 +930,6 @@ function NewsletterCard({
         </>
       }
     >
-      {/* Stays outside the expand/Tabs block so it's toggleable from the
-          collapsed row too, without needing to open the newsletter first —
-          unchanged from before the Details/History restructure. */}
-      <SettingRow
-        label="Enabled"
-        description="Send this newsletter on its configured schedule."
-        htmlFor={`newsletter-enabled-${newsletter.id}`}
-        control={
-          <Switch
-            id={`newsletter-enabled-${newsletter.id}`}
-            checked={newsletter.isEnabled}
-            onCheckedChange={(checked) => void handleToggleEnabled(checked)}
-            disabled={toggling}
-          />
-        }
-      />
-
       {/* Also outside the expand block, same reasoning as Enabled above —
           Send now (now in the header actions) should give feedback whether
           or not the row happens to be expanded. */}
