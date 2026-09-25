@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
+import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 
@@ -46,6 +47,7 @@ export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void
         .insert(recipientGroups)
         .values({ name: body.name, description: body.description })
         .returning();
+      request.log.info({ groupId: group!.id }, `Created group "${body.name}"`);
       return reply.code(201).send({ group });
     });
 
@@ -89,11 +91,18 @@ export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void
       if (!group) {
         return reply.code(404).send({ error: "Not found" });
       }
+      request.log.info({ groupId: group.id, fields: changedFields(body) }, `Updated group "${group.name}"`);
       return reply.send({ group });
     });
 
     scope.delete<{ Params: IdParams }>("/recipient-groups/:id", async (request, reply) => {
-      await db.delete(recipientGroups).where(eq(recipientGroups.id, request.params.id));
+      const [deleted] = await db
+        .delete(recipientGroups)
+        .where(eq(recipientGroups.id, request.params.id))
+        .returning();
+      if (deleted) {
+        request.log.info({ groupId: deleted.id }, `Deleted group "${deleted.name}"`);
+      }
       return reply.code(204).send();
     });
 
@@ -129,6 +138,7 @@ export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void
           throw err;
         }
 
+        request.log.info({ groupId: group.id, recipientId }, `Added ${recipient.email} to group "${group.name}"`);
         return reply.code(204).send();
       },
     );
@@ -136,14 +146,22 @@ export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void
     scope.delete<{ Params: GroupMemberParams }>(
       "/recipient-groups/:id/members/:recipientId",
       async (request, reply) => {
+        const { id, recipientId } = request.params;
+        const [membership] = await db
+          .select({ group: recipientGroups.name, email: recipients.email })
+          .from(recipientGroupMembers)
+          .innerJoin(recipientGroups, eq(recipientGroupMembers.groupId, recipientGroups.id))
+          .innerJoin(recipients, eq(recipientGroupMembers.recipientId, recipients.id))
+          .where(and(eq(recipientGroupMembers.groupId, id), eq(recipientGroupMembers.recipientId, recipientId)));
         await db
           .delete(recipientGroupMembers)
-          .where(
-            and(
-              eq(recipientGroupMembers.groupId, request.params.id),
-              eq(recipientGroupMembers.recipientId, request.params.recipientId),
-            ),
+          .where(and(eq(recipientGroupMembers.groupId, id), eq(recipientGroupMembers.recipientId, recipientId)));
+        if (membership) {
+          request.log.info(
+            { groupId: id, recipientId },
+            `Removed ${membership.email} from group "${membership.group}"`,
           );
+        }
         return reply.code(204).send();
       },
     );

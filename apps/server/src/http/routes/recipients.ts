@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
+import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 
@@ -50,6 +51,7 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
 
       try {
         const [recipient] = await db.insert(recipients).values({ email, displayName }).returning();
+        request.log.info({ recipientId: recipient!.id }, `Added recipient ${email}`);
         return reply.code(201).send({ recipient });
       } catch (err) {
         if (isUniqueConstraintError(err)) {
@@ -99,6 +101,11 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         }
       }
 
+      request.log.info(
+        { created: created.length, skipped: skipped.length },
+        `Imported ${created.length} recipient${created.length === 1 ? "" : "s"}` +
+          (skipped.length ? ` (${skipped.length} skipped)` : ""),
+      );
       return reply.code(201).send({ created, skipped });
     });
 
@@ -159,6 +166,12 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         if (!recipient) {
           return reply.code(404).send({ error: "Not found" });
         }
+        const fields = changedFields(body);
+        const message =
+          fields.length === 1 && isActive !== undefined
+            ? `${isActive ? "Activated" : "Deactivated"} recipient ${recipient.email}`
+            : `Updated recipient ${recipient.email}`;
+        request.log.info({ recipientId: recipient.id, fields }, message);
         return reply.send({ recipient });
       } catch (err) {
         if (isUniqueConstraintError(err)) {
@@ -169,7 +182,10 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
     });
 
     scope.delete<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {
-      await db.delete(recipients).where(eq(recipients.id, request.params.id));
+      const [deleted] = await db.delete(recipients).where(eq(recipients.id, request.params.id)).returning();
+      if (deleted) {
+        request.log.info({ recipientId: deleted.id }, `Deleted recipient ${deleted.email}`);
+      }
       return reply.code(204).send();
     });
   });

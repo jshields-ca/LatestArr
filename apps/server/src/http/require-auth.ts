@@ -9,5 +9,7 @@ export function requireAuth(db: Db) {
     if (!user) {
       return reply.code(401).send({ error: "Not authenticated" });
     }
+    // Every log line from an authenticated route records who did it.
+    request.log = request.log.child({ user: user.email });
   };
 }

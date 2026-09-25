@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getEncryptionKey } from "../../secrets.js";
+import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 
@@ -81,6 +82,7 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
         .values({ name, kind, baseUrl, publicUrl: publicUrl || null, credentialsEncrypted })
         .returning();
 
+      request.log.info({ sourceId: row!.id, kind }, `Added ${kind} source "${name}"`);
       return reply.code(201).send({ source: sanitize(row!) });
     });
 
@@ -127,11 +129,18 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
       if (!row) {
         return reply.code(404).send({ error: "Not found" });
       }
+      request.log.info({ sourceId: row.id, fields: changedFields(body) }, `Updated source "${row.name}"`);
       return reply.send({ source: sanitize(row) });
     });
 
     scope.delete<{ Params: IdParams }>("/sources/:id", async (request, reply) => {
-      await db.delete(sourceConnections).where(eq(sourceConnections.id, request.params.id));
+      const [deleted] = await db
+        .delete(sourceConnections)
+        .where(eq(sourceConnections.id, request.params.id))
+        .returning();
+      if (deleted) {
+        request.log.info({ sourceId: deleted.id }, `Deleted source "${deleted.name}"`);
+      }
       return reply.code(204).send();
     });
 
@@ -164,6 +173,14 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
         })
         .where(eq(sourceConnections.id, row.id));
 
+      if (result.ok) {
+        request.log.info({ sourceId: row.id }, `Connection test passed for source "${row.name}"`);
+      } else {
+        request.log.warn(
+          { sourceId: row.id, reason: result.message },
+          `Connection test failed for source "${row.name}": ${result.message ?? "Unknown error"}`,
+        );
+      }
       return reply.send(result);
     });
 

@@ -1,7 +1,8 @@
 import { type Db, newsletters, sendRuns } from "@latestarr/db";
 import { Cron } from "croner";
 import { desc, eq } from "drizzle-orm";
-import { runNewsletter } from "../pipeline/run-newsletter.js";
+import { logger as defaultLogger, type Logger } from "../logger.js";
+import { runNewsletter, type SendTrigger } from "../pipeline/run-newsletter.js";
 
 export interface CronLike {
   stop(): void;
@@ -25,23 +26,24 @@ export interface SchedulerOptions {
   onError?: (newsletterId: string, err: unknown) => void;
   // Injectable for deterministic tests; defaults to the real clock.
   now?: () => Date;
+  log?: Logger;
 }
 
-function defaultOnError(newsletterId: string, err: unknown): void {
-  // A scheduled run failing must never crash the process — unlike the
-  // manual /send-now route, there's no request to propagate the error to.
-  console.error(`Scheduled send failed for newsletter ${newsletterId}:`, err);
-}
+// runNewsletter already logs every failure, so there's nothing left to do
+// by default — this hook only exists so a scheduled run failing never
+// crashes the process (there's no request to propagate the error to).
+function defaultOnError(): void {}
 
 async function runScheduledNewsletter(
   db: Db,
   newsletterId: string,
-  onError: (newsletterId: string, err: unknown) => void,
+  trigger: SendTrigger,
+  options: SchedulerOptions,
 ): Promise<void> {
   try {
-    await runNewsletter(db, newsletterId);
+    await runNewsletter(db, newsletterId, { trigger, log: options.log });
   } catch (err) {
-    onError(newsletterId, err);
+    (options.onError ?? defaultOnError)(newsletterId, err);
   }
 }
 
@@ -51,7 +53,7 @@ export async function refreshScheduler(
   options: SchedulerOptions = {},
 ): Promise<void> {
   const cronFactory = options.cronFactory ?? defaultCronFactory;
-  const onError = options.onError ?? defaultOnError;
+  const log = options.log ?? defaultLogger;
 
   for (const job of handle.jobs.values()) {
     job.stop();
@@ -59,15 +61,26 @@ export async function refreshScheduler(
   handle.jobs.clear();
 
   const enabled = await db.select().from(newsletters).where(eq(newsletters.isEnabled, true));
+  const schedule: { name: string; nextRun: string | null }[] = [];
   for (const newsletter of enabled) {
     // Returning the promise (rather than fire-and-forget `void`) is what lets
     // tests await a captured callback reference deterministically instead of
     // polling for completion.
     const job = cronFactory(newsletter.scheduleCron, { timezone: newsletter.timezone }, () =>
-      runScheduledNewsletter(db, newsletter.id, onError),
+      runScheduledNewsletter(db, newsletter.id, "scheduled", options),
     );
     handle.jobs.set(newsletter.id, job);
+    let nextRun: string | null = null;
+    try {
+      nextRun = nextScheduledRunAfter(newsletter.scheduleCron, newsletter.timezone, new Date())?.toISOString() ?? null;
+    } catch {
+      // Only feeds the log line below; never worth failing a refresh over.
+    }
+    schedule.push({ name: newsletter.name, nextRun });
   }
+
+  const count = enabled.length;
+  log.info({ schedule }, `Scheduler updated: ${count} enabled newsletter${count === 1 ? "" : "s"} scheduled`);
 }
 
 async function lastSendStartedAt(db: Db, newsletterId: string): Promise<Date | undefined> {
@@ -104,15 +117,19 @@ function nextScheduledRunAfter(pattern: string, timezone: string, since: Date): 
 // refreshScheduler (which also runs on every newsletter create/update) —
 // this models "was the process down," not "did a save happen."
 async function runMissedNewsletters(db: Db, options: SchedulerOptions): Promise<void> {
-  const onError = options.onError ?? defaultOnError;
   const now = (options.now ?? (() => new Date()))();
+  const log = options.log ?? defaultLogger;
 
   const enabled = await db.select().from(newsletters).where(eq(newsletters.isEnabled, true));
   for (const newsletter of enabled) {
     const since = (await lastSendStartedAt(db, newsletter.id)) ?? newsletter.createdAt;
     const missedAt = nextScheduledRunAfter(newsletter.scheduleCron, newsletter.timezone, since);
     if (missedAt && missedAt <= now) {
-      await runScheduledNewsletter(db, newsletter.id, onError);
+      log.info(
+        { newsletterId: newsletter.id, missedAt: missedAt.toISOString() },
+        `Catching up "${newsletter.name}": its scheduled send was missed while LatestArr wasn't running`,
+      );
+      await runScheduledNewsletter(db, newsletter.id, "catch-up", options);
     }
   }
 }

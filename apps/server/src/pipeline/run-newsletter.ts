@@ -28,7 +28,15 @@ import {
 } from "./embed-images.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { renderDefaultNewsletterHtml } from "../render/newsletter-template.js";
+import { logger as defaultLogger, type Logger } from "../logger.js";
 import { getEncryptionKey } from "../secrets.js";
+
+export type SendTrigger = "manual" | "scheduled" | "catch-up";
+
+export interface RunNewsletterOptions {
+  trigger?: SendTrigger;
+  log?: Logger;
+}
 
 export class NewsletterNotFoundError extends Error {
   constructor(id: string) {
@@ -81,7 +89,7 @@ interface LinkedSource {
   credentials: Record<string, string>;
 }
 
-async function resolveLinkedSources(db: Db, newsletter: Newsletter): Promise<LinkedSource[]> {
+async function resolveLinkedSources(db: Db, newsletter: Newsletter, log: Logger): Promise<LinkedSource[]> {
   const sourceLinks = await db
     .select()
     .from(newsletterSources)
@@ -98,7 +106,13 @@ async function resolveLinkedSources(db: Db, newsletter: Newsletter): Promise<Lin
     if (!source) continue;
 
     const adapter = getAdapter(source.kind);
-    if (!adapter) continue;
+    if (!adapter) {
+      log.warn(
+        { sourceId: source.id, kind: source.kind },
+        `Skipped source "${source.name}": this version of LatestArr doesn't support "${source.kind}" sources`,
+      );
+      continue;
+    }
 
     const credentials = JSON.parse(decrypt(source.credentialsEncrypted, key)) as Record<
       string,
@@ -121,9 +135,22 @@ interface FetchedItems {
   sourceByItem: Map<NewItem, ItemImageSource>;
 }
 
+// Names the source in the log before the error propagates — the send's own
+// failure line only carries the adapter's message (often just "fetch
+// failed"), which doesn't say which of several linked sources broke.
+async function fetchFromSource<T>(log: Logger, source: SourceConnectionRow, fetch: () => Promise<T>): Promise<T> {
+  try {
+    return await fetch();
+  } catch (err) {
+    log.warn({ err, sourceId: source.id }, `Couldn't fetch from source "${source.name}"`);
+    throw err;
+  }
+}
+
 async function fetchRecentItemsFromSources(
   linkedSources: LinkedSource[],
   since: Date,
+  log: Logger,
 ): Promise<FetchedItems> {
   const items: NewItem[] = [];
   const sourceByItem = new Map<NewItem, ItemImageSource>();
@@ -134,11 +161,14 @@ async function fetchRecentItemsFromSources(
       publicUrl: source.publicUrl ?? undefined,
       credentials,
     };
-    const sourceItems = await adapter.fetchRecentItems(config, {
-      since,
-      mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
-      libraryIds: link.libraryFilter ?? undefined,
-    });
+    const sourceItems = await fetchFromSource(log, source, () =>
+      adapter.fetchRecentItems(config, {
+        since,
+        mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
+        libraryIds: link.libraryFilter ?? undefined,
+      }),
+    );
+    log.debug({ sourceId: source.id, count: sourceItems.length }, `Fetched ${sourceItems.length} items from "${source.name}"`);
     for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
     items.push(...sourceItems);
   }
@@ -152,21 +182,25 @@ async function fetchRecentItemsFromSources(
 async function fetchPopularItemsFromSources(
   linkedSources: LinkedSource[],
   since: Date,
+  log: Logger,
 ): Promise<FetchedItems> {
   const items: NewItem[] = [];
   const sourceByItem = new Map<NewItem, ItemImageSource>();
 
   for (const { link, source, adapter, credentials } of linkedSources) {
-    if (!adapter.fetchPopularItems) continue;
+    const fetchPopular = adapter.fetchPopularItems;
+    if (!fetchPopular) continue;
     const config: SourceConnectionConfig = {
       baseUrl: source.baseUrl,
       publicUrl: source.publicUrl ?? undefined,
       credentials,
     };
-    const sourceItems = await adapter.fetchPopularItems(config, {
-      since,
-      mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
-    });
+    const sourceItems = await fetchFromSource(log, source, () =>
+      fetchPopular.call(adapter, config, {
+        since,
+        mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
+      }),
+    );
     for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
     items.push(...sourceItems);
   }
@@ -211,11 +245,15 @@ async function renderNewsletterContent(
   db: Db,
   newsletter: Newsletter,
   generatedAt: Date,
+  log: Logger,
 ): Promise<RenderedNewsletter> {
   const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
-  const linkedSources = await resolveLinkedSources(db, newsletter);
+  const linkedSources = await resolveLinkedSources(db, newsletter, log);
+  if (linkedSources.length === 0) {
+    log.warn(`Newsletter "${newsletter.name}" has no usable sources linked, so it will have no items`);
+  }
 
-  const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since);
+  const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since, log);
   // Real posterUrls are swapped for opaque placeholder tokens *before* any
   // template rendering happens — see embed-images.ts's own doc comment for
   // why: a Media List block's count/order/showAll/emptyFallback selection
@@ -238,12 +276,12 @@ async function renderNewsletterContent(
       const needsFallback = template.compiledMjml.includes('emptyFallback="random"');
 
       const [popular, fallback] = await Promise.all([
-        needsPopular ? fetchPopularItemsFromSources(linkedSources, since) : Promise.resolve(EMPTY_FETCHED_ITEMS),
+        needsPopular ? fetchPopularItemsFromSources(linkedSources, since, log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
         // No "since" cutoff for the fallback pool — it exists specifically
         // for when nothing was added in the lookback window, so it has to
         // look further back than that window to find anything at all.
         needsFallback
-          ? fetchRecentItemsFromSources(linkedSources, new Date(0))
+          ? fetchRecentItemsFromSources(linkedSources, new Date(0), log)
           : Promise.resolve(EMPTY_FETCHED_ITEMS),
       ]);
 
@@ -321,11 +359,50 @@ async function resolveRecipients(db: Db, newsletterId: string) {
   return [...byId.values()];
 }
 
-export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sendRunId: string }> {
+interface RunContext {
+  name?: string;
+  sendRunId?: string;
+}
+
+// Logs every outcome of a send exactly once, whoever triggered it (the
+// send-now route, a cron tick, or the startup catch-up), so callers don't
+// need their own failure logging.
+export async function runNewsletter(
+  db: Db,
+  newsletterId: string,
+  options: RunNewsletterOptions = {},
+): Promise<{ sendRunId: string }> {
+  const log = (options.log ?? defaultLogger).child({ newsletterId, trigger: options.trigger ?? "manual" });
+  const context: RunContext = {};
+  try {
+    return await executeRun(db, newsletterId, log, context);
+  } catch (err) {
+    const label = context.name ? `"${context.name}"` : newsletterId;
+    if (
+      err instanceof NewsletterNotFoundError ||
+      err instanceof NewsletterMisconfiguredError ||
+      err instanceof SendAlreadyRunningError
+    ) {
+      log.warn(`Didn't send newsletter ${label}: ${err.message}`);
+    } else {
+      log.error({ err, sendRunId: context.sendRunId }, `Newsletter ${label} failed to send: ${describeSendFailure(err)}`);
+    }
+    throw err;
+  }
+}
+
+async function executeRun(
+  db: Db,
+  newsletterId: string,
+  baseLog: Logger,
+  context: RunContext,
+): Promise<{ sendRunId: string }> {
+  const startedAt = Date.now();
   const [newsletter] = await db.select().from(newsletters).where(eq(newsletters.id, newsletterId));
   if (!newsletter) {
     throw new NewsletterNotFoundError(newsletterId);
   }
+  context.name = newsletter.name;
   if (!newsletter.smtpProfileId) {
     throw new NewsletterMisconfiguredError("Newsletter has no SMTP profile configured");
   }
@@ -351,9 +428,12 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
     .values({ newsletterId, status: "running", startedAt: new Date() })
     .returning();
   const sendRunId = sendRun!.id;
+  context.sendRunId = sendRunId;
+  const log = baseLog.child({ sendRunId });
+  log.info(`Sending newsletter "${newsletter.name}"`);
 
   try {
-    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date());
+    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
     const subject = newsletter.subjectTemplate || newsletter.name;
 
     // Persisted as soon as rendering succeeds, independent of whether the
@@ -403,6 +483,7 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
         });
         sentCount++;
       } catch (err) {
+        log.warn({ err, recipientId: recipient.id }, `Couldn't deliver "${newsletter.name}" to ${recipient.email}`);
         await db.insert(sendRunRecipientResults).values({
           sendRunId,
           recipientId: recipient.id,
@@ -425,6 +506,25 @@ export async function runNewsletter(db: Db, newsletterId: string): Promise<{ sen
         recipientCount: activeRecipients.length,
       })
       .where(eq(sendRuns.id, sendRunId));
+
+    const summary = {
+      status: finalStatus,
+      sent: sentCount,
+      failed: failedCount,
+      items: items.length,
+      durationMs: Date.now() - startedAt,
+    };
+    const total = activeRecipients.length;
+    const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+    if (total === 0) {
+      log.warn(summary, `Newsletter "${newsletter.name}" has no active recipients, so nothing was sent`);
+    } else if (finalStatus === "success") {
+      log.info(summary, `Sent "${newsletter.name}" to ${plural(sentCount, "recipient")} (${plural(items.length, "item")})`);
+    } else if (finalStatus === "partial_failure") {
+      log.warn(summary, `Sent "${newsletter.name}" to ${sentCount} of ${total} recipients; ${failedCount} failed`);
+    } else {
+      log.error(summary, `Couldn't deliver "${newsletter.name}" to any of its ${plural(total, "recipient")}`);
+    }
 
     return { sendRunId };
   } catch (err) {

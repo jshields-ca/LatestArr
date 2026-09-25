@@ -4,6 +4,7 @@ import path from "node:path";
 import { createDb, newsletters, runMigrations, sendRuns, type Db } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLogBuffer, getRecentLogs } from "../log-buffer.js";
 import {
   refreshScheduler,
   startScheduler,
@@ -215,5 +216,42 @@ describe("scheduled callback", () => {
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0]![0]).toBe(newsletter.id);
     expect((onError.mock.calls[0]![1] as Error).message).toContain("SMTP profile");
+  });
+});
+
+describe("logging", () => {
+  beforeEach(() => clearLogBuffer());
+
+  function logsMatching(text: string) {
+    return getRecentLogs(500).filter((entry) => entry.msg.includes(text));
+  }
+
+  it("logs each refresh with every enabled newsletter's next run", async () => {
+    await createNewsletter({ scheduleCron: "0 9 * * 1" });
+    await createNewsletter({ isEnabled: false });
+
+    await startScheduler(db, { cronFactory: fakeCronFactory });
+
+    const [entry] = logsMatching("Scheduler updated: 1 enabled newsletter scheduled");
+    expect(entry?.level).toBe(30);
+    const schedule = entry!.schedule as { name: string; nextRun: string | null }[];
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0]!.name).toBe("Weekly Digest");
+    expect(new Date(schedule[0]!.nextRun!).getUTCDay()).toBe(1);
+  });
+
+  it("labels a missed-schedule catch-up and a normal scheduled fire by trigger", async () => {
+    const newsletter = await createNewsletter({ scheduleCron: "0 9 * * 1" });
+    await db
+      .update(newsletters)
+      .set({ createdAt: new Date("2024-01-01T00:00:00Z") })
+      .where(eq(newsletters.id, newsletter.id));
+
+    await startScheduler(db, { cronFactory: fakeCronFactory, now: () => new Date("2024-01-02T00:00:00Z") });
+    await recordedJobs[0]!.callback();
+
+    expect(logsMatching('Catching up "Weekly Digest"')[0]?.level).toBe(30);
+    const skipped = logsMatching(`Didn't send newsletter "Weekly Digest"`);
+    expect(skipped.map((entry) => entry.trigger)).toEqual(["scheduled", "catch-up"]);
   });
 });

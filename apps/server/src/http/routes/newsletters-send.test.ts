@@ -23,6 +23,7 @@ vi.mock("nodemailer", () => ({
 }));
 
 const { buildApp } = await import("../../app.js");
+const { clearLogBuffer, getRecentLogs } = await import("../../log-buffer.js");
 
 let dir: string;
 let db: Db;
@@ -609,5 +610,120 @@ describe("POST /newsletters/:id/send-now", () => {
     const sentMessage = mockSendMail.mock.calls[0]![0];
     expect(sentMessage.html).toContain("Most Watched Movie");
     expect(sentMessage.html).not.toContain("Some Movie");
+  });
+});
+
+describe("activity logging", () => {
+  function logsMatching(text: string) {
+    return getRecentLogs(500).filter((entry) => entry.msg.includes(text));
+  }
+
+  async function newsletterWithSourceAndGroup(...emails: string[]) {
+    const smtpProfileId = await createSmtpProfile();
+    const sourceId = await createSourceConnection();
+    const { groupId } = await createRecipientAndGroup(...emails);
+    const newsletterId = await createNewsletter(smtpProfileId);
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/sources`, payload: { sourceConnectionId: sourceId } }),
+    );
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/recipient-groups`, payload: { groupId } }),
+    );
+    return newsletterId;
+  }
+
+  beforeEach(() => clearLogBuffer());
+
+  it("logs settings changes with the admin who made them", async () => {
+    await newsletterWithSourceAndGroup("person@example.com");
+
+    for (const message of [
+      'Added tautulli source "Tautulli"',
+      'Added SMTP profile "Primary"',
+      'Created group "Household"',
+      "Added recipient person@example.com",
+      'Added person@example.com to group "Household"',
+      'Created newsletter "Weekly Digest"',
+      'Linked source "Tautulli" to newsletter "Weekly Digest"',
+      'Linked group "Household" to newsletter "Weekly Digest"',
+    ]) {
+      const [entry] = logsMatching(message);
+      expect(entry, message).toBeDefined();
+      expect(entry!.level).toBe(30);
+      expect(entry!.user).toBe("admin@example.com");
+    }
+    expect(logsMatching("Scheduler updated")).toHaveLength(0);
+  });
+
+  it("logs a successful manual send once, with its counts and who triggered it", async () => {
+    const newsletterId = await newsletterWithSourceAndGroup("person@example.com");
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValueOnce({ messageId: "msg-1" });
+
+    await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+
+    expect(logsMatching('Sending newsletter "Weekly Digest"')).toHaveLength(1);
+    const [done] = logsMatching('Sent "Weekly Digest" to 1 recipient (1 item)');
+    expect(done).toMatchObject({
+      level: 30,
+      trigger: "manual",
+      user: "admin@example.com",
+      newsletterId,
+      status: "success",
+      sent: 1,
+      failed: 0,
+    });
+  });
+
+  it("warns about each undeliverable recipient and the partial send", async () => {
+    const newsletterId = await newsletterWithSourceAndGroup("ok@example.com", "bad@example.com");
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValueOnce({ messageId: "msg-1" }).mockRejectedValueOnce(new Error("relay refused"));
+
+    await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+
+    const [recipient] = logsMatching('Couldn\'t deliver "Weekly Digest" to bad@example.com');
+    expect(recipient?.level).toBe(40);
+    expect(recipient?.err?.message).toBe("relay refused");
+    const [summary] = logsMatching('Sent "Weekly Digest" to 1 of 2 recipients; 1 failed');
+    expect(summary?.level).toBe(40);
+  });
+
+  it("names the unreachable source and logs the failed send exactly once", async () => {
+    const newsletterId = await newsletterWithSourceAndGroup("person@example.com");
+    mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+
+    await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+
+    expect(logsMatching('Couldn\'t fetch from source "Tautulli"')[0]?.level).toBe(40);
+    const errors = getRecentLogs(500).filter((entry) => entry.level >= 50);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.msg).toContain('Newsletter "Weekly Digest" failed to send');
+  });
+
+  it("warns, rather than errors, when a newsletter can't be sent as configured", async () => {
+    const newsletterId = await createNewsletter();
+    await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+
+    const [entry] = logsMatching('Didn\'t send newsletter "Weekly Digest": Newsletter has no SMTP profile configured');
+    expect(entry?.level).toBe(40);
+    expect(getRecentLogs(500).filter((e) => e.level >= 50)).toHaveLength(0);
+  });
+
+  it("logs sign-ins and failed sign-in attempts", async () => {
+    await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "wrong-password-here" },
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "a-very-long-password" },
+    });
+
+    expect(logsMatching("Failed sign-in attempt for admin@example.com")[0]?.level).toBe(40);
+    expect(logsMatching("admin@example.com signed in")[0]?.level).toBe(30);
+    expect(JSON.stringify(getRecentLogs(500))).not.toContain("a-very-long-password");
   });
 });
