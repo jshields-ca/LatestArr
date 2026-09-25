@@ -32,6 +32,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Every setting documented in .env.example has to be passed into the
+      # container, or setting it in .env silently does nothing.
+      - name: Check docker-compose.yml passes every .env.example setting
+        run: |
+          missing=0
+          for key in $(grep -oE '^[A-Z_]+=' .env.example | tr -d =); do
+            if ! grep -qF "\${$key" docker-compose.yml; then
+              echo "::error file=docker-compose.yml::$key is documented in .env.example but never passed into the container"
+              missing=1
+            fi
+          done
+          exit $missing
+
       - name: Lint
         run: pnpm turbo run lint
 
