@@ -80,6 +80,7 @@ export function registerAuthRoutes(
         .values({ email, displayName, passwordHash, role: "admin" })
         .returning();
 
+      request.log.info({ userId: user!.id }, `Created the admin account ${email}`);
       return reply.code(201).send({ user: sanitizeUser(user!) });
     },
   );
@@ -94,11 +95,13 @@ export function registerAuthRoutes(
 
       const [user] = await db.select().from(users).where(eq(users.email, email));
       if (!user || !user.passwordHash || !user.isActive) {
+        request.log.warn({ ip: request.ip }, `Failed sign-in attempt for ${email}`);
         return reply.code(401).send({ error: "Invalid email or password" });
       }
 
       const valid = await verifyPassword(user.passwordHash, password);
       if (!valid) {
+        request.log.warn({ ip: request.ip }, `Failed sign-in attempt for ${email}`);
         return reply.code(401).send({ error: "Invalid email or password" });
       }
 
@@ -125,6 +128,7 @@ export function registerAuthRoutes(
         expires: session.expiresAt,
       });
 
+      request.log.info({ userId: user.id, ip: request.ip }, `${user.email} signed in`);
       return reply.send({ user: sanitizeUser(user) });
     },
   );
@@ -132,7 +136,11 @@ export function registerAuthRoutes(
   app.post("/auth/logout", async (request, reply) => {
     const token = request.cookies[SESSION_COOKIE];
     if (token) {
+      const user = await getSessionUser(db, token);
       await deleteSession(db, token);
+      if (user) {
+        request.log.info({ userId: user.id }, `${user.email} signed out`);
+      }
     }
     reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return reply.code(204).send();
@@ -185,6 +193,7 @@ export function registerAuthRoutes(
       }
       const valid = await verifyPassword(currentUser.passwordHash, currentPassword);
       if (!valid) {
+        request.log.warn({ userId: currentUser.id }, `Password change for ${currentUser.email} rejected: current password was incorrect`);
         return reply.code(401).send({ error: "Current password is incorrect" });
       }
       updates.passwordHash = await hashPassword(newPassword);
@@ -195,6 +204,8 @@ export function registerAuthRoutes(
     }
 
     const [updated] = await db.update(users).set(updates).where(eq(users.id, currentUser.id)).returning();
+    const changed = [updates.displayName !== undefined && "display name", updates.passwordHash && "password"].filter(Boolean);
+    request.log.info({ userId: currentUser.id }, `${currentUser.email} changed their ${changed.join(" and ")}`);
 
     return reply.send({ user: sanitizeUser(updated!) });
   });

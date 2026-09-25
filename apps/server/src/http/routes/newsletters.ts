@@ -23,6 +23,7 @@ import {
 import type { SchedulerHandle } from "../../scheduler/engine.js";
 import { refreshScheduler } from "../../scheduler/engine.js";
 import { isUniqueConstraintError } from "../db-errors.js";
+import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 
@@ -149,6 +150,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         })
         .returning();
 
+      request.log.info({ newsletterId: newsletter!.id }, `Created newsletter "${name}"`);
       await refreshSchedule();
       return reply.code(201).send({ newsletter });
     });
@@ -233,12 +235,21 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       if (!newsletter) {
         return reply.code(404).send({ error: "Not found" });
       }
+      const fields = changedFields(body);
+      const message =
+        fields.length === 1 && isEnabled !== undefined
+          ? `${isEnabled ? "Enabled" : "Paused"} newsletter "${newsletter.name}"`
+          : `Updated newsletter "${newsletter.name}"`;
+      request.log.info({ newsletterId: newsletter.id, fields }, message);
       await refreshSchedule();
       return reply.send({ newsletter });
     });
 
     scope.delete<{ Params: IdParams }>("/newsletters/:id", async (request, reply) => {
-      await db.delete(newsletters).where(eq(newsletters.id, request.params.id));
+      const [deleted] = await db.delete(newsletters).where(eq(newsletters.id, request.params.id)).returning();
+      if (deleted) {
+        request.log.info({ newsletterId: deleted.id }, `Deleted newsletter "${deleted.name}"`);
+      }
       await refreshSchedule();
       return reply.code(204).send();
     });
@@ -280,6 +291,10 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           throw err;
         }
 
+        request.log.info(
+          { newsletterId: newsletter.id, sourceId: source.id },
+          `Linked source "${source.name}" to newsletter "${newsletter.name}"`,
+        );
         return reply.code(204).send();
       },
     );
@@ -287,14 +302,22 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
     scope.delete<{ Params: NewsletterSourceParams }>(
       "/newsletters/:id/sources/:sourceConnectionId",
       async (request, reply) => {
+        const { id, sourceConnectionId } = request.params;
+        const [link] = await db
+          .select({ newsletter: newsletters.name, source: sourceConnections.name })
+          .from(newsletterSources)
+          .innerJoin(newsletters, eq(newsletterSources.newsletterId, newsletters.id))
+          .innerJoin(sourceConnections, eq(newsletterSources.sourceConnectionId, sourceConnections.id))
+          .where(and(eq(newsletterSources.newsletterId, id), eq(newsletterSources.sourceConnectionId, sourceConnectionId)));
         await db
           .delete(newsletterSources)
-          .where(
-            and(
-              eq(newsletterSources.newsletterId, request.params.id),
-              eq(newsletterSources.sourceConnectionId, request.params.sourceConnectionId),
-            ),
+          .where(and(eq(newsletterSources.newsletterId, id), eq(newsletterSources.sourceConnectionId, sourceConnectionId)));
+        if (link) {
+          request.log.info(
+            { newsletterId: id, sourceId: sourceConnectionId },
+            `Unlinked source "${link.source}" from newsletter "${link.newsletter}"`,
           );
+        }
         return reply.code(204).send();
       },
     );
@@ -331,6 +354,10 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           throw err;
         }
 
+        request.log.info(
+          { newsletterId: newsletter.id, groupId },
+          `Linked group "${group.name}" to newsletter "${newsletter.name}"`,
+        );
         return reply.code(204).send();
       },
     );
@@ -338,21 +365,29 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
     scope.delete<{ Params: NewsletterGroupParams }>(
       "/newsletters/:id/recipient-groups/:groupId",
       async (request, reply) => {
+        const { id, groupId } = request.params;
+        const [link] = await db
+          .select({ newsletter: newsletters.name, group: recipientGroups.name })
+          .from(newsletterRecipientGroups)
+          .innerJoin(newsletters, eq(newsletterRecipientGroups.newsletterId, newsletters.id))
+          .innerJoin(recipientGroups, eq(newsletterRecipientGroups.groupId, recipientGroups.id))
+          .where(and(eq(newsletterRecipientGroups.newsletterId, id), eq(newsletterRecipientGroups.groupId, groupId)));
         await db
           .delete(newsletterRecipientGroups)
-          .where(
-            and(
-              eq(newsletterRecipientGroups.newsletterId, request.params.id),
-              eq(newsletterRecipientGroups.groupId, request.params.groupId),
-            ),
+          .where(and(eq(newsletterRecipientGroups.newsletterId, id), eq(newsletterRecipientGroups.groupId, groupId)));
+        if (link) {
+          request.log.info(
+            { newsletterId: id, groupId },
+            `Unlinked group "${link.group}" from newsletter "${link.newsletter}"`,
           );
+        }
         return reply.code(204).send();
       },
     );
 
     scope.post<{ Params: IdParams }>("/newsletters/:id/send-now", async (request, reply) => {
       try {
-        const result = await runNewsletter(db, request.params.id);
+        const result = await runNewsletter(db, request.params.id, { trigger: "manual", log: request.log });
         return reply.send(result);
       } catch (err) {
         if (err instanceof NewsletterNotFoundError) {
@@ -365,13 +400,12 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           return reply.code(409).send({ error: err.message });
         }
         // A genuine pipeline failure (source fetch, template render, SMTP,
-        // ...) — runNewsletter has already recorded it on the SendRun row
-        // and rethrown. Without this catch, it would fall through to
-        // Fastify's default error handler and reach the frontend as a bare
-        // "Internal Server Error" (see describeSendFailure for why). 502
+        // ...) — runNewsletter has already recorded it on the SendRun row,
+        // logged it, and rethrown. Without this catch, it would fall through
+        // to Fastify's default error handler and reach the frontend as a
+        // bare "Internal Server Error" (see describeSendFailure for why). 502
         // since this is almost always this newsletter's own upstream
         // dependency (a source or the SMTP server), not this API itself.
-        request.log.error({ err }, "Newsletter send failed");
         return reply.code(502).send({ error: describeSendFailure(err) });
       }
     });

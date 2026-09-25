@@ -2,6 +2,7 @@ import { type Db, templates } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 
@@ -35,6 +36,7 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         .values({ name, designJson: designJson ?? null, compiledMjml: compiledMjml ?? null })
         .returning();
 
+      request.log.info({ templateId: template!.id }, `Created template "${name}"`);
       return reply.code(201).send({ template });
     });
 
@@ -70,11 +72,15 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
       if (!template) {
         return reply.code(404).send({ error: "Not found" });
       }
+      request.log.info({ templateId: template.id, fields: changedFields(body) }, `Saved template "${template.name}"`);
       return reply.send({ template });
     });
 
     scope.delete<{ Params: IdParams }>("/templates/:id", async (request, reply) => {
-      await db.delete(templates).where(eq(templates.id, request.params.id));
+      const [deleted] = await db.delete(templates).where(eq(templates.id, request.params.id)).returning();
+      if (deleted) {
+        request.log.info({ templateId: deleted.id }, `Deleted template "${deleted.name}"`);
+      }
       return reply.code(204).send();
     });
   });

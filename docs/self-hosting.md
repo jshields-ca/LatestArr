@@ -88,6 +88,12 @@ LatestArr speaks generic OIDC via PKCE, so any standards-compliant provider work
 
 Local username/password login stays available alongside OIDC once it's configured — enabling SSO doesn't disable the account you bootstrapped with.
 
+## Logs
+
+The **Logs** page in the web UI shows the server's recent activity, newest first: every newsletter send (manual, scheduled, or caught up after downtime) with how many recipients it reached, recipients that couldn't be delivered to, sources that couldn't be reached, sign-ins and failed sign-in attempts, and each settings change along with the admin who made it. Expand an entry to see its details. The same lines go to `docker logs latestarr`.
+
+The page keeps the most recent 500 entries in memory, so it starts empty after a restart. Set `LOG_LEVEL` in `.env` to change the detail: `debug` adds per-source item counts for each send, and `warn` keeps only problems. The default is `info`. Passwords, API keys, and email contents are never logged.
+
 ## Backups and upgrades
 
 **Back up**: the `latestarr-data` volume (the entire SQLite database) and your `ENCRYPTION_KEY`. Losing the key while keeping the database means every encrypted credential in it is unrecoverable; losing the volume without the key is just a normal "restore from backup."

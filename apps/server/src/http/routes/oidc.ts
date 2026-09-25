@@ -115,9 +115,11 @@ export function registerOidcRoutes(app: FastifyInstance, db: Db): void {
         expires: session.expiresAt,
       });
 
+      request.log.info({ userId: user.id, ip: request.ip }, `${user.email} signed in with SSO`);
       return reply.redirect(process.env.WEB_ORIGIN ?? "/");
     } catch (err) {
       if (err instanceof OidcAccountNotLinkedError) {
+        request.log.warn({ ip: request.ip }, `SSO sign-in rejected: ${err.message}`);
         return reply.code(403).send({ error: err.message });
       }
       throw err;

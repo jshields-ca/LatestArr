@@ -13,7 +13,6 @@ import { rommAdapter } from "@latestarr/adapter-romm";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
 import Fastify, { type FastifyInstance } from "fastify";
-import pino from "pino";
 import { loadOidcConfigFromEnv } from "./auth/oidc-config.js";
 import { requireSameOrigin } from "./http/require-same-origin.js";
 import { registerAuthRoutes } from "./http/routes/auth.js";
@@ -25,7 +24,7 @@ import { registerRecipientRoutes } from "./http/routes/recipients.js";
 import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
 import { registerTemplateRoutes } from "./http/routes/templates.js";
-import { logBufferStream } from "./log-buffer.js";
+import { logger } from "./logger.js";
 import type { SchedulerHandle } from "./scheduler/engine.js";
 
 // Read once at module load rather than per-request — the version can't
@@ -70,18 +69,8 @@ export async function buildApp(
   // proxy setups opt in via TRUST_PROXY=true (see docs/self-hosting.md);
   // this is also what makes the session cookie's Secure flag correct in
   // both modes (see auth.ts/oidc.ts, which key off request.protocol).
-  // A named logger instance (rather than `logger: true`, which builds one
-  // internally with no way to attach an extra destination) writing to both
-  // stdout — unchanged from before, still what `docker logs` shows — and
-  // logBufferStream, so GET /logs (registered below) has recent entries to
-  // read without standing up a real log aggregator.
-  // pino's destination is its *second* argument — pino(multistreamResult)
-  // alone silently falls back to its own default stdout destination and
-  // never actually writes to any custom stream in the multistream array
-  // (confirmed by direct repro), even though a bare pino(customStream)
-  // with a single non-multistream destination works fine as the sole
-  // argument.
-  const logger = pino({}, pino.multistream([{ stream: process.stdout }, { stream: logBufferStream }]));
+  // The shared logger (see logger.ts) writes to both stdout — what
+  // `docker logs` shows — and the in-memory buffer behind GET /logs.
   // `as unknown as FastifyInstance`: passing a concrete pino instance via
   // loggerInstance makes Fastify() infer its return type parameterized
   // over that exact pino Logger<...> type, which structurally isn't
