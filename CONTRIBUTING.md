@@ -62,10 +62,16 @@ If you're proposing support for a source that isn't in the README's supported-so
 
 ### Writing a changeset
 
-A changeset's body becomes a `CHANGELOG.md` bullet and, unedited, the notes on the GitHub Release — so it needs to read for a self-hoster deciding whether to upgrade, not just for other contributors. Write it in two parts:
+A changeset's body becomes a `CHANGELOG.md` bullet, and its lede becomes a line in the GitHub Release notes, so it needs to read for a self-hoster deciding whether to upgrade, not just for other contributors. Write it in two parts:
 
-1. **A one- or two-sentence plain-language lede**, prefixed with a bold category tag: `**New:**` for a feature, `**Improved:**` for a behavior/UI change, `**Fixed:**` for a bug fix. No file paths, code identifiers, or "why" reasoning — just what changed and why a user would care.
-2. **A `<details><summary>Technical details</summary>...</details>` block** underneath, for the implementation rationale, file references, and edge cases a contributor or future-you would want. As detailed as you like — it's collapsed by default, so it costs nothing for a reader who just wants the headline.
+1. **A one- or two-sentence plain-language lede**, prefixed with a bold category tag: `**New:**` for a feature, `**Improved:**` for a behavior/UI change, `**Fixed:**` for a bug fix. No file paths, code identifiers, or "why" reasoning — just what changed and why a user would care. This is the only part that appears in the GitHub Release.
+2. **A `<details><summary>Technical details</summary>...</details>` block** underneath, for the implementation rationale, file references, and edge cases a contributor or future-you would want. As detailed as you like. It's kept in `CHANGELOG.md` (collapsed) and left out of the Release notes.
+
+A few rules keep the Release notes short and accurate:
+
+- **Only changes a user would notice.** Tests-only fixes, CI changes, and refactors don't get a changeset, even when they fix something (a flaky test is not a "Fixed" item for someone running LatestArr).
+- **One tag per kind of change.** If a PR both fixes something and adds something, give each its own tag (`**Fixed:** ... **New:** ...`). Each tag becomes its own bullet under the right heading, so a new feature never ends up listed under Fixed.
+- **One changeset per PR.** When you add to a PR that already has one, edit that changeset instead of adding a second, so the Release doesn't list the same PR twice.
 
 ```markdown
 ---
@@ -82,7 +88,7 @@ Addresses production feedback that there was no way to show "everything new this
 </details>
 ```
 
-This renders as a working collapsible section on GitHub (`CHANGELOG.md` and Release notes both support raw `<details>`/`<summary>`) with no extra tooling — `scripts/write-changelog.mjs` flattens the body's newlines into one line per bullet, which doesn't affect how the HTML renders.
+In `CHANGELOG.md` this renders as a collapsible section on GitHub. `scripts/write-changelog.mjs` flattens each changeset onto one line per bullet, and `scripts/build-release-notes.mjs` strips the `<details>` block when it builds the Release notes.
 
 ## Versioning & releases
 
@@ -90,13 +96,23 @@ LatestArr follows [Semantic Versioning](https://semver.org/) and keeps a [Keep a
 
 - Every workspace package versions together in lockstep (see `.changeset/config.json`'s `fixed` group) — there's one meaningful version number for the whole app, not independent versions per internal package. Every package is `private: true` (this app isn't published to npm), so `.changeset/config.json` sets `privatePackages.version: true` — without it, Changesets silently skips versioning private packages entirely, which is exactly what happened for months before this was caught.
 - Picking a bump type when running `pnpm changeset`: `patch` for bug fixes and internal improvements, `minor` for new features (including a new source adapter), `major` reserved for 1.0 and any deliberate breaking change after that.
-- **Releases are automated** (`.github/workflows/release.yml`): every push to `main` that carries pending changesets opens or updates a "Version Packages" PR. Merging that PR runs `pnpm version-packages` (writes one consolidated `CHANGELOG.md` entry via `scripts/write-changelog.mjs`, bumps every package version, syncs the root `package.json`), and the next push — the merge itself — cuts a git tag and a GitHub Release with that entry as its notes. Nothing to run by hand; a maintainer's only job is reviewing and merging the Version Packages PR.
+- **Releases are automated** (`.github/workflows/release.yml`): every push to `main` that carries pending changesets opens or updates a "Version Packages" PR. Merging that PR runs `pnpm version-packages` (writes one consolidated `CHANGELOG.md` entry via `scripts/write-changelog.mjs`, bumps every package version, syncs the root `package.json`), and the next push — the merge itself — cuts a git tag and a GitHub Release. Nothing to run by hand; a maintainer's job is writing the release highlights (below), then reviewing and merging the Version Packages PR.
+- **Release notes are built, not copied**: `scripts/build-release-notes.mjs` assembles the GitHub Release body from the version's highlights file, that version's `CHANGELOG.md` section with the Technical details removed, an "Upgrading" section (the `docker pull` line, plus a database-changes note when the release added migrations), and a link to the full changelog. Preview it locally with `node scripts/build-release-notes.mjs <version>`.
 - **CHANGELOG.md entries are grouped and auto-linked**: `scripts/write-changelog.mjs` buckets each version's changesets under `### New` / `### Improved` / `### Fixed` subheadings (parsed from the bold lede tag — see "Writing a changeset" above), and resolves each changeset's own PR via `@changesets/get-github-info` (using the `repo` field in `.changeset/config.json`), appending `([#123](...))` right after the lede sentence. This is best-effort — no `GITHUB_TOKEN`, a network hiccup, or GitHub not yet indexing a very fresh commit all degrade to "no link" rather than failing the release. A changeset that doesn't start with a recognized category tag still renders, under an `### Other` heading, rather than being dropped.
 - **Batch releases around a coherent theme rather than cutting one for every merge.** A release with a clear "why" (a described feature, a themed round of fixes) reads as intentional; a trickle of thinly-described patch releases reads as noisy and can make the project look less stable than it is. Hold the Version Packages PR open and keep letting it accumulate changesets from related work — merge it when there's a coherent story to tell, not on every single PR. The exception is an urgent fix (a real bug, a security issue) that shouldn't wait on unrelated work to land.
-- **Before considering a release done**, once the Version Packages PR is merged and the GitHub Release exists:
-  1. Add a one-line **release theme** to the top of the GitHub Release (e.g. "Clickable newsletters + admin UI polish") — the changelog's grouped bullets are the detail, this is the one-sentence "why."
-  2. For any release that touched `apps/web`, add a **Highlights** section with a screenshot or two of what's new below the theme line — the bullets say what changed, a screenshot shows it. Manual step; no tooling for it.
-  3. Do a **quick full docs pass** — `README.md` (feature list, supported-sources table, screenshots), `CONTRIBUTING.md`, and anything under `docs/` — for anything the release makes stale, not just files the release's own PRs happened to touch.
+- **After the release is out**, do a quick full docs pass: `README.md` (feature list, supported-sources table, screenshots), `CONTRIBUTING.md`, and anything under `docs/`, for anything the release makes stale, not just files the release's own PRs happened to touch.
+
+### Release highlights
+
+Every release opens with a short **Highlights** section written by a person: a one-line theme in bold, then two to four plain-language bullets on what matters most. For a release that changed the web UI, add a screenshot or two. It lives in `.github/release-highlights/vX.Y.Z.md` and is written on the Version Packages PR, right before merging it:
+
+1. The release workflow posts a comment on the Version Packages PR with a **Write the highlights** link. It opens the GitHub editor on that PR's branch with the file already named and a template (`.github/release-highlights/TEMPLATE.md`) filled in.
+2. Replace the template's comments with the highlights and commit. The **Release highlights** CI check on the PR stays red until the file has real content, and the comment switches to a ✅.
+3. Merge the PR. The highlights appear at the top of the GitHub Release.
+
+Write them last. changesets/action rebuilds the Version Packages branch from `main` whenever another PR merges, which drops the file; the comment and the red check come back when that happens. (Committing the file to `main` in a normal PR also works, if you already know the version number.)
+
+For screenshots, drag an image into any GitHub comment box, copy the link GitHub generates, and paste it into the file as `![Description](link)`. Breaking changes or manual upgrade steps go under a `### Before you upgrade` heading in the same file.
 
 ## Testing in-progress work without a release
 
