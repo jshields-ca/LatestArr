@@ -23,21 +23,32 @@ export function highlightsPath(version) {
 
 // HTML comments are stripped so the reminder template (all comments) counts
 // as "not written yet" rather than publishing an empty Highlights section.
+function stripHtmlComments(text) {
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<!--[\s\S]*?-->/g, "");
+  } while (text !== previous);
+  const unclosed = text.indexOf("<!--");
+  return unclosed === -1 ? text : text.slice(0, unclosed);
+}
+
 export function readHighlights(version) {
   const file = highlightsPath(version);
   if (!existsSync(file)) return null;
-  const content = readFileSync(file, "utf8").replace(/<!--[\s\S]*?-->/g, "").trim();
+  const content = stripHtmlComments(readFileSync(file, "utf8")).trim();
   return content || null;
 }
 
 function readChangelogSection(version) {
-  const changelog = readFileSync(path.join(rootDir, "CHANGELOG.md"), "utf8");
-  const heading = new RegExp(`^## \\[${version.replace(/\./g, "\\.")}\\].*$`, "m");
-  const start = changelog.match(heading);
-  if (!start) throw new Error(`No CHANGELOG.md section found for version ${version}`);
-  const rest = changelog.slice(start.index + start[0].length);
-  const next = rest.search(/^## \[/m);
-  return (next === -1 ? rest : rest.slice(0, next)).trim();
+  const lines = readFileSync(path.join(rootDir, "CHANGELOG.md"), "utf8").split(/\r?\n/);
+  const start = lines.findIndex((line) => line.startsWith(`## [${version}]`));
+  if (start === -1) throw new Error(`No CHANGELOG.md section found for version ${version}`);
+  const next = lines.findIndex((line, i) => i > start && line.startsWith("## ["));
+  return lines
+    .slice(start + 1, next === -1 ? undefined : next)
+    .join("\n")
+    .trim();
 }
 
 function stripTechnicalDetails(section) {
@@ -114,6 +125,11 @@ export function buildReleaseNotes(version, previousTag = findPreviousTag(version
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const args = process.argv.slice(2);
+  const versionArg = args[0] === "--check-highlights" ? args[1] : args[0];
+  if (versionArg && !/^\d+\.\d+\.\d+$/.test(versionArg)) {
+    console.error(`Expected a version like 1.2.3, got "${versionArg}"`);
+    process.exit(1);
+  }
   if (args[0] === "--check-highlights") {
     const version = args[1];
     if (!version) {
@@ -132,6 +148,10 @@ if (isMain) {
     const [version, previousTag] = args;
     if (!version) {
       console.error("Usage: node build-release-notes.mjs <version> [previousTag]");
+      process.exit(1);
+    }
+    if (previousTag && !/^v\d+\.\d+\.\d+$/.test(previousTag)) {
+      console.error(`Expected a previous tag like v1.2.3, got "${previousTag}"`);
       process.exit(1);
     }
     try {
