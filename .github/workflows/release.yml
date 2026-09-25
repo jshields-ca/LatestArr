@@ -5,8 +5,9 @@ name: Release
 # then — once a maintainer merges it — cut the actual GitHub Release and
 # publish that same version's image to GHCR. This app isn't published to
 # npm (every workspace package is private), so there's no npm `publish`
-# step here; "release" means a git tag, a GitHub Release with notes
-# pulled straight from CHANGELOG.md, and a container image.
+# step here; "release" means a git tag, a GitHub Release (notes built by
+# scripts/build-release-notes.mjs from CHANGELOG.md plus the version's
+# highlights file), and a container image.
 
 on:
   push:
@@ -78,10 +79,52 @@ jobs:
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Extract this version's release notes from CHANGELOG.md
+      # One sticky comment on the Version Packages PR, updated in place on
+      # every push, so writing highlights is a visible step before merging
+      # rather than something to remember after the release is already out.
+      # The file is checked on the PR branch, which changesets/action just
+      # rebuilt from main — so highlights committed to that branch are lost
+      # whenever another PR merges first, and this comment comes back.
+      - name: Remind the maintainer to write release highlights
+        if: steps.changesets.outputs.pr-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.changesets.outputs.pr-number }}
+          REPO: ${{ github.repository }}
+        run: |
+          git fetch --quiet origin changeset-release/main
+          VERSION=$(git show origin/changeset-release/main:package.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')
+          FILE=".github/release-highlights/v$VERSION.md"
+          MARKER="<!-- release-highlights-reminder -->"
+          EXISTING=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n1)
+
+          if git cat-file -e "origin/changeset-release/main:$FILE" 2>/dev/null; then
+            BODY="$MARKER
+          ✅ Release highlights for **v$VERSION** are in \`$FILE\`."
+          else
+            TEMPLATE=$(cat .github/release-highlights/TEMPLATE.md)
+            LINK="https://github.com/$REPO/new/changeset-release/main/.github/release-highlights?filename=v$VERSION.md&value=$(jq -rn --arg v "$TEMPLATE" '$v|@uri')"
+            BODY="$MARKER
+          ### ✍️ Write the release highlights before merging
+
+          This PR will release **v$VERSION**. Add a short summary for the top of the GitHub Release: a one-line theme, then the few changes that matter most, in plain language.
+
+          **[Write the highlights for v$VERSION]($LINK)** (opens the GitHub editor with a template, committed to this PR's branch)
+
+          The **Release highlights** check stays red until the file exists. Write highlights just before merging: if another PR merges to \`main\` first, this branch is rebuilt and they need to be added again. See CONTRIBUTING.md, \"Release highlights\"."
+          fi
+
+          if [ -n "$EXISTING" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING" -f body="$BODY" > /dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR_NUMBER/comments" -f body="$BODY" > /dev/null
+          fi
+
+      - name: Build this version's release notes
         if: steps.check_version.outputs.is_new == 'true'
         run: |
-          node scripts/extract-changelog-section.mjs "${{ steps.check_version.outputs.version }}" > /tmp/release-notes.md
+          node scripts/build-release-notes.mjs "${{ steps.check_version.outputs.version }}" > /tmp/release-notes.md
 
       - name: Create the tag and GitHub release
         if: steps.check_version.outputs.is_new == 'true'

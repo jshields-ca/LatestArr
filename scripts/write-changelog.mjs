@@ -81,20 +81,27 @@ async function resolvePrLink(filePath, repo) {
   }
 }
 
-// Splits a changeset body into its category, its plain-language lede
-// (the bit that should be visible at a glance, before any PR link), and
+// Splits a changeset body into one entry per category tag: its category,
+// its plain-language lede (visible at a glance, before any PR link), and
 // the rest (a <details> technical block, if present) — so the lede and
-// link can sit together on one line ahead of the collapsed details,
-// rather than the link landing wherever the flattened text happens to end.
+// link sit together on one line ahead of the collapsed details. A body
+// with more than one tag ("**Fixed:** ... **New:** ...") becomes one
+// bullet under each heading instead of the second tag being buried in
+// the first one's bullet; the details block stays with the first.
 function splitChangeset(summary) {
   const flat = summary.replace(/\n+/g, " ").trim();
-  const categoryMatch = flat.match(/^\*\*(New|Improved|Fixed):\*\*\s*/);
-  const category = categoryMatch ? categoryMatch[1] : "Other";
-  const withoutTag = categoryMatch ? flat.slice(categoryMatch[0].length) : flat;
-  const detailsIndex = withoutTag.indexOf("<details>");
-  const lede = detailsIndex === -1 ? withoutTag : withoutTag.slice(0, detailsIndex).trim();
-  const rest = detailsIndex === -1 ? "" : ` ${withoutTag.slice(detailsIndex)}`;
-  return { category, lede, rest };
+  const detailsIndex = flat.indexOf("<details>");
+  const ledePart = detailsIndex === -1 ? flat : flat.slice(0, detailsIndex).trim();
+  const rest = detailsIndex === -1 ? "" : ` ${flat.slice(detailsIndex)}`;
+  const tags = [...ledePart.matchAll(/\*\*(New|Improved|Fixed):\*\*\s*/g)];
+  if (tags.length === 0 || tags[0].index !== 0) {
+    return [{ category: "Other", lede: ledePart, rest }];
+  }
+  return tags.map((tag, i) => ({
+    category: tag[1],
+    lede: ledePart.slice(tag.index + tag[0].length, tags[i + 1]?.index).trim(),
+    rest: i === 0 ? rest : "",
+  }));
 }
 
 function formatBullet({ lede, rest }, prLink) {
@@ -133,10 +140,11 @@ const repo = Array.isArray(changesetConfig.changelog) ? changesetConfig.changelo
 let linksResolved = 0;
 const entries = [];
 for (const c of changesets) {
-  const split = splitChangeset(c.summary);
   const prLink = await resolvePrLink(path.join(changesetDir, c.file), repo);
   if (prLink) linksResolved++;
-  entries.push({ ...split, bullet: formatBullet(split, prLink) });
+  for (const split of splitChangeset(c.summary)) {
+    entries.push({ ...split, bullet: formatBullet(split, prLink) });
+  }
 }
 
 const byCategory = new Map();

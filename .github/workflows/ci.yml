@@ -44,6 +44,20 @@ jobs:
       - name: Test
         run: pnpm turbo run test
 
+  # Only runs on the Version Packages PR: fails until this version's
+  # highlights file exists, so the release can't be merged without them
+  # by accident (the release workflow also posts a reminder comment).
+  release-highlights:
+    name: Release highlights
+    if: github.event_name == 'pull_request' && github.head_ref == 'changeset-release/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check this release has highlights
+        run: node scripts/build-release-notes.mjs --check-highlights "$(node -p "require('./package.json').version")"
+
   docker-build:
     name: Docker build
     runs-on: ubuntu-latest
