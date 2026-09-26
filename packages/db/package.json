@@ -19,6 +19,7 @@
   "devDependencies": {
     "@latestarr/config": "workspace:*",
     "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.20.2",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.10.0",
     "typescript": "^5.6.0",
