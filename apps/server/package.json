@@ -39,7 +39,7 @@
   "devDependencies": {
     "@latestarr/config": "workspace:*",
     "@types/mjml": "^5.0.0",
-    "@types/node": "^22.10.0",
+    "@types/node": "^26.6.2",
     "@types/nodemailer": "^6.4.0",
     "eslint": "^10.10.0",
     "tsx": "^4.19.0",
