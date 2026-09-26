@@ -15,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20.x, 22.x]
+        # 22 is what the Docker image runs; 24 is the next LTS the image
+        # will move to. Node 20 reached end of life in April 2026.
+        node-version: [22.x, 24.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v7

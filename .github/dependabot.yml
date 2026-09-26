@@ -10,6 +10,16 @@ updates:
           - "minor"
           - "patch"
     open-pull-requests-limit: 10
+    ignore:
+      # Must match the Node major the Docker image runs (docker/Dockerfile);
+      # newer types would allow APIs that crash at runtime. Bump by hand
+      # together with the image.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # typescript-eslint doesn't support TypeScript 7 yet (see the
+      # TypeScript 7 tracking issue); remove once it does.
+      - dependency-name: "typescript"
+        versions: [">=7"]
     labels:
       - "dependencies"
     commit-message:
