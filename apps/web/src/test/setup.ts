@@ -45,8 +45,8 @@ if (typeof Element.prototype.scrollIntoView === "undefined") {
 // not just a testing shortcut.
 if (typeof Element.prototype.matches === "function") {
   const originalMatches = Element.prototype.matches;
-  Element.prototype.matches = function (selector: string) {
+  Element.prototype.matches = function (this: Element, selector: string) {
     if (selector === ":modal" || selector === ":popover-open") return false;
     return originalMatches.call(this, selector);
-  };
+  } as typeof Element.prototype.matches;
 }
