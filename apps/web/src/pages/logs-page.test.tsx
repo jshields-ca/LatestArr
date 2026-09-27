@@ -32,14 +32,32 @@ const warnEntry = {
   time: 1789999000000,
   level: 40,
   levelLabel: "warn",
-  msg: "A source sync came back empty",
+  msg: `Couldn't fetch from source "Home Tautulli"`,
 };
 
 describe("LogsPage", () => {
   it("shows the empty state", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [] }));
     render(<LogsPage />);
-    expect(await screen.findByText("No log entries to show.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing has been logged since the server last started.")).toBeInTheDocument();
+  });
+
+  it("asks for every entry the server keeps", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [] }));
+    render(<LogsPage />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/logs?limit=500", expect.anything()));
+  });
+
+  it("says when there are no warnings or errors under a level filter", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [warnEntry] }));
+    render(<LogsPage />);
+    await screen.findByText(`Couldn't fetch from source "Home Tautulli"`);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [] }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Filter by level" }));
+    await user.click(await screen.findByRole("option", { name: "Error & above" }));
+    expect(await screen.findByText("No errors since the server last started.")).toBeInTheDocument();
   });
 
   it("lists log entries with their level and message", async () => {
@@ -47,7 +65,7 @@ describe("LogsPage", () => {
     render(<LogsPage />);
 
     expect(await screen.findByText("Newsletter send failed")).toBeInTheDocument();
-    expect(screen.getByText("A source sync came back empty")).toBeInTheDocument();
+    expect(screen.getByText(`Couldn't fetch from source "Home Tautulli"`)).toBeInTheDocument();
     expect(screen.getByText("error")).toBeInTheDocument();
     expect(screen.getByText("warn")).toBeInTheDocument();
   });
@@ -66,7 +84,7 @@ describe("LogsPage", () => {
   it("does not offer a Details toggle for an entry with nothing extra to show", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [warnEntry] }));
     render(<LogsPage />);
-    await screen.findByText("A source sync came back empty");
+    await screen.findByText(`Couldn't fetch from source "Home Tautulli"`);
     expect(screen.queryByRole("button", { name: "Show details" })).not.toBeInTheDocument();
   });
 
@@ -81,7 +99,7 @@ describe("LogsPage", () => {
     await user.click(await screen.findByRole("option", { name: "Error & above" }));
 
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenLastCalledWith("/api/logs?level=error", expect.anything()),
+      expect(fetchMock).toHaveBeenLastCalledWith("/api/logs?limit=500&level=error", expect.anything()),
     );
   });
 
@@ -89,11 +107,11 @@ describe("LogsPage", () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [] }));
     render(<LogsPage />);
-    await screen.findByText("No log entries to show.");
+    await screen.findByText("Nothing has been logged since the server last started.");
 
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [warnEntry] }));
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByText("A source sync came back empty")).toBeInTheDocument();
+    expect(await screen.findByText(`Couldn't fetch from source "Home Tautulli"`)).toBeInTheDocument();
   });
 
   it("polls for new entries on an interval once Live is toggled on", async () => {
@@ -101,7 +119,7 @@ describe("LogsPage", () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [warnEntry] }));
     render(<LogsPage />);
-    await screen.findByText("A source sync came back empty");
+    await screen.findByText(`Couldn't fetch from source "Home Tautulli"`);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [errorEntry, warnEntry] }));
