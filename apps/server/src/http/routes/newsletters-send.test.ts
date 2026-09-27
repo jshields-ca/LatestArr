@@ -727,3 +727,128 @@ describe("activity logging", () => {
     expect(JSON.stringify(getRecentLogs(500))).not.toContain("a-very-long-password");
   });
 });
+
+describe("preview and test send", () => {
+  beforeEach(() => clearLogBuffer());
+
+  async function linkedNewsletter(smtp = true) {
+    const smtpProfileId = smtp ? await createSmtpProfile() : undefined;
+    const sourceId = await createSourceConnection();
+    const { groupId } = await createRecipientAndGroup("person@example.com");
+    const newsletterId = await createNewsletter(smtpProfileId);
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/sources`, payload: { sourceConnectionId: sourceId } }),
+    );
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/recipient-groups`, payload: { groupId } }),
+    );
+    return newsletterId;
+  }
+
+  function mockRecentlyAddedWithPoster() {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              {
+                rating_key: "1",
+                title: "Some Movie",
+                full_title: "Some Movie",
+                media_type: "movie",
+                added_at: String(Math.floor(Date.now() / 1000)),
+                thumb: "/library/metadata/1/thumb/1",
+              },
+            ],
+          },
+        },
+      }),
+    );
+  }
+
+  it("previews the next issue without sending or recording a send-run, with posters inlined", async () => {
+    const newsletterId = await linkedNewsletter(false);
+    mockRecentlyAddedWithPoster();
+    const { default: sharp } = await import("sharp");
+    const png = await sharp({ create: { width: 4, height: 6, channels: 3, background: "#ef5d86" } }).png().toBuffer();
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength),
+    });
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.subject).toBe("Weekly Digest");
+    expect(body.items).toEqual([{ title: "Some Movie", kind: "movie" }]);
+    expect(body.html).toContain("Some Movie");
+    expect(body.html).toContain("data:image/");
+    expect(body.html).not.toContain("cid:");
+    expect(mockSendMail).not.toHaveBeenCalled();
+    expect(await db.select().from(sendRuns)).toHaveLength(0);
+  });
+
+  it("previews without an SMTP profile, but 502s with a readable reason when a source is unreachable", async () => {
+    const newsletterId = await linkedNewsletter(false);
+    mockFetch.mockRejectedValue(new TypeError("fetch failed"));
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json().error).toContain("Could not reach one of this newsletter's connected sources");
+    expect(logsMatchingPreview(`Couldn't preview newsletter "Weekly Digest"`)).toHaveLength(1);
+  });
+
+  it("sends a test copy to one address only, marked [Test], without a send-run", async () => {
+    const newsletterId = await linkedNewsletter();
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValueOnce({ messageId: "test-1" });
+
+    const response = await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-test`, payload: { to: "me@example.com" } }),
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ messageId: "test-1" });
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+    const message = mockSendMail.mock.calls[0]![0];
+    expect(message.to).toBe("me@example.com");
+    expect(message.subject).toBe("[Test] Weekly Digest");
+    expect(message.html).toContain("Some Movie");
+    expect(await db.select().from(sendRuns)).toHaveLength(0);
+    const [entry] = logsMatchingPreview(`Sent a test of "Weekly Digest" to me@example.com`);
+    expect(entry).toMatchObject({ level: 30, trigger: "test", user: "admin@example.com" });
+  });
+
+  it("rejects a test send with no SMTP profile or an invalid address", async () => {
+    const withoutSmtp = await linkedNewsletter(false);
+    const noSmtp = await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${withoutSmtp}/send-test`, payload: { to: "me@example.com" } }),
+    );
+    expect(noSmtp.statusCode).toBe(400);
+
+    const badAddress = await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${withoutSmtp}/send-test`, payload: { to: "not-an-email" } }),
+    );
+    expect(badAddress.statusCode).toBe(400);
+    expect(mockSendMail).not.toHaveBeenCalled();
+  });
+
+  it("404s both for an unknown newsletter", async () => {
+    const preview = await app.inject(authed({ method: "POST", url: "/api/newsletters/nope/preview" }));
+    const test = await app.inject(
+      authed({ method: "POST", url: "/api/newsletters/nope/send-test", payload: { to: "me@example.com" } }),
+    );
+    expect(preview.statusCode).toBe(404);
+    expect(test.statusCode).toBe(404);
+  });
+
+  function logsMatchingPreview(text: string) {
+    return getRecentLogs(500).filter((entry) => entry.msg.includes(text));
+  }
+});

@@ -17,8 +17,10 @@ import {
   describeSendFailure,
   NewsletterMisconfiguredError,
   NewsletterNotFoundError,
+  previewNewsletter,
   runNewsletter,
   SendAlreadyRunningError,
+  sendTestNewsletter,
 } from "../../pipeline/run-newsletter.js";
 import type { SchedulerHandle } from "../../scheduler/engine.js";
 import { refreshScheduler } from "../../scheduler/engine.js";
@@ -31,6 +33,10 @@ const senderIdentitySchema = z.object({
   fromName: z.string().trim().min(1).optional(),
   fromEmail: z.email().optional(),
   replyTo: z.email().optional(),
+});
+
+const sendTestSchema = z.object({
+  to: z.email("A valid email address is required"),
 });
 
 const emailFontSchema = z.enum(Object.keys(EMAIL_FONTS) as [string, ...string[]]);
@@ -406,6 +412,35 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         // bare "Internal Server Error" (see describeSendFailure for why). 502
         // since this is almost always this newsletter's own upstream
         // dependency (a source or the SMTP server), not this API itself.
+        return reply.code(502).send({ error: describeSendFailure(err) });
+      }
+    });
+
+    scope.post<{ Params: IdParams }>("/newsletters/:id/preview", async (request, reply) => {
+      try {
+        const preview = await previewNewsletter(db, request.params.id, { log: request.log });
+        return reply.send(preview);
+      } catch (err) {
+        if (err instanceof NewsletterNotFoundError) {
+          return reply.code(404).send({ error: err.message });
+        }
+        return reply.code(502).send({ error: describeSendFailure(err) });
+      }
+    });
+
+    scope.post<{ Params: IdParams }>("/newsletters/:id/send-test", async (request, reply) => {
+      const body = parseBody(sendTestSchema, request.body, reply);
+      if (!body) return reply;
+      try {
+        const result = await sendTestNewsletter(db, request.params.id, body.to, { log: request.log });
+        return reply.send(result);
+      } catch (err) {
+        if (err instanceof NewsletterNotFoundError) {
+          return reply.code(404).send({ error: err.message });
+        }
+        if (err instanceof NewsletterMisconfiguredError) {
+          return reply.code(400).send({ error: err.message });
+        }
         return reply.code(502).send({ error: describeSendFailure(err) });
       }
     });

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Loader2, Pencil, Plus, Send, Trash2, X } from "lucide-react";
+import { Eye, Loader2, Pencil, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
 
+import { useOptionalAuth } from "@/components/auth-provider";
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { ListRow } from "@/components/list-row";
 import { SendRunHistoryList } from "@/components/send-run-history";
@@ -41,13 +42,16 @@ import {
   listSmtpProfiles,
   listSources,
   listTemplates,
+  previewNewsletter,
   removeNewsletterGroup,
   removeNewsletterSource,
   sendNewsletterNow,
+  sendTestNewsletter,
   updateNewsletter,
   type Newsletter,
   type NewsletterCta,
   type NewsletterDetail,
+  type NewsletterPreview,
   type RecipientGroup,
   type SendRun,
   type SmtpProfile,
@@ -915,6 +919,142 @@ function NewsletterDetailsForm({
   );
 }
 
+// Renders the next issue exactly as a send would (real items, template,
+// intro/footer/buttons) without emailing anyone, and can send that render
+// to a single address as a test.
+function NewsletterPreviewDialog({ newsletter }: { newsletter: Newsletter }) {
+  const auth = useOptionalAuth();
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<NewsletterPreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [testTo, setTestTo] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      setPreview(await previewNewsletter(newsletter.id));
+    } catch (err) {
+      setPreview(null);
+      setError(err instanceof ApiError ? err.message : "Couldn't build the preview.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSendTest(event: FormEvent) {
+    event.preventDefault();
+    setSendingTest(true);
+    setTestError(null);
+    try {
+      await sendTestNewsletter(newsletter.id, testTo);
+      toast({ variant: "success", title: "Test sent", description: `A test of ${newsletter.name} was sent to ${testTo}.` });
+    } catch (err) {
+      setTestError(err instanceof ApiError ? err.message : "Couldn't send the test.");
+    } finally {
+      setSendingTest(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setTestTo(auth?.user?.email ?? "");
+          setTestError(null);
+          void load();
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Eye />
+          Preview
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Preview: {newsletter.name}</DialogTitle>
+          <DialogDescription>
+            What the next send would contain right now. Nothing is emailed until you send a test.
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Building preview...
+          </div>
+        ) : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+
+        {preview && !loading ? (
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-sm">
+              <span className="text-muted-foreground">Subject: </span>
+              {preview.subject}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {preview.items.length === 0
+                ? "Nothing new in the lookback window."
+                : `${preview.items.length} ${preview.items.length === 1 ? "item" : "items"} from the last ${newsletter.lookbackDays} days.`}
+            </p>
+            {/* Sandboxed with no scripts or same-origin access; popups are
+                allowed so the email's own links open in a new tab. */}
+            <iframe
+              title={`Email preview for ${newsletter.name}`}
+              srcDoc={preview.html}
+              sandbox="allow-popups allow-popups-to-escape-sandbox"
+              className="h-[60dvh] w-full rounded-md border border-border bg-white"
+            />
+          </div>
+        ) : null}
+
+        <form className="flex flex-col gap-2 border-t border-border pt-4" onSubmit={handleSendTest} noValidate>
+          <Label htmlFor={`newsletter-test-to-${newsletter.id}`}>Send a test to</Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              id={`newsletter-test-to-${newsletter.id}`}
+              type="email"
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder="you@example.com"
+              disabled={sendingTest}
+            />
+            <div className="flex gap-2">
+              <Button type="submit" disabled={sendingTest || !testTo}>
+                {sendingTest ? <Loader2 className="animate-spin" /> : <Send />}
+                Send test
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void load()} disabled={loading}>
+                <RefreshCw />
+                Refresh
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Sent only to this address, with &quot;[Test]&quot; in the subject. It isn&apos;t added to History.
+          </p>
+          {testError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {testError}
+            </p>
+          ) : null}
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function NewsletterCard({
   newsletter,
   allSources,
@@ -1061,6 +1201,7 @@ function NewsletterCard({
             />
             Enabled
           </label>
+          <NewsletterPreviewDialog newsletter={newsletter} />
           {/* Reachable without expanding the row — previously only lived
               inside the Details tab, right next to Save changes, which
               read as two unrelated actions crowded together. */}

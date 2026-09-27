@@ -54,6 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// For components that only use the signed-in user as a convenience (e.g. a
+// prefilled email) and should still render without an AuthProvider.
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}
+
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
