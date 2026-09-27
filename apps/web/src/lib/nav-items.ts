@@ -4,7 +4,7 @@ import {
   Users,
   Mail,
   Send,
-  LayoutTemplate,
+  Palette,
   ScrollText,
   BellRing,
   type LucideIcon,
@@ -22,7 +22,7 @@ export const navItems: NavItem[] = [
   { to: "/recipients", label: "Recipients", icon: Users },
   { to: "/smtp", label: "SMTP Profiles", icon: Mail },
   { to: "/newsletters", label: "Newsletters", icon: Send },
-  { to: "/templates", label: "Templates", icon: LayoutTemplate },
+  { to: "/designs", label: "Designs", icon: Palette },
   { to: "/notifications", label: "Notifications", icon: BellRing },
   { to: "/logs", label: "Logs", icon: ScrollText },
 ];

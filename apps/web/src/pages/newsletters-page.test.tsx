@@ -88,6 +88,8 @@ const secondarySmtpProfile = { ...primarySmtpProfile, id: "smtp2", name: "Second
 const weeklyLayoutTemplate = {
   id: "t1",
   name: "Weekly Layout",
+  mode: "code" as const,
+  settings: null,
   designJson: null,
   compiledMjml: null,
   compiledHtml: null,
@@ -685,7 +687,7 @@ describe("NewslettersPage", () => {
       await user.click(screen.getByRole("button", { name: "Add newsletter" }));
       const dialog = await screen.findByRole("dialog");
       await user.type(within(dialog).getByLabelText("Name"), "Weekly digest");
-      selectOption(within(dialog).getByLabelText("Template"), "Weekly Layout");
+      selectOption(within(dialog).getByLabelText("Design"), "Weekly Layout (older template)");
 
       fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
       await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
@@ -698,7 +700,7 @@ describe("NewslettersPage", () => {
   );
 
   it(
-    "changes and then unsets an existing newsletter's template",
+    "changes and then unsets an existing newsletter's design",
     async () => {
       const user = userEvent.setup();
       mockRoutes(
@@ -716,22 +718,24 @@ describe("NewslettersPage", () => {
       renderPage();
       await screen.findByText("Weekly digest");
       await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-      await screen.findByLabelText("Template");
+      await screen.findByLabelText("Design");
 
       fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
-      selectOption(screen.getByLabelText("Template"), "Weekly Layout");
+      selectOption(screen.getByLabelText("Design"), "Weekly Layout (older template)");
       let [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string)).toEqual({ templateId: "t1" });
-      expect(await screen.findByRole("link", { name: "Edit template" })).toHaveAttribute(
+      // An older drag-and-drop template still opens its own editor.
+      expect(await screen.findByRole("link", { name: "Edit design" })).toHaveAttribute(
         "href",
         "/templates/t1/edit",
       );
+      expect(await screen.findByText("Saved")).toBeInTheDocument();
 
       fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: null } }));
-      selectOption(screen.getByLabelText("Template"), "Use the default layout");
+      selectOption(screen.getByLabelText("Design"), "Default");
       [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string)).toEqual({ templateId: null });
-      await waitFor(() => expect(screen.queryByRole("link", { name: "Edit template" })).not.toBeInTheDocument());
+      expect(await screen.findByRole("link", { name: "Manage designs" })).toHaveAttribute("href", "/designs");
     },
     // Two selectOption calls, each followed by an async `findBy`/`waitFor`
     // — see the testTimeout comment in vitest.config.ts.
@@ -739,7 +743,7 @@ describe("NewslettersPage", () => {
   );
 
   it(
-    "changes the default template's font, and hides the Font picker once a custom template is picked",
+    "changes the Default design's font, and hides the Font picker once another design is picked",
     async () => {
       const user = userEvent.setup();
       mockRoutes(
@@ -765,7 +769,7 @@ describe("NewslettersPage", () => {
       expect(JSON.parse(init.body as string)).toEqual({ emailFont: "georgia" });
 
       fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
-      selectOption(screen.getByLabelText("Template"), "Weekly Layout");
+      selectOption(screen.getByLabelText("Design"), "Weekly Layout (older template)");
       await waitFor(() => expect(screen.queryByLabelText("Font")).not.toBeInTheDocument());
     },
     240000,
@@ -811,7 +815,7 @@ describe("NewslettersPage", () => {
     });
   });
 
-  it("adds, edits, and removes CTA buttons, capping at 4", async () => {
+  it("saves CTA buttons by themselves once every row is complete, capping at 4", async () => {
     const user = userEvent.setup();
     mockRoutes(
       baseRoutes({
@@ -832,18 +836,24 @@ describe("NewslettersPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add button" }));
     await user.type(screen.getByLabelText("Button 1 label"), "Open Plex");
-    await user.type(screen.getByLabelText("Button 1 URL"), "https://app.plex.tv/desktop");
+    await user.type(screen.getByLabelText("Button 1 URL"), "app.plex.tv/desktop");
+    // An incomplete link isn't saved, and says why.
+    expect(screen.getByText(/to save this button/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save buttons" })).not.toBeInTheDocument();
 
     const savedCta = { label: "Open Plex", url: "https://app.plex.tv/desktop" };
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, { newsletter: { ...weeklyDigest, ctas: [savedCta] } }),
     );
-    await user.click(screen.getByRole("button", { name: "Save buttons" }));
+    await user.clear(screen.getByLabelText("Button 1 URL"));
+    await user.type(screen.getByLabelText("Button 1 URL"), "https://app.plex.tv/desktop");
 
     await waitFor(() => {
-      const call = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
-      expect(JSON.parse((call as [string, RequestInit])[1].body as string)).toEqual({ ctas: [savedCta] });
+      const patches = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+      expect(patches).toHaveLength(1);
+      expect(JSON.parse((patches[0] as [string, RequestInit])[1].body as string)).toEqual({ ctas: [savedCta] });
     });
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
 
     // Add 3 more to hit the cap of 4, then confirm "Add button" disappears.
     await user.click(screen.getByRole("button", { name: "Add button" }));
@@ -1078,7 +1088,7 @@ describe("NewslettersPage", () => {
     const { container } = renderPage();
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-    await screen.findByLabelText("Template");
+    await screen.findByLabelText("Design");
 
     expect(await axe(container)).toHaveNoViolations();
 

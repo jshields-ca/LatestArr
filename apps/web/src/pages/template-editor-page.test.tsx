@@ -94,7 +94,7 @@ function renderPage() {
     <MemoryRouter initialEntries={["/templates/t1/edit"]}>
       <Routes>
         <Route path="/templates/:id/edit" element={<TemplateEditorPage />} />
-        <Route path="/templates" element={<div>Templates list</div>} />
+        <Route path="/designs" element={<div>Designs list</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -165,14 +165,14 @@ describe("TemplateEditorPage", () => {
     expect(mockInit).toHaveBeenCalledTimes(1);
   });
 
-  it("navigates back to the templates list", async () => {
+  it("navigates back to the designs list", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { template: exampleTemplate }));
     renderPage();
     await screen.findByText("Weekly Digest");
 
     await user.click(screen.getByRole("button", { name: "Back to templates" }));
-    expect(await screen.findByText("Templates list")).toBeInTheDocument();
+    expect(await screen.findByText("Designs list")).toBeInTheDocument();
   });
 
   it("navigates back without confirming when there are no unsaved changes", async () => {
@@ -185,7 +185,7 @@ describe("TemplateEditorPage", () => {
     await user.click(screen.getByRole("button", { name: "Back to templates" }));
 
     expect(confirmSpy).not.toHaveBeenCalled();
-    expect(await screen.findByText("Templates list")).toBeInTheDocument();
+    expect(await screen.findByText("Designs list")).toBeInTheDocument();
     confirmSpy.mockRestore();
   });
 
@@ -199,11 +199,11 @@ describe("TemplateEditorPage", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     await user.click(screen.getByRole("button", { name: "Back to templates" }));
     expect(confirmSpy).toHaveBeenCalled();
-    expect(screen.queryByText("Templates list")).not.toBeInTheDocument();
+    expect(screen.queryByText("Designs list")).not.toBeInTheDocument();
 
     confirmSpy.mockReturnValue(true);
     await user.click(screen.getByRole("button", { name: "Back to templates" }));
-    expect(await screen.findByText("Templates list")).toBeInTheDocument();
+    expect(await screen.findByText("Designs list")).toBeInTheDocument();
     confirmSpy.mockRestore();
   });
 

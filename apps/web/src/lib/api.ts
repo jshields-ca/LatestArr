@@ -1,3 +1,5 @@
+import type { DesignSettings } from "./design";
+
 export class ApiError extends Error {
   status: number;
 
@@ -547,6 +549,10 @@ export function sendRunHtmlUrl(newsletterId: string, sendRunId: string): string 
 export interface Template {
   id: string;
   name: string;
+  // "design": options-based (settings). "code": built in the old
+  // drag-and-drop editor (designJson/compiledMjml).
+  mode: "design" | "code";
+  settings: DesignSettings | null;
   designJson: Record<string, unknown> | null;
   compiledMjml: string | null;
   compiledHtml: string | null;
@@ -554,11 +560,18 @@ export interface Template {
   updatedAt: string;
 }
 
+export function previewDesign(settings: DesignSettings, newsletterId?: string): Promise<NewsletterPreview> {
+  return apiFetch<NewsletterPreview>("/templates/preview", {
+    method: "POST",
+    body: JSON.stringify({ settings, ...(newsletterId && { newsletterId }) }),
+  });
+}
+
 export function listTemplates(): Promise<{ templates: Template[] }> {
   return apiFetch<{ templates: Template[] }>("/templates");
 }
 
-export function createTemplate(input: { name: string }): Promise<{ template: Template }> {
+export function createTemplate(input: { name: string; settings?: DesignSettings }): Promise<{ template: Template }> {
   return apiFetch<{ template: Template }>("/templates", {
     method: "POST",
     body: JSON.stringify(input),
@@ -575,7 +588,7 @@ export function getTemplate(id: string): Promise<{ template: Template }> {
 
 export function updateTemplate(
   id: string,
-  input: { name?: string; designJson?: Record<string, unknown>; compiledMjml?: string },
+  input: { name?: string; settings?: DesignSettings; designJson?: Record<string, unknown>; compiledMjml?: string },
 ): Promise<{ template: Template }> {
   return apiFetch<{ template: Template }>(`/templates/${id}`, {
     method: "PATCH",

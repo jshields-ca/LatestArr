@@ -194,6 +194,12 @@ function wrapSectionItems(settings: DesignSettings, inner: string): string {
   return `<tr><td style="padding:0 25px;">${wrapItems(settings, inner)}</td></tr>`;
 }
 
+// The original "cards" list sits flush with the column (the recorded
+// Default output); the newer layouts line up with the title instead.
+function wrapUngroupedItems(settings: DesignSettings, inner: string): string {
+  return settings.layout === "cards" ? wrapItems(settings, inner) : wrapSectionItems(settings, inner);
+}
+
 function heading(text: string, p: Palette, font: string): string {
   return `        <mj-text font-family="${font}" font-size="20px" font-weight="700" color="${p.text}" padding-bottom="4px">${text}</mj-text>`;
 }
@@ -211,7 +217,7 @@ function ungroupedItems(settings: DesignSettings, p: Palette, font: string): str
     `    <mj-section>`,
     `      <mj-column>`,
     `        <mj-raw>`,
-    `        ${wrapItems(settings, `${open}\n${card}\n        ${close}`)}`,
+    `        ${wrapUngroupedItems(settings, `${open}\n${card}\n        ${close}`)}`,
     `        </mj-raw>`,
     `      </mj-column>`,
     `    </mj-section>`,
@@ -225,7 +231,7 @@ function ungroupedItems(settings: DesignSettings, p: Palette, font: string): str
       `      <mj-column>`,
       `        <mj-text font-family="${font}" font-size="14px" color="${p.muted}">Nothing new this time. Here are a few from the library:</mj-text>`,
       `        <mj-raw>`,
-      `        ${wrapItems(settings, `{{#mediaList emptyFallback="random" fallbackCount="${limit ?? 5}"}}\n${fallbackCard}\n        {{/mediaList}}`)}`,
+      `        ${wrapUngroupedItems(settings, `{{#mediaList emptyFallback="random" fallbackCount="${limit ?? 5}"}}\n${fallbackCard}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,
       `      </mj-column>`,
       `    </mj-section>`,

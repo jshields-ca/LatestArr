@@ -162,7 +162,7 @@ export function TemplateEditorPage() {
     if (dirty && !window.confirm("You have unsaved changes. Leave without saving?")) {
       return;
     }
-    navigate("/templates");
+    navigate("/designs");
   }
 
   return (
