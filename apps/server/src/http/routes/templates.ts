@@ -2,18 +2,35 @@ import { type Db, templates } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import {
+  describeSendFailure,
+  NewsletterNotFoundError,
+  previewNewsletter,
+} from "../../pipeline/run-newsletter.js";
+import { designSettingsSchema } from "../../render/design.js";
+import { renderDesignSample } from "../../render/design-sample.js";
 import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 
+const previewDesignSchema = z.object({
+  settings: designSettingsSchema,
+  // Preview against this newsletter's real items; sample content otherwise.
+  newsletterId: z.string().min(1).optional(),
+});
+
+// Sending `settings` creates an options-based design; otherwise it's a
+// code template (designJson/compiledMjml, from the old drag-and-drop editor).
 const createTemplateSchema = z.object({
   name: z.string().trim().min(1, "name is required"),
+  settings: designSettingsSchema.optional(),
   designJson: z.record(z.string(), z.unknown()).optional(),
   compiledMjml: z.string().optional(),
 });
 
 const updateTemplateSchema = z.object({
   name: z.string().trim().min(1).optional(),
+  settings: designSettingsSchema.optional(),
   designJson: z.record(z.string(), z.unknown()).optional(),
   compiledMjml: z.string().optional(),
 });
@@ -29,15 +46,39 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     scope.post("/templates", async (request, reply) => {
       const body = parseBody(createTemplateSchema, request.body, reply);
       if (!body) return reply;
-      const { name, designJson, compiledMjml } = body;
+      const { name, settings, designJson, compiledMjml } = body;
 
       const [template] = await db
         .insert(templates)
-        .values({ name, designJson: designJson ?? null, compiledMjml: compiledMjml ?? null })
+        .values(
+          settings
+            ? { name, mode: "design", settings }
+            : { name, mode: "code", designJson: designJson ?? null, compiledMjml: compiledMjml ?? null },
+        )
         .returning();
 
       request.log.info({ templateId: template!.id }, `Created template "${name}"`);
       return reply.code(201).send({ template });
+    });
+
+    // Renders design settings (saved or not), for the design editor's live
+    // preview. Registered before "/templates/:id" routes; POST-only anyway.
+    scope.post("/templates/preview", async (request, reply) => {
+      const body = parseBody(previewDesignSchema, request.body, reply);
+      if (!body) return reply;
+      if (!body.newsletterId) {
+        return reply.send({ subject: "Sample newsletter", html: await renderDesignSample(body.settings), items: [] });
+      }
+      try {
+        return reply.send(
+          await previewNewsletter(db, body.newsletterId, { log: request.log, design: body.settings }),
+        );
+      } catch (err) {
+        if (err instanceof NewsletterNotFoundError) {
+          return reply.code(404).send({ error: err.message });
+        }
+        return reply.code(502).send({ error: describeSendFailure(err) });
+      }
     });
 
     scope.get("/templates", async (_request, reply) => {
@@ -56,12 +97,13 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     scope.patch<{ Params: IdParams }>("/templates/:id", async (request, reply) => {
       const body = parseBody(updateTemplateSchema, request.body, reply);
       if (!body) return reply;
-      const { name, designJson, compiledMjml } = body;
+      const { name, settings, designJson, compiledMjml } = body;
 
       const [template] = await db
         .update(templates)
         .set({
           ...(name !== undefined && { name }),
+          ...(settings !== undefined && { settings, mode: "design" as const }),
           ...(designJson !== undefined && { designJson }),
           ...(compiledMjml !== undefined && { compiledMjml }),
           updatedAt: new Date(),

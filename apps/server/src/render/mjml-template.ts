@@ -196,7 +196,7 @@ Handlebars.registerHelper("mediaList", function mediaList(
   },
   options: Handlebars.HelperOptions,
 ) {
-  const { contentType, sort, count, order, showAll, emptyFallback, fallbackCount, fallbackLinkLabel } =
+  const { contentType, sort, count, order, showAll, emptyFallback, fallbackCount, fallbackLinkLabel, fallbackWrap } =
     options.hash as {
       contentType?: string;
       sort?: string;
@@ -206,6 +206,9 @@ Handlebars.registerHelper("mediaList", function mediaList(
       emptyFallback?: string;
       fallbackCount?: number | string;
       fallbackLinkLabel?: string;
+      /** "none" when the helper is already inside an <mj-raw> (design
+       * output), so the fallback link mustn't add a second, nested one. */
+      fallbackWrap?: string;
     };
 
   const pool = selectPool(this, sort);
@@ -236,11 +239,11 @@ Handlebars.registerHelper("mediaList", function mediaList(
     // the {{#mediaList}}/{{/mediaList}} site, sitting straight inside an
     // <mj-column> — the same "bare non-mj-tag HTML gets silently dropped"
     // trap documented in newsletter-template.ts and grapesjs-blocks.ts.
-    return (
-      `<mj-raw><a href="${Handlebars.escapeExpression(href)}" ` +
+    const link =
+      `<a href="${Handlebars.escapeExpression(href)}" ` +
       `style="color:${ACCENT_COLOR};font-family:sans-serif;font-size:14px;font-weight:600;">` +
-      `${label} &rarr;</a></mj-raw>`
-    );
+      `${label} &rarr;</a>`;
+    return fallbackWrap === "none" ? link : `<mj-raw>${link}</mj-raw>`;
   }
 
   return selected.map((item) => options.fn(item)).join("");
@@ -266,6 +269,18 @@ Handlebars.registerHelper("ifAnyItems", function ifAnyItems(
   const pool = selectPool(this, sort);
   const hasAny = pool.some((item) => matchesContentType(item, contentType));
   return hasAny ? options.fn(this) : options.inverse(this);
+});
+
+// True when one of the newsletter's linked sources provides this content
+// type, so a design only shows a "Books" section (even an empty one) for a
+// newsletter that actually has a book source.
+Handlebars.registerHelper("ifKindLinked", function ifKindLinked(
+  this: { sourceLinksByContentType?: Record<string, string> },
+  options: Handlebars.HelperOptions,
+) {
+  const { contentType } = options.hash as { contentType?: string };
+  const linked = Boolean(contentType && this.sourceLinksByContentType?.[contentType]);
+  return linked ? options.fn(this) : options.inverse(this);
 });
 
 export async function renderMjmlTemplate(

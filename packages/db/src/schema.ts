@@ -123,6 +123,12 @@ export const recipientGroupMembers = sqliteTable(
 export const templates = sqliteTable("templates", {
   id: id(),
   name: text("name").notNull(),
+  // "design": rendered from `settings` (colours, layout, sections; see
+  // apps/server/src/render/design.ts). "code": rendered from compiledMjml,
+  // which covers templates built in the old drag-and-drop editor. Existing
+  // rows default to "code" so they keep rendering exactly as before.
+  mode: text("mode", { enum: ["design", "code"] }).notNull().default("code"),
+  settings: text("settings", { mode: "json" }).$type<Record<string, unknown>>(),
   designJson: text("design_json", { mode: "json" }).$type<Record<string, unknown>>(),
   compiledMjml: text("compiled_mjml"),
   compiledHtml: text("compiled_html"),

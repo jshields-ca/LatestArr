@@ -12,6 +12,7 @@ import {
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { designSettingsSchema } from "../../render/design.js";
 import { EMAIL_FONTS } from "../../render/email-fonts.js";
 import {
   describeSendFailure,
@@ -33,6 +34,10 @@ const senderIdentitySchema = z.object({
   fromName: z.string().trim().min(1).optional(),
   fromEmail: z.email().optional(),
   replyTo: z.email().optional(),
+});
+
+const previewSchema = z.object({
+  design: designSettingsSchema.optional(),
 });
 
 const sendTestSchema = z.object({
@@ -423,9 +428,13 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       }
     });
 
+    // An optional `design` previews unsaved design settings against this
+    // newsletter's real items.
     scope.post<{ Params: IdParams }>("/newsletters/:id/preview", async (request, reply) => {
+      const body = parseBody(previewSchema, request.body ?? {}, reply);
+      if (!body) return reply;
       try {
-        const preview = await previewNewsletter(db, request.params.id, { log: request.log });
+        const preview = await previewNewsletter(db, request.params.id, { log: request.log, design: body.design });
         return reply.send(preview);
       } catch (err) {
         if (err instanceof NewsletterNotFoundError) {

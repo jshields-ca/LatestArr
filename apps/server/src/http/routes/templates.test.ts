@@ -161,3 +161,59 @@ describe("auth gating", () => {
     expect(response.statusCode).toBe(401);
   });
 });
+
+describe("designs", () => {
+  it("creates a design from settings, filling in defaults for anything left out", async () => {
+    const response = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Dark", settings: { layout: "compact", colors: { background: "#101820" } } } }),
+    );
+    expect(response.statusCode).toBe(201);
+    const { template } = response.json();
+    expect(template.mode).toBe("design");
+    expect(template.settings).toMatchObject({
+      layout: "compact",
+      colors: { background: "#101820", accent: "#c31d4c" },
+      show: { poster: true },
+    });
+    expect(template.compiledMjml).toBeNull();
+  });
+
+  it("keeps a template created without settings as a code template", async () => {
+    const response = await app.inject(authed({ method: "POST", url: "/api/templates", payload: { name: "Legacy" } }));
+    expect(response.json().template.mode).toBe("code");
+  });
+
+  it("rejects invalid design settings", async () => {
+    const badColour = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Bad", settings: { colors: { accent: "red" } } } }),
+    );
+    expect(badColour.statusCode).toBe(400);
+  });
+
+  it("turns a template into a design when settings are saved", async () => {
+    const created = await app.inject(authed({ method: "POST", url: "/api/templates", payload: { name: "Legacy" } }));
+    const id = created.json().template.id;
+    const updated = await app.inject(
+      authed({ method: "PATCH", url: `/api/templates/${id}`, payload: { settings: { layout: "grid" } } }),
+    );
+    expect(updated.json().template).toMatchObject({ mode: "design", settings: { layout: "grid" } });
+  });
+
+  it("previews unsaved settings with sample content", async () => {
+    const response = await app.inject(
+      authed({ method: "POST", url: "/api/templates/preview", payload: { settings: { layout: "grid" } } }),
+    );
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.subject).toBe("Sample newsletter");
+    expect(body.html).toContain("The Quiet Harbour");
+    expect(body.html).toContain("display:inline-block;width:50%");
+  });
+
+  it("404s a preview against an unknown newsletter", async () => {
+    const response = await app.inject(
+      authed({ method: "POST", url: "/api/templates/preview", payload: { settings: {}, newsletterId: "nope" } }),
+    );
+    expect(response.statusCode).toBe(404);
+  });
+});

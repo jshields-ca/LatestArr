@@ -925,3 +925,45 @@ describe("skip when there's nothing new", () => {
     expect(mockSendMail).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("designs in the send pipeline", () => {
+  async function newsletterWithSource() {
+    const sourceId = await createSourceConnection();
+    const newsletterId = await createNewsletter();
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/sources`, payload: { sourceConnectionId: sourceId } }),
+    );
+    return newsletterId;
+  }
+
+  it("renders a newsletter with its linked design", async () => {
+    const newsletterId = await newsletterWithSource();
+    const created = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Compact", settings: { layout: "compact" } } }),
+    );
+    await app.inject(
+      authed({ method: "PATCH", url: `/api/newsletters/${newsletterId}`, payload: { templateId: created.json().template.id } }),
+    );
+    mockRecentlyAdded();
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().html).toContain("padding:8px 0;border-bottom:1px solid");
+    expect(response.json().html).toContain("Some Movie");
+  });
+
+  it("previews unsaved design settings against the newsletter's real items without saving them", async () => {
+    const newsletterId = await newsletterWithSource();
+    mockRecentlyAdded();
+
+    const response = await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview`, payload: { design: { layout: "grid" } } }),
+    );
+
+    expect(response.json().html).toContain("display:inline-block;width:50%");
+    expect(response.json().html).toContain("Some Movie");
+    const [row] = await db.select().from(newsletters).where(eq(newsletters.id, newsletterId));
+    expect(row?.templateId).toBeNull();
+  });
+});
