@@ -18,6 +18,7 @@ import { requireSameOrigin } from "./http/require-same-origin.js";
 import { registerAuthRoutes } from "./http/routes/auth.js";
 import { registerLogRoutes } from "./http/routes/logs.js";
 import { registerNewsletterRoutes } from "./http/routes/newsletters.js";
+import { registerNotificationRoutes } from "./http/routes/notifications.js";
 import { registerOidcRoutes } from "./http/routes/oidc.js";
 import { registerRecipientGroupRoutes } from "./http/routes/recipient-groups.js";
 import { registerRecipientRoutes } from "./http/routes/recipients.js";
@@ -163,6 +164,7 @@ export async function buildApp(
       registerNewsletterRoutes(api, db, scheduler);
       registerTemplateRoutes(api, db);
       registerLogRoutes(api, db);
+      registerNotificationRoutes(api, db);
     },
     { prefix: "/api" },
   );

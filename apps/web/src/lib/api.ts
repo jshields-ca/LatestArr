@@ -604,3 +604,42 @@ export function listLogs(params?: {
   const query = search.toString();
   return apiFetch<{ logs: LogEntry[] }>(`/logs${query ? `?${query}` : ""}`);
 }
+
+export type WebhookFormat = "discord" | "slack" | "ntfy" | "apprise" | "json";
+
+export interface NotificationSettings {
+  onFailure: boolean;
+  onPartialFailure: boolean;
+  email: { enabled: boolean; smtpProfileId: string | null; to: string };
+  // The saved URL is never sent back, only whether one exists and its host.
+  webhook: { enabled: boolean; format: WebhookFormat; hasUrl: boolean; urlHost: string | null };
+}
+
+export interface NotificationSettingsInput {
+  onFailure: boolean;
+  onPartialFailure: boolean;
+  email: { enabled: boolean; smtpProfileId: string | null; to: string };
+  // Omit url to keep the saved one.
+  webhook: { enabled: boolean; format: WebhookFormat; url?: string | null };
+}
+
+export interface AlertDeliveryResult {
+  destination: "email" | "webhook";
+  ok: boolean;
+  error?: string;
+}
+
+export function getNotificationSettings(): Promise<{ settings: NotificationSettings }> {
+  return apiFetch<{ settings: NotificationSettings }>("/notifications");
+}
+
+export function saveNotificationSettings(input: NotificationSettingsInput): Promise<{ settings: NotificationSettings }> {
+  return apiFetch<{ settings: NotificationSettings }>("/notifications", { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function sendTestAlert(input: NotificationSettingsInput): Promise<{ results: AlertDeliveryResult[] }> {
+  return apiFetch<{ results: AlertDeliveryResult[] }>("/notifications/test", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
