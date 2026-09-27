@@ -383,6 +383,7 @@ export interface Newsletter {
   timezone: string;
   isEnabled: boolean;
   lookbackDays: number;
+  skipWhenEmpty: boolean;
   /** Which of the default template's built-in font stacks to render with —
    * only meaningful while templateId is unset. See lib/email-fonts.ts for
    * the picker options. */
@@ -405,6 +406,7 @@ export interface CreateNewsletterInput {
   timezone?: string;
   subjectTemplate?: string;
   lookbackDays?: number;
+  skipWhenEmpty?: boolean;
   smtpProfileId?: string;
   templateId?: string;
   senderIdentity?: SenderIdentity;
@@ -423,7 +425,7 @@ export interface NewsletterDetail {
 export interface SendRun {
   id: string;
   newsletterId: string;
-  status: "pending" | "running" | "success" | "partial_failure" | "failed";
+  status: "pending" | "running" | "success" | "partial_failure" | "failed" | "skipped";
   startedAt: string | null;
   finishedAt: string | null;
   itemCountIncluded: number;

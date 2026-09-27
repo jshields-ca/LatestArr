@@ -147,6 +147,7 @@ describe("newsletter relationships", () => {
     expect(newsletter.introText).toBeNull();
     expect(newsletter.footerNote).toBeNull();
     expect(newsletter.ctas).toBeNull();
+    expect(newsletter.skipWhenEmpty).toBe(false);
 
     const linkedGroups = await db
       .select()

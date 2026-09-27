@@ -1,0 +1,1 @@
+ALTER TABLE `newsletters` ADD `skip_when_empty` integer DEFAULT false NOT NULL;

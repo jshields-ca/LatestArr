@@ -24,6 +24,7 @@ vi.mock("nodemailer", () => ({
 
 const { buildApp } = await import("../../app.js");
 const { clearLogBuffer, getRecentLogs } = await import("../../log-buffer.js");
+const { runNewsletter } = await import("../../pipeline/run-newsletter.js");
 
 let dir: string;
 let db: Db;
@@ -851,4 +852,76 @@ describe("preview and test send", () => {
   function logsMatchingPreview(text: string) {
     return getRecentLogs(500).filter((entry) => entry.msg.includes(text));
   }
+});
+
+describe("skip when there's nothing new", () => {
+  beforeEach(() => clearLogBuffer());
+
+  async function emptyNewsletter(skipWhenEmpty?: boolean) {
+    const smtpProfileId = await createSmtpProfile();
+    const sourceId = await createSourceConnection();
+    const { groupId } = await createRecipientAndGroup("person@example.com");
+    const newsletterId = await createNewsletter(smtpProfileId);
+    if (skipWhenEmpty !== undefined) {
+      await app.inject(authed({ method: "PATCH", url: `/api/newsletters/${newsletterId}`, payload: { skipWhenEmpty } }));
+    }
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/sources`, payload: { sourceConnectionId: sourceId } }),
+    );
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/recipient-groups`, payload: { groupId } }),
+    );
+    return newsletterId;
+  }
+
+  function mockNothingAdded() {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "success", message: null, data: { recently_added: [] } } }),
+    );
+  }
+
+  it("turns the option on for newly created newsletters", async () => {
+    const newsletterId = await createNewsletter();
+    const [row] = await db.select().from(newsletters).where(eq(newsletters.id, newsletterId));
+    expect(row?.skipWhenEmpty).toBe(true);
+  });
+
+  it("records a scheduled send with nothing new as skipped, without emailing anyone", async () => {
+    const newsletterId = await emptyNewsletter();
+    mockNothingAdded();
+
+    const { sendRunId } = await runNewsletter(db, newsletterId, { trigger: "scheduled" });
+
+    const [run] = await db.select().from(sendRuns).where(eq(sendRuns.id, sendRunId));
+    expect(run?.status).toBe("skipped");
+    expect(run?.startedAt).toBeInstanceOf(Date);
+    expect(run?.renderedHtml).toBeNull();
+    expect(mockSendMail).not.toHaveBeenCalled();
+    const [entry] = getRecentLogs(500).filter((e) => e.msg.includes(`Skipped "Weekly Digest": nothing new in the last 7 days`));
+    expect(entry).toMatchObject({ level: 30, trigger: "scheduled" });
+  });
+
+  it("still sends when Send now is pressed, even with nothing new", async () => {
+    const newsletterId = await emptyNewsletter();
+    mockNothingAdded();
+    mockSendMail.mockResolvedValueOnce({ messageId: "msg-1" });
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+
+    const [run] = await db.select().from(sendRuns).where(eq(sendRuns.id, response.json().sendRunId));
+    expect(run?.status).toBe("success");
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends an empty scheduled issue when the option is turned off", async () => {
+    const newsletterId = await emptyNewsletter(false);
+    mockNothingAdded();
+    mockSendMail.mockResolvedValueOnce({ messageId: "msg-1" });
+
+    const { sendRunId } = await runNewsletter(db, newsletterId, { trigger: "scheduled" });
+
+    const [run] = await db.select().from(sendRuns).where(eq(sendRuns.id, sendRunId));
+    expect(run?.status).toBe("success");
+    expect(mockSendMail).toHaveBeenCalledTimes(1);
+  });
 });
