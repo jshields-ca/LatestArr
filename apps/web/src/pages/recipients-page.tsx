@@ -430,7 +430,7 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
                   aria-label={`Remove from ${group.name}`}
                   onClick={() => void handleRemove(group)}
                   disabled={removingId === group.id}
-                  className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+                  className="-my-1 rounded-full p-1.5 hover:bg-muted-foreground/20"
                 >
                   <X className="size-3" />
                 </button>
@@ -620,8 +620,11 @@ function RecipientTableRow({
         <p className="truncate font-medium">
           {recipient.displayName || <span className="text-muted-foreground">&mdash;</span>}
         </p>
+        {/* Phones don't have room for a separate Email column, so the
+            address sits under the name instead. */}
+        <p className="truncate text-xs text-muted-foreground sm:hidden">{recipient.email}</p>
       </td>
-      <td className="max-w-0 py-2.5 pr-4">
+      <td className="hidden max-w-0 py-2.5 pr-4 sm:table-cell">
         <p className="truncate text-muted-foreground">{recipient.email}</p>
       </td>
       <td className="py-2.5 pr-4">
@@ -633,7 +636,7 @@ function RecipientTableRow({
             disabled={toggling}
             aria-label={recipient.isActive ? "Active" : "Inactive"}
           />
-          <Label htmlFor={`recipient-active-${recipient.id}`} className="text-muted-foreground">
+          <Label htmlFor={`recipient-active-${recipient.id}`} className="hidden text-muted-foreground sm:block">
             {recipient.isActive ? "Active" : "Inactive"}
           </Label>
         </div>
@@ -718,7 +721,7 @@ function SortableColumnHeader({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className="flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+        className="-my-1.5 flex items-center gap-1 py-1.5 font-medium text-muted-foreground hover:text-foreground"
       >
         {label}
         <Icon className={cn("size-3.5", !active && "opacity-40")} aria-hidden="true" />
@@ -848,7 +851,7 @@ function RecipientsSection({
                         activeSortKey={sortKey}
                         sortDir={sortDir}
                         onSort={handleSort}
-                        className="w-2/5 px-4 py-2.5"
+                        className="px-4 py-2.5 sm:w-2/5"
                       />
                       <SortableColumnHeader
                         label="Email"
@@ -856,7 +859,7 @@ function RecipientsSection({
                         activeSortKey={sortKey}
                         sortDir={sortDir}
                         onSort={handleSort}
-                        className="w-2/5 py-2.5"
+                        className="hidden w-2/5 py-2.5 sm:table-cell"
                       />
                       <SortableColumnHeader
                         label="Status"
@@ -864,9 +867,9 @@ function RecipientsSection({
                         activeSortKey={sortKey}
                         sortDir={sortDir}
                         onSort={handleSort}
-                        className="py-2.5"
+                        className="w-px py-2.5 pr-4"
                       />
-                      <th scope="col" className="py-2.5 pr-4">
+                      <th scope="col" className="w-px py-2.5 pr-4">
                         <span className="sr-only">Actions</span>
                       </th>
                     </tr>
@@ -1174,7 +1177,7 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
                   aria-label={`Remove ${member.email} from group`}
                   onClick={() => void handleRemove(member.id)}
                   disabled={removingId === member.id}
-                  className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+                  className="-my-1 rounded-full p-1.5 hover:bg-muted-foreground/20"
                 >
                   <X className="size-3" />
                 </button>

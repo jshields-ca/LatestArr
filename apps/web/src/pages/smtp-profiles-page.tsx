@@ -154,7 +154,7 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
           Add SMTP profile
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Add an SMTP profile</DialogTitle>
           <DialogDescription>Used to send newsletters and test emails.</DialogDescription>
@@ -356,7 +356,7 @@ function EditSmtpProfileDialog({
           <Pencil />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit SMTP profile</DialogTitle>
           <DialogDescription>Used to send newsletters and test emails.</DialogDescription>
