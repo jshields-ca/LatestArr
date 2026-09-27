@@ -24,6 +24,16 @@ const LEVEL_FILTERS: { value: string; label: string }[] = [
   { value: "error", label: "Error & above" },
 ];
 
+const EMPTY_MESSAGES: Record<string, string> = {
+  "": "Nothing has been logged since the server last started.",
+  warn: "No warnings or errors since the server last started.",
+  error: "No errors since the server last started.",
+};
+
+// The server keeps this many entries (apps/server/src/log-buffer.ts); ask
+// for all of them so the page matches its own description.
+const LOG_LIMIT = 500;
+
 // Fields already surfaced directly (time, level, levelLabel, msg) or too
 // noisy to be worth a raw-details dump (pid, hostname, reqId — the same on
 // nearly every line) are left out of what expanding a line reveals.
@@ -98,7 +108,7 @@ export function LogsPage() {
 
   function load(options: { silent?: boolean } = {}) {
     if (!options.silent) setLoading(true);
-    listLogs({ level: (levelRef.current || undefined) as LogEntry["levelLabel"] | undefined })
+    listLogs({ limit: LOG_LIMIT, level: (levelRef.current || undefined) as LogEntry["levelLabel"] | undefined })
       .then(({ logs: loaded }) => {
         setLogs(loaded);
         setError(null);
@@ -127,7 +137,7 @@ export function LogsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Logs"
-        description="Recent server activity — sends, source sync errors, auth events, and anything else worth troubleshooting. Routine request traffic is filtered out."
+        description="What LatestArr has been doing: newsletter sends, delivery and source problems, sign-ins, and settings changes along with who made them. Shows the latest 500 entries since the server last started; the same lines appear in docker logs."
         actions={
           <div className="flex items-center gap-2">
             <Select
@@ -180,7 +190,7 @@ export function LogsPage() {
       ) : null}
 
       {logs && logs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No log entries to show.</p>
+        <p className="text-sm text-muted-foreground">{EMPTY_MESSAGES[level] ?? EMPTY_MESSAGES[""]}</p>
       ) : null}
 
       {logs && logs.length > 0 ? (
