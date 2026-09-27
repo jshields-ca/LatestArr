@@ -1,0 +1,190 @@
+import type { NewItem } from "@latestarr/adapter-core";
+import { describe, expect, it } from "vitest";
+import { buildDesignMjml, DEFAULT_DESIGN_SETTINGS, type DesignSettings, designSettingsSchema, parseDesignSettings } from "./design.js";
+import { renderDesignSample } from "./design-sample.js";
+import { type MjmlRenderContext, renderMjmlTemplate } from "./mjml-template.js";
+
+const generatedAt = new Date("2026-01-20T12:00:00Z");
+
+function item(overrides: Partial<NewItem>): NewItem {
+  return {
+    id: overrides.title ?? "1",
+    externalId: overrides.title ?? "1",
+    kind: "movie",
+    title: "Some Movie",
+    addedAt: new Date("2026-01-15T12:00:00Z"),
+    ...overrides,
+  };
+}
+
+const movie = item({ title: "A Movie", overview: "Movie overview.", posterUrl: "https://img.example/m.jpg" });
+const book = item({ kind: "book", title: "A Book", contentLabel: "Ebook", pageCount: 200 });
+
+function design(overrides: Record<string, unknown>): DesignSettings {
+  return designSettingsSchema.parse(overrides);
+}
+
+function render(settings: DesignSettings, context: Partial<MjmlRenderContext> = {}) {
+  return renderMjmlTemplate(buildDesignMjml(settings), {
+    newsletterName: "Weekly Digest",
+    items: [movie, book],
+    generatedAt,
+    lookbackDays: 7,
+    ...context,
+  });
+}
+
+describe("design settings", () => {
+  it("fills every missing option with its default", () => {
+    expect(DEFAULT_DESIGN_SETTINGS).toMatchObject({
+      font: "ubuntu",
+      layout: "cards",
+      colors: { accent: "#c31d4c", background: "#ffffff" },
+      show: { poster: true, overview: true },
+      sections: { groupByType: false, empty: "message", mostWatched: { enabled: false, count: 5 } },
+      customCss: "",
+    });
+    expect(design({ layout: "grid", show: { poster: false } })).toMatchObject({
+      layout: "grid",
+      show: { poster: false, overview: true },
+      sections: { limit: null },
+    });
+  });
+
+  it("rejects invalid values, and falls back to the defaults when reading a bad stored value", () => {
+    expect(designSettingsSchema.safeParse({ colors: { accent: "red" } }).success).toBe(false);
+    expect(designSettingsSchema.safeParse({ layout: "carousel" }).success).toBe(false);
+    expect(parseDesignSettings({ colors: { accent: "javascript:alert(1)" } })).toEqual(DEFAULT_DESIGN_SETTINGS);
+    expect(parseDesignSettings(null)).toEqual(DEFAULT_DESIGN_SETTINGS);
+  });
+});
+
+describe("buildDesignMjml", () => {
+  it("renders the compact layout as one line per item, without posters", async () => {
+    const html = await render(design({ layout: "compact" }));
+    expect(html).toContain("A Movie");
+    expect(html).toContain("200 pages");
+    expect(html).not.toContain("https://img.example/m.jpg");
+    expect(html).not.toContain("Movie overview.");
+  });
+
+  it("renders the grid layout as posters side by side", async () => {
+    const html = await render(design({ layout: "grid" }));
+    expect(html).toContain("display:inline-block;width:50%");
+    expect(html).toContain("https://img.example/m.jpg");
+  });
+
+  it("leaves out each item detail that's switched off", async () => {
+    const html = await render(design({ show: { poster: false, overview: false, badge: false, dates: false } }));
+    expect(html).not.toContain("https://img.example/m.jpg");
+    expect(html).not.toContain("Movie overview.");
+    expect(html).not.toContain("Ebook");
+    expect(html).not.toContain("Added January 15, 2026");
+    expect(html).toContain("A Book");
+  });
+
+  it("applies custom colours, derives the lighter shades, and sets the page background", async () => {
+    const html = await render(design({ colors: { accent: "#0055aa", background: "#101820", text: "#eeeeee", muted: "#aabbcc" } }));
+    expect(html).toContain("#0055aa");
+    expect(html).toContain("#eeeeee");
+    expect(html.toLowerCase()).toContain("background-color:#101820");
+    expect(html).not.toContain("#c31d4c");
+  });
+
+  it("can hide the lookback line", async () => {
+    const shown = await render(DEFAULT_DESIGN_SETTINGS);
+    const hidden = await render(design({ showLookbackLine: false }));
+    expect(shown).toContain("in the last 7 days");
+    expect(hidden).not.toContain("in the last 7 days");
+  });
+
+  it("caps the number of items when a limit is set", async () => {
+    const html = await render(design({ sections: { limit: 1 } }));
+    expect(html).toContain("A Movie");
+    expect(html).not.toContain("A Book");
+  });
+
+  describe("grouped by content type", () => {
+    const links = { movie: "https://plex.example", book: "https://books.example", game: "https://games.example" };
+
+    it("gives each type with new items its own heading, in the chosen order", async () => {
+      const html = await render(design({ sections: { groupByType: true, order: ["book", "movie", "game"] } }), {
+        sourceLinksByContentType: links,
+      });
+      expect(html.indexOf(">Books<")).toBeGreaterThan(-1);
+      expect(html.indexOf(">Books<")).toBeLessThan(html.indexOf(">Movies<"));
+    });
+
+    it("says there's nothing new for a linked type with no items, and leaves unlinked types out", async () => {
+      const html = await render(design({ sections: { groupByType: true, empty: "message" } }), {
+        sourceLinksByContentType: links,
+      });
+      expect(html).toContain(">Games<");
+      expect(html).toContain("Nothing new this time.");
+      expect(html).not.toContain(">Audiobooks<");
+    });
+
+    it("hides empty sections entirely when asked", async () => {
+      const html = await render(design({ sections: { groupByType: true, empty: "hide" } }), {
+        sourceLinksByContentType: links,
+      });
+      expect(html).not.toContain(">Games<");
+      expect(html).not.toContain("Nothing new this time.");
+    });
+
+    it("links to the library for an empty section", async () => {
+      const html = await render(design({ sections: { groupByType: true, empty: "link" } }), {
+        sourceLinksByContentType: links,
+      });
+      expect(html).toContain('href="https://games.example"');
+      expect(html).toContain("Browse games");
+    });
+
+    it("fills an empty section with library picks, marked as such", async () => {
+      const oldGame = item({ kind: "game", title: "An Old Game" });
+      const html = await render(design({ sections: { groupByType: true, empty: "random" } }), {
+        sourceLinksByContentType: links,
+        fallbackItems: [oldGame],
+      });
+      expect(html).toContain("An Old Game");
+      expect(html).toContain("From the library");
+    });
+  });
+
+  it("adds a Most watched section from the popular pool", async () => {
+    const popular = item({ title: "Everyone Watched This" });
+    const html = await render(design({ sections: { mostWatched: { enabled: true, count: 3 } } }), {
+      popularItems: [popular],
+    });
+    expect(html).toContain(">Most watched<");
+    expect(html).toContain("Everyone Watched This");
+  });
+
+  it("inlines custom CSS, with anything that could break out of the style block removed", async () => {
+    const css = "table { letter-spacing: 1px; } </mj-style><mj-raw>{{newsletterName}}";
+    const mjml = buildDesignMjml(design({ customCss: css }));
+    expect(mjml).not.toContain("</mj-style><");
+    expect(mjml).not.toContain("{{newsletterName}}</mj-style>");
+    const html = await render(design({ customCss: css }));
+    expect(html).toMatch(/style="[^"]*letter-spacing: 1px/);
+  });
+
+  it("escapes item text in every layout", async () => {
+    const nasty = item({ title: "<script>alert(1)</script>" });
+    for (const layout of ["cards", "compact", "grid"] as const) {
+      const html = await render(design({ layout }), { items: [nasty] });
+      expect(html).not.toContain("<script>alert(1)</script>");
+      expect(html).toContain("&lt;script&gt;");
+    }
+  });
+});
+
+describe("renderDesignSample", () => {
+  it("renders a design with made-up content and inline poster images", async () => {
+    const html = await renderDesignSample(design({ sections: { groupByType: true } }));
+    expect(html).toContain("Sample newsletter");
+    expect(html).toContain("The Quiet Harbour");
+    expect(html).toContain("data:image/svg+xml;base64,");
+    expect(html).toContain(">Audiobooks<");
+  });
+});

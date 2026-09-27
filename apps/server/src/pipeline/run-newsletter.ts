@@ -28,7 +28,8 @@ import {
   type ItemImageSource,
 } from "./embed-images.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
-import { renderDefaultNewsletterHtml } from "../render/newsletter-template.js";
+import { buildDesignMjml, DEFAULT_DESIGN_SETTINGS, type DesignSettings, parseDesignSettings } from "../render/design.js";
+import { DEFAULT_EMAIL_FONT, isEmailFont } from "../render/email-fonts.js";
 import { logger as defaultLogger, type Logger } from "../logger.js";
 import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -243,11 +244,26 @@ interface RenderedNewsletter {
 
 const EMPTY_FETCHED_ITEMS: FetchedItems = { items: [], sourceByItem: new Map() };
 
+// Which email markup a newsletter renders with: a preview's unsaved design,
+// the newsletter's own design or legacy code template, or the built-in
+// Default design with the newsletter's chosen font.
+async function resolveMjmlSource(db: Db, newsletter: Newsletter, designOverride?: DesignSettings): Promise<string> {
+  if (designOverride) return buildDesignMjml(designOverride);
+  if (newsletter.templateId) {
+    const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
+    if (template?.mode === "design") return buildDesignMjml(parseDesignSettings(template.settings));
+    if (template?.compiledMjml) return template.compiledMjml;
+  }
+  const font = isEmailFont(newsletter.emailFont) ? newsletter.emailFont : DEFAULT_EMAIL_FONT;
+  return buildDesignMjml({ ...DEFAULT_DESIGN_SETTINGS, font });
+}
+
 async function renderNewsletterContent(
   db: Db,
   newsletter: Newsletter,
   generatedAt: Date,
   log: Logger,
+  designOverride?: DesignSettings,
 ): Promise<RenderedNewsletter> {
   const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
   const linkedSources = await resolveLinkedSources(db, newsletter, log);
@@ -257,86 +273,46 @@ async function renderNewsletterContent(
 
   const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since, log);
   // Real posterUrls are swapped for opaque placeholder tokens *before* any
-  // template rendering happens — see embed-images.ts's own doc comment for
-  // why: a Media List block's count/order/showAll/emptyFallback selection
-  // (in mjml-template.ts's `mediaList` helper) can pick as few as 5 items
-  // out of a much larger fetched pool, and eagerly embedding every
-  // fetched item's poster (rather than only the ones actually rendered)
-  // wastes fetches/resizes on images that never appear in the sent email
-  // — exactly the "keep message size sane" goal CID embedding exists for.
+  // template rendering happens (see embed-images.ts): a section's count/
+  // sort/fallback selection can pick only a few items out of the fetched
+  // pool, so only posters that actually end up in the output get fetched.
   const addedPlaceholders = preparePosterPlaceholders(items);
 
-  if (newsletter.templateId) {
-    const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
-    if (template?.compiledMjml) {
-      // Fetching "most watched" data, or an all-time fallback pool, means
-      // extra adapter API calls — only pay for either when the compiled
-      // template actually has a Media List block configured to use it,
-      // and run both concurrently rather than one after the other since
-      // neither depends on the other's result.
-      const needsPopular = template.compiledMjml.includes('sort="mostWatched"');
-      const needsFallback = template.compiledMjml.includes('emptyFallback="random"');
+  const mjml = await resolveMjmlSource(db, newsletter, designOverride);
 
-      const [popular, fallback] = await Promise.all([
-        needsPopular ? fetchPopularItemsFromSources(linkedSources, since, log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
-        // No "since" cutoff for the fallback pool — it exists specifically
-        // for when nothing was added in the lookback window, so it has to
-        // look further back than that window to find anything at all.
-        needsFallback
-          ? fetchRecentItemsFromSources(linkedSources, new Date(0), log)
-          : Promise.resolve(EMPTY_FETCHED_ITEMS),
-      ]);
+  // "Most watched" data and the all-time fallback pool cost extra source
+  // calls, so they're only fetched when the markup uses them, concurrently.
+  const needsPopular = mjml.includes('sort="mostWatched"');
+  const needsFallback = mjml.includes('emptyFallback="random"');
+  const [popular, fallback] = await Promise.all([
+    needsPopular ? fetchPopularItemsFromSources(linkedSources, since, log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
+    // No "since" cutoff: the fallback exists for when nothing was added in
+    // the lookback window, so it has to look further back than that.
+    needsFallback ? fetchRecentItemsFromSources(linkedSources, new Date(0), log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
+  ]);
+  const popularPlaceholders = preparePosterPlaceholders(popular.items);
+  const fallbackPlaceholders = preparePosterPlaceholders(fallback.items);
 
-      const popularPlaceholders = preparePosterPlaceholders(popular.items);
-      const fallbackPlaceholders = preparePosterPlaceholders(fallback.items);
-
-      const html = await renderMjmlTemplate(template.compiledMjml, {
-        newsletterName: newsletter.name,
-        items: addedPlaceholders.items,
-        popularItems: popularPlaceholders.items,
-        fallbackItems: fallbackPlaceholders.items,
-        sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
-        generatedAt,
-        introText: newsletter.introText ?? undefined,
-        footerNote: newsletter.footerNote ?? undefined,
-        ctas: newsletter.ctas ?? undefined,
-      });
-
-      // Only *now*, once the template has already decided which items it
-      // actually shows, do we look up which placeholder tokens made it
-      // into the output and fetch/embed images for just those.
-      const allPlaceholders = new Map([
-        ...addedPlaceholders.placeholders,
-        ...popularPlaceholders.placeholders,
-        ...fallbackPlaceholders.placeholders,
-      ]);
-      const allSourceByItem = new Map([...sourceByItem, ...popular.sourceByItem, ...fallback.sourceByItem]);
-      const resolved = await resolvePosterPlaceholders(html, allPlaceholders, (item) =>
-        allSourceByItem.get(item),
-      );
-
-      return { html: resolved.html, attachments: resolved.attachments, items };
-    }
-  }
-
-  // The default template has no per-block selection to wait on (it shows
-  // every fetched item, uncapped) — but it still goes through the same
-  // placeholder round-trip, both to share one code path and because it's
-  // no less correct here: only posters that actually end up in the output
-  // get fetched.
-  const html = await renderDefaultNewsletterHtml({
+  const html = await renderMjmlTemplate(mjml, {
     newsletterName: newsletter.name,
     items: addedPlaceholders.items,
+    popularItems: popularPlaceholders.items,
+    fallbackItems: fallbackPlaceholders.items,
+    sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
     generatedAt,
     lookbackDays: newsletter.lookbackDays,
-    emailFont: newsletter.emailFont,
     introText: newsletter.introText ?? undefined,
     footerNote: newsletter.footerNote ?? undefined,
     ctas: newsletter.ctas ?? undefined,
   });
-  const resolved = await resolvePosterPlaceholders(html, addedPlaceholders.placeholders, (item) =>
-    sourceByItem.get(item),
-  );
+
+  const allPlaceholders = new Map([
+    ...addedPlaceholders.placeholders,
+    ...popularPlaceholders.placeholders,
+    ...fallbackPlaceholders.placeholders,
+  ]);
+  const allSourceByItem = new Map([...sourceByItem, ...popular.sourceByItem, ...fallback.sourceByItem]);
+  const resolved = await resolvePosterPlaceholders(html, allPlaceholders, (item) => allSourceByItem.get(item));
   return { html: resolved.html, attachments: resolved.attachments, items };
 }
 
@@ -469,12 +445,12 @@ export interface NewsletterPreview {
 export async function previewNewsletter(
   db: Db,
   newsletterId: string,
-  options: { log?: Logger } = {},
+  options: { log?: Logger; design?: DesignSettings } = {},
 ): Promise<NewsletterPreview> {
   const log = (options.log ?? defaultLogger).child({ newsletterId });
   const newsletter = await loadNewsletter(db, newsletterId);
   try {
-    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
+    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log, options.design);
     return {
       subject: subjectFor(newsletter),
       html: inlineAttachments(html, attachments),
