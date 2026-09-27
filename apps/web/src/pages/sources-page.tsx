@@ -596,7 +596,7 @@ function ImportSourceUsersDialog({
           Import users
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Import users from {source.name}</DialogTitle>
           <DialogDescription>Add its known users as recipients, grouped together.</DialogDescription>

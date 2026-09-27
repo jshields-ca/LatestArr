@@ -144,7 +144,7 @@ function AddNewsletterDialog({
           Add newsletter
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a newsletter</DialogTitle>
           <DialogDescription>Connect sources and recipient groups after creating it.</DialogDescription>
@@ -325,7 +325,7 @@ function LinkedSources({
                   aria-label={`Remove ${source.name} from newsletter`}
                   onClick={() => void handleRemove(source.id)}
                   disabled={removingId === source.id}
-                  className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+                  className="-my-1 rounded-full p-1.5 hover:bg-muted-foreground/20"
                 >
                   <X className="size-3" />
                 </button>
@@ -434,7 +434,7 @@ function LinkedGroups({
                   aria-label={`Remove ${group.name} from newsletter`}
                   onClick={() => void handleRemove(group.id)}
                   disabled={removingId === group.id}
-                  className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+                  className="-my-1 rounded-full p-1.5 hover:bg-muted-foreground/20"
                 >
                   <X className="size-3" />
                 </button>
@@ -704,14 +704,16 @@ function CtaButtonsField({
       ) : (
         <ul className="flex flex-col gap-2">
           {ctas.map((cta, index) => (
-            <li key={index} className="flex items-center gap-2">
+            // On phones: label and remove on one line, the URL full-width
+            // below it, since both fields side by side leave ~110px each.
+            <li key={index} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
               <Input
                 aria-label={`Button ${index + 1} label`}
                 placeholder="Label"
                 value={cta.label}
                 onChange={(e) => updateRow(index, { label: e.target.value })}
                 disabled={saving}
-                className="max-w-[9rem]"
+                className="min-w-0 flex-1 sm:max-w-[9rem] sm:flex-none"
               />
               <Input
                 aria-label={`Button ${index + 1} URL`}
@@ -719,6 +721,7 @@ function CtaButtonsField({
                 value={cta.url}
                 onChange={(e) => updateRow(index, { url: e.target.value })}
                 disabled={saving}
+                className="order-last basis-full sm:order-none sm:basis-auto sm:flex-1"
               />
               <Button
                 type="button"

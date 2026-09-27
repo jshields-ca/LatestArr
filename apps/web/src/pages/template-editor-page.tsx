@@ -193,6 +193,13 @@ export function TemplateEditorPage() {
         </div>
       </div>
 
+      {/* The builder's block panel and drag-and-drop need a pointer and
+          room; on a phone it technically renders but can't really be used. */}
+      <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground md:hidden">
+        The template editor needs a larger screen. Open this page on a tablet or computer to design your
+        template.
+      </p>
+
       {loadError ? (
         <p role="alert" className="text-sm text-destructive">
           {loadError}

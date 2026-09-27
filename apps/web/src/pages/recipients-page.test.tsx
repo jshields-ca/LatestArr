@@ -176,7 +176,11 @@ describe("RecipientsPage", () => {
     });
 
     function names() {
-      return screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0]!.textContent);
+      // The Name cell's first line; a second, phone-only line repeats the email.
+      return screen
+        .getAllByRole("row")
+        .slice(1)
+        .map((row) => within(row).getAllByRole("cell")[0]!.querySelector("p")!.textContent);
     }
 
     render(<RecipientsPage />);

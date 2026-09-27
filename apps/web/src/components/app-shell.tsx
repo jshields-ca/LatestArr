@@ -29,8 +29,9 @@ const REPO_URL = "https://github.com/jshields-ca/LatestArr";
 const LICENSE_URL = "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE";
 const AUTHOR_URL = "https://www.scootr.ca";
 
+// -m-1.5 p-1.5 grows the tap target to 28px without moving the icon.
 const iconLinkClassName =
-  "text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
+  "-m-1.5 p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
 
 // The footer's attribution links get the tertiary informational-blue
 // treatment instead of plain muted-foreground (see the "Tertiary" note in
@@ -130,7 +131,7 @@ function ProjectInfoCard() {
               type="button"
               aria-label="Star on GitHub"
               title="Star on GitHub"
-              className="star-glow star-glow-intro text-amber-500 hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+              className="star-glow star-glow-intro -m-1.5 p-1.5 text-amber-500 hover:text-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
             >
               <Star className="size-4 fill-current" />
             </button>
