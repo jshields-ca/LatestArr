@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Eye, Loader2, Pencil, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
+import { Check, Eye, Loader2, Pencil, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
 
 import { useOptionalAuth } from "@/components/auth-provider";
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
@@ -211,17 +211,17 @@ function AddNewsletterDialog({
               </div>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="newsletter-template">Template</Label>
+              <Label htmlFor="newsletter-template">Design</Label>
               <Select
                 id="newsletter-template"
                 value={templateId}
                 onChange={(e) => setTemplateId(e.target.value)}
                 disabled={submitting}
               >
-                <option value="">Use the default layout</option>
+                <option value="">Default</option>
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>
-                    {template.name}
+                    {template.mode === "code" ? `${template.name} (older template)` : template.name}
                   </option>
                 ))}
               </Select>
@@ -477,7 +477,59 @@ function LinkedGroups({
   );
 }
 
-function TemplatePicker({
+type SaveState = { status: "idle" | "saving" | "saved" } | { status: "error"; message: string };
+
+// Every field in the Content panel saves on its own and reports it the same
+// way, inline next to the field, instead of a toast per change.
+function SaveStatus({ state }: { state: SaveState }) {
+  if (state.status === "saving") {
+    return (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+        <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+        Saving...
+      </span>
+    );
+  }
+  if (state.status === "saved") {
+    return (
+      <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+        <Check className="size-3" aria-hidden="true" />
+        Saved
+      </span>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <span role="alert" className="text-xs text-destructive">
+        {state.message}
+      </span>
+    );
+  }
+  return null;
+}
+
+async function saveField(
+  newsletterId: string,
+  input: Parameters<typeof updateNewsletter>[1],
+  setState: (state: SaveState) => void,
+  onChanged: (newsletter: Newsletter) => void,
+  fallbackMessage: string,
+) {
+  setState({ status: "saving" });
+  try {
+    const { newsletter } = await updateNewsletter(newsletterId, input);
+    onChanged(newsletter);
+    setState({ status: "saved" });
+  } catch (err) {
+    setState({ status: "error", message: err instanceof ApiError ? err.message : fallbackMessage });
+  }
+}
+
+function designEditLink(template: Template): string {
+  return template.mode === "design" ? `/designs/${template.id}` : `/templates/${template.id}/edit`;
+}
+
+function DesignPicker({
   newsletter,
   templates,
   onChanged,
@@ -486,72 +538,58 @@ function TemplatePicker({
   templates: Template[];
   onChanged: (newsletter: Newsletter) => void;
 }) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleChange(nextTemplateId: string) {
-    setSaving(true);
-    setError(null);
-    try {
-      const { newsletter: updated } = await updateNewsletter(newsletter.id, {
-        templateId: nextTemplateId || null,
-      });
-      onChanged(updated);
-      const templateName = templates.find((t) => t.id === nextTemplateId)?.name;
-      toast({
-        variant: "success",
-        title: "Template updated",
-        description: templateName ?? "Using the default layout.",
-      });
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Failed to update template.";
-      setError(message);
-      toast({ variant: "destructive", title: "Failed to update template", description: message });
-    } finally {
-      setSaving(false);
-    }
-  }
+  const [state, setState] = useState<SaveState>({ status: "idle" });
+  const current = templates.find((t) => t.id === newsletter.templateId);
+  const designs = templates.filter((t) => t.mode === "design");
+  const legacy = templates.filter((t) => t.mode === "code");
 
   return (
     <div className="flex flex-col gap-2">
-      <SubsectionHeading>Template</SubsectionHeading>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <SubsectionHeading>Design</SubsectionHeading>
+        <SaveStatus state={state} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
         <Select
-          aria-label="Template"
+          aria-label="Design"
           value={newsletter.templateId ?? ""}
-          onChange={(e) => void handleChange(e.target.value)}
-          disabled={saving}
+          onChange={(e) =>
+            void saveField(
+              newsletter.id,
+              { templateId: e.target.value || null },
+              setState,
+              onChanged,
+              "Couldn't change the design.",
+            )
+          }
+          disabled={state.status === "saving"}
           className="max-w-xs"
         >
-          <option value="">Use the default layout</option>
-          {templates.map((template) => (
+          <option value="">Default</option>
+          {designs.map((template) => (
             <option key={template.id} value={template.id}>
               {template.name}
             </option>
           ))}
+          {legacy.map((template) => (
+            <option key={template.id} value={template.id}>
+              {`${template.name} (older template)`}
+            </option>
+          ))}
         </Select>
-        {newsletter.templateId ? (
-          <Button variant="outline" size="sm" asChild>
-            <Link to={`/templates/${newsletter.templateId}/edit`}>
-              <Pencil />
-              Edit template
-            </Link>
-          </Button>
-        ) : null}
+        <Button variant="outline" size="sm" asChild>
+          <Link to={current ? designEditLink(current) : "/designs"}>
+            <Pencil />
+            {current ? "Edit design" : "Manage designs"}
+          </Link>
+        </Button>
       </div>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }
 
-// Only meaningful for the default layout — a custom GrapesJS template
-// defines its own fonts, so this is hidden once a template is picked above
-// rather than shown-but-inert, which would just invite "why didn't this do
-// anything" confusion.
+// The Default design is built in, so its font is chosen per newsletter;
+// every other design carries its own font.
 function EmailFontPicker({
   newsletter,
   onChanged,
@@ -559,33 +597,21 @@ function EmailFontPicker({
   newsletter: Newsletter;
   onChanged: (newsletter: Newsletter) => void;
 }) {
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleChange(nextFont: string) {
-    setSaving(true);
-    setError(null);
-    try {
-      const { newsletter: updated } = await updateNewsletter(newsletter.id, { emailFont: nextFont });
-      onChanged(updated);
-      toast({ variant: "success", title: "Font updated" });
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Failed to update font.";
-      setError(message);
-      toast({ variant: "destructive", title: "Failed to update font", description: message });
-    } finally {
-      setSaving(false);
-    }
-  }
+  const [state, setState] = useState<SaveState>({ status: "idle" });
 
   return (
     <div className="flex flex-col gap-2">
-      <SubsectionHeading>Font</SubsectionHeading>
+      <div className="flex items-center justify-between gap-2">
+        <SubsectionHeading>Font</SubsectionHeading>
+        <SaveStatus state={state} />
+      </div>
       <Select
         aria-label="Font"
         value={newsletter.emailFont}
-        onChange={(e) => void handleChange(e.target.value)}
-        disabled={saving}
+        onChange={(e) =>
+          void saveField(newsletter.id, { emailFont: e.target.value }, setState, onChanged, "Couldn't change the font.")
+        }
+        disabled={state.status === "saving"}
         className="max-w-xs"
       >
         {EMAIL_FONT_OPTIONS.map((font) => (
@@ -594,20 +620,11 @@ function EmailFontPicker({
           </option>
         ))}
       </Select>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }
 
-// Shared by IntroTextField/FooterNoteField below — a free-text field that
-// saves on blur (only when the value actually changed) rather than a
-// dedicated Save button, since each is a single independent field with no
-// other fields it needs to batch with. Only meaningful for the default
-// layout, same as EmailFontPicker above.
+// Saves on blur, and only when the value actually changed.
 function NewsletterTextField({
   newsletter,
   field,
@@ -622,52 +639,54 @@ function NewsletterTextField({
   onChanged: (newsletter: Newsletter) => void;
 }) {
   const [value, setValue] = useState(newsletter[field] ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const idPrefix = `newsletter-${field}-${newsletter.id}`;
+  const [state, setState] = useState<SaveState>({ status: "idle" });
+  const id = `newsletter-${field}-${newsletter.id}`;
 
-  async function handleBlur() {
+  function handleBlur() {
     if (value === (newsletter[field] ?? "")) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const { newsletter: updated } = await updateNewsletter(newsletter.id, { [field]: value || null });
-      onChanged(updated);
-      toast({ variant: "success", title: `${label} updated` });
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : `Failed to update ${label.toLowerCase()}.`;
-      setError(message);
-      toast({ variant: "destructive", title: `Failed to update ${label.toLowerCase()}`, description: message });
-    } finally {
-      setSaving(false);
-    }
+    void saveField(
+      newsletter.id,
+      { [field]: value || null },
+      setState,
+      onChanged,
+      `Couldn't save the ${label.toLowerCase()}.`,
+    );
   }
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={idPrefix}>{label} (optional)</Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={id}>{label} (optional)</Label>
+        <SaveStatus state={state} />
+      </div>
       <Textarea
-        id={idPrefix}
+        id={id}
         rows={2}
         placeholder={placeholder}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={() => void handleBlur()}
-        disabled={saving}
+        onBlur={handleBlur}
       />
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }
 
-// Up to 4 {label, url} buttons rendered in the default template — see
-// apps/server/src/render/newsletter-template.ts. Unlike the single-field
-// autosave-on-blur pattern above, this batches every row into one explicit
-// Save, since a half-typed URL blurring mid-edit shouldn't silently commit.
+const CTA_SAVE_DELAY_MS = 800;
+const MAX_CTAS = 4;
+
+function isCompleteCta(cta: NewsletterCta): boolean {
+  if (!cta.label.trim()) return false;
+  try {
+    const url = new URL(cta.url);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// Up to 4 {label, url} buttons. They save by themselves shortly after the
+// last edit, but only once every row is complete, so a half-typed URL is
+// never saved; an incomplete row says what it's missing.
 function CtaButtonsField({
   newsletter,
   onChanged,
@@ -676,93 +695,86 @@ function CtaButtonsField({
   onChanged: (newsletter: Newsletter) => void;
 }) {
   const [ctas, setCtas] = useState<NewsletterCta[]>(newsletter.ctas ?? []);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const idPrefix = `newsletter-ctas-${newsletter.id}`;
+  const [state, setState] = useState<SaveState>({ status: "idle" });
+  const [touched, setTouched] = useState(false);
+  const savedRef = useRef(JSON.stringify(newsletter.ctas ?? []));
+  const complete = ctas.every(isCompleteCta);
 
-  function updateRow(index: number, patch: Partial<NewsletterCta>) {
-    setCtas((prev) => prev.map((cta, i) => (i === index ? { ...cta, ...patch } : cta)));
-  }
+  useEffect(() => {
+    if (!touched || !complete || JSON.stringify(ctas) === savedRef.current) return;
+    const timer = setTimeout(() => {
+      savedRef.current = JSON.stringify(ctas);
+      void saveField(newsletter.id, { ctas }, setState, onChanged, "Couldn't save the buttons.");
+    }, CTA_SAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [ctas, complete, touched, newsletter.id, onChanged]);
 
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    try {
-      const { newsletter: updated } = await updateNewsletter(newsletter.id, { ctas });
-      onChanged(updated);
-      toast({ variant: "success", title: "Buttons updated" });
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Failed to update buttons.";
-      setError(message);
-      toast({ variant: "destructive", title: "Failed to update buttons", description: message });
-    } finally {
-      setSaving(false);
-    }
+  function change(next: NewsletterCta[]) {
+    setTouched(true);
+    setCtas(next);
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <SubsectionHeading>Buttons</SubsectionHeading>
+      <div className="flex items-center justify-between gap-2">
+        <SubsectionHeading>Buttons</SubsectionHeading>
+        <SaveStatus state={state} />
+      </div>
       {ctas.length === 0 ? (
         <p className="text-sm text-muted-foreground">No buttons yet — e.g. a link to your Plex app.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {ctas.map((cta, index) => (
-            // On phones: label and remove on one line, the URL full-width
-            // below it, since both fields side by side leave ~110px each.
-            <li key={index} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-              <Input
-                aria-label={`Button ${index + 1} label`}
-                placeholder="Label"
-                value={cta.label}
-                onChange={(e) => updateRow(index, { label: e.target.value })}
-                disabled={saving}
-                className="min-w-0 flex-1 sm:max-w-[9rem] sm:flex-none"
-              />
-              <Input
-                aria-label={`Button ${index + 1} URL`}
-                placeholder="https://..."
-                value={cta.url}
-                onChange={(e) => updateRow(index, { url: e.target.value })}
-                disabled={saving}
-                className="order-last basis-full sm:order-none sm:basis-auto sm:flex-1"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`Remove button ${index + 1}`}
-                onClick={() => setCtas((prev) => prev.filter((_, i) => i !== index))}
-                disabled={saving}
-              >
-                <X />
-              </Button>
-            </li>
-          ))}
+          {ctas.map((cta, index) => {
+            const incomplete = touched && !isCompleteCta(cta);
+            const hintId = `newsletter-cta-hint-${newsletter.id}-${index}`;
+            return (
+              // On phones: label and remove on one line, the URL full-width
+              // below it, since both fields side by side leave ~110px each.
+              <li key={index} className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  <Input
+                    aria-label={`Button ${index + 1} label`}
+                    placeholder="Label"
+                    value={cta.label}
+                    onChange={(e) => change(ctas.map((c, i) => (i === index ? { ...c, label: e.target.value } : c)))}
+                    aria-describedby={incomplete ? hintId : undefined}
+                    className="min-w-0 flex-1 sm:max-w-[9rem] sm:flex-none"
+                  />
+                  <Input
+                    aria-label={`Button ${index + 1} URL`}
+                    placeholder="https://..."
+                    value={cta.url}
+                    onChange={(e) => change(ctas.map((c, i) => (i === index ? { ...c, url: e.target.value } : c)))}
+                    aria-describedby={incomplete ? hintId : undefined}
+                    className="order-last basis-full sm:order-none sm:basis-auto sm:flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove button ${index + 1}`}
+                    onClick={() => change(ctas.filter((_, i) => i !== index))}
+                  >
+                    <X />
+                  </Button>
+                </div>
+                {incomplete ? (
+                  <p id={hintId} className="text-xs text-muted-foreground">
+                    Add a label and a full link starting with https:// to save this button.
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
-      <div className="flex items-center gap-2">
-        {ctas.length < 4 ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setCtas((prev) => [...prev, { label: "", url: "" }])}
-            disabled={saving}
-          >
+      {ctas.length < MAX_CTAS ? (
+        <div>
+          <Button type="button" variant="outline" size="sm" onClick={() => change([...ctas, { label: "", url: "" }])}>
             <Plus />
             Add button
           </Button>
-        ) : null}
-        <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving} id={idPrefix}>
-          {saving ? <Loader2 className="animate-spin" /> : null}
-          Save buttons
-        </Button>
-      </div>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+        </div>
       ) : null}
     </div>
   );
@@ -1179,6 +1191,10 @@ function NewsletterCard({
   }
 
   const scheduleParts = describeScheduleParts(newsletter.scheduleCron, newsletter.timezone);
+  // Intro, footer, and buttons are rendered by designs (including Default),
+  // not by older drag-and-drop templates.
+  const usesDesign =
+    !newsletter.templateId || allTemplates.find((t) => t.id === newsletter.templateId)?.mode === "design";
 
   return (
     <ListRow
@@ -1312,10 +1328,10 @@ function NewsletterCard({
 
                   {detail ? (
                     <>
-                      <TemplatePicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
-                      {!newsletter.templateId ? (
+                      <DesignPicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
+                      {!newsletter.templateId ? <EmailFontPicker newsletter={newsletter} onChanged={onChanged} /> : null}
+                      {usesDesign ? (
                         <>
-                          <EmailFontPicker newsletter={newsletter} onChanged={onChanged} />
                           <NewsletterTextField
                             newsletter={newsletter}
                             field="introText"
@@ -1338,7 +1354,7 @@ function NewsletterCard({
                         allGroups={allGroups}
                         onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
                       />
-                      {!newsletter.templateId ? (
+                      {usesDesign ? (
                         <NewsletterTextField
                           newsletter={newsletter}
                           field="footerNote"

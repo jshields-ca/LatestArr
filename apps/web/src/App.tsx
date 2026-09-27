@@ -1,10 +1,12 @@
 import { Suspense, lazy } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
 import { Toaster } from "@/components/ui/toaster";
 import { DashboardPage } from "@/pages/dashboard-page";
+import { DesignEditorPage } from "@/pages/design-editor-page";
+import { DesignsPage } from "@/pages/designs-page";
 import { LoginPage } from "@/pages/login-page";
 import { LogsPage } from "@/pages/logs-page";
 import { NotificationsPage } from "@/pages/notifications-page";
@@ -14,7 +16,6 @@ import { RecipientsPage } from "@/pages/recipients-page";
 import { SetupPage } from "@/pages/setup-page";
 import { SmtpProfilesPage } from "@/pages/smtp-profiles-page";
 import { SourcesPage } from "@/pages/sources-page";
-import { TemplatesPage } from "@/pages/templates-page";
 
 // GrapesJS is large (~700kB gzipped) — code-split so it's only downloaded
 // by users who actually open the builder, not on every page load.
@@ -39,7 +40,9 @@ export default function App() {
                   <Route path="/recipients" element={<RecipientsPage />} />
                   <Route path="/smtp" element={<SmtpProfilesPage />} />
                   <Route path="/newsletters" element={<NewslettersPage />} />
-                  <Route path="/templates" element={<TemplatesPage />} />
+                  <Route path="/designs" element={<DesignsPage />} />
+                  <Route path="/designs/:id" element={<DesignEditorPage />} />
+                  <Route path="/templates" element={<Navigate to="/designs" replace />} />
                   <Route path="/notifications" element={<NotificationsPage />} />
                   <Route path="/logs" element={<LogsPage />} />
                   <Route

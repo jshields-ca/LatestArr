@@ -286,9 +286,9 @@ export function DashboardPage() {
     },
     {
       key: "template",
-      label: "Build a template",
-      description: "Optional — newsletters use a starter template until you design your own.",
-      href: "/templates",
+      label: "Choose a design",
+      description: "Optional — newsletters use the Default design until you make your own.",
+      href: "/designs",
       done: (templates?.length ?? 0) > 0,
       optional: true,
     },
