@@ -798,6 +798,7 @@ function NewsletterDetailsForm({
   const [lookbackDays, setLookbackDays] = useState(String(newsletter.lookbackDays));
   const [subjectTemplate, setSubjectTemplate] = useState(newsletter.subjectTemplate ?? "");
   const [smtpProfileId, setSmtpProfileId] = useState(newsletter.smtpProfileId ?? "");
+  const [skipWhenEmpty, setSkipWhenEmpty] = useState(newsletter.skipWhenEmpty);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -816,6 +817,7 @@ function NewsletterDetailsForm({
         lookbackDays: Number(lookbackDays),
         subjectTemplate: subjectTemplate || undefined,
         smtpProfileId: smtpProfileId || null,
+        skipWhenEmpty,
       });
       onSaved(updated);
       toast({ variant: "success", title: "Newsletter updated" });
@@ -899,6 +901,23 @@ function NewsletterDetailsForm({
               onChange={(e) => setSubjectTemplate(e.target.value)}
               disabled={submitting}
             />
+          </div>
+          <div className="flex items-start gap-3">
+            <Switch
+              id={`${idPrefix}-skip-empty`}
+              checked={skipWhenEmpty}
+              onCheckedChange={setSkipWhenEmpty}
+              disabled={submitting}
+              aria-describedby={`${idPrefix}-skip-empty-hint`}
+              className="mt-0.5"
+            />
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor={`${idPrefix}-skip-empty`}>Skip scheduled sends when there&apos;s nothing new</Label>
+              <p id={`${idPrefix}-skip-empty-hint`} className="text-xs text-muted-foreground">
+                Nothing is emailed if nothing was added in the lookback window; History shows it as skipped. Send now
+                always sends.
+              </p>
+            </div>
           </div>
         </div>
       </div>

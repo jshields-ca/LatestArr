@@ -41,6 +41,7 @@ const weeklyDigest = {
   timezone: "UTC",
   isEnabled: true,
   lookbackDays: 7,
+  skipWhenEmpty: false,
   emailFont: "ubuntu",
   introText: null,
   footerNote: null,
@@ -934,6 +935,36 @@ describe("NewslettersPage", () => {
         scheduleCron: "30 10 * * *",
         timezone: "UTC",
       });
+    },
+    150000,
+  );
+
+  it(
+    "saves the skip-when-empty option with the rest of the Details form",
+    async () => {
+      const user = userEvent.setup();
+      mockRoutes(
+        baseRoutes({
+          "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+          "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [], recipientGroups: [] }),
+          "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+        }),
+      );
+      renderPage();
+      await screen.findByText("Weekly digest");
+      await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+
+      const toggle = await screen.findByRole("switch", { name: "Skip scheduled sends when there's nothing new" });
+      expect(toggle).toHaveAttribute("aria-checked", "false");
+      await user.click(toggle);
+
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, skipWhenEmpty: true } }));
+      const saveButton = screen.getByRole("button", { name: "Save changes" });
+      await user.click(saveButton);
+      await waitFor(() => expect(saveButton).not.toBeDisabled());
+
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toMatchObject({ skipWhenEmpty: true });
     },
     150000,
   );

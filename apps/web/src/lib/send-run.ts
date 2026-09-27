@@ -8,6 +8,7 @@ const STATUS_VARIANT: Record<SendRun["status"], BadgeVariant> = {
   failed: "destructive",
   pending: "neutral",
   running: "neutral",
+  skipped: "neutral",
 };
 
 // A newsletter with no linked source or no linked recipient group still
@@ -27,5 +28,6 @@ export function sendRunBadgeVariant(run: SendRun): BadgeVariant {
 
 export function sendRunBadgeLabel(run: SendRun): string {
   if (isEmptySendRun(run)) return "Sent (empty)";
+  if (run.status === "skipped") return "Skipped (nothing new)";
   return run.status;
 }

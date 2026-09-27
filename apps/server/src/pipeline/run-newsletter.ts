@@ -375,7 +375,7 @@ export async function runNewsletter(
   const log = (options.log ?? defaultLogger).child({ newsletterId, trigger: options.trigger ?? "manual" });
   const context: RunContext = {};
   try {
-    return await executeRun(db, newsletterId, log, context);
+    return await executeRun(db, newsletterId, options.trigger ?? "manual", log, context);
   } catch (err) {
     const label = context.name ? `"${context.name}"` : newsletterId;
     if (
@@ -506,6 +506,7 @@ export async function sendTestNewsletter(
 async function executeRun(
   db: Db,
   newsletterId: string,
+  trigger: SendTrigger,
   baseLog: Logger,
   context: RunContext,
 ): Promise<{ sendRunId: string }> {
@@ -534,6 +535,22 @@ async function executeRun(
   try {
     const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
     const subject = subjectFor(newsletter);
+
+    // "Nothing new" means nothing added in the lookback window; a custom
+    // template's empty-section fallback content doesn't count. Send now
+    // always sends, since someone asked for it explicitly. The skipped run
+    // keeps its startedAt, so missed-send catch-up treats it as handled.
+    if (items.length === 0 && newsletter.skipWhenEmpty && trigger !== "manual") {
+      await db
+        .update(sendRuns)
+        .set({ status: "skipped", finishedAt: new Date(), itemsSnapshot: [], itemCountIncluded: 0, recipientCount: 0 })
+        .where(eq(sendRuns.id, sendRunId));
+      log.info(
+        { status: "skipped", durationMs: Date.now() - startedAt },
+        `Skipped "${newsletter.name}": nothing new in the last ${newsletter.lookbackDays} days`,
+      );
+      return { sendRunId };
+    }
 
     // Persisted as soon as rendering succeeds, independent of whether the
     // send-loop below ends up sent/partial_failure/failed for individual

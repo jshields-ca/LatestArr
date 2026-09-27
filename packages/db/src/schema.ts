@@ -157,6 +157,11 @@ export const newsletters = sqliteTable("newsletters", {
   timezone: text("timezone").notNull().default("UTC"),
   isEnabled: integer("is_enabled", { mode: "boolean" }).notNull().default(true),
   lookbackDays: integer("lookback_days").notNull().default(7),
+  // Scheduled and catch-up sends with nothing new in the lookback window
+  // are recorded as "skipped" instead of emailing an empty issue. The
+  // column defaults to false so existing newsletters keep sending as
+  // before; the create route turns it on for new ones.
+  skipWhenEmpty: integer("skip_when_empty", { mode: "boolean" }).notNull().default(false),
   // Which of the default template's built-in font stacks to render with —
   // only meaningful when this newsletter has no custom templateId (see
   // apps/server/src/render/email-fonts.ts for the catalog). A custom
@@ -217,7 +222,7 @@ export const sendRuns = sqliteTable("send_runs", {
     .notNull()
     .references(() => newsletters.id, { onDelete: "cascade" }),
   status: text("status", {
-    enum: ["pending", "running", "success", "partial_failure", "failed"],
+    enum: ["pending", "running", "success", "partial_failure", "failed", "skipped"],
   })
     .notNull()
     .default("pending"),
