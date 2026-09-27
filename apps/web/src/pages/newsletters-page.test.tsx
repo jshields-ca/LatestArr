@@ -938,6 +938,76 @@ describe("NewslettersPage", () => {
     150000,
   );
 
+  it("previews the next issue in a sandboxed frame and sends a test to one address", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1/preview": jsonResponse(200, {
+          subject: "Weekly digest",
+          html: "<html><body><p>Some Movie</p></body></html>",
+          items: [{ title: "Some Movie", kind: "movie" }],
+        }),
+        "/api/newsletters/n1/send-test": jsonResponse(200, { messageId: "test-1" }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    const dialog = await screen.findByRole("dialog", { name: "Preview: Weekly digest" });
+    expect(await within(dialog).findByText("1 item from the last 7 days.")).toBeInTheDocument();
+    const frame = within(dialog).getByTitle("Email preview for Weekly digest");
+    expect(frame).toHaveAttribute("srcdoc", "<html><body><p>Some Movie</p></body></html>");
+    expect(frame).toHaveAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
+
+    await user.type(within(dialog).getByLabelText("Send a test to"), "me@example.com");
+    await user.click(within(dialog).getByRole("button", { name: "Send test" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/newsletters/n1/send-test",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ to: "me@example.com" }) }),
+      ),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/newsletters/n1/send-now", expect.anything());
+  });
+
+  it("shows why a preview couldn't be built", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1/preview": jsonResponse(502, {
+          error: "Could not reach one of this newsletter's connected sources (fetch failed)",
+        }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Could not reach one of this newsletter's connected sources");
+  });
+
+  it("has no accessibility violations with the preview open", async () => {
+    const user = userEvent.setup();
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1/preview": jsonResponse(200, { subject: "Weekly digest", html: "<p>Hi</p>", items: [] }),
+      }),
+    );
+    renderPage();
+    await screen.findByText("Weekly digest");
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("Nothing new in the lookback window.");
+    // The iframe holds the email itself, not app UI, and jsdom can't host
+    // axe inside frames.
+    expect(await axe(document.body, { iframes: false })).toHaveNoViolations();
+  });
+
   it("deletes a newsletter after confirmation", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));

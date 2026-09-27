@@ -505,6 +505,23 @@ export function sendNewsletterNow(id: string): Promise<{ sendRunId: string }> {
   return apiFetch<{ sendRunId: string }>(`/newsletters/${id}/send-now`, { method: "POST" });
 }
 
+export interface NewsletterPreview {
+  subject: string;
+  html: string;
+  items: { title: string; kind: string }[];
+}
+
+export function previewNewsletter(id: string): Promise<NewsletterPreview> {
+  return apiFetch<NewsletterPreview>(`/newsletters/${id}/preview`, { method: "POST" });
+}
+
+export function sendTestNewsletter(id: string, to: string): Promise<{ messageId: string }> {
+  return apiFetch<{ messageId: string }>(`/newsletters/${id}/send-test`, {
+    method: "POST",
+    body: JSON.stringify({ to }),
+  });
+}
+
 export function listSendRuns(newsletterId: string): Promise<{ sendRuns: SendRun[] }> {
   return apiFetch<{ sendRuns: SendRun[] }>(`/newsletters/${newsletterId}/send-runs`);
 }

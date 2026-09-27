@@ -391,22 +391,23 @@ export async function runNewsletter(
   }
 }
 
-async function executeRun(
-  db: Db,
-  newsletterId: string,
-  baseLog: Logger,
-  context: RunContext,
-): Promise<{ sendRunId: string }> {
-  const startedAt = Date.now();
+async function loadNewsletter(db: Db, newsletterId: string): Promise<Newsletter> {
   const [newsletter] = await db.select().from(newsletters).where(eq(newsletters.id, newsletterId));
   if (!newsletter) {
     throw new NewsletterNotFoundError(newsletterId);
   }
-  context.name = newsletter.name;
+  return newsletter;
+}
+
+interface Sender {
+  credentials: SmtpCredentials;
+  from: string;
+}
+
+async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender> {
   if (!newsletter.smtpProfileId) {
     throw new NewsletterMisconfiguredError("Newsletter has no SMTP profile configured");
   }
-
   const [smtpProfile] = await db
     .select()
     .from(smtpProfiles)
@@ -414,6 +415,104 @@ async function executeRun(
   if (!smtpProfile) {
     throw new NewsletterMisconfiguredError("Configured SMTP profile no longer exists");
   }
+
+  const key = getEncryptionKey();
+  const fromName = newsletter.senderIdentity?.fromName ?? smtpProfile.defaultFromName;
+  const fromEmail = newsletter.senderIdentity?.fromEmail ?? smtpProfile.defaultFromEmail;
+  return {
+    credentials: {
+      host: smtpProfile.host,
+      port: smtpProfile.port,
+      secure: smtpProfile.secure,
+      user: smtpProfile.authUserEncrypted ? decrypt(smtpProfile.authUserEncrypted, key) : undefined,
+      pass: smtpProfile.authPassEncrypted ? decrypt(smtpProfile.authPassEncrypted, key) : undefined,
+    },
+    from: `${fromName} <${fromEmail}>`,
+  };
+}
+
+function subjectFor(newsletter: Newsletter): string {
+  return newsletter.subjectTemplate || newsletter.name;
+}
+
+// A browser can't resolve cid: references, so the preview swaps each
+// embedded image for an inline data URI of the same bytes.
+function inlineAttachments(html: string, attachments: EmailAttachment[]): string {
+  let result = html;
+  for (const attachment of attachments) {
+    result = result
+      .split(`cid:${attachment.cid}`)
+      .join(`data:${attachment.contentType};base64,${attachment.content.toString("base64")}`);
+  }
+  return result;
+}
+
+export interface NewsletterPreview {
+  subject: string;
+  html: string;
+  items: { title: string; kind: string }[];
+}
+
+// Renders exactly what the next send would contain, without sending it or
+// recording a send-run, so it doesn't count as a send for catch-up either.
+export async function previewNewsletter(
+  db: Db,
+  newsletterId: string,
+  options: { log?: Logger } = {},
+): Promise<NewsletterPreview> {
+  const log = (options.log ?? defaultLogger).child({ newsletterId });
+  const newsletter = await loadNewsletter(db, newsletterId);
+  try {
+    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
+    return {
+      subject: subjectFor(newsletter),
+      html: inlineAttachments(html, attachments),
+      items: items.map((item) => ({ title: item.title, kind: item.kind })),
+    };
+  } catch (err) {
+    log.warn({ err }, `Couldn't preview newsletter "${newsletter.name}": ${describeSendFailure(err)}`);
+    throw err;
+  }
+}
+
+// Sends the next issue to one address only. Like the preview, it leaves no
+// send-run behind, so History and missed-send catch-up are unaffected.
+export async function sendTestNewsletter(
+  db: Db,
+  newsletterId: string,
+  to: string,
+  options: { log?: Logger } = {},
+): Promise<{ messageId: string }> {
+  const log = (options.log ?? defaultLogger).child({ newsletterId, trigger: "test" });
+  const newsletter = await loadNewsletter(db, newsletterId);
+  const sender = await loadSender(db, newsletter);
+  try {
+    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
+    const result = await sendEmail(sender.credentials, {
+      from: sender.from,
+      to,
+      subject: `[Test] ${subjectFor(newsletter)}`,
+      html,
+      attachments,
+    });
+    log.info({ items: items.length }, `Sent a test of "${newsletter.name}" to ${to}`);
+    return { messageId: result.messageId };
+  } catch (err) {
+    log.warn({ err }, `Couldn't send a test of "${newsletter.name}" to ${to}: ${describeSendFailure(err)}`);
+    throw err;
+  }
+}
+
+async function executeRun(
+  db: Db,
+  newsletterId: string,
+  baseLog: Logger,
+  context: RunContext,
+): Promise<{ sendRunId: string }> {
+  const startedAt = Date.now();
+  const newsletter = await loadNewsletter(db, newsletterId);
+  context.name = newsletter.name;
+  const sender = await loadSender(db, newsletter);
 
   const runningRuns = await db
     .select()
@@ -434,7 +533,7 @@ async function executeRun(
 
   try {
     const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
-    const subject = newsletter.subjectTemplate || newsletter.name;
+    const subject = subjectFor(newsletter);
 
     // Persisted as soon as rendering succeeds, independent of whether the
     // send-loop below ends up sent/partial_failure/failed for individual
@@ -451,25 +550,13 @@ async function executeRun(
     const recipientRows = await resolveRecipients(db, newsletterId);
     const activeRecipients = recipientRows.filter((recipient) => recipient.isActive);
 
-    const key = getEncryptionKey();
-    const smtpCredentials: SmtpCredentials = {
-      host: smtpProfile.host,
-      port: smtpProfile.port,
-      secure: smtpProfile.secure,
-      user: smtpProfile.authUserEncrypted ? decrypt(smtpProfile.authUserEncrypted, key) : undefined,
-      pass: smtpProfile.authPassEncrypted ? decrypt(smtpProfile.authPassEncrypted, key) : undefined,
-    };
-
-    const fromName = newsletter.senderIdentity?.fromName ?? smtpProfile.defaultFromName;
-    const fromEmail = newsletter.senderIdentity?.fromEmail ?? smtpProfile.defaultFromEmail;
-
     let sentCount = 0;
     let failedCount = 0;
 
     for (const recipient of activeRecipients) {
       try {
-        const result = await sendEmail(smtpCredentials, {
-          from: `${fromName} <${fromEmail}>`,
+        const result = await sendEmail(sender.credentials, {
+          from: sender.from,
           to: recipient.email,
           subject,
           html,
