@@ -94,6 +94,10 @@ The **Logs** page in the web UI shows the server's recent activity, newest first
 
 The page keeps the most recent 500 entries in memory, so it starts empty after a restart. Set `LOG_LEVEL` in `.env` to change the detail: `debug` adds per-source item counts for each send, and `warn` keeps only problems. The default is `info`. Passwords, API keys, and email contents are never logged.
 
+## Failure alerts
+
+The **Notifications** page can alert you when a scheduled newsletter fails to send or only reaches some of its recipients: by email through one of your SMTP profiles, and/or through a webhook (Discord, Slack, ntfy, Apprise, or generic JSON). Manual **Send now** results don't alert, since you see those yourself, and alerts for the same newsletter are limited to one per hour. Use **Send test alert** to check a destination before saving. If the problem is your mail server, an email alert can't get through either, so a webhook is the more reliable choice.
+
 ## Backups and upgrades
 
 **Back up**: the `latestarr-data` volume (the entire SQLite database) and your `ENCRYPTION_KEY`. Losing the key while keeping the database means every encrypted credential in it is unrecoverable; losing the volume without the key is just a normal "restore from backup."

@@ -20,6 +20,7 @@ import {
   templates,
 } from "@latestarr/db";
 import { and, eq, inArray } from "drizzle-orm";
+import { smtpCredentialsFor } from "../mailer/credentials.js";
 import { sendEmail, type EmailAttachment, type SmtpCredentials } from "../mailer/send.js";
 import {
   preparePosterPlaceholders,
@@ -29,6 +30,7 @@ import {
 import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { renderDefaultNewsletterHtml } from "../render/newsletter-template.js";
 import { logger as defaultLogger, type Logger } from "../logger.js";
+import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
 
 export type SendTrigger = "manual" | "scheduled" | "catch-up";
@@ -372,20 +374,39 @@ export async function runNewsletter(
   newsletterId: string,
   options: RunNewsletterOptions = {},
 ): Promise<{ sendRunId: string }> {
-  const log = (options.log ?? defaultLogger).child({ newsletterId, trigger: options.trigger ?? "manual" });
+  const trigger = options.trigger ?? "manual";
+  const log = (options.log ?? defaultLogger).child({ newsletterId, trigger });
   const context: RunContext = {};
   try {
-    return await executeRun(db, newsletterId, options.trigger ?? "manual", log, context);
+    return await executeRun(db, newsletterId, trigger, log, context);
   } catch (err) {
     const label = context.name ? `"${context.name}"` : newsletterId;
-    if (
+    const refused =
       err instanceof NewsletterNotFoundError ||
       err instanceof NewsletterMisconfiguredError ||
-      err instanceof SendAlreadyRunningError
-    ) {
+      err instanceof SendAlreadyRunningError;
+    if (refused) {
       log.warn(`Didn't send newsletter ${label}: ${err.message}`);
     } else {
       log.error({ err, sendRunId: context.sendRunId }, `Newsletter ${label} failed to send: ${describeSendFailure(err)}`);
+    }
+    // A misconfigured newsletter (e.g. its SMTP profile was deleted) would
+    // otherwise silently never send on schedule, so it alerts too; an
+    // overlapping run or a deleted newsletter doesn't.
+    const alertWorthy = !refused || err instanceof NewsletterMisconfiguredError;
+    if (trigger !== "manual" && alertWorthy && context.name) {
+      await sendFailureAlert(
+        db,
+        {
+          kind: "failed",
+          newsletterId,
+          newsletterName: context.name,
+          trigger,
+          reason: refused ? (err as Error).message : describeSendFailure(err),
+          sendRunId: context.sendRunId,
+        },
+        log,
+      );
     }
     throw err;
   }
@@ -416,19 +437,9 @@ async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender> {
     throw new NewsletterMisconfiguredError("Configured SMTP profile no longer exists");
   }
 
-  const key = getEncryptionKey();
   const fromName = newsletter.senderIdentity?.fromName ?? smtpProfile.defaultFromName;
   const fromEmail = newsletter.senderIdentity?.fromEmail ?? smtpProfile.defaultFromEmail;
-  return {
-    credentials: {
-      host: smtpProfile.host,
-      port: smtpProfile.port,
-      secure: smtpProfile.secure,
-      user: smtpProfile.authUserEncrypted ? decrypt(smtpProfile.authUserEncrypted, key) : undefined,
-      pass: smtpProfile.authPassEncrypted ? decrypt(smtpProfile.authPassEncrypted, key) : undefined,
-    },
-    from: `${fromName} <${fromEmail}>`,
-  };
+  return { credentials: smtpCredentialsFor(smtpProfile), from: `${fromName} <${fromEmail}>` };
 }
 
 function subjectFor(newsletter: Newsletter): string {
@@ -628,6 +639,24 @@ async function executeRun(
       log.warn(summary, `Sent "${newsletter.name}" to ${sentCount} of ${total} recipients; ${failedCount} failed`);
     } else {
       log.error(summary, `Couldn't deliver "${newsletter.name}" to any of its ${plural(total, "recipient")}`);
+    }
+
+    if (trigger !== "manual" && total > 0 && finalStatus !== "success") {
+      await sendFailureAlert(
+        db,
+        {
+          kind: finalStatus === "failed" ? "failed" : "partial_failure",
+          newsletterId,
+          newsletterName: newsletter.name,
+          trigger,
+          reason:
+            finalStatus === "failed"
+              ? `It couldn't be delivered to any of its ${plural(total, "recipient")}.`
+              : `It reached ${sentCount} of ${total} recipients; ${failedCount} failed.`,
+          sendRunId,
+        },
+        log,
+      );
     }
 
     return { sendRunId };

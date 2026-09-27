@@ -1,8 +1,9 @@
-import { decrypt, encrypt } from "@latestarr/crypto";
+import { encrypt } from "@latestarr/crypto";
 import { type Db, smtpProfiles } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { smtpCredentialsFor } from "../../mailer/credentials.js";
 import { sendEmail, verifySmtpConnection } from "../../mailer/send.js";
 import { getEncryptionKey } from "../../secrets.js";
 import { changedFields } from "../log-fields.js";
@@ -16,19 +17,6 @@ function sanitize(row: SelectedSmtpProfile) {
   return { ...safe, hasAuth: Boolean(row.authUserEncrypted) };
 }
 
-function decryptOptional(value: string | null): string | undefined {
-  return value ? decrypt(value, getEncryptionKey()) : undefined;
-}
-
-function credentialsFor(row: SelectedSmtpProfile) {
-  return {
-    host: row.host,
-    port: row.port,
-    secure: row.secure,
-    user: decryptOptional(row.authUserEncrypted),
-    pass: decryptOptional(row.authPassEncrypted),
-  };
-}
 
 const createSmtpProfileSchema = z.object({
   name: z.string().trim().min(1, "name is required"),
@@ -155,7 +143,7 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
       }
 
       try {
-        await verifySmtpConnection(credentialsFor(profile));
+        await verifySmtpConnection(smtpCredentialsFor(profile));
         request.log.info({ smtpProfileId: profile.id }, `Connection test passed for SMTP profile "${profile.name}"`);
         return reply.send({ ok: true });
       } catch (err) {
@@ -184,7 +172,7 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
         }
 
         try {
-          const result = await sendEmail(credentialsFor(profile), {
+          const result = await sendEmail(smtpCredentialsFor(profile), {
             from: `${profile.defaultFromName} <${profile.defaultFromEmail}>`,
             to,
             subject: "LatestArr test email",
