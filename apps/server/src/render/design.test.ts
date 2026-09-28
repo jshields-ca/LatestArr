@@ -68,6 +68,27 @@ describe("buildDesignMjml", () => {
     expect(html).not.toContain("Movie overview.");
   });
 
+  it("declares light and dark support, with dark colours derived from a custom palette", async () => {
+    const html = await render(design({ colors: { accent: "#1D4ED8", background: "#FAFAFA", text: "#111111", muted: "#555555" } }));
+    expect(html).toContain('<meta name="color-scheme" content="light dark">');
+    expect(html).toContain("background-color:#fafafa");
+    // Matched by value, lower-cased the same way the inline styles are.
+    expect(html).toContain('[style*="color:#111111"] { color:');
+    expect(html).toContain('[data-ogsc] [style*="color:#1d4ed8"]');
+    expect(html).toContain('[data-ogsb] [style*="background-color:#fafafa"]');
+  });
+
+  it("leaves an already dark design's colours alone in dark mode", async () => {
+    const html = await render(design({ colors: { background: "#101820", text: "#f0f0f0" } }));
+    expect(html).toContain('<meta name="color-scheme" content="light dark">');
+    expect(html).not.toContain("prefers-color-scheme");
+  });
+
+  it("gives badges an outline, so they survive a client dropping their background", async () => {
+    const html = await render(design({}));
+    expect(html).toMatch(/border:1px solid #[0-9a-f]{6};border-radius:4px;[^"]*">Movie</);
+  });
+
   it("renders the grid layout as posters side by side", async () => {
     const html = await render(design({ layout: "grid" }));
     expect(html).toContain("display:inline-block;width:50%");
