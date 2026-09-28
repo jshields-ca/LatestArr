@@ -21,6 +21,7 @@ export interface DesignSettings {
   show: { poster: boolean; badge: boolean; subtitle: boolean; details: boolean; overview: boolean; dates: boolean };
   sections: {
     groupByType: boolean;
+    groupEpisodes: boolean;
     order: DesignKind[];
     limit: number | null;
     empty: DesignEmptySection;
@@ -30,15 +31,6 @@ export interface DesignSettings {
   customCss: string;
 }
 
-export const DESIGN_KIND_LABELS: Record<DesignKind, string> = {
-  movie: "Movies",
-  tv_episode: "TV episodes",
-  tv_season: "TV seasons",
-  book: "Books",
-  audiobook: "Audiobooks",
-  game: "Games",
-};
-
 export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   font: "ubuntu",
   colors: { accent: "#c31d4c", background: "#ffffff", text: "#241521", muted: "#7c5a68" },
@@ -46,7 +38,8 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   layout: "cards",
   show: { poster: true, badge: true, subtitle: true, details: true, overview: true, dates: true },
   sections: {
-    groupByType: false,
+    groupByType: true,
+    groupEpisodes: true,
     order: ["movie", "tv_episode", "tv_season", "book", "audiobook", "game"],
     limit: null,
     empty: "message",
@@ -84,4 +77,31 @@ export function isCompleteCta(cta: DesignCta): boolean {
   } catch {
     return false;
   }
+}
+
+// The sections of a grouped newsletter, as the server renders them
+// (apps/server/src/render/design.ts SECTIONS): TV episodes and seasons
+// share one "TV" section.
+export const DESIGN_SECTIONS: { label: string; kinds: DesignKind[] }[] = [
+  { label: "Movies", kinds: ["movie"] },
+  { label: "TV", kinds: ["tv_episode", "tv_season"] },
+  { label: "Books", kinds: ["book"] },
+  { label: "Audiobooks", kinds: ["audiobook"] },
+  { label: "Games", kinds: ["game"] },
+];
+
+// Sections in the design's order: each sits where its first kind is.
+export function orderedSections(order: DesignKind[]): { label: string; kinds: DesignKind[] }[] {
+  const rank = (kinds: DesignKind[]) =>
+    Math.min(...kinds.map((kind) => (order.includes(kind) ? order.indexOf(kind) : order.length)));
+  return [...DESIGN_SECTIONS].sort((a, b) => rank(a.kinds) - rank(b.kinds));
+}
+
+// Moves one section up or down, returning the new kind order.
+export function moveSection(order: DesignKind[], index: number, direction: -1 | 1): DesignKind[] {
+  const sections = orderedSections(order);
+  const target = index + direction;
+  if (target < 0 || target >= sections.length) return order;
+  [sections[index], sections[target]] = [sections[target]!, sections[index]!];
+  return sections.flatMap((section) => section.kinds);
 }

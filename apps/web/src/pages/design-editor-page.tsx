@@ -25,12 +25,13 @@ import {
   type Template,
 } from "@/lib/api";
 import {
-  DESIGN_KIND_LABELS,
   type DesignCta,
   type DesignEmptySection,
   type DesignLayout,
   type DesignSettings,
   isCompleteCta,
+  moveSection,
+  orderedSections,
   MAX_DESIGN_CTAS,
   withDesignDefaults,
 } from "@/lib/design";
@@ -295,14 +296,11 @@ export function DesignEditorPage() {
     navigate("/designs");
   }
 
-  function moveKind(index: number, direction: -1 | 1) {
-    update((current) => {
-      const order = [...current.sections.order];
-      const target = index + direction;
-      if (target < 0 || target >= order.length) return current;
-      [order[index], order[target]] = [order[target]!, order[index]!];
-      return { ...current, sections: { ...current.sections, order } };
-    });
+  function moveSectionAt(index: number, direction: -1 | 1) {
+    update((current) => ({
+      ...current,
+      sections: { ...current.sections, order: moveSection(current.sections.order, index, direction) },
+    }));
   }
 
   if (loadError) {
@@ -482,8 +480,8 @@ export function DesignEditorPage() {
                 ))}
               </div>
               <SettingRow
-                label="Show the lookback line"
-                description={`"Here's what's new in the last 7 days" under the title.`}
+                label="Show the date range and counts"
+                description={`"Sep 21 – 28, 2026 · 36 new" and a count for each type, under the title.`}
                 htmlFor="design-lookback"
                 className="py-1"
                 control={
@@ -544,8 +542,23 @@ export function DesignEditorPage() {
 
             <Section title="Sections">
               <SettingRow
+                label="Group a show's new episodes"
+                description="Several new episodes of one show share a row, listed under its title."
+                htmlFor="design-group-episodes"
+                className="py-1"
+                control={
+                  <Switch
+                    id="design-group-episodes"
+                    checked={settings.sections.groupEpisodes}
+                    onCheckedChange={(checked) =>
+                      update((c) => ({ ...c, sections: { ...c.sections, groupEpisodes: checked } }))
+                    }
+                  />
+                }
+              />
+              <SettingRow
                 label="Group by type"
-                description="A heading for each type (Movies, Books, ...), in the order below."
+                description="A heading for each type (Movies, TV, Books, ...), in the order below."
                 htmlFor="design-group"
                 className="py-1"
                 control={
@@ -560,25 +573,25 @@ export function DesignEditorPage() {
               />
               {settings.sections.groupByType ? (
                 <ol className="flex flex-col gap-1" aria-label="Section order">
-                  {settings.sections.order.map((kind, index) => (
-                    <li key={kind} className="flex items-center justify-between rounded-md border border-border px-3 py-1 text-sm">
-                      {DESIGN_KIND_LABELS[kind]}
+                  {orderedSections(settings.sections.order).map((section, index, sections) => (
+                    <li key={section.label} className="flex items-center justify-between rounded-md border border-border px-3 py-1 text-sm">
+                      {section.label}
                       <span className="flex">
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Move ${DESIGN_KIND_LABELS[kind]} up`}
+                          aria-label={`Move ${section.label} up`}
                           disabled={index === 0}
-                          onClick={() => moveKind(index, -1)}
+                          onClick={() => moveSectionAt(index, -1)}
                         >
                           <ArrowUp />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Move ${DESIGN_KIND_LABELS[kind]} down`}
-                          disabled={index === settings.sections.order.length - 1}
-                          onClick={() => moveKind(index, 1)}
+                          aria-label={`Move ${section.label} down`}
+                          disabled={index === sections.length - 1}
+                          onClick={() => moveSectionAt(index, 1)}
                         >
                           <ArrowDown />
                         </Button>

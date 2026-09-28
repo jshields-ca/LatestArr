@@ -41,6 +41,19 @@ function sampleItems(now: Date): NewItem[] {
       runtimeMinutes: 44,
       addedAt: new Date(now.getTime() - 2 * DAY),
     },
+    // A second episode of the same show, so the preview shows how several
+    // new episodes are grouped.
+    {
+      id: "sample-2b",
+      externalId: "sample-2b",
+      kind: "tv_episode",
+      title: "Night Shift",
+      subtitle: "S02E06 · Lights Out",
+      overview: "A blackout keeps everyone on the ward.",
+      posterUrl: posterDataUri("#5b3b7a", "TV"),
+      runtimeMinutes: 42,
+      addedAt: new Date(now.getTime() - 2 * DAY),
+    },
     {
       id: "sample-3",
       externalId: "sample-3",

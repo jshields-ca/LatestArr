@@ -136,20 +136,32 @@ describe("DesignEditorPage", () => {
     await waitFor(() => expect(previewBodies.at(-1)?.newsletterId).toBe("n1"));
   });
 
-  it("reorders sections when grouping by type", async () => {
+  it("reorders sections, moving TV episodes and seasons together", async () => {
     const user = userEvent.setup();
     renderEditor();
     await screen.findByTitle("Design preview");
 
     await user.click(screen.getByText("Sections"));
-    await user.click(screen.getByRole("switch", { name: "Group by type" }));
+    expect(screen.getByRole("switch", { name: "Group by type" })).toBeChecked();
     await user.click(screen.getByRole("button", { name: "Move Books up" }));
 
     const order = within(screen.getByRole("list", { name: "Section order" }))
       .getAllByRole("listitem")
       .map((item) => item.textContent);
-    expect(order.slice(0, 5)).toEqual(["Movies", "TV episodes", "Books", "TV seasons", "Audiobooks"]);
-    await waitFor(() => expect(previewBodies.at(-1)?.settings.sections.order[2]).toBe("book"));
+    expect(order).toEqual(["Movies", "Books", "TV", "Audiobooks", "Games"]);
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.sections.order).toEqual(["movie", "book", "tv_episode", "tv_season", "audiobook", "game"]),
+    );
+  });
+
+  it("can turn off grouping a show's episodes", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    await user.click(screen.getByText("Sections"));
+    await user.click(screen.getByRole("switch", { name: "Group a show's new episodes" }));
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.sections.groupEpisodes).toBe(false));
   });
 
   it("edits the intro and buttons, holding back Save until a button is complete", async () => {

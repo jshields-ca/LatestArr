@@ -31,6 +31,16 @@ interface RenderableItem {
   /** Runtime, pages, length, or platform, then rating, joined with " · ";
    * absent when the item has none of them. */
   detailsLine?: string;
+  /** The overview cut to about two lines, at a word, with an ellipsis. */
+  overviewShort?: string;
+  /** Set on a row standing in for several new episodes of one series
+   * (mediaList's groupEpisodes): each episode's subtitle and link, up to
+   * MAX_LISTED_EPISODES of them. */
+  episodes?: { subtitle?: string; externalUrl?: string }[];
+  /** How many episodes a grouped row stands for, and how many of those
+   * aren't listed in `episodes`. */
+  episodeCount?: number;
+  moreEpisodes?: number;
   externalUrl?: string;
   /** Set only on an item substituted in by a Media List block's
    * emptyFallback="random" — lets a template's card markup mark it as a
@@ -123,6 +133,17 @@ function detailsLineOf(item: RenderableItem): string | undefined {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
+const OVERVIEW_SHORT_LENGTH = 180;
+
+// Email clients don't support line-clamp, so "about two lines" is a
+// character count, cut back to the last whole word.
+function shorten(text: string | undefined): string | undefined {
+  if (!text || text.length <= OVERVIEW_SHORT_LENGTH) return text;
+  const cut = text.slice(0, OVERVIEW_SHORT_LENGTH);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > OVERVIEW_SHORT_LENGTH / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
+}
+
 function toRenderable(item: NewItem): RenderableItem {
   const renderable: RenderableItem = {
     kind: item.kind,
@@ -149,7 +170,7 @@ function toRenderable(item: NewItem): RenderableItem {
     platform: item.platform,
     externalUrl: item.externalUrl,
   };
-  return { ...renderable, detailsLine: detailsLineOf(renderable) };
+  return { ...renderable, detailsLine: detailsLineOf(renderable), overviewShort: shorten(renderable.overview) };
 }
 
 // Fisher-Yates, used by the mediaList helper's order="random" variant and
@@ -182,8 +203,49 @@ function selectPool(
   return sort === "mostWatched" ? (context.popularItems ?? []) : (context.items ?? []);
 }
 
+// contentType may name several kinds, comma-separated (e.g. a "TV"
+// section showing "tv_episode,tv_season").
 function matchesContentType(item: RenderableItem, contentType: string | undefined): boolean {
-  return !contentType || item.kind === contentType;
+  return !contentType || contentType.split(",").includes(item.kind);
+}
+
+const MAX_LISTED_EPISODES = 5;
+
+// Several new episodes of one series become a single row: the first
+// episode's details (title, poster, link) with the rest listed beneath.
+// Rows keep the order of each series' first appearance.
+function groupEpisodes(items: RenderableItem[]): RenderableItem[] {
+  const bySeries = new Map<string, RenderableItem[]>();
+  for (const item of items) {
+    if (item.kind !== "tv_episode") continue;
+    bySeries.set(item.title, [...(bySeries.get(item.title) ?? []), item]);
+  }
+  const rows: RenderableItem[] = [];
+  const done = new Set<string>();
+  for (const item of items) {
+    const series = item.kind === "tv_episode" ? bySeries.get(item.title) : undefined;
+    if (!series || series.length < 2) {
+      rows.push(item);
+      continue;
+    }
+    if (done.has(item.title)) continue;
+    done.add(item.title);
+    rows.push({
+      ...item,
+      subtitle: undefined,
+      overview: undefined,
+      overviewShort: undefined,
+      detailsLine: undefined,
+      releaseDateFormatted: undefined,
+      episodes: series.slice(0, MAX_LISTED_EPISODES).map((episode) => ({
+        subtitle: episode.subtitle,
+        externalUrl: episode.externalUrl,
+      })),
+      episodeCount: series.length,
+      moreEpisodes: Math.max(0, series.length - MAX_LISTED_EPISODES),
+    });
+  }
+  return rows;
 }
 
 // A filtered, sorted, trimmed list, configured by hash arguments —
@@ -200,7 +262,7 @@ Handlebars.registerHelper("mediaList", function mediaList(
   },
   options: Handlebars.HelperOptions,
 ) {
-  const { contentType, sort, count, order, showAll, emptyFallback, fallbackCount, fallbackLinkLabel, fallbackWrap } =
+  const { contentType, sort, count, order, showAll, emptyFallback, fallbackCount, fallbackLinkLabel, fallbackWrap, groupEpisodes: group } =
     options.hash as {
       contentType?: string;
       sort?: string;
@@ -213,11 +275,14 @@ Handlebars.registerHelper("mediaList", function mediaList(
       /** "none" when the helper is already inside an <mj-raw> (design
        * output), so the fallback link mustn't add a second, nested one. */
       fallbackWrap?: string;
+      /** "true" to fold several episodes of one series into one row. */
+      groupEpisodes?: boolean | string;
     };
 
   const pool = selectPool(this, sort);
   let filtered = pool.filter((item) => matchesContentType(item, contentType));
   if (order === "random") filtered = shuffled(filtered);
+  if (group === true || group === "true") filtered = groupEpisodes(filtered);
 
   const isShowAll = showAll === true || showAll === "true";
   const limit = Number(count);
@@ -234,7 +299,10 @@ Handlebars.registerHelper("mediaList", function mediaList(
   }
 
   if (selected.length === 0 && emptyFallback === "link") {
-    const href = contentType ? this.sourceLinksByContentType?.[contentType] : undefined;
+    const href = contentType
+      ?.split(",")
+      .map((kind) => this.sourceLinksByContentType?.[kind])
+      .find(Boolean);
     if (!href) return "";
     const label = Handlebars.escapeExpression(fallbackLinkLabel || "Browse the library");
     // Wrapped in its own <mj-raw> unless told otherwise: this string
@@ -273,15 +341,47 @@ Handlebars.registerHelper("ifAnyItems", function ifAnyItems(
 
 // True when one of the newsletter's linked sources provides this content
 // type, so a design only shows a "Books" section (even an empty one) for a
-// newsletter that actually has a book source.
+// newsletter that actually has a book source. Also true whenever there are
+// items of that type, so a section never hides real items.
 Handlebars.registerHelper("ifKindLinked", function ifKindLinked(
-  this: { sourceLinksByContentType?: Record<string, string> },
+  this: { sourceLinksByContentType?: Record<string, string>; items?: RenderableItem[] },
   options: Handlebars.HelperOptions,
 ) {
   const { contentType } = options.hash as { contentType?: string };
-  const linked = Boolean(contentType && this.sourceLinksByContentType?.[contentType]);
-  return linked ? options.fn(this) : options.inverse(this);
+  const linked = Boolean(contentType?.split(",").some((kind) => this.sourceLinksByContentType?.[kind]));
+  const hasItems = (this.items ?? []).some((item) => matchesContentType(item, contentType));
+  return linked || hasItems ? options.fn(this) : options.inverse(this);
 });
+
+const KIND_COUNT_LABELS: Record<NewItem["kind"], [string, string]> = {
+  movie: ["movie", "movies"],
+  tv_episode: ["episode", "episodes"],
+  tv_season: ["season", "seasons"],
+  book: ["book", "books"],
+  audiobook: ["audiobook", "audiobooks"],
+  game: ["game", "games"],
+};
+
+// "23 episodes", "9 movies", ... largest first.
+function kindCounts(items: NewItem[]): string[] {
+  const counts = new Map<NewItem["kind"], number>();
+  for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([kind, n]) => `${n} ${KIND_COUNT_LABELS[kind][n === 1 ? 0 : 1]}`);
+}
+
+// "Sep 21 – 28, 2026", "Aug 30 – Sep 5, 2026", or across years in full.
+function formatPeriod(end: Date, days: number): string {
+  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
+  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "short" });
+  if (start.getFullYear() !== end.getFullYear()) {
+    const full = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return `${full(start)} – ${full(end)}`;
+  }
+  const endPart = start.getMonth() === end.getMonth() ? `${end.getDate()}` : `${month(end)} ${end.getDate()}`;
+  return `${month(start)} ${start.getDate()} – ${endPart}, ${end.getFullYear()}`;
+}
 
 export async function renderMjmlTemplate(
   mjmlSource: string,
@@ -293,8 +393,12 @@ export async function renderMjmlTemplate(
     popularItems: (context.popularItems ?? []).map(toRenderable),
     fallbackItems: (context.fallbackItems ?? []).map(toRenderable),
     sourceLinksByContentType: context.sourceLinksByContentType ?? {},
+    hasLinkedSources: Object.keys(context.sourceLinksByContentType ?? {}).length > 0,
     generatedAtFormatted: formatDate(context.generatedAt),
     lookbackDays: context.lookbackDays,
+    periodFormatted: context.lookbackDays ? formatPeriod(context.generatedAt, context.lookbackDays) : undefined,
+    itemCount: context.items.length,
+    kindCounts: kindCounts(context.items),
     introText: context.introText,
     footerNote: context.footerNote,
     ctas: context.ctas ?? [],
