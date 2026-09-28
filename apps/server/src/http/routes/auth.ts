@@ -1,12 +1,18 @@
 import { type Db, users } from "@latestarr/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "../../auth/password.js";
-import { createSession, deleteSession, getSessionUser, SESSION_COOKIE } from "../../auth/session.js";
+import {
+  createSession,
+  deleteSession,
+  deleteUserSessions,
+  getSessionUser,
+  SESSION_COOKIE,
+} from "../../auth/session.js";
 import { parseBody } from "../validate.js";
 
-const MIN_PASSWORD_LENGTH = 12;
+export const MIN_PASSWORD_LENGTH = 12;
 
 type SelectedUser = typeof users.$inferSelect;
 
@@ -93,7 +99,8 @@ export function registerAuthRoutes(
       if (!body) return reply;
       const { email, password } = body;
 
-      const [user] = await db.select().from(users).where(eq(users.email, email));
+      // Email addresses match regardless of case.
+      const [user] = await db.select().from(users).where(eq(sql`lower(${users.email})`, email.trim().toLowerCase()));
       if (!user || !user.passwordHash || !user.isActive) {
         request.log.warn({ ip: request.ip }, `Failed sign-in attempt for ${email}`);
         return reply.code(401).send({ error: "Invalid email or password" });
@@ -174,7 +181,7 @@ export function registerAuthRoutes(
     if (!body) return reply;
     const { displayName, currentPassword, newPassword } = body;
 
-    const updates: { displayName?: string; passwordHash?: string } = {};
+    const updates: { displayName?: string; passwordHash?: string; mustChangePassword?: boolean } = {};
 
     if (displayName !== undefined) {
       updates.displayName = displayName;
@@ -196,7 +203,11 @@ export function registerAuthRoutes(
         request.log.warn({ userId: currentUser.id }, `Password change for ${currentUser.email} rejected: current password was incorrect`);
         return reply.code(401).send({ error: "Current password is incorrect" });
       }
+      if (newPassword === currentPassword) {
+        return reply.code(400).send({ error: "Choose a new password that's different from the current one" });
+      }
       updates.passwordHash = await hashPassword(newPassword);
+      updates.mustChangePassword = false;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -204,6 +215,9 @@ export function registerAuthRoutes(
     }
 
     const [updated] = await db.update(users).set(updates).where(eq(users.id, currentUser.id)).returning();
+    // A new password signs out every other session, e.g. one opened with a
+    // temporary password.
+    if (updates.passwordHash) await deleteUserSessions(db, currentUser.id, token);
     const changed = [updates.displayName !== undefined && "display name", updates.passwordHash && "password"].filter(Boolean);
     request.log.info({ userId: currentUser.id }, `${currentUser.email} changed their ${changed.join(" and ")}`);
 

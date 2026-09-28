@@ -23,6 +23,9 @@ export const users = sqliteTable("users", {
     .notNull()
     .default("admin"),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  // Set when an admin creates the account or resets its password: the
+  // password is temporary, so the web app asks for a new one at sign-in.
+  mustChangePassword: integer("must_change_password", { mode: "boolean" }).notNull().default(false),
   lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
   ...timestamps,
 });

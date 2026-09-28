@@ -1,10 +1,12 @@
 import { type Db, oidcIdentities, users } from "@latestarr/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 export interface OidcClaims {
   issuer: string;
   subject: string;
   email?: string;
+  /** The identity provider's email_verified claim. */
+  emailVerified?: boolean;
   name?: string;
 }
 
@@ -16,12 +18,12 @@ export class OidcAccountNotLinkedError extends Error {
 }
 
 /**
- * Resolves an OIDC login to a local user, following the plan's default
- * account-linking rule: no auto-provisioning once any local user exists,
- * except that the very first login on a fresh instance (zero users) may
- * bootstrap the initial admin account via SSO. Linking OIDC to an
- * *existing* local account is a future authenticated "connect SSO" flow,
- * not implemented here yet.
+ * Resolves an OIDC login to a local user. Accounts are never created by
+ * SSO once any local user exists (the very first login on a fresh instance
+ * may bootstrap the initial admin). An SSO identity is linked to an
+ * existing active account the first time it signs in with that account's
+ * email, but only when the provider says the email is verified, so an
+ * admin adds someone on the Users page and they can then use SSO.
  */
 export async function resolveOidcUser(db: Db, claims: OidcClaims) {
   const [existingLink] = await db
@@ -39,7 +41,12 @@ export async function resolveOidcUser(db: Db, claims: OidcClaims) {
 
   const anyUsers = await db.select({ id: users.id }).from(users).limit(1);
   if (anyUsers.length > 0) {
-    throw new OidcAccountNotLinkedError();
+    const email = claims.email?.trim().toLowerCase();
+    if (!email || claims.emailVerified !== true) throw new OidcAccountNotLinkedError();
+    const [match] = await db.select().from(users).where(eq(sql`lower(${users.email})`, email));
+    if (!match || !match.isActive) throw new OidcAccountNotLinkedError();
+    await db.insert(oidcIdentities).values({ userId: match.id, issuer: claims.issuer, subject: claims.subject });
+    return match;
   }
 
   const [user] = await db

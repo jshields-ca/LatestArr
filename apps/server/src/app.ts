@@ -26,6 +26,7 @@ import { registerRecipientRoutes } from "./http/routes/recipients.js";
 import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
 import { registerTemplateRoutes } from "./http/routes/templates.js";
+import { registerUserRoutes } from "./http/routes/users.js";
 import { logger } from "./logger.js";
 import type { SchedulerHandle } from "./scheduler/engine.js";
 
@@ -160,6 +161,7 @@ export async function buildApp(
       registerRecipientGroupRoutes(api, db);
       registerNewsletterRoutes(api, db, scheduler);
       registerTemplateRoutes(api, db);
+      registerUserRoutes(api, db);
       registerLogRoutes(api, db);
       registerNotificationRoutes(api, db);
     },

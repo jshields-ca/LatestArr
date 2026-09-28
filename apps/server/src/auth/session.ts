@@ -49,7 +49,9 @@ export async function getSessionUser(db: Db, token: string) {
 
   if (!row) return null;
 
-  if (row.expiresAt.getTime() < Date.now()) {
+  // A deactivated account's sessions stop working at once, not when they
+  // expire.
+  if (row.expiresAt.getTime() < Date.now() || !row.user.isActive) {
     await db.delete(sessions).where(eq(sessions.id, id));
     return null;
   }
@@ -59,4 +61,14 @@ export async function getSessionUser(db: Db, token: string) {
 
 export async function deleteSession(db: Db, token: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.id, hashToken(token)));
+}
+
+// Signs a user out everywhere, e.g. when an admin deactivates them or
+// resets their password. `exceptToken` keeps the caller's own session.
+export async function deleteUserSessions(db: Db, userId: string, exceptToken?: string): Promise<void> {
+  const keep = exceptToken ? hashToken(exceptToken) : undefined;
+  const rows = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId));
+  for (const row of rows) {
+    if (row.id !== keep) await db.delete(sessions).where(eq(sessions.id, row.id));
+  }
 }

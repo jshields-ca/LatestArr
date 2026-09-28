@@ -57,6 +57,13 @@
       "when": 1790555288105,
       "tag": "0007_retire_drag_and_drop",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790628630912,
+      "tag": "0008_user_management",
+      "breakpoints": true
     }
   ]
 }
