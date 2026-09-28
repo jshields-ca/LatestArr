@@ -15,6 +15,7 @@ COPY packages/crypto/package.json packages/crypto/package.json
 COPY packages/adapters/core/package.json packages/adapters/core/package.json
 COPY packages/adapters/tautulli/package.json packages/adapters/tautulli/package.json
 COPY packages/adapters/plex/package.json packages/adapters/plex/package.json
+COPY packages/adapters/jellyfin/package.json packages/adapters/jellyfin/package.json
 COPY packages/adapters/booklore-family/package.json packages/adapters/booklore-family/package.json
 COPY packages/adapters/audiobookshelf/package.json packages/adapters/audiobookshelf/package.json
 COPY packages/adapters/romm/package.json packages/adapters/romm/package.json

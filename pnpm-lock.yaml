@@ -50,6 +50,9 @@ importers:
       '@latestarr/adapter-core':
         specifier: workspace:*
         version: link:../../packages/adapters/core
+      '@latestarr/adapter-jellyfin':
+        specifier: workspace:*
+        version: link:../../packages/adapters/jellyfin
       '@latestarr/adapter-plex':
         specifier: workspace:*
         version: link:../../packages/adapters/plex
@@ -302,6 +305,28 @@ importers:
         version: 5.0.1(@types/node@22.20.4)(jsdom@30.1.1)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.25.12)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/adapters/core:
+    devDependencies:
+      '@latestarr/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@types/node':
+        specifier: ^22.20.4
+        version: 22.20.4
+      eslint:
+        specifier: ^10.10.0
+        version: 10.11.0(jiti@2.7.0)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(@types/node@22.20.4)(jsdom@30.1.1)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.25.12)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/adapters/jellyfin:
+    dependencies:
+      '@latestarr/adapter-core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@latestarr/config':
         specifier: workspace:*

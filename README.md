@@ -35,12 +35,16 @@ It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter featur
 | --- | --- | --- | --- |
 | [Tautulli](https://tautulli.com/) | Movies, TV | Tautulli API | ✅ Implemented |
 | Plex (direct) | Movies, TV | Plex API | ✅ Implemented |
+| [Jellyfin](https://jellyfin.org/) | Movies, TV, books, audiobooks | Jellyfin API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
+| [Emby](https://emby.media/) | Movies, TV, books, audiobooks | Emby API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
 | [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | ✅ Implemented |
 | [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | OPDS | ✅ Implemented |
 | [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | OPDS | ✅ Implemented |
 | [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks | Audiobookshelf API | ✅ Implemented |
 | [RomM](https://github.com/rommapp/romm) | Games | RomM API | ✅ Implemented |
-| Kavita, Komga, Calibre-Web, Jellyfin/Emby, Immich, ... | Various | — | Under consideration |
+| Kavita, Komga, Calibre-Web, Immich, ... | Various | — | Under consideration |
+
+> **Help test Jellyfin and Emby.** Both are built from their published API docs, but haven't been confirmed on a real server yet. If you run either one, add it as a source and [tell us how it went](https://github.com/jshields-ca/LatestArr/issues/196): your server version, what worked, and any errors from the **Logs** page. Each moves to ✅ once someone confirms it works.
 
 BookLore, BookOrbit, and Grimmory are separate apps (forks of a common lineage) that all expose the same [OPDS](https://opds.io/) catalog protocol, so LatestArr talks to all three through one shared adapter rather than three separate integrations.
 

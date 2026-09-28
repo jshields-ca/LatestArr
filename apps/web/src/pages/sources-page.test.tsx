@@ -21,7 +21,7 @@ function jsonResponse(status: number, body: unknown) {
   return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve(body) };
 }
 
-const ALL_KINDS = ["tautulli", "plex", "booklore", "bookorbit", "grimmory", "audiobookshelf", "romm"];
+const ALL_KINDS = ["tautulli", "plex", "jellyfin", "emby", "booklore", "bookorbit", "grimmory", "audiobookshelf", "romm"];
 
 // SourcesPage fetches the sources list, the available adapter kinds, and
 // the recipient groups list (for ImportSourceUsersDialog's "reuse an
@@ -314,6 +314,30 @@ describe("SourcesPage", () => {
       expect(screen.getByText("Error")).toBeInTheDocument();
     },
     150000,
+  );
+
+  it(
+    "asks for a Jellyfin API key, says where to find it, and asks for testers",
+    async () => {
+      const user = userEvent.setup();
+      mockLoad({ sources: [] });
+      render(<SourcesPage />);
+      await screen.findByText("No sources yet");
+
+      await user.click(screen.getByRole("button", { name: "Add source" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(within(dialog).queryByText(/support is new/)).not.toBeInTheDocument();
+
+      selectOption(within(dialog).getByLabelText("Source type"), "Jellyfin");
+      const hint = within(dialog).getByText("Create one in Jellyfin's Dashboard, under API Keys.");
+      expect(within(dialog).getByLabelText("Jellyfin API key")).toHaveAttribute("aria-describedby", hint.id);
+      expect(within(dialog).getByText(/Jellyfin support is new/)).toBeInTheDocument();
+      expect(within(dialog).getByRole("link", { name: "tell us how it went" })).toHaveAttribute(
+        "href",
+        "https://github.com/jshields-ca/LatestArr/issues/196",
+      );
+    },
+    240000,
   );
 
   it("deletes a source after confirmation", async () => {

@@ -56,7 +56,9 @@ import {
 // packages/adapters/*/src/*-adapter.ts) — checked here too so the
 // "Import users" action only appears where it can actually work, rather
 // than every row offering it and most of them 404ing.
-const KINDS_WITH_USER_IMPORT = new Set(["plex", "tautulli"]);
+const KINDS_WITH_USER_IMPORT = new Set(["plex", "tautulli", "jellyfin", "emby"]);
+
+const TESTERS_ISSUE_URL = "https://github.com/jshields-ca/LatestArr/issues/196";
 
 interface SourceKindField {
   key: string;
@@ -72,6 +74,11 @@ interface SourceKindConfig {
    *  name most self-hosters won't recognize — this shows a plain-language
    *  note next to their username/password fields instead. */
   opdsHint?: boolean;
+  /** Where to find the credential, shown under its field. */
+  fieldHint?: string;
+  /** Built from the API docs but not yet confirmed on a real server; asks
+   *  the admin to report how it went. */
+  needsTesters?: boolean;
 }
 
 // The SourceAdapter contract takes an opaque Record<string, string> of
@@ -89,6 +96,20 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
     label: "Plex",
     description: "Connect directly to a Plex Media Server.",
     fields: [{ key: "token", label: "Plex token", type: "password" }],
+  },
+  jellyfin: {
+    label: "Jellyfin",
+    description: "Connect to a Jellyfin server for movies, TV, books, and audiobooks.",
+    fields: [{ key: "apiKey", label: "Jellyfin API key", type: "password" }],
+    fieldHint: "Create one in Jellyfin's Dashboard, under API Keys.",
+    needsTesters: true,
+  },
+  emby: {
+    label: "Emby",
+    description: "Connect to an Emby server for movies, TV, books, and audiobooks.",
+    fields: [{ key: "apiKey", label: "Emby API key", type: "password" }],
+    fieldHint: "Create one in Emby's server settings, under API Keys.",
+    needsTesters: true,
   },
   booklore: {
     label: "BookLore",
@@ -141,6 +162,8 @@ const FALLBACK_CONFIG: SourceKindConfig = {
 const KIND_ICON: Record<string, LucideIcon> = {
   tautulli: Activity,
   plex: Clapperboard,
+  jellyfin: Clapperboard,
+  emby: Clapperboard,
   booklore: BookOpen,
   bookorbit: BookOpen,
   grimmory: BookOpen,
@@ -156,6 +179,18 @@ function OpdsHint({ id, label }: { id: string; label: string }) {
   return (
     <p id={id} className="text-xs text-muted-foreground">
       OPDS is just how {label} shares its catalog — use the same username and password you already use to sign in to {label}&apos;s own web reader, not a separate API key.
+    </p>
+  );
+}
+
+function TestersNote({ label }: { label: string }) {
+  return (
+    <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+      {label} support is new and hasn&apos;t been confirmed on a real server yet. If you try it, please{" "}
+      <a href={TESTERS_ISSUE_URL} target="_blank" rel="noreferrer" className="font-medium text-primary underline">
+        tell us how it went
+      </a>
+      : your server version, what worked, and any errors from the Logs page.
     </p>
   );
 }
@@ -317,11 +352,19 @@ function AddSourceDialog({
                   setCredentialValues((prev) => ({ ...prev, [field.key]: e.target.value }))
                 }
                 disabled={submitting}
-                aria-describedby={config.opdsHint ? "source-opds-hint" : undefined}
+                aria-describedby={
+                  config.opdsHint ? "source-opds-hint" : config.fieldHint ? "source-field-hint" : undefined
+                }
               />
             </div>
           ))}
           {config.opdsHint ? <OpdsHint id="source-opds-hint" label={config.label} /> : null}
+          {config.fieldHint ? (
+            <p id="source-field-hint" className="text-xs text-muted-foreground">
+              {config.fieldHint}
+            </p>
+          ) : null}
+          {config.needsTesters ? <TestersNote label={config.label} /> : null}
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
