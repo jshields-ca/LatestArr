@@ -243,6 +243,32 @@ describe("fetchRecentItems", () => {
     expect(items[0]?.subtitle).toBeUndefined();
   });
 
+  it("uses the series poster for an episode", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              {
+                ...baseItem,
+                rating_key: "1",
+                media_type: "episode",
+                added_at: "1700000000",
+                thumb: "/still/1",
+                grandparent_thumb: "/poster/9",
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
+    expect(new URL(items[0]!.posterUrl!).searchParams.get("img")).toBe("/poster/9");
+  });
+
   it("maps thumb into a pms_image_proxy posterUrl", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({

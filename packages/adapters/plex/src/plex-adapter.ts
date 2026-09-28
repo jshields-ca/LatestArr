@@ -94,6 +94,12 @@ function buildExternalUrl(
   return `${trimTrailingSlashes(webUrl)}/web/index.html`;
 }
 
+// Episodes use the series poster, so every image is the same portrait
+// shape rather than some being wide video stills.
+function posterPath(kind: MediaKind, item: PlexMetadataItem): string | undefined {
+  return (kind === "tv_episode" && item.grandparentThumb) || item.thumb;
+}
+
 export const plexAdapter: SourceAdapter = {
   kind: "plex",
   capabilities: {
@@ -163,6 +169,7 @@ export const plexAdapter: SourceAdapter = {
         if (params.mediaKinds && !params.mediaKinds.includes(kind)) continue;
 
         const addedAt = new Date(item.addedAt * 1000);
+        const poster = posterPath(kind, item);
         // recentlyAdded has no server-side "since" filter — it's sorted by
         // most-recently-added, so we page in `count` items and cut here.
         if (addedAt < params.since) continue;
@@ -186,7 +193,7 @@ export const plexAdapter: SourceAdapter = {
           overview: item.summary || undefined,
           addedAt,
           releaseDate: item.originallyAvailableAt ? new Date(item.originallyAvailableAt) : undefined,
-          posterUrl: item.thumb ? buildImageUrl(config.baseUrl, token, item.thumb) : undefined,
+          posterUrl: poster ? buildImageUrl(config.baseUrl, token, poster) : undefined,
           externalUrl: buildExternalUrl(webUrl, machineIdentifier, item.ratingKey),
           raw: item,
         });

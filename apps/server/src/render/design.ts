@@ -155,13 +155,15 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
     ? `{{#if contentLabel}} <span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border-radius:4px;padding:2px 6px;vertical-align:middle;">{{contentLabel}}</span>{{/if}}`
     : "";
   const linkedTitle = `{{#if externalUrl}}<a href="{{externalUrl}}" style="color:inherit;text-decoration:none;">{{title}}</a>{{else}}{{title}}{{/if}}`;
-  const details = `{{#if runtimeFormatted}}{{runtimeFormatted}}{{/if}}{{#if pageCount}}{{pageCount}} pages{{/if}}{{#if durationFormatted}}{{durationFormatted}}{{/if}}{{#if platform}}{{platform}}{{/if}}{{#if rating}} · {{rating}}{{/if}}`;
+  // Left out entirely for an item with none of these, rather than leaving
+  // an empty line.
+  const details = (markup: string) => `{{#if detailsLine}}${markup}{{/if}}`;
 
   if (settings.layout === "compact") {
     return `<div style="padding:8px 0;border-bottom:1px solid ${p.border};font-family:${font};font-size:15px;color:${p.text};">` +
       `<span style="font-weight:700;">${linkedTitle}</span>${badge}` +
       (show.subtitle ? `{{#if subtitle}} <span style="color:${p.muted};font-size:14px;">· {{subtitle}}</span>{{/if}}` : "") +
-      (show.details ? `<span style="color:${p.accent};font-size:13px;font-weight:600;"> ${details}</span>` : "") +
+      (show.details ? details(`<span style="color:${p.accent};font-size:13px;font-weight:600;"> {{detailsLine}}</span>`) : "") +
       (show.dates ? `<div style="font-size:12px;color:${p.subtle};margin-top:2px;">Added {{addedAtFormatted}}</div>` : "") +
       fallbackNote +
       `</div>`;
@@ -176,7 +178,7 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
       `<div style="font-weight:700;font-size:15px;color:${p.text};">${linkedTitle}</div>` +
       (show.badge ? `{{#if contentLabel}}<div style="margin-top:3px;"><span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border-radius:4px;padding:2px 6px;">{{contentLabel}}</span></div>{{/if}}` : "") +
       (show.subtitle ? `{{#if subtitle}}<div style="color:${p.muted};font-size:13px;margin-top:2px;">{{subtitle}}</div>{{/if}}` : "") +
-      (show.details ? `<div style="font-size:12px;font-weight:600;color:${p.accent};margin-top:2px;">${details}</div>` : "") +
+      (show.details ? details(`<div style="font-size:12px;font-weight:600;color:${p.accent};margin-top:2px;">{{detailsLine}}</div>`) : "") +
       fallbackNote +
       `</div>`;
   }
@@ -192,7 +194,9 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
   lines.push(`        <td style="vertical-align:top;font-family:${font};">`);
   lines.push(`          <div style="font-weight:700;font-size:18px;color:${p.text};">${linkedTitle}${badge}</div>`);
   if (show.subtitle) lines.push(`          {{#if subtitle}}<div style="color:${p.muted};font-size:14px;margin-top:2px;">{{subtitle}}</div>{{/if}}`);
-  if (show.details) lines.push(`          <div style="font-size:13px;font-weight:600;color:${p.accent};margin-top:3px;">${details}</div>`);
+  if (show.details) {
+    lines.push(details(`          <div style="font-size:13px;font-weight:600;color:${p.accent};margin-top:3px;">{{detailsLine}}</div>`));
+  }
   if (show.overview) lines.push(`          {{#if overview}}<div style="font-size:14px;color:${p.text};margin-top:5px;line-height:1.4;">{{overview}}</div>{{/if}}`);
   if (show.dates) lines.push(`          <div style="font-size:12px;color:${p.subtle};margin-top:5px;">Added {{addedAtFormatted}}{{#if releaseDateFormatted}} · Released {{releaseDateFormatted}}{{/if}}</div>`);
   if (fallbackNote) lines.push(`          ${fallbackNote}`);

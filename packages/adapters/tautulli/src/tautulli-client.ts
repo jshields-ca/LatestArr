@@ -35,6 +35,8 @@ export interface TautulliRecentlyAddedItem {
   // server's own token.
   thumb?: string;
   art?: string;
+  /** An episode's series poster; its own thumb is a video still. */
+  grandparent_thumb?: string;
 }
 
 export interface TautulliHomeStatRow {
