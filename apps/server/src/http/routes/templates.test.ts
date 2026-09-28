@@ -339,4 +339,20 @@ describe("code designs", () => {
     const missing = await app.inject(authed({ method: "POST", url: "/api/templates/nope/convert-to-code" }));
     expect(missing.statusCode).toBe(404);
   });
+
+  it("keeps a converted design's dark-mode styles behind one marker line, added back when rendered", async () => {
+    const created = await app.inject(authed({ method: "POST", url: "/api/templates", payload: { name: "Plain", settings: {} } }));
+    const id = created.json().template.id;
+    const { template } = (
+      await app.inject(authed({ method: "POST", url: `/api/templates/${id}/convert-to-code` }))
+    ).json();
+    expect(template.compiledMjml).toContain("<!-- latestarr:dark-mode");
+    expect(template.compiledMjml).not.toContain("prefers-color-scheme");
+
+    const preview = (mjml: string) =>
+      app.inject(authed({ method: "POST", url: "/api/templates/preview", payload: { mjml, settings: template.settings } }));
+    expect((await preview(template.compiledMjml)).json().html).toContain("prefers-color-scheme: dark");
+    const withoutMarker = template.compiledMjml.replace(/<!-- latestarr:dark-mode[^>]*-->/, "");
+    expect((await preview(withoutMarker)).json().html).not.toContain("prefers-color-scheme");
+  });
 });

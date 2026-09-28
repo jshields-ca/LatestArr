@@ -1,5 +1,5 @@
 import type { NewItem } from "@latestarr/adapter-core";
-import { buildDesignMjml, DESIGN_KINDS, type DesignSettings, designContentVariables } from "./design.js";
+import { buildDesignMjml, DESIGN_KINDS, type DesignSettings, designContentVariables, expandDarkModeMarker } from "./design.js";
 import { renderMjmlTemplate } from "./mjml-template.js";
 
 // Made-up content for previewing a design that isn't attached to a
@@ -82,7 +82,7 @@ function sampleItems(now: Date): NewItem[] {
 export async function renderDesignSample(settings: DesignSettings, mjml?: string): Promise<string> {
   const now = new Date();
   const items = sampleItems(now);
-  return renderMjmlTemplate(mjml ?? buildDesignMjml(settings), {
+  return renderMjmlTemplate(mjml ? expandDarkModeMarker(mjml, settings) : buildDesignMjml(settings), {
     newsletterName: "Sample newsletter",
     items,
     popularItems: items.slice(0, 2),

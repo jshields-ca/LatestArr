@@ -33,6 +33,7 @@ import {
   buildDesignMjml,
   DEFAULT_DESIGN_SETTINGS,
   designContentVariables,
+  expandDarkModeMarker,
   type DesignSettings,
   parseDesignSettings,
 } from "../render/design.js";
@@ -271,13 +272,13 @@ async function resolveDesign(
 ): Promise<{ mjml: string; settings: DesignSettings }> {
   if (designOverride) {
     const { settings, mjml } = designOverride;
-    return { mjml: mjml ?? buildDesignMjml(settings), settings };
+    return { mjml: mjml ? expandDarkModeMarker(mjml, settings) : buildDesignMjml(settings), settings };
   }
   if (newsletter.templateId) {
     const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
     const settings = parseDesignSettings(template?.settings);
     if (template?.mode === "design") return { mjml: buildDesignMjml(settings), settings };
-    if (template?.compiledMjml) return { mjml: template.compiledMjml, settings };
+    if (template?.compiledMjml) return { mjml: expandDarkModeMarker(template.compiledMjml, settings), settings };
   }
   return { mjml: buildDesignMjml(DEFAULT_DESIGN_SETTINGS), settings: DEFAULT_DESIGN_SETTINGS };
 }

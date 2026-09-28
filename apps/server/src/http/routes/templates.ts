@@ -161,7 +161,7 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         .update(templates)
         .set({
           mode: "code",
-          compiledMjml: buildDesignMjml(parseDesignSettings(existing.settings)).trim(),
+          compiledMjml: buildDesignMjml(parseDesignSettings(existing.settings), { darkModeMarker: true }).trim(),
           updatedAt: new Date(),
         })
         .where(eq(templates.id, existing.id))

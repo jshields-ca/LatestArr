@@ -26,7 +26,9 @@ export function DesignCodeReference() {
     <div className="flex flex-col gap-4 text-sm">
       <p className="text-xs text-muted-foreground">
         Everything is escaped, so item text can&apos;t break your markup. HTML that isn&apos;t an MJML tag goes inside{" "}
-        <code className="font-mono">&lt;mj-raw&gt;</code>.
+        <code className="font-mono">&lt;mj-raw&gt;</code>. The{" "}
+        <code className="font-mono">latestarr:dark-mode</code> comment in the head adds this design&apos;s dark-mode
+        colours when it&apos;s sent; delete it to leave them out.
       </p>
 
       <Group title="Newsletter">

@@ -332,6 +332,9 @@ describe("SourcesPage", () => {
       const hint = within(dialog).getByText("Create one in Jellyfin's Dashboard, under API Keys.");
       expect(within(dialog).getByLabelText("Jellyfin API key")).toHaveAttribute("aria-describedby", hint.id);
       expect(within(dialog).getByText(/Jellyfin support is new/)).toBeInTheDocument();
+      // Example values match the chosen type, not Tautulli's.
+      expect(within(dialog).getByLabelText("Base URL")).toHaveAttribute("placeholder", "http://localhost:8096");
+      expect(within(dialog).getByLabelText("Name")).toHaveAttribute("placeholder", "Home Jellyfin");
       expect(within(dialog).getByRole("link", { name: "tell us how it went" })).toHaveAttribute(
         "href",
         "https://github.com/jshields-ca/LatestArr/issues/196",

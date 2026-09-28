@@ -457,12 +457,24 @@ function sanitizeCss(css: string): string {
 // The email is a card on a softly tinted page: an accent bar across the
 // top, the name, date range, and counts, then the items, with the credits
 // below the card.
-export function buildDesignMjml(settings: DesignSettings): string {
+// Stands in for the generated dark-mode styles in a design switched to
+// code, so its markup doesn't open with ~25 lines of CSS. Expanded when
+// the email is rendered (expandDarkModeMarker); deleting the line turns
+// the dark-mode colours off.
+export const DARK_MODE_MARKER = "<!-- latestarr:dark-mode (dark-mode colours for this design are added here when it's sent; delete this line to leave them out) -->";
+const DARK_MODE_MARKER_PATTERN = /<!--\s*latestarr:dark-mode\b[^>]*-->/;
+
+export function expandDarkModeMarker(mjml: string, settings: DesignSettings): string {
+  return mjml.replace(DARK_MODE_MARKER_PATTERN, () => darkModeHead(paletteFor(settings)).trim());
+}
+
+export function buildDesignMjml(settings: DesignSettings, options: { darkModeMarker?: boolean } = {}): string {
   const p = paletteFor(settings);
   const font = EMAIL_FONTS[settings.font].stack;
   const css = sanitizeCss(settings.customCss).trim();
   const customCss = css ? `\n    <mj-style inline="inline">${css}</mj-style>` : "";
-  const head = `\n  <mj-head>${darkModeHead(p)}${customCss}\n  </mj-head>`;
+  const darkMode = options.darkModeMarker ? `\n    ${DARK_MODE_MARKER}` : darkModeHead(p);
+  const head = `\n  <mj-head>${darkMode}${customCss}\n  </mj-head>`;
 
   // Without a lookback window (a code path only tests use) there's no date
   // range, so the counts stand alone.
