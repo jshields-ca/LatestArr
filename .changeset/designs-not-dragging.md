@@ -13,8 +13,8 @@
 
 Part of #199 (phases 1 and 2; phase 1's renderer shipped in #205) and closes #197.
 
-- Web: `pages/designs-page.tsx` (list, with the built-in Default shown first; create from Default, duplicate, delete; older drag-and-drop templates listed separately and still editable in the old editor until the migration phase) and `pages/design-editor-page.tsx` (settings in collapsible sections, with a sticky preview that re-renders 400 ms after the last change through `POST /templates/preview`, ignoring stale responses; unsaved-changes indicator and leave warning; explicit Save). Nav item and route `/designs`; `/templates` redirects there.
-- Newsletter Content panel: `DesignPicker` replaces the Template picker (Default, designs, and "(older template)" entries, with Edit linking to the right editor), saving with an inline `SaveStatus` instead of a toast. The intro, footer note, buttons, and font moved into the design in #207.
+- Web: `pages/designs-page.tsx` (list, with the built-in Default shown first; create from Default, duplicate, delete) and `pages/design-editor-page.tsx` (settings in collapsible sections, with a sticky preview that re-renders 400 ms after the last change through `POST /templates/preview`, ignoring stale responses; unsaved-changes indicator and leave warning; explicit Save). Nav item and route `/designs`; `/templates` redirects there.
+- Newsletter Content panel: `DesignPicker` replaces the Template picker (Default and your designs, with Edit linking to the design editor), saving with an inline `SaveStatus` instead of a toast. The intro, footer note, buttons, and font moved into the design in #207.
 - `lib/design.ts` mirrors the server's design settings shape and defaults (`withDesignDefaults` fills options missing from older saved designs).
 - Server: the ungrouped compact and grid layouts line up with the title, like grouped sections; ungrouped cards stays flush so the Default design's recorded output is unchanged.
 

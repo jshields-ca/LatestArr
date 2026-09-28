@@ -218,7 +218,7 @@ function AddNewsletterDialog({
                 <option value="">Default</option>
                 {templates.map((template) => (
                   <option key={template.id} value={template.id}>
-                    {template.mode === "code" ? `${template.name} (older template)` : template.name}
+                    {template.name}
                   </option>
                 ))}
               </Select>
@@ -522,16 +522,6 @@ async function saveField(
   }
 }
 
-// Templates from the old drag-and-drop editor (still holding its state in
-// designJson) open there until they move to code designs.
-function isLegacyTemplate(template: Template): boolean {
-  return template.mode === "code" && template.designJson !== null;
-}
-
-function designEditLink(template: Template): string {
-  return isLegacyTemplate(template) ? `/templates/${template.id}/edit` : `/designs/${template.id}`;
-}
-
 function DesignPicker({
   newsletter,
   templates,
@@ -543,8 +533,6 @@ function DesignPicker({
 }) {
   const [state, setState] = useState<SaveState>({ status: "idle" });
   const current = templates.find((t) => t.id === newsletter.templateId);
-  const designs = templates.filter((t) => !isLegacyTemplate(t));
-  const legacy = templates.filter(isLegacyTemplate);
 
   return (
     <div className="flex flex-col gap-2">
@@ -569,19 +557,14 @@ function DesignPicker({
           className="max-w-xs"
         >
           <option value="">Default</option>
-          {designs.map((template) => (
+          {templates.map((template) => (
             <option key={template.id} value={template.id}>
               {template.name}
             </option>
           ))}
-          {legacy.map((template) => (
-            <option key={template.id} value={template.id}>
-              {`${template.name} (older template)`}
-            </option>
-          ))}
         </Select>
         <Button variant="outline" size="sm" asChild>
-          <Link to={current ? designEditLink(current) : "/designs"}>
+          <Link to={current ? `/designs/${current.id}` : "/designs"}>
             <Pencil />
             {current ? "Edit design" : "Manage designs"}
           </Link>

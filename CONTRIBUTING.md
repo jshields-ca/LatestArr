@@ -78,12 +78,12 @@ A few rules keep the Release notes short and accurate:
 "@latestarr/web": minor
 ---
 
-**New:** Add a single "All New (This Period)" block to the template editor — drop it in and it shows everything added recently, grouped by type, instead of six separate blocks.
+**New:** Designs can show a "Most watched" section: turn it on in the design editor and choose how many items it lists.
 
 <details>
 <summary>Technical details</summary>
 
-Addresses production feedback that there was no way to show "everything new this period" across content kinds. Registered as its own GrapesJS component type reusing the standalone Media List block's card markup...
+Adds `sections.mostWatched` to the design settings schema and renders it with the `mediaList` helper's `sort="mostWatched"` pool...
 
 </details>
 ```

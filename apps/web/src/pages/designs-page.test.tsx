@@ -27,21 +27,9 @@ const plexDark = {
   name: "Plex dark",
   mode: "design",
   settings: { ...DEFAULT_DESIGN_SETTINGS, colors: { ...DEFAULT_DESIGN_SETTINGS.colors, background: "#15181f" } },
-  designJson: null,
   compiledMjml: null,
-  compiledHtml: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
-};
-
-const legacyTemplate = {
-  ...plexDark,
-  id: "t1",
-  name: "Old layout",
-  mode: "code",
-  settings: null,
-  designJson: { pages: [] },
-  compiledMjml: "<mjml />",
 };
 
 function renderPage() {
@@ -60,22 +48,13 @@ function mockList(templates: unknown[]) {
 }
 
 describe("DesignsPage", () => {
-  it("lists the built-in Default, your designs, and older templates separately", async () => {
-    mockList([plexDark, legacyTemplate]);
+  it("lists the built-in Default and your designs", async () => {
+    mockList([plexDark]);
     renderPage();
 
     expect(await screen.findByText("Plex dark")).toBeInTheDocument();
     expect(screen.getByText("Built in")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Edit Plex dark" })).toHaveAttribute("href", "/designs/d1");
-    expect(screen.getByText("Drag-and-drop templates (older)")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Edit Old layout" })).toHaveAttribute("href", "/templates/t1/edit");
-  });
-
-  it("hides the older templates section when there are none", async () => {
-    mockList([plexDark]);
-    renderPage();
-    await screen.findByText("Plex dark");
-    expect(screen.queryByText("Drag-and-drop templates (older)")).not.toBeInTheDocument();
   });
 
   it("creates a new design from the Default settings and opens it", async () => {
@@ -128,7 +107,7 @@ describe("DesignsPage", () => {
   });
 
   it("has no accessibility violations", async () => {
-    mockList([plexDark, legacyTemplate]);
+    mockList([plexDark]);
     const { container } = renderPage();
     await screen.findByText("Plex dark");
     await waitFor(async () => expect(await axe(container)).toHaveNoViolations());

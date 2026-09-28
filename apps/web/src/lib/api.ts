@@ -534,9 +534,7 @@ export interface Template {
   // compiledMjml, with settings.content for its intro, footer, and buttons.
   mode: "design" | "code";
   settings: DesignSettings | null;
-  designJson: Record<string, unknown> | null;
   compiledMjml: string | null;
-  compiledHtml: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -607,7 +605,6 @@ export function updateTemplate(
     name?: string;
     mode?: Template["mode"];
     settings?: DesignSettings;
-    designJson?: Record<string, unknown>;
     compiledMjml?: string;
   },
 ): Promise<{ template: Template }> {

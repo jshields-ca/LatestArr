@@ -472,9 +472,7 @@ describe("newsletters", () => {
 const exampleTemplate = {
   id: "t1",
   name: "Weekly Digest",
-  designJson: null,
   compiledMjml: null,
-  compiledHtml: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -503,7 +501,7 @@ describe("templates", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/templates/t1", expect.anything());
   });
 
-  it("updates a template's designJson and compiledMjml", async () => {
+  it("updates a template's compiledMjml", async () => {
     const updated = { ...exampleTemplate, compiledMjml: "<mjml></mjml>" };
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { template: updated }));
     const result = await updateTemplate("t1", { compiledMjml: "<mjml></mjml>" });

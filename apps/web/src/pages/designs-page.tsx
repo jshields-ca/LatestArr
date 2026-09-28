@@ -18,7 +18,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
-import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { toast } from "@/components/ui/use-toast";
 import { ApiError, createTemplate, deleteTemplate, listTemplates, type Template } from "@/lib/api";
 import { DEFAULT_DESIGN_SETTINGS, type DesignSettings, withDesignDefaults } from "@/lib/design";
@@ -148,12 +147,7 @@ export function DesignsPage() {
       });
   }
 
-  // Code templates still carrying the old drag-and-drop editor's state are
-  // listed apart until they're moved over; hand-written code designs sit
-  // with the rest.
-  const isLegacy = (t: Template) => t.mode === "code" && t.designJson !== null;
-  const designs = templates?.filter((t) => !isLegacy(t)) ?? [];
-  const legacy = templates?.filter(isLegacy) ?? [];
+  const designs = templates ?? [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -236,34 +230,6 @@ export function DesignsPage() {
               />
             );
           })}
-        </div>
-      ) : null}
-
-      {legacy.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <SubsectionHeading>Drag-and-drop templates (older)</SubsectionHeading>
-            <p className="text-sm text-muted-foreground">
-              Built with the previous editor. They still work, and will move to code-mode designs in this release.
-            </p>
-          </div>
-          {legacy.map((template) => (
-            <ListRow
-              key={template.id}
-              primary={<p className="truncate font-medium">{template.name}</p>}
-              actions={
-                <>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/templates/${template.id}/edit`} aria-label={`Edit ${template.name}`}>
-                      <Pencil />
-                      Edit
-                    </Link>
-                  </Button>
-                  <ConfirmDeleteButton label={`Delete ${template.name}`} onConfirm={() => remove(template)} />
-                </>
-              }
-            />
-          ))}
         </div>
       ) : null}
     </div>

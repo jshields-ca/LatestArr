@@ -40,9 +40,7 @@ const design = {
   name: "Plex dark",
   mode: "design",
   settings: DEFAULT_DESIGN_SETTINGS,
-  designJson: null,
   compiledMjml: null,
-  compiledHtml: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
