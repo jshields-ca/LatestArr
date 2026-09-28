@@ -210,6 +210,39 @@ describe("designs", () => {
     expect(body.html).toContain("display:inline-block;width:50%");
   });
 
+  it("keeps a design's intro, footer note, and up to 4 buttons, and shows them in the preview", async () => {
+    const ctas = [1, 2, 3, 4].map((n) => ({ label: `Link ${n}`, url: `https://example.com/${n}` }));
+    const content = { intro: "Hey folks!", footerNote: "See you next week.", ctas };
+    const created = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Words", settings: { content } } }),
+    );
+    expect(created.statusCode).toBe(201);
+    expect(created.json().template.settings.content).toEqual(content);
+
+    const preview = await app.inject(
+      authed({ method: "POST", url: "/api/templates/preview", payload: { settings: { content } } }),
+    );
+    expect(preview.json().html).toContain("Hey folks!");
+    expect(preview.json().html).toContain("See you next week.");
+    expect(preview.json().html).toContain("https://example.com/4");
+  });
+
+  it("rejects a 5th button and a button link that isn't http(s)", async () => {
+    const ctas = [1, 2, 3, 4, 5].map((n) => ({ label: `Link ${n}`, url: `https://example.com/${n}` }));
+    const tooMany = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Words", settings: { content: { ctas } } } }),
+    );
+    expect(tooMany.statusCode).toBe(400);
+    const badUrl = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/templates",
+        payload: { name: "Words", settings: { content: { ctas: [{ label: "Bad", url: "javascript:alert(1)" }] } } },
+      }),
+    );
+    expect(badUrl.statusCode).toBe(400);
+  });
+
   it("404s a preview against an unknown newsletter", async () => {
     const response = await app.inject(
       authed({ method: "POST", url: "/api/templates/preview", payload: { settings: {}, newsletterId: "nope" } }),

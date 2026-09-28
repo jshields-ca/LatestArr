@@ -3,12 +3,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDb, runMigrations } from "@latestarr/db";
 import { buildApp } from "./app.js";
+import { logger } from "./logger.js";
+import { migrateContentIntoDesigns } from "./render/migrate-content-into-designs.js";
 import { startScheduler } from "./scheduler/engine.js";
 
 const databasePath = process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "latestarr.db");
 mkdirSync(path.dirname(databasePath), { recursive: true });
 const db = createDb(databasePath);
 runMigrations(db);
+migrateContentIntoDesigns(db, logger);
 
 const scheduler = await startScheduler(db);
 

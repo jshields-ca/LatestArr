@@ -13,7 +13,6 @@ import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { designSettingsSchema } from "../../render/design.js";
-import { EMAIL_FONTS } from "../../render/email-fonts.js";
 import {
   describeSendFailure,
   NewsletterMisconfiguredError,
@@ -44,17 +43,6 @@ const sendTestSchema = z.object({
   to: z.email("A valid email address is required"),
 });
 
-const emailFontSchema = z.enum(Object.keys(EMAIL_FONTS) as [string, ...string[]]);
-
-const ctaSchema = z.object({
-  label: z.string().trim().min(1).max(40),
-  url: z.url(),
-});
-
-// Capped at 4 — a handful of quick links (Plex app, donation, "browse the
-// library"), not a general-purpose link list.
-const ctasSchema = z.array(ctaSchema).max(4);
-
 const createNewsletterSchema = z.object({
   name: z.string().trim().min(1, "name and scheduleCron are required"),
   scheduleCron: z.string().trim().min(1, "name and scheduleCron are required"),
@@ -65,10 +53,6 @@ const createNewsletterSchema = z.object({
   smtpProfileId: z.string().min(1).optional(),
   templateId: z.string().min(1).optional(),
   senderIdentity: senderIdentitySchema.optional(),
-  emailFont: emailFontSchema.optional(),
-  introText: z.string().trim().max(2000).optional(),
-  footerNote: z.string().trim().max(2000).optional(),
-  ctas: ctasSchema.optional(),
 });
 
 const updateNewsletterSchema = z.object({
@@ -82,10 +66,6 @@ const updateNewsletterSchema = z.object({
   smtpProfileId: z.string().min(1).nullable().optional(),
   templateId: z.string().min(1).nullable().optional(),
   senderIdentity: senderIdentitySchema.optional(),
-  emailFont: emailFontSchema.optional(),
-  introText: z.string().trim().max(2000).nullable().optional(),
-  footerNote: z.string().trim().max(2000).nullable().optional(),
-  ctas: ctasSchema.optional(),
 });
 
 const addSourceSchema = z.object({
@@ -140,10 +120,6 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         smtpProfileId,
         templateId,
         senderIdentity,
-        emailFont,
-        introText,
-        footerNote,
-        ctas,
       } = body;
 
       const [newsletter] = await db
@@ -159,10 +135,6 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           ...(smtpProfileId !== undefined && { smtpProfileId }),
           ...(templateId !== undefined && { templateId }),
           ...(senderIdentity !== undefined && { senderIdentity }),
-          ...(emailFont !== undefined && { emailFont }),
-          ...(introText !== undefined && { introText }),
-          ...(footerNote !== undefined && { footerNote }),
-          ...(ctas !== undefined && { ctas }),
         })
         .returning();
 
@@ -222,10 +194,6 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         smtpProfileId,
         templateId,
         senderIdentity,
-        emailFont,
-        introText,
-        footerNote,
-        ctas,
       } = body;
 
       const [newsletter] = await db
@@ -241,10 +209,6 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           ...(smtpProfileId !== undefined && { smtpProfileId }),
           ...(templateId !== undefined && { templateId }),
           ...(senderIdentity !== undefined && { senderIdentity }),
-          ...(emailFont !== undefined && { emailFont }),
-          ...(introText !== undefined && { introText }),
-          ...(footerNote !== undefined && { footerNote }),
-          ...(ctas !== undefined && { ctas }),
           updatedAt: new Date(),
         })
         .where(eq(newsletters.id, request.params.id))

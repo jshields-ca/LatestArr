@@ -742,49 +742,13 @@ describe("NewslettersPage", () => {
     240000,
   );
 
-  it(
-    "changes the Default design's font, and hides the Font picker once another design is picked",
-    async () => {
-      const user = userEvent.setup();
-      mockRoutes(
-        baseRoutes({
-          "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
-          "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }),
-          "/api/newsletters/n1": jsonResponse(200, {
-            newsletter: weeklyDigest,
-            sources: [],
-            recipientGroups: [],
-          }),
-          "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
-        }),
-      );
-      renderPage();
-      await screen.findByText("Weekly digest");
-      await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-      await screen.findByLabelText("Font");
-
-      fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, emailFont: "georgia" } }));
-      selectOption(screen.getByLabelText("Font"), "Georgia (serif)");
-      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
-      expect(JSON.parse(init.body as string)).toEqual({ emailFont: "georgia" });
-
-      fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
-      selectOption(screen.getByLabelText("Design"), "Weekly Layout (older template)");
-      await waitFor(() => expect(screen.queryByLabelText("Font")).not.toBeInTheDocument());
-    },
-    240000,
-  );
-
-  it("saves the intro text on blur, only when it actually changed", async () => {
+  it("leaves the font, intro, footer note, and buttons to the design", async () => {
     const user = userEvent.setup();
     mockRoutes(
       baseRoutes({
         "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
-        "/api/newsletters/n1": jsonResponse(200, {
-          newsletter: weeklyDigest,
-          sources: [],
-          recipientGroups: [],
-        }),
+        "/api/templates": jsonResponse(200, { templates: [weeklyLayoutTemplate] }),
+        "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [], recipientGroups: [] }),
         "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
       }),
     );
@@ -792,77 +756,10 @@ describe("NewslettersPage", () => {
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
 
-    const introField = await screen.findByLabelText("Intro (optional)");
-    await user.click(introField);
-    await user.tab();
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      "/api/newsletters/n1",
-      expect.objectContaining({ method: "PATCH" }),
-    );
-
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { newsletter: { ...weeklyDigest, introText: "Hey folks!" } }),
-    );
-    await user.type(introField, "Hey folks!");
-    await user.tab();
-
-    await waitFor(() => {
-      const call = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH");
-      expect(call).toBeTruthy();
-      expect(JSON.parse((call as [string, RequestInit])[1].body as string)).toEqual({
-        introText: "Hey folks!",
-      });
-    });
-  });
-
-  it("saves CTA buttons by themselves once every row is complete, capping at 4", async () => {
-    const user = userEvent.setup();
-    mockRoutes(
-      baseRoutes({
-        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
-        "/api/newsletters/n1": jsonResponse(200, {
-          newsletter: weeklyDigest,
-          sources: [],
-          recipientGroups: [],
-        }),
-        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
-      }),
-    );
-    renderPage();
-    await screen.findByText("Weekly digest");
-    await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
-
-    expect(await screen.findByText(/No buttons yet/)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Add button" }));
-    await user.type(screen.getByLabelText("Button 1 label"), "Open Plex");
-    await user.type(screen.getByLabelText("Button 1 URL"), "app.plex.tv/desktop");
-    // An incomplete link isn't saved, and says why.
-    expect(screen.getByText(/to save this button/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save buttons" })).not.toBeInTheDocument();
-
-    const savedCta = { label: "Open Plex", url: "https://app.plex.tv/desktop" };
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { newsletter: { ...weeklyDigest, ctas: [savedCta] } }),
-    );
-    await user.clear(screen.getByLabelText("Button 1 URL"));
-    await user.type(screen.getByLabelText("Button 1 URL"), "https://app.plex.tv/desktop");
-
-    await waitFor(() => {
-      const patches = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
-      expect(patches).toHaveLength(1);
-      expect(JSON.parse((patches[0] as [string, RequestInit])[1].body as string)).toEqual({ ctas: [savedCta] });
-    });
-    expect(await screen.findByText("Saved")).toBeInTheDocument();
-
-    // Add 3 more to hit the cap of 4, then confirm "Add button" disappears.
-    await user.click(screen.getByRole("button", { name: "Add button" }));
-    await user.click(screen.getByRole("button", { name: "Add button" }));
-    await user.click(screen.getByRole("button", { name: "Add button" }));
+    expect(await screen.findByText(/Default has no intro or buttons/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Font")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Intro/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add button" })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Remove button 2" }));
-    expect(await screen.findByRole("button", { name: "Add button" })).toBeInTheDocument();
   });
 
   it("prefills the Details tab with the existing schedule parsed into simple mode", async () => {

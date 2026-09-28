@@ -939,7 +939,14 @@ describe("designs in the send pipeline", () => {
   it("renders a newsletter with its linked design", async () => {
     const newsletterId = await newsletterWithSource();
     const created = await app.inject(
-      authed({ method: "POST", url: "/api/templates", payload: { name: "Compact", settings: { layout: "compact" } } }),
+      authed({
+        method: "POST",
+        url: "/api/templates",
+        payload: {
+          name: "Compact",
+          settings: { layout: "compact", content: { intro: "Hey folks!", ctas: [{ label: "Open Plex", url: "https://app.plex.tv/" }] } },
+        },
+      }),
     );
     await app.inject(
       authed({ method: "PATCH", url: `/api/newsletters/${newsletterId}`, payload: { templateId: created.json().template.id } }),
@@ -951,6 +958,9 @@ describe("designs in the send pipeline", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().html).toContain("padding:8px 0;border-bottom:1px solid");
     expect(response.json().html).toContain("Some Movie");
+    // The intro and buttons come from the design, not the newsletter.
+    expect(response.json().html).toContain("Hey folks!");
+    expect(response.json().html).toContain("https://app.plex.tv/");
   });
 
   it("previews unsaved design settings against the newsletter's real items without saving them", async () => {
