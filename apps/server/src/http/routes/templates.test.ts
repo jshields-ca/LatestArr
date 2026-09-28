@@ -139,6 +139,24 @@ describe("template lifecycle", () => {
     const getResponse = await app.inject(authed({ method: "GET", url: `/api/templates/${id}` }));
     expect(getResponse.statusCode).toBe(404);
   });
+
+  it("deletes a design a newsletter uses, switching that newsletter to Default", async () => {
+    const id = await createTemplate();
+    const created = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: { name: "Weekly", scheduleCron: "0 9 * * 1", templateId: id },
+      }),
+    );
+    const newsletterId = created.json().newsletter.id;
+
+    const deleteResponse = await app.inject(authed({ method: "DELETE", url: `/api/templates/${id}` }));
+    expect(deleteResponse.statusCode).toBe(204);
+
+    const newsletter = await app.inject(authed({ method: "GET", url: `/api/newsletters/${newsletterId}` }));
+    expect(newsletter.json().newsletter.templateId).toBeNull();
+  });
 });
 
 describe("auth gating", () => {
