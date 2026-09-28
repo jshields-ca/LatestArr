@@ -56,7 +56,10 @@ import {
 // packages/adapters/*/src/*-adapter.ts) — checked here too so the
 // "Import users" action only appears where it can actually work, rather
 // than every row offering it and most of them 404ing.
-const KINDS_WITH_USER_IMPORT = new Set(["plex", "tautulli", "jellyfin", "emby"]);
+const KINDS_WITH_USER_IMPORT = new Set(["plex", "tautulli", "jellyfin", "emby", "audiobookshelf", "romm"]);
+
+// Loose on purpose: the server validates properly on import.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const TESTERS_ISSUE_URL = "https://github.com/jshields-ca/LatestArr/issues/196";
 
@@ -547,6 +550,8 @@ function ImportSourceUsersDialog({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [users, setUsers] = useState<SourceUser[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Emails typed in for users the source has none for (Plex, Jellyfin, ...).
+  const [typedEmails, setTypedEmails] = useState<Record<string, string>>({});
   const [groupName, setGroupName] = useState(source.name);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ created: number; addedToGroup: number; noEmail: number } | null>(
@@ -560,6 +565,7 @@ function ImportSourceUsersDialog({
     setResult(null);
     setGroupName(source.name);
     setUsers(null);
+    setTypedEmails({});
     setLoading(true);
     listSourceUsers(source.id)
       .then(({ users: loaded }) => {
@@ -568,6 +574,24 @@ function ImportSourceUsersDialog({
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load users."))
       .finally(() => setLoading(false));
+  }
+
+  function emailFor(user: SourceUser): string | undefined {
+    if (user.email) return user.email;
+    const typed = typedEmails[user.externalId]?.trim();
+    return typed && EMAIL_PATTERN.test(typed) ? typed : undefined;
+  }
+
+  // Typing a complete address selects the user; clearing it deselects them.
+  function typeEmail(user: SourceUser, value: string) {
+    setTypedEmails((prev) => ({ ...prev, [user.externalId]: value }));
+    const valid = EMAIL_PATTERN.test(value.trim());
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (valid) next.add(user.externalId);
+      else next.delete(user.externalId);
+      return next;
+    });
   }
 
   function toggle(externalId: string) {
@@ -582,8 +606,8 @@ function ImportSourceUsersDialog({
   async function handleImport() {
     if (!users) return;
     const rows = users
-      .filter((u) => u.email && selected.has(u.externalId))
-      .map((u) => ({ email: u.email!, displayName: u.username }));
+      .filter((u) => emailFor(u) && selected.has(u.externalId))
+      .map((u) => ({ email: emailFor(u)!, displayName: u.username }));
     if (rows.length === 0) return;
 
     setSubmitting(true);
@@ -609,7 +633,7 @@ function ImportSourceUsersDialog({
       setResult({
         created: importResult.created.length,
         addedToGroup,
-        noEmail: users.filter((u) => !u.email).length,
+        noEmail: users.filter((u) => !emailFor(u)).length,
       });
       toast({
         variant: "success",
@@ -627,7 +651,7 @@ function ImportSourceUsersDialog({
   }
 
   const selectedWithEmailCount = users
-    ? users.filter((u) => u.email && selected.has(u.externalId)).length
+    ? users.filter((u) => emailFor(u) && selected.has(u.externalId)).length
     : 0;
   const groupExists = groups.some((g) => g.name === groupName.trim());
 
@@ -642,7 +666,10 @@ function ImportSourceUsersDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Import users from {source.name}</DialogTitle>
-          <DialogDescription>Add its known users as recipients, grouped together.</DialogDescription>
+          <DialogDescription>
+            Add its users as recipients, grouped together. Type an email for anyone {source.name} doesn&apos;t
+            have one for.
+          </DialogDescription>
         </DialogHeader>
 
         {loading ? (
@@ -666,7 +693,7 @@ function ImportSourceUsersDialog({
               ) : null}
               .{" "}
               {result.noEmail > 0
-                ? `${result.noEmail} user${result.noEmail === 1 ? " has" : "s have"} no known email and couldn't be imported.`
+                ? `${result.noEmail} user${result.noEmail === 1 ? "" : "s"} without an email ${result.noEmail === 1 ? "wasn't" : "weren't"} imported.`
                 : ""}
             </p>
             <DialogFooter>
@@ -682,12 +709,12 @@ function ImportSourceUsersDialog({
             <div className="flex flex-col gap-4">
               <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
                 {users.map((user) => (
-                  <li key={user.externalId} className="flex items-center gap-2 rounded px-1.5 py-1">
+                  <li key={user.externalId} className="flex flex-wrap items-center gap-2 rounded px-1.5 py-1">
                     <input
                       type="checkbox"
                       id={`import-user-${source.id}-${user.externalId}`}
                       checked={selected.has(user.externalId)}
-                      disabled={!user.email}
+                      disabled={!emailFor(user)}
                       onChange={() => toggle(user.externalId)}
                       className="size-4 shrink-0 accent-primary disabled:opacity-50"
                     />
@@ -698,12 +725,19 @@ function ImportSourceUsersDialog({
                       <span className="truncate">{user.username}</span>
                       {user.email ? (
                         <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                      ) : (
-                        <Badge variant="neutral" className="shrink-0">
-                          No email
-                        </Badge>
-                      )}
+                      ) : null}
                     </label>
+                    {user.email ? null : (
+                      <Input
+                        type="email"
+                        aria-label={`Email for ${user.username}`}
+                        placeholder="Add an email"
+                        value={typedEmails[user.externalId] ?? ""}
+                        onChange={(e) => typeEmail(user, e.target.value)}
+                        disabled={submitting}
+                        className="h-8 basis-full sm:basis-56"
+                      />
+                    )}
                   </li>
                 ))}
               </ul>

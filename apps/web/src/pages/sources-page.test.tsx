@@ -388,16 +388,16 @@ describe("SourcesPage", () => {
 describe("ImportSourceUsersDialog", () => {
   it("only offers Import users for source kinds that support it", async () => {
     mockLoad({
-      sources: [exampleSource, { ...exampleSource, id: "2", name: "Game Library", kind: "romm" }],
+      sources: [exampleSource, { ...exampleSource, id: "2", name: "Book Library", kind: "booklore" }],
     });
     render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
-    await screen.findByText("Game Library");
+    await screen.findByText("Book Library");
 
     expect(screen.getAllByRole("button", { name: "Import users" })).toHaveLength(1);
   });
 
-  it("previews users, pre-checking those with an email, and imports the selected ones into a new group", async () => {
+  it("previews users, pre-checking those with an email, takes typed emails for the rest, and imports them into a new group", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [exampleSource] });
     fetchMock.mockImplementationOnce(() =>
@@ -422,13 +422,21 @@ describe("ImportSourceUsersDialog", () => {
     const bobCheckbox = within(dialog).getByRole("checkbox", { name: /bob/ });
     expect(aliceCheckbox).toBeChecked();
     expect(bobCheckbox).toBeDisabled();
-    expect(within(dialog).getByText("No email")).toBeInTheDocument();
+
+    const bobEmail = within(dialog).getByLabelText("Email for bob");
+    await user.type(bobEmail, "bob@example");
+    expect(bobCheckbox).toBeDisabled();
+    await user.type(bobEmail, ".com");
+    expect(bobCheckbox).toBeChecked();
 
     expect(within(dialog).getByLabelText("Add to group")).toHaveValue("Home Tautulli");
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse(201, {
-        created: [{ id: "r1", email: "alice@example.com", displayName: "alice", isActive: true }],
+        created: [
+          { id: "r1", email: "alice@example.com", displayName: "alice", isActive: true },
+          { id: "r2", email: "bob@example.com", displayName: "bob", isActive: true },
+        ],
         skipped: [],
       }),
     );
@@ -436,17 +444,21 @@ describe("ImportSourceUsersDialog", () => {
       jsonResponse(201, { group: { id: "g1", name: "Home Tautulli", description: null } }),
     );
     fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
+    fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
 
-    await user.click(within(dialog).getByRole("button", { name: /Import 1 recipient/ }));
+    await user.click(within(dialog).getByRole("button", { name: /Import 2 recipients/ }));
 
-    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1\s*recipient.*Home Tautulli/));
+    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*2\s*recipients.*Home Tautulli/));
 
     const importCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipients/import") as [
       string,
       RequestInit,
     ];
     expect(JSON.parse(importCall[1].body as string)).toEqual({
-      rows: [{ email: "alice@example.com", displayName: "alice" }],
+      rows: [
+        { email: "alice@example.com", displayName: "alice" },
+        { email: "bob@example.com", displayName: "bob" },
+      ],
     });
 
     const createGroupCall = fetchMock.mock.calls.find(

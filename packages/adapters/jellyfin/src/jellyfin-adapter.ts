@@ -24,6 +24,7 @@ import {
 
 const DEFAULT_FETCH_COUNT = 100;
 const TICKS_PER_SECOND = 10_000_000;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const ITEM_KIND: Record<string, MediaKind> = {
   Movie: "movie",
@@ -136,11 +137,18 @@ function createAdapter(flavor: ServerFlavor): SourceAdapter {
         .map((folder) => ({ id: folder.Id, name: folder.Name, kind: libraryKind(folder.CollectionType) }));
     },
 
-    // Server accounts carry no email address, so every candidate needs one
-    // added before it can become a recipient (see SourceUser).
+    // Jellyfin accounts have no email address, so those need one typed in
+    // when importing. An Emby user linked to Emby Connect often signs in
+    // with an email, which is used when it looks like one.
     async listUsers(config: SourceConnectionConfig): Promise<SourceUser[]> {
       const users = await getUsers(flavor, config.baseUrl, apiKeyOf(config));
-      return users.map((user) => ({ externalId: user.Id, username: user.Name }));
+      return users
+        .filter((user) => !user.Policy?.IsDisabled)
+        .map((user) => {
+          const connect = user.ConnectUserName?.trim();
+          const email = flavor === "emby" && connect && EMAIL_PATTERN.test(connect) ? connect : undefined;
+          return { externalId: user.Id, username: user.Name, ...(email && { email }) };
+        });
     },
 
     async fetchRecentItems(config: SourceConnectionConfig, params: FetchRecentItemsParams): Promise<NewItem[]> {

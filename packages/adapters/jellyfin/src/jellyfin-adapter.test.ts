@@ -127,9 +127,26 @@ describe("listLibraries", () => {
 });
 
 describe("listUsers", () => {
-  it("lists server accounts without emails", async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse([{ Id: "u1", Name: "alex" }]));
-    await expect(jellyfinAdapter.listUsers!(config)).resolves.toEqual([{ externalId: "u1", username: "alex" }]);
+  const users = [
+    { Id: "u1", Name: "alex", ConnectUserName: "alex@example.com" },
+    { Id: "u2", Name: "sam", ConnectUserName: "sam at home@example" },
+    { Id: "u3", Name: "old", Policy: { IsDisabled: true } },
+  ];
+
+  it("lists enabled Jellyfin accounts, which have no emails", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(users));
+    await expect(jellyfinAdapter.listUsers!(config)).resolves.toEqual([
+      { externalId: "u1", username: "alex" },
+      { externalId: "u2", username: "sam" },
+    ]);
+  });
+
+  it("uses an Emby Connect name as the email when it is one", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse(users));
+    await expect(embyAdapter.listUsers!(config)).resolves.toEqual([
+      { externalId: "u1", username: "alex", email: "alex@example.com" },
+      { externalId: "u2", username: "sam" },
+    ]);
   });
 });
 
