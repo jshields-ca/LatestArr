@@ -382,10 +382,10 @@ describe("full source lifecycle", () => {
       url: "/api/sources",
       cookies: { latestarr_session: sessionCookie },
       payload: {
-        name: "Game Library",
-        kind: "romm",
-        baseUrl: "http://romm.local:8080",
-        credentials: { token: "secret-token" },
+        name: "Book Library",
+        kind: "booklore",
+        baseUrl: "http://booklore.local:6060",
+        credentials: { username: "reader", password: "secret" },
       },
     });
     const id = createResponse.json().source.id as string;
