@@ -156,8 +156,8 @@ describe("poster and metadata fields on rendered items", () => {
   });
 });
 
-// Mirrors the actual shape apps/web/src/lib/grapesjs-blocks.ts's media-list
-// component type exports (one <mj-raw> pair per rendered item, nested right
+// Mirrors the shape the old drag-and-drop editor's media-list block
+// exported, which migrated code designs still contain (one <mj-raw> pair per rendered item, nested right
 // inside the {{#mediaList}}/{{/mediaList}} block), rather than hand-writing
 // a fixture that's already careful to wrap things correctly — this is the
 // regression guard for a real bug: MJML's compiler silently drops a bare
@@ -272,8 +272,8 @@ describe("the mediaList block helper's showAll variant", () => {
 });
 
 describe("the mediaList block helper's count handling", () => {
-  it("treats a non-numeric count (e.g. the GrapesJS-side 'all' sentinel) as unbounded, same as showAll", async () => {
-    // grapesjs-blocks.ts never sends a literal count="all" itself (it uses
+  it("treats a non-numeric count (e.g. an 'all' sentinel) as unbounded, same as showAll", async () => {
+    // The old drag-and-drop editor never wrote a literal count="all" (it used
     // the showAll="true" hash arg instead — see the "showAll variant"
     // describe block above), but the helper's own count coercion already
     // falls back to "show everything" for any non-numeric count, so this
@@ -298,7 +298,7 @@ describe("the mediaList block helper's count handling", () => {
 });
 
 describe("the ifAnyItems block helper", () => {
-  // Backs the GrapesJS "All New (This Period)" composite block: a heading
+  // Backs the old editor's "All New (This Period)" block, still in migrated designs: a heading
   // wrapped in {{#ifAnyItems}} right above a {{#mediaList}} call with the
   // same contentType/sort, so the heading disappears along with an empty
   // list instead of sitting above nothing.
@@ -357,7 +357,7 @@ describe("the ifAnyItems block helper", () => {
   });
 });
 
-// Mirrors what apps/web/src/lib/grapesjs-blocks.ts's "All New (This Period)"
+// Mirrors what the old drag-and-drop editor's "All New (This Period)"
 // composite block actually exports: one {{#ifAnyItems}}-gated heading +
 // {{#mediaList ... showAll="true"}} pair per content kind, all sharing the
 // same lookback-scoped `items` pool. This is the end-to-end regression

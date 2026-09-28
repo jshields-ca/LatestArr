@@ -56,25 +56,15 @@ describe("POST /templates", () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it("creates a template without a designJson", async () => {
+  it("creates an options design with the defaults when given only a name", async () => {
     const response = await app.inject(
       authed({ method: "POST", url: "/api/templates", payload: { name: "Weekly digest" } }),
     );
     expect(response.statusCode).toBe(201);
-    expect(response.json().template.name).toBe("Weekly digest");
-    expect(response.json().template.designJson).toBeNull();
+    expect(response.json().template).toMatchObject({ name: "Weekly digest", mode: "design", compiledMjml: null });
   });
 
-  it("creates a template with a designJson blob", async () => {
-    const designJson = { blocks: [{ type: "header", text: "New this week" }] };
-    const response = await app.inject(
-      authed({ method: "POST", url: "/api/templates", payload: { name: "Weekly digest", designJson } }),
-    );
-    expect(response.statusCode).toBe(201);
-    expect(response.json().template.designJson).toEqual(designJson);
-  });
-
-  it("creates a template with compiled MJML", async () => {
+  it("creates a code design from compiled MJML", async () => {
     const response = await app.inject(
       authed({
         method: "POST",
@@ -83,14 +73,14 @@ describe("POST /templates", () => {
       }),
     );
     expect(response.statusCode).toBe(201);
-    expect(response.json().template.compiledMjml).toBe("<mjml><mj-body></mj-body></mjml>");
+    expect(response.json().template).toMatchObject({ mode: "code", compiledMjml: "<mjml><mj-body></mj-body></mjml>" });
   });
 });
 
 describe("template lifecycle", () => {
-  async function createTemplate(designJson?: Record<string, unknown>) {
+  async function createTemplate() {
     const response = await app.inject(
-      authed({ method: "POST", url: "/api/templates", payload: { name: "Weekly digest", designJson } }),
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Weekly digest" } }),
     );
     return response.json().template.id as string;
   }
@@ -115,21 +105,17 @@ describe("template lifecycle", () => {
     expect(patchResponse.statusCode).toBe(404);
   });
 
-  it("updates the name and designJson independently", async () => {
-    const id = await createTemplate({ blocks: [] });
+  it("updates the name and settings independently", async () => {
+    const id = await createTemplate();
 
+    const restyled = await app.inject(
+      authed({ method: "PATCH", url: `/api/templates/${id}`, payload: { settings: { layout: "grid" } } }),
+    );
     const renamed = await app.inject(
       authed({ method: "PATCH", url: `/api/templates/${id}`, payload: { name: "Renamed" } }),
     );
-    expect(renamed.json().template.name).toBe("Renamed");
-    expect(renamed.json().template.designJson).toEqual({ blocks: [] });
-
-    const newDesign = { blocks: [{ type: "footer" }] };
-    const redesigned = await app.inject(
-      authed({ method: "PATCH", url: `/api/templates/${id}`, payload: { designJson: newDesign } }),
-    );
-    expect(redesigned.json().template.name).toBe("Renamed");
-    expect(redesigned.json().template.designJson).toEqual(newDesign);
+    expect(restyled.json().template.settings.layout).toBe("grid");
+    expect(renamed.json().template).toMatchObject({ name: "Renamed", settings: { layout: "grid" } });
   });
 
   it("updates compiledMjml", async () => {
@@ -178,11 +164,6 @@ describe("designs", () => {
     expect(template.compiledMjml).toBeNull();
   });
 
-  it("keeps a template created without settings as a code template", async () => {
-    const response = await app.inject(authed({ method: "POST", url: "/api/templates", payload: { name: "Legacy" } }));
-    expect(response.json().template.mode).toBe("code");
-  });
-
   it("rejects invalid design settings", async () => {
     const badColour = await app.inject(
       authed({ method: "POST", url: "/api/templates", payload: { name: "Bad", settings: { colors: { accent: "red" } } } }),
@@ -190,13 +171,19 @@ describe("designs", () => {
     expect(badColour.statusCode).toBe(400);
   });
 
-  it("turns a template into a design when settings are saved", async () => {
-    const created = await app.inject(authed({ method: "POST", url: "/api/templates", payload: { name: "Legacy" } }));
-    const id = created.json().template.id;
-    const updated = await app.inject(
-      authed({ method: "PATCH", url: `/api/templates/${id}`, payload: { settings: { layout: "grid" } } }),
+  it("changes a design's mode only when asked to", async () => {
+    const created = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Code", compiledMjml: "<mjml><mj-body></mj-body></mjml>" } }),
     );
-    expect(updated.json().template).toMatchObject({ mode: "design", settings: { layout: "grid" } });
+    const id = created.json().template.id;
+    const textOnly = await app.inject(
+      authed({ method: "PATCH", url: `/api/templates/${id}`, payload: { settings: { content: { intro: "Hi" } } } }),
+    );
+    expect(textOnly.json().template.mode).toBe("code");
+    const back = await app.inject(
+      authed({ method: "PATCH", url: `/api/templates/${id}`, payload: { mode: "design", settings: { layout: "grid" } } }),
+    );
+    expect(back.json().template).toMatchObject({ mode: "design", settings: { layout: "grid" } });
   });
 
   it("previews unsaved settings with sample content", async () => {

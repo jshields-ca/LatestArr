@@ -1,5 +1,4 @@
-import { Suspense, lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
@@ -17,11 +16,12 @@ import { SetupPage } from "@/pages/setup-page";
 import { SmtpProfilesPage } from "@/pages/smtp-profiles-page";
 import { SourcesPage } from "@/pages/sources-page";
 
-// GrapesJS is large (~700kB gzipped) — code-split so it's only downloaded
-// by users who actually open the builder, not on every page load.
-const TemplateEditorPage = lazy(() =>
-  import("@/pages/template-editor-page").then((m) => ({ default: m.TemplateEditorPage })),
-);
+// Old bookmarks to the retired drag-and-drop editor open the same design
+// in the design editor.
+function TemplateEditRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/designs/${id}`} replace />;
+}
 
 export default function App() {
   return (
@@ -45,14 +45,7 @@ export default function App() {
                   <Route path="/templates" element={<Navigate to="/designs" replace />} />
                   <Route path="/notifications" element={<NotificationsPage />} />
                   <Route path="/logs" element={<LogsPage />} />
-                  <Route
-                    path="/templates/:id/edit"
-                    element={
-                      <Suspense fallback={null}>
-                        <TemplateEditorPage />
-                      </Suspense>
-                    }
-                  />
+                  <Route path="/templates/:id/edit" element={<TemplateEditRedirect />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </AppShell>

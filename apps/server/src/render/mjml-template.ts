@@ -2,10 +2,9 @@ import type { NewItem } from "@latestarr/adapter-core";
 import Handlebars from "handlebars";
 import mjml2html from "mjml";
 
-// The GrapesJS builder exports MJML source that still contains literal
-// Handlebars tokens (e.g. {{#each items}}) for its dynamic blocks — we
-// reuse the same data-binding layer as the hardcoded starter template
-// rather than inventing a second templating mechanism. {{title}}/etc. use
+// Every design renders through here: MJML containing Handlebars tokens
+// (e.g. {{#each items}}), whether generated from a design's options
+// (design.ts) or written by hand in a code design. {{title}}/etc. use
 // Handlebars' default {{}} escaping, not {{{}}}, so item text from a
 // source can't inject markup into the compiled HTML.
 
@@ -58,9 +57,7 @@ export interface MjmlRenderContext {
   generatedAt: Date;
   /** The newsletter's configured lookback-window length, for the default
    * template's "Here's what's new in the last N days" intro line
-   * (newsletter-template.ts). Optional since a custom, GrapesJS-authored
-   * template has no built-in use for it — it's still bound as
-   * {{lookbackDays}} for any custom template that references it directly. */
+   * (design.ts). Bound as {{lookbackDays}} for code designs too. */
   lookbackDays?: number;
   /** Free-text shown near the top of the default template, above the item
    * list. Bound as {{introText}} for any template that references it. */
@@ -98,10 +95,9 @@ function formatRating(rating: NewItem["rating"]): string | undefined {
 // episodes/seasons and games never set one — only BookLore-family and
 // Audiobookshelf do, to distinguish Ebook/Comic/Audiobook/Podcast within
 // their shared "book"/"audiobook" kinds). Keeping this map here, and
-// resolving it into contentLabel once in toRenderable below, means the
-// badge markup itself (apps/web/src/lib/grapesjs-blocks.ts's
-// CONTENT_LABEL_BADGE) only ever has to read {{contentLabel}} — it never
-// needs its own copy of this map or to know about `kind` at all.
+// resolving it into contentLabel once in toRenderable below, means badge
+// markup only ever has to read {{contentLabel}}: it never needs its own
+// copy of this map or to know about `kind` at all.
 const KIND_LABELS: Record<NewItem["kind"], string> = {
   movie: "Movie",
   tv_episode: "TV Episode",
@@ -160,8 +156,7 @@ function shuffled<T>(items: T[]): T[] {
 }
 
 // The accent color of LatestArr's own Bloom palette (hsl(343 74% 44%)),
-// matching the hardcoded copies in newsletter-template.ts and
-// grapesjs-blocks.ts — this one's only use is the emptyFallback="link" flow's
+// matching the Default design; its only use is the emptyFallback="link"
 // plain-link markup below.
 const ACCENT_COLOR = "#c31d4c";
 
@@ -181,9 +176,8 @@ function matchesContentType(item: RenderableItem, contentType: string | undefine
   return !contentType || item.kind === contentType;
 }
 
-// The GrapesJS "Media List" block exports its trait values as hash
-// arguments on this block helper rather than as a second templating
-// mechanism — {{#mediaList contentType="movie" sort="added" count="5"
+// A filtered, sorted, trimmed list, configured by hash arguments —
+// {{#mediaList contentType="movie" sort="added" count="5"
 // order="sequential" showAll="false" emptyFallback="none"}}...{{/mediaList}}.
 // The block body is rendered once per matching item, exactly like a
 // filtered/sorted/sliced {{#each}}.
@@ -233,12 +227,10 @@ Handlebars.registerHelper("mediaList", function mediaList(
     const href = contentType ? this.sourceLinksByContentType?.[contentType] : undefined;
     if (!href) return "";
     const label = Handlebars.escapeExpression(fallbackLinkLabel || "Browse the library");
-    // Must be wrapped in its own <mj-raw> here — unlike the per-item body
-    // (options.fn's own <mj-raw>...</mj-raw>, supplied by the block's own
-    // toHTML), this string substitutes directly into the compiled MJML at
-    // the {{#mediaList}}/{{/mediaList}} site, sitting straight inside an
-    // <mj-column> — the same "bare non-mj-tag HTML gets silently dropped"
-    // trap documented in newsletter-template.ts and grapesjs-blocks.ts.
+    // Wrapped in its own <mj-raw> unless told otherwise: this string
+    // substitutes directly into the MJML at the {{#mediaList}} site, often
+    // straight inside an <mj-column>, where bare non-mj-tag HTML is
+    // silently dropped.
     const link =
       `<a href="${Handlebars.escapeExpression(href)}" ` +
       `style="color:${ACCENT_COLOR};font-family:sans-serif;font-size:14px;font-weight:600;">` +
@@ -249,18 +241,16 @@ Handlebars.registerHelper("mediaList", function mediaList(
   return selected.map((item) => options.fn(item)).join("");
 });
 
-// Backs the GrapesJS "All New (This Period)" composite block
-// (grapesjs-blocks.ts), which stacks one heading + {{#mediaList}} pair per
-// adapter content kind and needs each kind's heading to disappear along
-// with its (empty) list rather than sitting above a blank section.
+// Lets a heading above a {{#mediaList}} disappear along with its (empty)
+// list, rather than sitting above a blank section.
 // {{#mediaList}} itself can't answer "would I render anything" from outside
 // — it's a block helper whose body only ever runs once per matching item,
 // with no count exposed to the surrounding template — so this is a second,
 // read-only helper applying the exact same pool + contentType filter
 // mediaList uses, purely to decide whether to render its block at all.
-// Always called with the same contentType/sort as the {{#mediaList}}
-// immediately below it, so "would mediaList render anything" and "is this
-// filtered pool non-empty" are the same question.
+// Given the same contentType/sort as that {{#mediaList}}, "would mediaList
+// render anything" and "is this filtered pool non-empty" are the same
+// question.
 Handlebars.registerHelper("ifAnyItems", function ifAnyItems(
   this: { items?: RenderableItem[]; popularItems?: RenderableItem[] },
   options: Handlebars.HelperOptions,
@@ -300,20 +290,16 @@ export async function renderMjmlTemplate(
     ctas: context.ctas ?? [],
   });
 
-  // A template saved from the builder before it's ever had an initial
-  // design loaded exports a bare fragment (just its section/column
-  // content, no root element) — mjml2html rejects that outright, even
-  // under "soft" validation, rather than returning best-effort HTML. Wrap
-  // it the same way a template built from scratch in the editor ends up
-  // wrapped, so a truly bare-bones custom template still renders instead
-  // of failing the whole send.
+  // A code design may be a bare fragment (just its section/column content,
+  // no root element), which mjml2html rejects outright even under "soft"
+  // validation. Wrap it so it still renders instead of failing the send.
   const wrappedMjml = /^\s*<mjml[\s>]/.test(substitutedMjml)
     ? substitutedMjml
     : `<mjml><mj-body>${substitutedMjml}</mj-body></mjml>`;
 
   // "soft" validation still returns best-effort HTML for a malformed
-  // custom template rather than aborting the send outright — a user's
-  // builder mistake shouldn't take down a newsletter that otherwise has
+  // code design rather than aborting the send outright — a markup
+  // mistake shouldn't take down a newsletter that otherwise has
   // real content to deliver.
   const { html } = await mjml2html(wrappedMjml, { validationLevel: "soft" });
   return html;

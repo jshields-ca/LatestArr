@@ -30,12 +30,11 @@ const modeSchema = z.enum(["design", "code"]);
 
 // "design" renders from `settings`; "code" from compiledMjml, with
 // `settings` supplying only its intro, footer note, and buttons. Without a
-// mode, sending `settings` alone makes a design, anything else code.
+// mode, sending compiledMjml makes a code design, anything else options.
 const createTemplateSchema = z.object({
   name: z.string().trim().min(1, "name is required"),
   mode: modeSchema.optional(),
   settings: designSettingsSchema.optional(),
-  designJson: z.record(z.string(), z.unknown()).optional(),
   compiledMjml: mjmlSchema.optional(),
 });
 
@@ -43,7 +42,6 @@ const updateTemplateSchema = z.object({
   name: z.string().trim().min(1).optional(),
   mode: modeSchema.optional(),
   settings: designSettingsSchema.optional(),
-  designJson: z.record(z.string(), z.unknown()).optional(),
   compiledMjml: mjmlSchema.optional(),
 });
 
@@ -63,8 +61,8 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     scope.post("/templates", async (request, reply) => {
       const body = parseBody(createTemplateSchema, request.body, reply);
       if (!body) return reply;
-      const { name, settings, designJson, compiledMjml } = body;
-      const mode = body.mode ?? (settings && compiledMjml === undefined ? "design" : "code");
+      const { name, settings, compiledMjml } = body;
+      const mode = body.mode ?? (compiledMjml === undefined ? "design" : "code");
       if (mode === "code" && compiledMjml) {
         const check = await checkCodeTemplate(compiledMjml);
         if (check.errors.length > 0) return reply.code(422).send(codeErrorReply(check));
@@ -72,17 +70,7 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
 
       const [template] = await db
         .insert(templates)
-        .values(
-          mode === "design"
-            ? { name, mode, settings: settings ?? {} }
-            : {
-                name,
-                mode,
-                settings: settings ?? null,
-                designJson: designJson ?? null,
-                compiledMjml: compiledMjml ?? null,
-              },
-        )
+        .values({ name, mode, settings: settings ?? {}, compiledMjml: mode === "code" ? (compiledMjml ?? "") : null })
         .returning();
 
       request.log.info({ templateId: template!.id }, `Created template "${name}"`);
@@ -132,8 +120,8 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     scope.patch<{ Params: IdParams }>("/templates/:id", async (request, reply) => {
       const body = parseBody(updateTemplateSchema, request.body, reply);
       if (!body) return reply;
-      const { name, settings, designJson, compiledMjml } = body;
-      const mode = body.mode ?? (settings !== undefined && compiledMjml === undefined ? "design" : undefined);
+      const { name, settings, compiledMjml } = body;
+      const { mode } = body;
       if (compiledMjml && mode !== "design") {
         const check = await checkCodeTemplate(compiledMjml);
         if (check.errors.length > 0) return reply.code(422).send(codeErrorReply(check));
@@ -145,7 +133,6 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
           ...(name !== undefined && { name }),
           ...(mode !== undefined && { mode }),
           ...(settings !== undefined && { settings }),
-          ...(designJson !== undefined && { designJson }),
           ...(compiledMjml !== undefined && { compiledMjml }),
           updatedAt: new Date(),
         })
@@ -175,8 +162,6 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         .set({
           mode: "code",
           compiledMjml: buildDesignMjml(parseDesignSettings(existing.settings)).trim(),
-          designJson: null,
-          compiledHtml: null,
           updatedAt: new Date(),
         })
         .where(eq(templates.id, existing.id))

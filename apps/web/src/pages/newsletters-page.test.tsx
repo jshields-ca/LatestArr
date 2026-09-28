@@ -90,9 +90,7 @@ const weeklyLayoutTemplate = {
   name: "Weekly Layout",
   mode: "code" as const,
   settings: null,
-  designJson: { pages: [] },
-  compiledMjml: null,
-  compiledHtml: null,
+  compiledMjml: "<mjml><mj-body></mj-body></mjml>",
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
@@ -687,7 +685,7 @@ describe("NewslettersPage", () => {
       await user.click(screen.getByRole("button", { name: "Add newsletter" }));
       const dialog = await screen.findByRole("dialog");
       await user.type(within(dialog).getByLabelText("Name"), "Weekly digest");
-      selectOption(within(dialog).getByLabelText("Design"), "Weekly Layout (older template)");
+      selectOption(within(dialog).getByLabelText("Design"), "Weekly Layout");
 
       fetchMock.mockResolvedValueOnce(jsonResponse(201, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
       await user.click(within(dialog).getByRole("button", { name: "Add newsletter" }));
@@ -721,14 +719,10 @@ describe("NewslettersPage", () => {
       await screen.findByLabelText("Design");
 
       fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: "t1" } }));
-      selectOption(screen.getByLabelText("Design"), "Weekly Layout (older template)");
+      selectOption(screen.getByLabelText("Design"), "Weekly Layout");
       let [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string)).toEqual({ templateId: "t1" });
-      // An older drag-and-drop template still opens its own editor.
-      expect(await screen.findByRole("link", { name: "Edit design" })).toHaveAttribute(
-        "href",
-        "/templates/t1/edit",
-      );
+      expect(await screen.findByRole("link", { name: "Edit design" })).toHaveAttribute("href", "/designs/t1");
       expect(await screen.findByText("Saved")).toBeInTheDocument();
 
       fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, templateId: null } }));

@@ -88,24 +88,18 @@ export async function buildApp(
   await app.register(cookie);
 
   // CSP allows what the admin WebUI actually needs: 'unsafe-inline' on
-  // style-src for Radix's inline positioning styles and the GrapesJS
-  // template builder, which injects <style> tags into its own same-origin
-  // canvas iframe as a user edits — there's no way to do live style
-  // editing under a strict style-src. cdnjs.cloudflare.com is GrapesJS's
-  // own hardcoded Font Awesome stylesheet (its default panel/block icons
-  // depend on it, confirmed by loading the builder in a browser and
-  // watching for CSP violations — GrapesJS injects that <link> itself,
-  // not something this app can avoid short of replacing its default UI
-  // icon set). crossOriginEmbedderPolicy is off because it would otherwise
-  // block the Google Fonts stylesheet (no CORP header) used for the
-  // "LatestArr" wordmark.
+  // style-src for Radix's inline positioning styles and the design code
+  // editor (CodeMirror adds its theme as <style> tags at runtime).
+  // crossOriginEmbedderPolicy is off because it would otherwise block the
+  // Google Fonts stylesheet (no CORP header) used for the "LatestArr"
+  // wordmark.
   await app.register(helmet, {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:"],
         connectSrc: ["'self'"],
         frameSrc: ["'self'"],
