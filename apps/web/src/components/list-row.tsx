@@ -90,6 +90,8 @@ export function ListRow({ leading, primary, secondary, actions, expand, children
 export interface ConfirmDeleteButtonProps {
   label: string;
   onConfirm: () => Promise<void>;
+  /** Replaces the default "Delete?" prompt, e.g. to say what else changes. */
+  prompt?: string;
 }
 
 /**
@@ -101,7 +103,7 @@ export interface ConfirmDeleteButtonProps {
  * boolean themselves instead of using this component, since it owns its own
  * confirming state.
  */
-export function ConfirmDeleteButton({ label, onConfirm }: ConfirmDeleteButtonProps) {
+export function ConfirmDeleteButton({ label, onConfirm, prompt = "Delete?" }: ConfirmDeleteButtonProps) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -115,7 +117,7 @@ export function ConfirmDeleteButton({ label, onConfirm }: ConfirmDeleteButtonPro
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">Delete?</span>
+      <span className="text-sm text-muted-foreground">{prompt}</span>
       <Button
         variant="destructive"
         size="sm"

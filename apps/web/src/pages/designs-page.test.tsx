@@ -106,6 +106,19 @@ describe("DesignsPage", () => {
     expect(JSON.parse(init.body as string)).toMatchObject({ mode: "code", compiledMjml: "<mjml />" });
   });
 
+  it("shows which newsletters use a design, and warns they'll switch to Default before deleting it", async () => {
+    const user = userEvent.setup();
+    mockList([plexDark]);
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { newsletters: [{ id: "n1", name: "Weekly Digest", templateId: "d1" }] }),
+    );
+    renderPage();
+    expect(await screen.findByText("Used by Weekly Digest")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete Plex dark" }));
+    expect(screen.getByText("Delete? Its newsletter will use Default.")).toBeInTheDocument();
+  });
+
   it("has no accessibility violations", async () => {
     mockList([plexDark]);
     const { container } = renderPage();

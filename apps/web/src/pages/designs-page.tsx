@@ -19,7 +19,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "@/components/ui/use-toast";
-import { ApiError, createTemplate, deleteTemplate, listTemplates, type Template } from "@/lib/api";
+import {
+  ApiError,
+  createTemplate,
+  deleteTemplate,
+  listNewsletters,
+  listTemplates,
+  type Newsletter,
+  type Template,
+} from "@/lib/api";
 import { DEFAULT_DESIGN_SETTINGS, type DesignSettings, withDesignDefaults } from "@/lib/design";
 
 function NewDesignDialog() {
@@ -105,12 +113,22 @@ export function DesignsPage() {
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
+  const [newsletters, setNewsletters] = useState<Newsletter[]>([]);
 
   useEffect(() => {
     listTemplates()
       .then(({ templates: loaded }) => setTemplates(loaded))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Couldn't load designs."));
+    // Only for showing which newsletters use each design; the list still
+    // works without it.
+    listNewsletters()
+      .then(({ newsletters: loaded }) => setNewsletters(loaded))
+      .catch(() => setNewsletters([]));
   }, []);
+
+  function usersOf(template: Template): string[] {
+    return newsletters.filter((n) => n.templateId === template.id).map((n) => n.name);
+  }
 
   async function duplicate(key: string, name: string, settings: DesignSettings, source?: Template) {
     setDuplicating(key);
@@ -196,6 +214,7 @@ export function DesignsPage() {
           />
           {designs.map((template) => {
             const settings = withDesignDefaults(template.settings);
+            const usedBy = usersOf(template);
             return (
               <ListRow
                 key={template.id}
@@ -205,6 +224,11 @@ export function DesignsPage() {
                     <p className="truncate font-medium">{template.name}</p>
                     {template.mode === "code" ? <Badge variant="neutral">Code</Badge> : null}
                   </>
+                }
+                secondary={
+                  usedBy.length > 0 ? (
+                    <p className="truncate text-sm text-muted-foreground">Used by {usedBy.join(", ")}</p>
+                  ) : undefined
                 }
                 actions={
                   <>
@@ -224,7 +248,15 @@ export function DesignsPage() {
                       {duplicating === template.id ? <Loader2 className="animate-spin" /> : <Copy />}
                       Duplicate
                     </Button>
-                    <ConfirmDeleteButton label={`Delete ${template.name}`} onConfirm={() => remove(template)} />
+                    <ConfirmDeleteButton
+                      label={`Delete ${template.name}`}
+                      onConfirm={() => remove(template)}
+                      prompt={
+                        usedBy.length > 0
+                          ? `Delete? ${usedBy.length === 1 ? "Its newsletter" : `Its ${usedBy.length} newsletters`} will use Default.`
+                          : undefined
+                      }
+                    />
                   </>
                 }
               />

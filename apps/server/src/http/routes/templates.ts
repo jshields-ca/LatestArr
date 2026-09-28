@@ -1,4 +1,4 @@
-import { type Db, templates } from "@latestarr/db";
+import { type Db, newsletters, templates } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -171,9 +171,23 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     });
 
     scope.delete<{ Params: IdParams }>("/templates/:id", async (request, reply) => {
-      const [deleted] = await db.delete(templates).where(eq(templates.id, request.params.id)).returning();
+      // Newsletters using this design go back to Default rather than
+      // blocking the delete (the web app says so before confirming).
+      const { deleted, switched } = db.transaction((tx) => {
+        const switched = tx
+          .update(newsletters)
+          .set({ templateId: null, updatedAt: new Date() })
+          .where(eq(newsletters.templateId, request.params.id))
+          .returning({ name: newsletters.name })
+          .all();
+        const [deleted] = tx.delete(templates).where(eq(templates.id, request.params.id)).returning().all();
+        return { deleted, switched };
+      });
       if (deleted) {
-        request.log.info({ templateId: deleted.id }, `Deleted template "${deleted.name}"`);
+        request.log.info(
+          { templateId: deleted.id, switchedToDefault: switched.map((n) => n.name) },
+          `Deleted design "${deleted.name}"${switched.length > 0 ? `; ${switched.length} newsletter(s) now use Default` : ""}`,
+        );
       }
       return reply.code(204).send();
     });
