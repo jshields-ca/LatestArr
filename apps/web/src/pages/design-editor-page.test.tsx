@@ -117,6 +117,31 @@ describe("DesignEditorPage", () => {
     await waitFor(() => expect(previewBodies.at(-1)?.settings.sections.order[2]).toBe("book"));
   });
 
+  it("edits the intro and buttons, holding back Save until a button is complete", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    await user.type(screen.getByLabelText("Intro (optional)"), "Hey folks!");
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    await user.type(screen.getByLabelText("Button 1 label"), "Open Plex");
+    expect(screen.getByText(/Add a label and a full link/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    // The half-finished button is left out of the preview rather than failing it.
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.content.intro).toBe("Hey folks!"));
+    expect(previewBodies.at(-1)?.settings.content.ctas).toEqual([]);
+
+    await user.type(screen.getByLabelText("Button 1 URL"), "https://app.plex.tv");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument());
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH") as [string, RequestInit];
+    expect(JSON.parse(patch[1].body as string).settings.content).toEqual({
+      intro: "Hey folks!",
+      footerNote: "",
+      ctas: [{ label: "Open Plex", url: "https://app.plex.tv" }],
+    });
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = renderEditor();
     await screen.findByTitle("Design preview");

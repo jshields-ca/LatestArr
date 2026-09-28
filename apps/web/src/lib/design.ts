@@ -6,6 +6,13 @@ export type DesignKind = "movie" | "tv_episode" | "tv_season" | "book" | "audiob
 export type DesignLayout = "cards" | "compact" | "grid";
 export type DesignEmptySection = "hide" | "message" | "link" | "random";
 
+export interface DesignCta {
+  label: string;
+  url: string;
+}
+
+export const MAX_DESIGN_CTAS = 4;
+
 export interface DesignSettings {
   font: string;
   colors: { accent: string; background: string; text: string; muted: string };
@@ -19,6 +26,7 @@ export interface DesignSettings {
     empty: DesignEmptySection;
     mostWatched: { enabled: boolean; count: number };
   };
+  content: { intro: string; footerNote: string; ctas: DesignCta[] };
   customCss: string;
 }
 
@@ -44,6 +52,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     empty: "message",
     mostWatched: { enabled: false, count: 5 },
   },
+  content: { intro: "", footerNote: "", ctas: [] },
   customCss: "",
 };
 
@@ -61,5 +70,18 @@ export function withDesignDefaults(settings: Partial<DesignSettings> | null | un
       ...value.sections,
       mostWatched: { ...DEFAULT_DESIGN_SETTINGS.sections.mostWatched, ...value.sections?.mostWatched },
     },
+    content: { ...DEFAULT_DESIGN_SETTINGS.content, ...value.content },
   };
+}
+
+// A button is saved only with a label and a full http(s) link; the server
+// rejects anything else.
+export function isCompleteCta(cta: DesignCta): boolean {
+  if (!cta.label.trim()) return false;
+  try {
+    const url = new URL(cta.url);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

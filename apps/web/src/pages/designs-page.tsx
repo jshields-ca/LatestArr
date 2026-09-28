@@ -151,7 +151,7 @@ export function DesignsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Designs"
-        description="How your newsletters look: colours, font, layout, and how items are grouped. Newsletters use the Default design until you pick another."
+        description="How your newsletters look and read: colours, font, layout, the intro and buttons, and how items are grouped. Newsletters use the Default design until you pick another."
         actions={templates ? <NewDesignDialog /> : null}
       />
 

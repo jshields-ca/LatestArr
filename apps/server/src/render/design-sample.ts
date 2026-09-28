@@ -1,5 +1,5 @@
 import type { NewItem } from "@latestarr/adapter-core";
-import { buildDesignMjml, DESIGN_KINDS, type DesignSettings } from "./design.js";
+import { buildDesignMjml, DESIGN_KINDS, type DesignSettings, designContentVariables } from "./design.js";
 import { renderMjmlTemplate } from "./mjml-template.js";
 
 // Made-up content for previewing a design that isn't attached to a
@@ -77,8 +77,6 @@ export async function renderDesignSample(settings: DesignSettings): Promise<stri
     sourceLinksByContentType: Object.fromEntries(DESIGN_KINDS.map((kind) => [kind, "https://example.com/library"])),
     generatedAt: now,
     lookbackDays: 7,
-    introText: "Your intro note appears here.",
-    footerNote: "Your footer note appears here.",
-    ctas: [{ label: "Example button", url: "https://example.com" }],
+    ...designContentVariables(settings),
   });
 }

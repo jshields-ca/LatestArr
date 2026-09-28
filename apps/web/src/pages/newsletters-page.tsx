@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Check, Eye, Loader2, Pencil, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
@@ -27,7 +27,6 @@ import { Select } from "@/components/ui/select";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
@@ -49,7 +48,6 @@ import {
   sendTestNewsletter,
   updateNewsletter,
   type Newsletter,
-  type NewsletterCta,
   type NewsletterDetail,
   type NewsletterPreview,
   type RecipientGroup,
@@ -58,7 +56,6 @@ import {
   type SourceConnection,
   type Template,
 } from "@/lib/api";
-import { EMAIL_FONT_OPTIONS } from "@/lib/email-fonts";
 import {
   DEFAULT_SIMPLE_SCHEDULE,
   describeScheduleParts,
@@ -584,198 +581,11 @@ function DesignPicker({
           </Link>
         </Button>
       </div>
-    </div>
-  );
-}
-
-// The Default design is built in, so its font is chosen per newsletter;
-// every other design carries its own font.
-function EmailFontPicker({
-  newsletter,
-  onChanged,
-}: {
-  newsletter: Newsletter;
-  onChanged: (newsletter: Newsletter) => void;
-}) {
-  const [state, setState] = useState<SaveState>({ status: "idle" });
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <SubsectionHeading>Font</SubsectionHeading>
-        <SaveStatus state={state} />
-      </div>
-      <Select
-        aria-label="Font"
-        value={newsletter.emailFont}
-        onChange={(e) =>
-          void saveField(newsletter.id, { emailFont: e.target.value }, setState, onChanged, "Couldn't change the font.")
-        }
-        disabled={state.status === "saving"}
-        className="max-w-xs"
-      >
-        {EMAIL_FONT_OPTIONS.map((font) => (
-          <option key={font.value} value={font.value}>
-            {font.label}
-          </option>
-        ))}
-      </Select>
-    </div>
-  );
-}
-
-// Saves on blur, and only when the value actually changed.
-function NewsletterTextField({
-  newsletter,
-  field,
-  label,
-  placeholder,
-  onChanged,
-}: {
-  newsletter: Newsletter;
-  field: "introText" | "footerNote";
-  label: string;
-  placeholder: string;
-  onChanged: (newsletter: Newsletter) => void;
-}) {
-  const [value, setValue] = useState(newsletter[field] ?? "");
-  const [state, setState] = useState<SaveState>({ status: "idle" });
-  const id = `newsletter-${field}-${newsletter.id}`;
-
-  function handleBlur() {
-    if (value === (newsletter[field] ?? "")) return;
-    void saveField(
-      newsletter.id,
-      { [field]: value || null },
-      setState,
-      onChanged,
-      `Couldn't save the ${label.toLowerCase()}.`,
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={id}>{label} (optional)</Label>
-        <SaveStatus state={state} />
-      </div>
-      <Textarea
-        id={id}
-        rows={2}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={handleBlur}
-      />
-    </div>
-  );
-}
-
-const CTA_SAVE_DELAY_MS = 800;
-const MAX_CTAS = 4;
-
-function isCompleteCta(cta: NewsletterCta): boolean {
-  if (!cta.label.trim()) return false;
-  try {
-    const url = new URL(cta.url);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-// Up to 4 {label, url} buttons. They save by themselves shortly after the
-// last edit, but only once every row is complete, so a half-typed URL is
-// never saved; an incomplete row says what it's missing.
-function CtaButtonsField({
-  newsletter,
-  onChanged,
-}: {
-  newsletter: Newsletter;
-  onChanged: (newsletter: Newsletter) => void;
-}) {
-  const [ctas, setCtas] = useState<NewsletterCta[]>(newsletter.ctas ?? []);
-  const [state, setState] = useState<SaveState>({ status: "idle" });
-  const [touched, setTouched] = useState(false);
-  const savedRef = useRef(JSON.stringify(newsletter.ctas ?? []));
-  const complete = ctas.every(isCompleteCta);
-
-  useEffect(() => {
-    if (!touched || !complete || JSON.stringify(ctas) === savedRef.current) return;
-    const timer = setTimeout(() => {
-      savedRef.current = JSON.stringify(ctas);
-      void saveField(newsletter.id, { ctas }, setState, onChanged, "Couldn't save the buttons.");
-    }, CTA_SAVE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [ctas, complete, touched, newsletter.id, onChanged]);
-
-  function change(next: NewsletterCta[]) {
-    setTouched(true);
-    setCtas(next);
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <SubsectionHeading>Buttons</SubsectionHeading>
-        <SaveStatus state={state} />
-      </div>
-      {ctas.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No buttons yet — e.g. a link to your Plex app.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {ctas.map((cta, index) => {
-            const incomplete = touched && !isCompleteCta(cta);
-            const hintId = `newsletter-cta-hint-${newsletter.id}-${index}`;
-            return (
-              // On phones: label and remove on one line, the URL full-width
-              // below it, since both fields side by side leave ~110px each.
-              <li key={index} className="flex flex-col gap-1">
-                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-                  <Input
-                    aria-label={`Button ${index + 1} label`}
-                    placeholder="Label"
-                    value={cta.label}
-                    onChange={(e) => change(ctas.map((c, i) => (i === index ? { ...c, label: e.target.value } : c)))}
-                    aria-describedby={incomplete ? hintId : undefined}
-                    className="min-w-0 flex-1 sm:max-w-[9rem] sm:flex-none"
-                  />
-                  <Input
-                    aria-label={`Button ${index + 1} URL`}
-                    placeholder="https://..."
-                    value={cta.url}
-                    onChange={(e) => change(ctas.map((c, i) => (i === index ? { ...c, url: e.target.value } : c)))}
-                    aria-describedby={incomplete ? hintId : undefined}
-                    className="order-last basis-full sm:order-none sm:basis-auto sm:flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove button ${index + 1}`}
-                    onClick={() => change(ctas.filter((_, i) => i !== index))}
-                  >
-                    <X />
-                  </Button>
-                </div>
-                {incomplete ? (
-                  <p id={hintId} className="text-xs text-muted-foreground">
-                    Add a label and a full link starting with https:// to save this button.
-                  </p>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {ctas.length < MAX_CTAS ? (
-        <div>
-          <Button type="button" variant="outline" size="sm" onClick={() => change([...ctas, { label: "", url: "" }])}>
-            <Plus />
-            Add button
-          </Button>
-        </div>
-      ) : null}
+      <p className="text-xs text-muted-foreground">
+        {current
+          ? "The font, intro, footer note, and buttons are part of the design."
+          : "Default has no intro or buttons. To add them, or change the font, duplicate it in Designs."}
+      </p>
     </div>
   );
 }
@@ -1191,11 +1001,6 @@ function NewsletterCard({
   }
 
   const scheduleParts = describeScheduleParts(newsletter.scheduleCron, newsletter.timezone);
-  // Intro, footer, and buttons are rendered by designs (including Default),
-  // not by older drag-and-drop templates.
-  const usesDesign =
-    !newsletter.templateId || allTemplates.find((t) => t.id === newsletter.templateId)?.mode === "design";
-
   return (
     <ListRow
       primary={<span className="truncate font-medium">{newsletter.name}</span>}
@@ -1329,19 +1134,6 @@ function NewsletterCard({
                   {detail ? (
                     <>
                       <DesignPicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
-                      {!newsletter.templateId ? <EmailFontPicker newsletter={newsletter} onChanged={onChanged} /> : null}
-                      {usesDesign ? (
-                        <>
-                          <NewsletterTextField
-                            newsletter={newsletter}
-                            field="introText"
-                            label="Intro"
-                            placeholder="A note to include above the items, e.g. a quick update."
-                            onChanged={onChanged}
-                          />
-                          <CtaButtonsField newsletter={newsletter} onChanged={onChanged} />
-                        </>
-                      ) : null}
                       <LinkedSources
                         newsletterId={newsletter.id}
                         sources={detail.sources}
@@ -1354,15 +1146,6 @@ function NewsletterCard({
                         allGroups={allGroups}
                         onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
                       />
-                      {usesDesign ? (
-                        <NewsletterTextField
-                          newsletter={newsletter}
-                          field="footerNote"
-                          label="Footer note"
-                          placeholder="A note to include near the bottom, above the LatestArr credit line."
-                          onChanged={onChanged}
-                        />
-                      ) : null}
                     </>
                   ) : null}
                 </div>

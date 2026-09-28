@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Loader2, Save } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Loader2, Plus, Save, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,9 +21,12 @@ import {
 } from "@/lib/api";
 import {
   DESIGN_KIND_LABELS,
+  type DesignCta,
   type DesignEmptySection,
   type DesignLayout,
   type DesignSettings,
+  isCompleteCta,
+  MAX_DESIGN_CTAS,
   withDesignDefaults,
 } from "@/lib/design";
 import { EMAIL_FONT_OPTIONS } from "@/lib/email-fonts";
@@ -73,6 +76,70 @@ function Section({ title, defaultOpen = false, children }: { title: string; defa
   );
 }
 
+// Up to 4 {label, url} buttons. An incomplete row says what it's missing
+// and holds back Save (and is left out of the preview) until it's done.
+function CtaRows({ ctas, onChange }: { ctas: DesignCta[]; onChange: (ctas: DesignCta[]) => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-sm font-medium">Buttons</span>
+      {ctas.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No buttons yet, e.g. a link to your Plex app.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {ctas.map((cta, index) => {
+            const incomplete = !isCompleteCta(cta);
+            const hintId = `design-cta-hint-${index}`;
+            return (
+              <li key={index} className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    aria-label={`Button ${index + 1} label`}
+                    placeholder="Label"
+                    value={cta.label}
+                    onChange={(e) => onChange(ctas.map((c, i) => (i === index ? { ...c, label: e.target.value } : c)))}
+                    aria-describedby={incomplete ? hintId : undefined}
+                    className="min-w-0 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove button ${index + 1}`}
+                    onClick={() => onChange(ctas.filter((_, i) => i !== index))}
+                  >
+                    <X />
+                  </Button>
+                  <Input
+                    aria-label={`Button ${index + 1} URL`}
+                    placeholder="https://..."
+                    value={cta.url}
+                    onChange={(e) => onChange(ctas.map((c, i) => (i === index ? { ...c, url: e.target.value } : c)))}
+                    aria-describedby={incomplete ? hintId : undefined}
+                    className="basis-full"
+                  />
+                </div>
+                {incomplete ? (
+                  <p id={hintId} className="text-xs text-muted-foreground">
+                    Add a label and a full link starting with https:// to use this button.
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {ctas.length < MAX_DESIGN_CTAS ? (
+        <div>
+          <Button type="button" variant="outline" size="sm" onClick={() => onChange([...ctas, { label: "", url: "" }])}>
+            <Plus />
+            Add button
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function DesignEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -91,6 +158,7 @@ export function DesignEditorPage() {
   const previewRequest = useRef(0);
 
   const dirty = settings !== null && JSON.stringify({ name, settings }) !== savedSnapshot;
+  const ctasComplete = settings?.content.ctas.every(isCompleteCta) ?? true;
 
   useEffect(() => {
     if (!id) return;
@@ -114,7 +182,12 @@ export function DesignEditorPage() {
     const request = ++previewRequest.current;
     const timer = setTimeout(() => {
       setPreviewing(true);
-      previewDesign(settings, previewSource === SAMPLE ? undefined : previewSource)
+      // A half-typed button would fail validation; preview the rest.
+      const previewable = {
+        ...settings,
+        content: { ...settings.content, ctas: settings.content.ctas.filter(isCompleteCta) },
+      };
+      previewDesign(previewable, previewSource === SAMPLE ? undefined : previewSource)
         .then(({ html }) => {
           if (request !== previewRequest.current) return;
           setPreviewHtml(html);
@@ -210,7 +283,7 @@ export function DesignEditorPage() {
         </div>
         <div className="flex items-center gap-3">
           {dirty ? <span className="text-sm text-muted-foreground">Unsaved changes</span> : null}
-          <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim()}>
+          <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim() || !ctasComplete}>
             {saving ? <Loader2 className="animate-spin" /> : <Save />}
             Save
           </Button>
@@ -269,6 +342,33 @@ export function DesignEditorPage() {
                 />
               }
             />
+          </Section>
+
+          <Section title="Text and buttons" defaultOpen>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="design-intro">Intro (optional)</Label>
+              <Textarea
+                id="design-intro"
+                rows={2}
+                placeholder="A note above the items, e.g. a quick update."
+                value={settings.content.intro}
+                onChange={(e) => update((c) => ({ ...c, content: { ...c.content, intro: e.target.value } }))}
+              />
+            </div>
+            <CtaRows
+              ctas={settings.content.ctas}
+              onChange={(ctas) => update((c) => ({ ...c, content: { ...c.content, ctas } }))}
+            />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="design-footer">Footer note (optional)</Label>
+              <Textarea
+                id="design-footer"
+                rows={2}
+                placeholder="A note near the bottom, above the LatestArr credit line."
+                value={settings.content.footerNote}
+                onChange={(e) => update((c) => ({ ...c, content: { ...c.content, footerNote: e.target.value } }))}
+              />
+            </div>
           </Section>
 
           <Section title="Layout" defaultOpen>

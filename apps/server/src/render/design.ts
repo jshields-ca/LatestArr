@@ -60,6 +60,21 @@ export const designSettingsSchema = z.object({
         .prefault({}),
     })
     .prefault({}),
+  // The words around the item list. Rendered through Handlebars variables
+  // ({{introText}}, {{footerNote}}, {{#each ctas}}), so code-mode designs
+  // use them too, and they are escaped like any other value.
+  content: z
+    .object({
+      intro: z.string().trim().max(2000).default(""),
+      footerNote: z.string().trim().max(2000).default(""),
+      // A handful of quick links (Plex app, "browse the library"), not a
+      // general-purpose link list.
+      ctas: z
+        .array(z.object({ label: z.string().trim().min(1).max(40), url: z.url({ protocol: /^https?$/ }) }))
+        .max(4)
+        .default([]),
+    })
+    .prefault({}),
   customCss: z.string().max(10_000).default(""),
 });
 
@@ -72,6 +87,13 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = designSettingsSchema.pars
 export function parseDesignSettings(value: unknown): DesignSettings {
   const result = designSettingsSchema.safeParse(value ?? {});
   return result.success ? result.data : DEFAULT_DESIGN_SETTINGS;
+}
+
+// A design's words, as the template variables every design (and code
+// template) reads.
+export function designContentVariables(settings: DesignSettings) {
+  const { intro, footerNote, ctas } = settings.content;
+  return { introText: intro || undefined, footerNote: footerNote || undefined, ctas };
 }
 
 // The original palette's hand-tuned tint, border, and "subtle" shades. A

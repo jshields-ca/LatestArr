@@ -28,8 +28,13 @@ import {
   type ItemImageSource,
 } from "./embed-images.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
-import { buildDesignMjml, DEFAULT_DESIGN_SETTINGS, type DesignSettings, parseDesignSettings } from "../render/design.js";
-import { DEFAULT_EMAIL_FONT, isEmailFont } from "../render/email-fonts.js";
+import {
+  buildDesignMjml,
+  DEFAULT_DESIGN_SETTINGS,
+  designContentVariables,
+  type DesignSettings,
+  parseDesignSettings,
+} from "../render/design.js";
 import { logger as defaultLogger, type Logger } from "../logger.js";
 import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -244,18 +249,24 @@ interface RenderedNewsletter {
 
 const EMPTY_FETCHED_ITEMS: FetchedItems = { items: [], sourceByItem: new Map() };
 
-// Which email markup a newsletter renders with: a preview's unsaved design,
-// the newsletter's own design or legacy code template, or the built-in
-// Default design with the newsletter's chosen font.
-async function resolveMjmlSource(db: Db, newsletter: Newsletter, designOverride?: DesignSettings): Promise<string> {
-  if (designOverride) return buildDesignMjml(designOverride);
+// Which email markup and words a newsletter renders with: a preview's
+// unsaved design, the newsletter's own design or code template, or the
+// built-in Default design. Intro, footer note, and buttons belong to the
+// design (older versions kept them on the newsletter; see
+// migrate-content-into-designs.ts).
+async function resolveDesign(
+  db: Db,
+  newsletter: Newsletter,
+  designOverride?: DesignSettings,
+): Promise<{ mjml: string; settings: DesignSettings }> {
+  if (designOverride) return { mjml: buildDesignMjml(designOverride), settings: designOverride };
   if (newsletter.templateId) {
     const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
-    if (template?.mode === "design") return buildDesignMjml(parseDesignSettings(template.settings));
-    if (template?.compiledMjml) return template.compiledMjml;
+    const settings = parseDesignSettings(template?.settings);
+    if (template?.mode === "design") return { mjml: buildDesignMjml(settings), settings };
+    if (template?.compiledMjml) return { mjml: template.compiledMjml, settings };
   }
-  const font = isEmailFont(newsletter.emailFont) ? newsletter.emailFont : DEFAULT_EMAIL_FONT;
-  return buildDesignMjml({ ...DEFAULT_DESIGN_SETTINGS, font });
+  return { mjml: buildDesignMjml(DEFAULT_DESIGN_SETTINGS), settings: DEFAULT_DESIGN_SETTINGS };
 }
 
 async function renderNewsletterContent(
@@ -278,7 +289,7 @@ async function renderNewsletterContent(
   // pool, so only posters that actually end up in the output get fetched.
   const addedPlaceholders = preparePosterPlaceholders(items);
 
-  const mjml = await resolveMjmlSource(db, newsletter, designOverride);
+  const { mjml, settings } = await resolveDesign(db, newsletter, designOverride);
 
   // "Most watched" data and the all-time fallback pool cost extra source
   // calls, so they're only fetched when the markup uses them, concurrently.
@@ -301,9 +312,7 @@ async function renderNewsletterContent(
     sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
     generatedAt,
     lookbackDays: newsletter.lookbackDays,
-    introText: newsletter.introText ?? undefined,
-    footerNote: newsletter.footerNote ?? undefined,
-    ctas: newsletter.ctas ?? undefined,
+    ...designContentVariables(settings),
   });
 
   const allPlaceholders = new Map([
