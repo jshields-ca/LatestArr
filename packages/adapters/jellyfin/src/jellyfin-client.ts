@@ -51,6 +51,10 @@ export interface ServerInfo {
 export interface ServerUser {
   Id: string;
   Name: string;
+  /** Emby only: the Emby Connect account linked to this user, which is
+   * often (not always) an email address. */
+  ConnectUserName?: string;
+  Policy?: { IsDisabled?: boolean };
 }
 
 const REQUEST_TIMEOUT_MS = 15_000;

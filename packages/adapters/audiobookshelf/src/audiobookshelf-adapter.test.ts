@@ -260,3 +260,24 @@ describe("fetchImageBytes", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+describe("listUsers", () => {
+  it("lists active users with their emails, when set", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        users: [
+          { id: "u1", username: "alex", email: "alex@example.com", isActive: true },
+          { id: "u2", username: "sam", email: null, isActive: true },
+          { id: "u3", username: "gone", email: "gone@example.com", isActive: false },
+        ],
+      }),
+    );
+    await expect(audiobookshelfAdapter.listUsers!(config)).resolves.toEqual([
+      { externalId: "u1", username: "alex", email: "alex@example.com" },
+      { externalId: "u2", username: "sam", email: undefined },
+    ]);
+    const [url, init] = mockFetch.mock.calls[0] as [URL, RequestInit];
+    expect(String(url)).toMatch(/\/api\/users$/);
+    expect(init.headers).toMatchObject({ Authorization: expect.stringMatching(/^Bearer /) });
+  });
+});

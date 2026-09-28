@@ -6,8 +6,9 @@ import type {
   SourceAdapter,
   SourceConnectionConfig,
   SourceLibrary,
+  SourceUser,
 } from "@latestarr/adapter-core";
-import { buildRomWebUrl, fetchImage, getPlatforms, getRoms, type RommRom } from "./romm-client.js";
+import { buildRomWebUrl, fetchImage, getPlatforms, getRoms, getUsers, type RommRom } from "./romm-client.js";
 
 const DEFAULT_FETCH_COUNT = 100;
 
@@ -71,6 +72,20 @@ export const rommAdapter: SourceAdapter = {
 
   // config is unused — url_cover is RomM's own public static asset URL, no
   // auth needed to fetch it (see romm-client.ts's fetchImage).
+  // Needs a client API token with the users.read scope; one without it
+  // gets a 403, explained here since the scope is easy to miss.
+  async listUsers(config: SourceConnectionConfig): Promise<SourceUser[]> {
+    const users = await getUsers(config.baseUrl, config.credentials.token ?? "").catch((err: unknown) => {
+      if (err instanceof Error && /HTTP 40[13]/.test(err.message)) {
+        throw new Error("RomM refused to list users. Give the client API token the users.read scope.");
+      }
+      throw err;
+    });
+    return users
+      .filter((user) => user.enabled !== false)
+      .map((user) => ({ externalId: String(user.id), username: user.username, email: user.email || undefined }));
+  },
+
   async fetchImageBytes(_config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {
     if (!item.posterUrl) return null;
     return fetchImage(item.posterUrl);

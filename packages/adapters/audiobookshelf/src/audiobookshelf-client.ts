@@ -127,3 +127,16 @@ export async function getLibraryItems(
   );
   return body.results ?? [];
 }
+
+export interface AudiobookshelfUser {
+  id: string;
+  username: string;
+  email?: string | null;
+  isActive?: boolean;
+}
+
+// Needs a token belonging to an admin (or root) user.
+export async function getUsers(baseUrl: string, token: string): Promise<AudiobookshelfUser[]> {
+  const body = await callAudiobookshelf<{ users?: AudiobookshelfUser[] }>(baseUrl, "/api/users", token);
+  return body.users ?? [];
+}

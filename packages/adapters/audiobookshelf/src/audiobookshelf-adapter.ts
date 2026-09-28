@@ -6,6 +6,7 @@ import type {
   SourceAdapter,
   SourceConnectionConfig,
   SourceLibrary,
+  SourceUser,
 } from "@latestarr/adapter-core";
 import {
   buildCoverUrl,
@@ -13,6 +14,7 @@ import {
   fetchImage,
   getLibraries,
   getLibraryItems,
+  getUsers,
   type AudiobookshelfLibraryItem,
 } from "./audiobookshelf-client.js";
 
@@ -105,6 +107,15 @@ export const audiobookshelfAdapter: SourceAdapter = {
   // config is unused here — posterUrl (built above with buildCoverUrl) is
   // already an absolute, token-bearing URL, so no extra auth is needed at
   // fetch time.
+  // Audiobookshelf only lists users for an admin token; each may or may
+  // not have an email set. Deactivated accounts are left out.
+  async listUsers(config: SourceConnectionConfig): Promise<SourceUser[]> {
+    const users = await getUsers(config.baseUrl, config.credentials.token ?? "");
+    return users
+      .filter((user) => user.isActive !== false)
+      .map((user) => ({ externalId: user.id, username: user.username, email: user.email || undefined }));
+  },
+
   async fetchImageBytes(_config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {
     if (!item.posterUrl) return null;
     return fetchImage(item.posterUrl);

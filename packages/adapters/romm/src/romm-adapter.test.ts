@@ -168,3 +168,24 @@ describe("fetchImageBytes", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+describe("listUsers", () => {
+  it("lists enabled users with their emails, when set", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse([
+        { id: 1, username: "alex", email: "alex@example.com", enabled: true },
+        { id: 2, username: "sam", email: "", enabled: true },
+        { id: 3, username: "gone", email: "gone@example.com", enabled: false },
+      ]),
+    );
+    await expect(rommAdapter.listUsers!(config)).resolves.toEqual([
+      { externalId: "1", username: "alex", email: "alex@example.com" },
+      { externalId: "2", username: "sam", email: undefined },
+    ]);
+  });
+
+  it("explains the missing users.read scope", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, false, 403));
+    await expect(rommAdapter.listUsers!(config)).rejects.toThrow(/users\.read scope/);
+  });
+});

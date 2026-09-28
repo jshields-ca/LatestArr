@@ -113,3 +113,15 @@ export async function getRoms(
   const page = await callRomm<RommPage<RommRom>>(baseUrl, "/api/roms", token, params);
   return page.items ?? [];
 }
+
+export interface RommUser {
+  id: number;
+  username: string;
+  email?: string | null;
+  enabled?: boolean;
+}
+
+// Needs a client API token with the users.read scope.
+export async function getUsers(baseUrl: string, token: string): Promise<RommUser[]> {
+  return callRomm<RommUser[]>(baseUrl, "/api/users", token);
+}
