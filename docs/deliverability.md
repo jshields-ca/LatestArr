@@ -26,8 +26,15 @@ Whichever you choose, the domain that needs SPF/DKIM/DMARC configured is the dom
 
 After setting up DNS records, use **Send test email** on the SMTP profile's detail page, then check the received message's headers (most webmail clients show this as "Show original" or similar) for `spf=pass` and `dkim=pass`. [mail-tester.com](https://www.mail-tester.com/) gives a more thorough score if you want a second check.
 
+### If DKIM shows `temperror` or `fail`
+
+- **`dkim=temperror`** means the receiving server couldn't look up your DKIM key at that moment. It's often a passing DNS hiccup, but if it keeps happening, the key record may be missing or malformed. The `DKIM-Signature` header in the received message names the selector (`s=`) and domain (`d=`). Look up `<selector>._domainkey.<domain>` as a TXT record with any DNS tool (for example `nslookup -type=TXT <selector>._domainkey.<domain>`). It should return one record starting `v=DKIM1`.
+- **`dkim=fail`** usually means the record doesn't match the key your SMTP server signs with, often after a provider rotates keys. Copy the current record from your provider's DNS or DKIM settings.
+- **No `DKIM-Signature` header at all** means your SMTP server isn't signing. Turn DKIM on in your provider's settings for the sending domain.
+
 ## What LatestArr does and doesn't do for you
 
 - The `defaultFromName`/`defaultFromEmail` on an SMTP profile become the message's `From` header on every send — make sure the address matches whichever domain you've authenticated.
 - **There's no built-in unsubscribe mechanism yet** — no `List-Unsubscribe` header, no self-serve opt-out link in the sent email. Today, removing someone from future sends means an admin toggling that recipient inactive (or deleting them) from the Recipients screen. If you're sending to more than a handful of people who didn't explicitly ask to be on the list, be aware this is a real gap against CAN-SPAM/GDPR one-click-unsubscribe expectations, not just a deliverability nicety — mailbox providers increasingly penalize senders without it, independent of authentication.
+- Every newsletter is sent with a plain-text version alongside the HTML, generated from the same content. HTML-only mail scores worse with spam filters, and some readers only show the text.
 - Every send goes out individually per recipient (not one message BCC'd to the whole group), which avoids the "large recipient list in one message" pattern spam filters also scrutinize.
