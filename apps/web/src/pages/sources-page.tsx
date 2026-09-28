@@ -82,6 +82,8 @@ interface SourceKindConfig {
   /** Built from the API docs but not yet confirmed on a real server; asks
    *  the admin to report how it went. */
   needsTesters?: boolean;
+  /** Example values for the Name, Base URL, and Public URL fields. */
+  examples: { name: string; baseUrl: string; publicUrl: string };
 }
 
 // The SourceAdapter contract takes an opaque Record<string, string> of
@@ -92,16 +94,19 @@ interface SourceKindConfig {
 const KIND_CONFIG: Record<string, SourceKindConfig> = {
   tautulli: {
     label: "Tautulli",
+    examples: { name: "Home Tautulli", baseUrl: "http://localhost:8181", publicUrl: "https://plex.example.com" },
     description: "Connect a Tautulli server for Plex activity data.",
     fields: [{ key: "apiKey", label: "Tautulli API key", type: "password" }],
   },
   plex: {
     label: "Plex",
+    examples: { name: "Home Plex", baseUrl: "http://localhost:32400", publicUrl: "https://plex.example.com" },
     description: "Connect directly to a Plex Media Server.",
     fields: [{ key: "token", label: "Plex token", type: "password" }],
   },
   jellyfin: {
     label: "Jellyfin",
+    examples: { name: "Home Jellyfin", baseUrl: "http://localhost:8096", publicUrl: "https://jellyfin.example.com" },
     description: "Connect to a Jellyfin server for movies, TV, books, and audiobooks.",
     fields: [{ key: "apiKey", label: "Jellyfin API key", type: "password" }],
     fieldHint: "Create one in Jellyfin's Dashboard, under API Keys.",
@@ -109,6 +114,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   emby: {
     label: "Emby",
+    examples: { name: "Home Emby", baseUrl: "http://localhost:8096", publicUrl: "https://emby.example.com" },
     description: "Connect to an Emby server for movies, TV, books, and audiobooks.",
     fields: [{ key: "apiKey", label: "Emby API key", type: "password" }],
     fieldHint: "Create one in Emby's server settings, under API Keys.",
@@ -116,6 +122,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   booklore: {
     label: "BookLore",
+    examples: { name: "Books", baseUrl: "http://localhost:6060", publicUrl: "https://books.example.com" },
     description: "Connect to a BookLore OPDS catalog.",
     fields: [
       { key: "username", label: "OPDS username" },
@@ -125,6 +132,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   bookorbit: {
     label: "BookOrbit",
+    examples: { name: "Books", baseUrl: "http://bookorbit.local", publicUrl: "https://books.example.com" },
     description: "Connect to a BookOrbit OPDS catalog.",
     fields: [
       { key: "username", label: "OPDS username" },
@@ -134,6 +142,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   grimmory: {
     label: "Grimmory",
+    examples: { name: "Books", baseUrl: "http://grimmory.local", publicUrl: "https://books.example.com" },
     description: "Connect to a Grimmory OPDS catalog.",
     fields: [
       { key: "username", label: "OPDS username" },
@@ -143,11 +152,13 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   audiobookshelf: {
     label: "Audiobookshelf",
+    examples: { name: "Audiobooks", baseUrl: "http://localhost:13378", publicUrl: "https://audiobooks.example.com" },
     description: "Connect to an Audiobookshelf server.",
     fields: [{ key: "token", label: "Audiobookshelf API token", type: "password" }],
   },
   romm: {
     label: "RomM",
+    examples: { name: "Games", baseUrl: "http://localhost:8080", publicUrl: "https://games.example.com" },
     description: "Connect to a RomM server.",
     fields: [{ key: "token", label: "RomM client API token", type: "password" }],
   },
@@ -155,6 +166,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
 
 const FALLBACK_CONFIG: SourceKindConfig = {
   label: "Source",
+  examples: { name: "My server", baseUrl: "http://localhost:8080", publicUrl: "https://media.example.com" },
   description: "Connect a media source.",
   fields: [{ key: "apiKey", label: "API key", type: "password" }],
 };
@@ -311,7 +323,7 @@ function AddSourceDialog({
             <Label htmlFor="source-name">Name</Label>
             <Input
               id="source-name"
-              placeholder="Home Tautulli"
+              placeholder={config.examples.name}
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -323,7 +335,7 @@ function AddSourceDialog({
             <Input
               id="source-base-url"
               type="url"
-              placeholder="http://localhost:8181"
+              placeholder={config.examples.baseUrl}
               required
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
@@ -335,7 +347,7 @@ function AddSourceDialog({
             <Input
               id="source-public-url"
               type="url"
-              placeholder="https://plex.example.com"
+              placeholder={config.examples.publicUrl}
               value={publicUrl}
               onChange={(e) => setPublicUrl(e.target.value)}
               disabled={submitting}
@@ -485,7 +497,7 @@ function EditSourceDialog({
             <Input
               id={`edit-source-public-url-${source.id}`}
               type="url"
-              placeholder="https://plex.example.com"
+              placeholder={config.examples.publicUrl}
               value={publicUrl}
               onChange={(e) => setPublicUrl(e.target.value)}
               disabled={submitting}
