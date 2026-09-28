@@ -8,6 +8,7 @@ import fastifyStatic from "@fastify/static";
 import { audiobookshelfAdapter } from "@latestarr/adapter-audiobookshelf";
 import { bookOrbitAdapter, bookloreAdapter, grimmoryAdapter } from "@latestarr/adapter-booklore-family";
 import { registerAdapter } from "@latestarr/adapter-core";
+import { embyAdapter, jellyfinAdapter } from "@latestarr/adapter-jellyfin";
 import { plexAdapter } from "@latestarr/adapter-plex";
 import { rommAdapter } from "@latestarr/adapter-romm";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
@@ -39,6 +40,8 @@ const appVersion = (JSON.parse(readFileSync(packageJsonPath, "utf8")) as { versi
 
 registerAdapter(tautulliAdapter);
 registerAdapter(plexAdapter);
+registerAdapter(jellyfinAdapter);
+registerAdapter(embyAdapter);
 registerAdapter(bookloreAdapter);
 registerAdapter(bookOrbitAdapter);
 registerAdapter(grimmoryAdapter);

@@ -5,7 +5,7 @@ A full walkthrough from a fresh checkout to a first sent newsletter. If you just
 ## 1. Prerequisites
 
 - Docker and Docker Compose (or a way to run a single container with a persistent volume, if you're not using Compose).
-- At least one media server LatestArr can connect to (Tautulli, direct Plex, a BookLore-family app, Audiobookshelf, or RomM) — see [Supported sources](../README.md#supported-sources).
+- At least one media server LatestArr can connect to (Tautulli, direct Plex, Jellyfin, Emby, a BookLore-family app, Audiobookshelf, or RomM) — see [Supported sources](../README.md#supported-sources).
 - SMTP credentials to send mail from. Any standard SMTP server works — see [Deliverability](deliverability.md) for provider-specific notes and, importantly, why your digest emails might otherwise land in spam.
 - A domain or reverse proxy in front of the container if you're exposing it to the internet (see [Running behind a reverse proxy](#running-behind-a-reverse-proxy) below) — LatestArr itself only speaks plain HTTP.
 
@@ -54,7 +54,7 @@ Visit `http://localhost:3000` (or wherever you've exposed it). The first thing y
 
 After creating the admin account and logging in, the dashboard shows a setup checklist:
 
-1. **Connect a source** — point LatestArr at a running Tautulli, Plex, BookLore-family app, Audiobookshelf, or RomM instance and its API credentials. Use the **Test connection** button before saving; it calls the source's own API immediately rather than waiting for the first scheduled fetch to discover a bad URL or key.
+1. **Connect a source** — point LatestArr at a running Tautulli, Plex, Jellyfin, Emby, BookLore-family app, Audiobookshelf, or RomM instance and its API credentials. Use the **Test connection** button before saving; it calls the source's own API immediately rather than waiting for the first scheduled fetch to discover a bad URL or key.
 2. **Add recipients and a group** — recipients are added individually (email + display name), then grouped, since a newsletter targets one or more groups rather than individual recipients directly.
 3. **Configure an SMTP profile** — see [Deliverability](deliverability.md) for what to put in `defaultFromEmail`/`defaultFromName` and why. Use **Send test email** before wiring it to a real newsletter.
 4. **(Optional) Make a design** — under Designs, duplicate the built-in Default and change its colours, layout, and details, and add an intro, footer note, or buttons, with a live preview. **Edit as code** switches a design to hand-written MJML if you want full control. Skip this and a newsletter uses Default; you can always come back and design one later.
