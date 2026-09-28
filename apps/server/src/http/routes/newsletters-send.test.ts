@@ -291,6 +291,9 @@ describe("POST /newsletters/:id/send-now", () => {
     expect(sentMessage.to).toBe("person@example.com");
     expect(sentMessage.from).toBe("LatestArr <noreply@example.com>");
     expect(sentMessage.html).toContain("Some Movie");
+    // A plain-text part goes with the HTML, without image alt text.
+    expect(sentMessage.text).toContain("Some Movie");
+    expect(sentMessage.text).not.toContain("cover art");
 
     const [run] = await db.select().from(sendRuns).where(eq(sendRuns.id, sendRunId));
     expect(run?.status).toBe("success");

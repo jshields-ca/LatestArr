@@ -28,6 +28,7 @@ import {
   type ItemImageSource,
 } from "./embed-images.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
+import { htmlToPlainText } from "../render/plain-text.js";
 import {
   buildDesignMjml,
   DEFAULT_DESIGN_SETTINGS,
@@ -243,6 +244,8 @@ export interface DesignOverride {
 
 interface RenderedNewsletter {
   html: string;
+  /** The plain-text part sent alongside the HTML. */
+  text: string;
   attachments: EmailAttachment[];
   /** The fetched pool this render drew from — same set `itemCountIncluded`
    * has always counted (its `.length`), now also captured as a
@@ -332,7 +335,7 @@ async function renderNewsletterContent(
   ]);
   const allSourceByItem = new Map([...sourceByItem, ...popular.sourceByItem, ...fallback.sourceByItem]);
   const resolved = await resolvePosterPlaceholders(html, allPlaceholders, (item) => allSourceByItem.get(item));
-  return { html: resolved.html, attachments: resolved.attachments, items };
+  return { html: resolved.html, text: htmlToPlainText(resolved.html), attachments: resolved.attachments, items };
 }
 
 async function resolveRecipients(db: Db, newsletterId: string) {
@@ -493,12 +496,13 @@ export async function sendTestNewsletter(
   const newsletter = await loadNewsletter(db, newsletterId);
   const sender = await loadSender(db, newsletter);
   try {
-    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
+    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
     const result = await sendEmail(sender.credentials, {
       from: sender.from,
       to,
       subject: `[Test] ${subjectFor(newsletter)}`,
       html,
+      text,
       attachments,
     });
     log.info({ items: items.length }, `Sent a test of "${newsletter.name}" to ${to}`);
@@ -539,7 +543,7 @@ async function executeRun(
   log.info(`Sending newsletter "${newsletter.name}"`);
 
   try {
-    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
+    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
     const subject = subjectFor(newsletter);
 
     // "Nothing new" means nothing added in the lookback window; a custom
@@ -583,6 +587,7 @@ async function executeRun(
           to: recipient.email,
           subject,
           html,
+          text,
           attachments,
         });
         await db.insert(sendRunRecipientResults).values({
