@@ -2,11 +2,15 @@ import type { DesignSettings } from "./design";
 
 export class ApiError extends Error {
   status: number;
+  /** The parsed JSON error response, for routes that return more than a
+   * message (e.g. a code design's line-by-line issues). */
+  body: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -38,7 +42,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       body && typeof body === "object" && "error" in body && typeof body.error === "string"
         ? body.error
         : `Request to ${path} failed with status ${response.status}`;
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, body);
   }
 
   return body as T;
@@ -526,8 +530,8 @@ export function sendRunHtmlUrl(newsletterId: string, sendRunId: string): string 
 export interface Template {
   id: string;
   name: string;
-  // "design": options-based (settings). "code": built in the old
-  // drag-and-drop editor (designJson/compiledMjml).
+  // "design": options-based (settings). "code": hand-written MJML in
+  // compiledMjml, with settings.content for its intro, footer, and buttons.
   mode: "design" | "code";
   settings: DesignSettings | null;
   designJson: Record<string, unknown> | null;
@@ -537,18 +541,52 @@ export interface Template {
   updatedAt: string;
 }
 
-export function previewDesign(settings: DesignSettings, newsletterId?: string): Promise<NewsletterPreview> {
-  return apiFetch<NewsletterPreview>("/templates/preview", {
+export interface CodeIssue {
+  line: number;
+  message: string;
+}
+
+export interface CodeCheck {
+  errors: CodeIssue[];
+  warnings: CodeIssue[];
+}
+
+/** A code design's issues from a 422 on preview or save, if that's what failed. */
+export function codeCheckFrom(err: unknown): CodeCheck | null {
+  if (!(err instanceof ApiError) || err.status !== 422) return null;
+  const issues = (err.body as { issues?: CodeCheck } | undefined)?.issues;
+  return issues ?? null;
+}
+
+export type DesignPreview = NewsletterPreview & { warnings?: CodeIssue[] };
+
+// Renders unsaved options, or unsaved code (`mjml`) with the design's text
+// and buttons from `settings`.
+export function previewDesign(
+  settings: DesignSettings,
+  newsletterId?: string,
+  mjml?: string,
+): Promise<DesignPreview> {
+  return apiFetch<DesignPreview>("/templates/preview", {
     method: "POST",
-    body: JSON.stringify({ settings, ...(newsletterId && { newsletterId }) }),
+    body: JSON.stringify({ settings, ...(mjml !== undefined && { mjml }), ...(newsletterId && { newsletterId }) }),
   });
+}
+
+export function convertDesignToCode(id: string): Promise<{ template: Template }> {
+  return apiFetch<{ template: Template }>(`/templates/${id}/convert-to-code`, { method: "POST" });
 }
 
 export function listTemplates(): Promise<{ templates: Template[] }> {
   return apiFetch<{ templates: Template[] }>("/templates");
 }
 
-export function createTemplate(input: { name: string; settings?: DesignSettings }): Promise<{ template: Template }> {
+export function createTemplate(input: {
+  name: string;
+  mode?: Template["mode"];
+  settings?: DesignSettings;
+  compiledMjml?: string;
+}): Promise<{ template: Template }> {
   return apiFetch<{ template: Template }>("/templates", {
     method: "POST",
     body: JSON.stringify(input),
@@ -565,7 +603,13 @@ export function getTemplate(id: string): Promise<{ template: Template }> {
 
 export function updateTemplate(
   id: string,
-  input: { name?: string; settings?: DesignSettings; designJson?: Record<string, unknown>; compiledMjml?: string },
+  input: {
+    name?: string;
+    mode?: Template["mode"];
+    settings?: DesignSettings;
+    designJson?: Record<string, unknown>;
+    compiledMjml?: string;
+  },
 ): Promise<{ template: Template }> {
   return apiFetch<{ template: Template }>(`/templates/${id}`, {
     method: "PATCH",

@@ -64,10 +64,12 @@ function sampleItems(now: Date): NewItem[] {
   ];
 }
 
-export async function renderDesignSample(settings: DesignSettings): Promise<string> {
+// Renders a design with sample items: its options, or `mjml` (a code-mode
+// design) with the design's text and buttons.
+export async function renderDesignSample(settings: DesignSettings, mjml?: string): Promise<string> {
   const now = new Date();
   const items = sampleItems(now);
-  return renderMjmlTemplate(buildDesignMjml(settings), {
+  return renderMjmlTemplate(mjml ?? buildDesignMjml(settings), {
     newsletterName: "Sample newsletter",
     items,
     popularItems: items.slice(0, 2),

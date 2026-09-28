@@ -398,7 +398,10 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       const body = parseBody(previewSchema, request.body ?? {}, reply);
       if (!body) return reply;
       try {
-        const preview = await previewNewsletter(db, request.params.id, { log: request.log, design: body.design });
+        const preview = await previewNewsletter(db, request.params.id, {
+          log: request.log,
+          design: body.design && { settings: body.design },
+        });
         return reply.send(preview);
       } catch (err) {
         if (err instanceof NewsletterNotFoundError) {

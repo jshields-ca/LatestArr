@@ -113,10 +113,14 @@ export function DesignsPage() {
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Couldn't load designs."));
   }, []);
 
-  async function duplicate(key: string, name: string, settings: DesignSettings) {
+  async function duplicate(key: string, name: string, settings: DesignSettings, source?: Template) {
     setDuplicating(key);
     try {
-      const { template } = await createTemplate({ name, settings });
+      const { template } = await createTemplate(
+        source?.mode === "code"
+          ? { name, mode: "code", settings, compiledMjml: source.compiledMjml ?? "" }
+          : { name, settings },
+      );
       navigate(`/designs/${template.id}`);
     } catch (err) {
       toast({
@@ -144,8 +148,12 @@ export function DesignsPage() {
       });
   }
 
-  const designs = templates?.filter((t) => t.mode === "design") ?? [];
-  const legacy = templates?.filter((t) => t.mode === "code") ?? [];
+  // Code templates still carrying the old drag-and-drop editor's state are
+  // listed apart until they're moved over; hand-written code designs sit
+  // with the rest.
+  const isLegacy = (t: Template) => t.mode === "code" && t.designJson !== null;
+  const designs = templates?.filter((t) => !isLegacy(t)) ?? [];
+  const legacy = templates?.filter(isLegacy) ?? [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -198,7 +206,12 @@ export function DesignsPage() {
               <ListRow
                 key={template.id}
                 leading={<ColorSwatches settings={settings} />}
-                primary={<p className="truncate font-medium">{template.name}</p>}
+                primary={
+                  <>
+                    <p className="truncate font-medium">{template.name}</p>
+                    {template.mode === "code" ? <Badge variant="neutral">Code</Badge> : null}
+                  </>
+                }
                 actions={
                   <>
                     <Button variant="outline" size="sm" asChild>
@@ -211,7 +224,7 @@ export function DesignsPage() {
                       variant="outline"
                       size="sm"
                       disabled={duplicating !== null}
-                      onClick={() => void duplicate(template.id, `${template.name} (copy)`, settings)}
+                      onClick={() => void duplicate(template.id, `${template.name} (copy)`, settings, template)}
                       aria-label={`Duplicate ${template.name}`}
                     >
                       {duplicating === template.id ? <Loader2 className="animate-spin" /> : <Copy />}

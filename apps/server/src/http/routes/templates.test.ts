@@ -79,11 +79,11 @@ describe("POST /templates", () => {
       authed({
         method: "POST",
         url: "/api/templates",
-        payload: { name: "Weekly digest", compiledMjml: "<mjml></mjml>" },
+        payload: { name: "Weekly digest", compiledMjml: "<mjml><mj-body></mj-body></mjml>" },
       }),
     );
     expect(response.statusCode).toBe(201);
-    expect(response.json().template.compiledMjml).toBe("<mjml></mjml>");
+    expect(response.json().template.compiledMjml).toBe("<mjml><mj-body></mj-body></mjml>");
   });
 });
 
@@ -248,5 +248,90 @@ describe("designs", () => {
       authed({ method: "POST", url: "/api/templates/preview", payload: { settings: {}, newsletterId: "nope" } }),
     );
     expect(response.statusCode).toBe(404);
+  });
+});
+
+describe("code designs", () => {
+  const CODE = `<mjml>
+  <mj-body>
+    <mj-section><mj-column>
+      <mj-text>{{introText}}</mj-text>
+      {{#each items}}<mj-text>{{title}}</mj-text>{{/each}}
+    </mj-column></mj-section>
+  </mj-body>
+</mjml>`;
+
+  it("previews code with the design's text, reporting MJML warnings by line", async () => {
+    const withWarning = CODE.replace("<mj-text>{{introText}}", "<mj-text bogus=\"1\">{{introText}}");
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/templates/preview",
+        payload: { mjml: withWarning, settings: { content: { intro: "Hey folks!" } } },
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.html).toContain("Hey folks!");
+    expect(body.html).toContain("The Quiet Harbour");
+    expect(body.warnings).toEqual([{ line: 4, message: "Attribute bogus is illegal" }]);
+  });
+
+  it("refuses to preview or save code with a Handlebars error, saying which line", async () => {
+    const broken = CODE.replace("{{/each}}", "{{/if}}");
+    const preview = await app.inject(
+      authed({ method: "POST", url: "/api/templates/preview", payload: { mjml: broken } }),
+    );
+    expect(preview.statusCode).toBe(422);
+    expect(preview.json().issues.errors[0].line).toBe(5);
+
+    const created = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Code", mode: "code", compiledMjml: CODE } }),
+    );
+    expect(created.statusCode).toBe(201);
+    const saved = await app.inject(
+      authed({
+        method: "PATCH",
+        url: `/api/templates/${created.json().template.id}`,
+        payload: { compiledMjml: broken },
+      }),
+    );
+    expect(saved.statusCode).toBe(422);
+    expect(saved.json().error).toMatch(/^Line 5: /);
+  });
+
+  it("saves code and its text together without turning it back into an options design", async () => {
+    const created = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Code", mode: "code", compiledMjml: CODE } }),
+    );
+    const id = created.json().template.id;
+    const saved = await app.inject(
+      authed({
+        method: "PATCH",
+        url: `/api/templates/${id}`,
+        payload: { mode: "code", compiledMjml: CODE, settings: { content: { footerNote: "Bye" } } },
+      }),
+    );
+    expect(saved.json().template).toMatchObject({ mode: "code", compiledMjml: CODE, settings: { content: { footerNote: "Bye" } } });
+  });
+
+  it("switches an options design to code, starting from the markup its options produce", async () => {
+    const created = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/templates",
+        payload: { name: "Dark", settings: { layout: "grid", content: { intro: "Hi" } } },
+      }),
+    );
+    const id = created.json().template.id;
+    const converted = await app.inject(authed({ method: "POST", url: `/api/templates/${id}/convert-to-code` }));
+    const { template } = converted.json();
+    expect(template.mode).toBe("code");
+    expect(template.compiledMjml.startsWith("<mjml>")).toBe(true);
+    expect(template.compiledMjml).toContain("{{introText}}");
+    expect(template.settings).toMatchObject({ layout: "grid", content: { intro: "Hi" } });
+
+    const missing = await app.inject(authed({ method: "POST", url: "/api/templates/nope/convert-to-code" }));
+    expect(missing.statusCode).toBe(404);
   });
 });

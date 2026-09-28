@@ -234,6 +234,13 @@ function buildSourceLinksByContentType(linkedSources: LinkedSource[]): Record<st
   return result;
 }
 
+/** Unsaved design to preview with: options-based settings, or code (MJML)
+ * plus the settings that carry its intro, footer note, and buttons. */
+export interface DesignOverride {
+  settings: DesignSettings;
+  mjml?: string;
+}
+
 interface RenderedNewsletter {
   html: string;
   attachments: EmailAttachment[];
@@ -250,16 +257,19 @@ interface RenderedNewsletter {
 const EMPTY_FETCHED_ITEMS: FetchedItems = { items: [], sourceByItem: new Map() };
 
 // Which email markup and words a newsletter renders with: a preview's
-// unsaved design, the newsletter's own design or code template, or the
+// unsaved design (options, or code with its text), the newsletter's own design or code template, or the
 // built-in Default design. Intro, footer note, and buttons belong to the
 // design (older versions kept them on the newsletter; see
 // migrate-content-into-designs.ts).
 async function resolveDesign(
   db: Db,
   newsletter: Newsletter,
-  designOverride?: DesignSettings,
+  designOverride?: DesignOverride,
 ): Promise<{ mjml: string; settings: DesignSettings }> {
-  if (designOverride) return { mjml: buildDesignMjml(designOverride), settings: designOverride };
+  if (designOverride) {
+    const { settings, mjml } = designOverride;
+    return { mjml: mjml ?? buildDesignMjml(settings), settings };
+  }
   if (newsletter.templateId) {
     const [template] = await db.select().from(templates).where(eq(templates.id, newsletter.templateId));
     const settings = parseDesignSettings(template?.settings);
@@ -274,7 +284,7 @@ async function renderNewsletterContent(
   newsletter: Newsletter,
   generatedAt: Date,
   log: Logger,
-  designOverride?: DesignSettings,
+  designOverride?: DesignOverride,
 ): Promise<RenderedNewsletter> {
   const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
   const linkedSources = await resolveLinkedSources(db, newsletter, log);
@@ -454,7 +464,7 @@ export interface NewsletterPreview {
 export async function previewNewsletter(
   db: Db,
   newsletterId: string,
-  options: { log?: Logger; design?: DesignSettings } = {},
+  options: { log?: Logger; design?: DesignOverride } = {},
 ): Promise<NewsletterPreview> {
   const log = (options.log ?? defaultLogger).child({ newsletterId });
   const newsletter = await loadNewsletter(db, newsletterId);
