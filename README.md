@@ -11,11 +11,13 @@
 
 **LatestArr** is a self-hosted, open-source "new content" newsletter tool for the self-hosted media ecosystem — the *arr stack and friends. It connects to your existing media servers, pulls in whatever movies, TV episodes, books, audiobooks, and games were recently added, and sends a fully custom-branded HTML digest to your users on a schedule you control.
 
-It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter feature — the closest existing tool to this — only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is a standalone tool, Plex-aware but not Plex-only, with a design editor that lets anyone style their newsletter from simple options and a live preview, no HTML or CSS required, and a code mode for anyone who wants full control.
+It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter, the closest existing tool, only speaks to Plex and offers limited control over layout, scheduling, and branding. LatestArr is Plex-aware but not Plex-only, and its design editor lets anyone style a newsletter with a live preview and no HTML or CSS, with a code mode for full control.
+
+The goal is simple: give something genuinely useful back to the *arr community.
 
 ## Why LatestArr?
 
-- **Source-agnostic** — connect Plex/Tautulli, book libraries, audiobook servers, and game libraries, and mix them into one newsletter or split them across many.
+- **Source-agnostic** — connect Plex, Tautulli, Jellyfin, Emby, book libraries, audiobook servers, and game libraries, and mix them into one newsletter or split them across many.
 - **Designs with a live preview** — pick colours, font, and layout (cards, compact list, or grid), choose which details each item shows, group items by type, and add your own intro, footer, and buttons, all without code. Or switch a design to **code mode** and edit its MJML directly, with the same live preview.
 - **Flexible scheduling** — every newsletter has its own schedule, lookback window, sources, and recipient list, with automatic catch-up if the server was down when a send was due.
 - **Built for public exposure** — OIDC/SSO support, encrypted-at-rest credentials, security headers, rate limiting, CSRF protection, and input validation on every route, because self-hosted tools increasingly get exposed to the internet.
@@ -24,7 +26,7 @@ It exists because [Tautulli](https://tautulli.com/)'s built-in newsletter featur
 
 ## How it works
 
-1. **Connect a source** — Tautulli, direct Plex, a BookLore-family app, Audiobookshelf, or RomM. LatestArr polls it on a schedule for recently-added items.
+1. **Connect a source** — any of the [supported sources](#supported-sources) below. LatestArr asks it for recently added items each time a newsletter is built.
 2. **Pick a design** (optional) — duplicate the built-in Default under Designs and adjust it with a live preview, or skip this and use Default as is.
 3. **Set up recipients and SMTP** — group your recipients, connect an SMTP server to send from.
 4. **Create a newsletter** — pick a schedule, a lookback window, which sources feed it, and who receives it. It sends itself from there.
@@ -61,33 +63,33 @@ docker compose pull   # fetch the published image — skip this to build from so
 docker compose up -d
 ```
 
-Then visit `http://localhost:3000`, create the admin account, and the dashboard's setup checklist walks you through connecting a source, adding recipients, configuring SMTP, and creating your first newsletter — no separate wizard, just the admin screens themselves in a sensible order.
+Then visit `http://localhost:3000`, create the admin account, and follow the dashboard's setup checklist: connect a source, add recipients, configure SMTP, and create your first newsletter.
 
 See [`.env.example`](.env.example) for every supported environment variable, [`docs/self-hosting.md`](docs/self-hosting.md) for the full walkthrough (reverse proxy setup, OIDC/SSO, backups, upgrades), and [`docs/deliverability.md`](docs/deliverability.md) for why digest emails land in spam without SPF/DKIM/DMARC and how to set them up.
 
-This project is still pre-1.0 — see [`CHANGELOG.md`](CHANGELOG.md) for release notes and the [Issues](https://github.com/jshields-ca/latestarr/issues) page for what's planned or in progress.
+## How it's built
 
-## Contributing
+AI is LatestArr's lead developer: the code, tests, CI, and docs are written by [Claude Code](https://claude.com/claude-code), Anthropic's AI coding agent. A human maintainer directs the work, reviews every change before it merges, and tests releases on a real setup. That's worth knowing before you self-host a tool that holds credentials and may face the internet.
 
-Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to set up a dev environment, coding standards, and how to add a new source adapter. Please also read our [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+What keeps it honest:
 
-Found a bug or want a feature? [Open an issue](https://github.com/jshields-ca/latestarr/issues/new/choose). Found a security issue? Please follow the process in [`SECURITY.md`](SECURITY.md) rather than opening a public issue.
+- **Automated checks on every change:** lint, typecheck, build, and tests (including axe-core accessibility checks) on two Node versions, plus a Docker build, all required to pass in CI.
+- **Real-world testing:** UI changes are checked in a real browser, and releases are run against the maintainer's own media servers. Where that isn't possible, as with Jellyfin and Emby today, the README says so.
+- **Security by design:** credentials encrypted at rest, server-side sessions, rate limiting, CSRF protection, and input validation on every route. Dependabot and CodeQL run continuously. See [`SECURITY.md`](SECURITY.md).
 
-If you'd like to support development directly, [GitHub Sponsors](https://github.com/sponsors/jshields-ca) is open. If you just find this useful, a star on the repo goes a long way too.
+None of this makes it bug-free. Treat AI authorship as a reason to read the code before trusting it with sensitive data, the same care you'd give any early-stage open-source project.
 
-## Built with Claude Code
+## Help wanted
 
-LatestArr's code — application logic, tests, CI/release automation, and this documentation — is written by [Claude Code](https://claude.com/claude-code) (Anthropic's AI coding agent), directed by a single human maintainer acting as product owner and reviewer. This is disclosed here because it's directly relevant to how much scrutiny to apply before self-hosting a tool that handles credentials and can be exposed to the public internet.
+Outside eyes make this better, and all of these are welcome:
 
-What that means in practice:
+- **Code review**, especially anything touching security, credentials, or email handling.
+- **Testing sources that haven't been confirmed yet** (marked 🧪 in [Supported sources](#supported-sources)), or any source on a setup different from ours.
+- **Guidance** on making LatestArr more reliable, secure, and mature: what's missing, what's wrong, what you'd expect from a tool like this.
 
-- **Every change is validated before merge**: the full lint/typecheck/build/test suite (`pnpm turbo run lint typecheck build test`) must pass, including automated accessibility checks (axe-core) and a Docker build + runtime smoke test — all enforced in CI (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
-- **UI changes are manually verified in a real browser**, not just against unit tests, before being considered done.
-- **Dependency and static-analysis scanning run continuously**: Dependabot for dependency updates, CodeQL for static security analysis.
-- **Security-sensitive design decisions are deliberate, not improvised**: envelope-encrypted credentials at rest, server-side sessions rather than client-stored tokens, rate limiting, CSRF protection, and input validation on every route — see [`SECURITY.md`](SECURITY.md) for the full scope and how to report a vulnerability.
-- **A human reviews and directs every change** — nothing merges without the maintainer reviewing the actual diff, not just a description of it.
+[Open an issue](https://github.com/jshields-ca/latestarr/issues/new/choose) to share findings or ideas. To contribute code, see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev setup, standards, and how to add a source adapter, and please read the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Found a security issue? Follow [`SECURITY.md`](SECURITY.md) rather than opening a public issue.
 
-None of this makes LatestArr immune to bugs, and the project is still pre-1.0 (see the callout at the top of this README). Treat AI authorship as a reason to read the code before trusting it with sensitive data — not as a reason to trust this project less than any other early-stage open-source tool.
+If you'd like to support development, [GitHub Sponsors](https://github.com/sponsors/jshields-ca) is open, and a star on the repo helps too.
 
 ## License
 
