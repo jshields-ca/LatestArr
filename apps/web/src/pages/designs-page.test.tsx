@@ -34,7 +34,15 @@ const plexDark = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
-const legacyTemplate = { ...plexDark, id: "t1", name: "Old layout", mode: "code", settings: null, compiledMjml: "<mjml />" };
+const legacyTemplate = {
+  ...plexDark,
+  id: "t1",
+  name: "Old layout",
+  mode: "code",
+  settings: null,
+  designJson: { pages: [] },
+  compiledMjml: "<mjml />",
+};
 
 function renderPage() {
   return render(
@@ -101,6 +109,22 @@ describe("DesignsPage", () => {
     const body = JSON.parse(init.body as string);
     expect(body.name).toBe("Plex dark (copy)");
     expect(body.settings.colors.background).toBe("#15181f");
+  });
+
+  it("lists code designs with the rest, and duplicates them with their code", async () => {
+    const user = userEvent.setup();
+    const codeDesign = { ...plexDark, id: "c1", name: "Hand made", mode: "code", compiledMjml: "<mjml />" };
+    mockList([codeDesign]);
+    renderPage();
+    await screen.findByText("Hand made");
+    expect(screen.getByText("Code")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit Hand made" })).toHaveAttribute("href", "/designs/c1");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { template: { ...codeDesign, id: "c2" } }));
+    await user.click(screen.getByRole("button", { name: "Duplicate Hand made" }));
+    await screen.findByText("Design editor");
+    const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ mode: "code", compiledMjml: "<mjml />" });
   });
 
   it("has no accessibility violations", async () => {

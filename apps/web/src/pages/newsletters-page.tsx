@@ -522,8 +522,14 @@ async function saveField(
   }
 }
 
+// Templates from the old drag-and-drop editor (still holding its state in
+// designJson) open there until they move to code designs.
+function isLegacyTemplate(template: Template): boolean {
+  return template.mode === "code" && template.designJson !== null;
+}
+
 function designEditLink(template: Template): string {
-  return template.mode === "design" ? `/designs/${template.id}` : `/templates/${template.id}/edit`;
+  return isLegacyTemplate(template) ? `/templates/${template.id}/edit` : `/designs/${template.id}`;
 }
 
 function DesignPicker({
@@ -537,8 +543,8 @@ function DesignPicker({
 }) {
   const [state, setState] = useState<SaveState>({ status: "idle" });
   const current = templates.find((t) => t.id === newsletter.templateId);
-  const designs = templates.filter((t) => t.mode === "design");
-  const legacy = templates.filter((t) => t.mode === "code");
+  const designs = templates.filter((t) => !isLegacyTemplate(t));
+  const legacy = templates.filter(isLegacyTemplate);
 
   return (
     <div className="flex flex-col gap-2">

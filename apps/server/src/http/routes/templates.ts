@@ -7,33 +7,50 @@ import {
   NewsletterNotFoundError,
   previewNewsletter,
 } from "../../pipeline/run-newsletter.js";
-import { designSettingsSchema } from "../../render/design.js";
+import { checkCodeTemplate, type CodeCheck } from "../../render/code-template.js";
+import { buildDesignMjml, designSettingsSchema, parseDesignSettings } from "../../render/design.js";
 import { renderDesignSample } from "../../render/design-sample.js";
 import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 
+// Generous for hand-written MJML; the built-in design is about 15 KB.
+const mjmlSchema = z.string().max(200_000);
+
 const previewDesignSchema = z.object({
-  settings: designSettingsSchema,
+  settings: designSettingsSchema.prefault({}),
+  // A code-mode design's markup; the options in `settings` are used otherwise
+  // (its intro, footer note, and buttons apply either way).
+  mjml: mjmlSchema.optional(),
   // Preview against this newsletter's real items; sample content otherwise.
   newsletterId: z.string().min(1).optional(),
 });
 
-// Sending `settings` creates an options-based design; otherwise it's a
-// code template (designJson/compiledMjml, from the old drag-and-drop editor).
+const modeSchema = z.enum(["design", "code"]);
+
+// "design" renders from `settings`; "code" from compiledMjml, with
+// `settings` supplying only its intro, footer note, and buttons. Without a
+// mode, sending `settings` alone makes a design, anything else code.
 const createTemplateSchema = z.object({
   name: z.string().trim().min(1, "name is required"),
+  mode: modeSchema.optional(),
   settings: designSettingsSchema.optional(),
   designJson: z.record(z.string(), z.unknown()).optional(),
-  compiledMjml: z.string().optional(),
+  compiledMjml: mjmlSchema.optional(),
 });
 
 const updateTemplateSchema = z.object({
   name: z.string().trim().min(1).optional(),
+  mode: modeSchema.optional(),
   settings: designSettingsSchema.optional(),
   designJson: z.record(z.string(), z.unknown()).optional(),
-  compiledMjml: z.string().optional(),
+  compiledMjml: mjmlSchema.optional(),
 });
+
+function codeErrorReply(check: CodeCheck) {
+  const [first] = check.errors;
+  return { error: `Line ${first!.line}: ${first!.message}`, issues: check };
+}
 
 interface IdParams {
   id: string;
@@ -47,13 +64,24 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
       const body = parseBody(createTemplateSchema, request.body, reply);
       if (!body) return reply;
       const { name, settings, designJson, compiledMjml } = body;
+      const mode = body.mode ?? (settings && compiledMjml === undefined ? "design" : "code");
+      if (mode === "code" && compiledMjml) {
+        const check = await checkCodeTemplate(compiledMjml);
+        if (check.errors.length > 0) return reply.code(422).send(codeErrorReply(check));
+      }
 
       const [template] = await db
         .insert(templates)
         .values(
-          settings
-            ? { name, mode: "design", settings }
-            : { name, mode: "code", designJson: designJson ?? null, compiledMjml: compiledMjml ?? null },
+          mode === "design"
+            ? { name, mode, settings: settings ?? {} }
+            : {
+                name,
+                mode,
+                settings: settings ?? null,
+                designJson: designJson ?? null,
+                compiledMjml: compiledMjml ?? null,
+              },
         )
         .returning();
 
@@ -66,13 +94,20 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
     scope.post("/templates/preview", async (request, reply) => {
       const body = parseBody(previewDesignSchema, request.body, reply);
       if (!body) return reply;
-      if (!body.newsletterId) {
-        return reply.send({ subject: "Sample newsletter", html: await renderDesignSample(body.settings), items: [] });
+      const { settings, mjml, newsletterId } = body;
+      let warnings: CodeCheck["warnings"] = [];
+      if (mjml !== undefined) {
+        const check = await checkCodeTemplate(mjml);
+        if (check.errors.length > 0) return reply.code(422).send(codeErrorReply(check));
+        warnings = check.warnings;
+      }
+      if (!newsletterId) {
+        const html = await renderDesignSample(settings, mjml);
+        return reply.send({ subject: "Sample newsletter", html, items: [], warnings });
       }
       try {
-        return reply.send(
-          await previewNewsletter(db, body.newsletterId, { log: request.log, design: body.settings }),
-        );
+        const preview = await previewNewsletter(db, newsletterId, { log: request.log, design: { settings, mjml } });
+        return reply.send({ ...preview, warnings });
       } catch (err) {
         if (err instanceof NewsletterNotFoundError) {
           return reply.code(404).send({ error: err.message });
@@ -98,12 +133,18 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
       const body = parseBody(updateTemplateSchema, request.body, reply);
       if (!body) return reply;
       const { name, settings, designJson, compiledMjml } = body;
+      const mode = body.mode ?? (settings !== undefined && compiledMjml === undefined ? "design" : undefined);
+      if (compiledMjml && mode !== "design") {
+        const check = await checkCodeTemplate(compiledMjml);
+        if (check.errors.length > 0) return reply.code(422).send(codeErrorReply(check));
+      }
 
       const [template] = await db
         .update(templates)
         .set({
           ...(name !== undefined && { name }),
-          ...(settings !== undefined && { settings, mode: "design" as const }),
+          ...(mode !== undefined && { mode }),
+          ...(settings !== undefined && { settings }),
           ...(designJson !== undefined && { designJson }),
           ...(compiledMjml !== undefined && { compiledMjml }),
           updatedAt: new Date(),
@@ -115,6 +156,32 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         return reply.code(404).send({ error: "Not found" });
       }
       request.log.info({ templateId: template.id, fields: changedFields(body) }, `Saved template "${template.name}"`);
+      return reply.send({ template });
+    });
+
+    // "Start from this design": turns an options-based design into code,
+    // starting from exactly the markup its options produce. Its text and
+    // buttons stay in `settings`, so they keep working.
+    scope.post<{ Params: IdParams }>("/templates/:id/convert-to-code", async (request, reply) => {
+      const [existing] = await db.select().from(templates).where(eq(templates.id, request.params.id));
+      if (!existing) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+      if (existing.mode === "code") {
+        return reply.send({ template: existing });
+      }
+      const [template] = await db
+        .update(templates)
+        .set({
+          mode: "code",
+          compiledMjml: buildDesignMjml(parseDesignSettings(existing.settings)).trim(),
+          designJson: null,
+          compiledHtml: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(templates.id, existing.id))
+        .returning();
+      request.log.info({ templateId: template!.id }, `Switched design "${template!.name}" to code`);
       return reply.send({ template });
     });
 

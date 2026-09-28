@@ -378,7 +378,6 @@ ${bodyOpen}
           font-weight="600"
           border-radius="8px"
           inner-padding="10px 20px"
-          width="auto"
           padding-top="0"
           padding-bottom="8px"
         >{{label}}</mj-button>

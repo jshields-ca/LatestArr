@@ -7,6 +7,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_DESIGN_SETTINGS } from "@/lib/design";
 import { DesignEditorPage } from "./design-editor-page";
 
+// CodeMirror needs real layout; a textarea stands in with the same contract.
+vi.mock("@/components/code-editor", () => ({
+  default: ({
+    value,
+    onChange,
+    label,
+    issues,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    label: string;
+    issues: { line: number }[];
+  }) => (
+    <textarea
+      aria-label={label}
+      data-issue-lines={issues.map((issue) => issue.line).join(",")}
+      defaultValue={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
 const fetchMock = vi.fn();
 
 function jsonResponse(status: number, body: unknown) {
@@ -27,19 +49,34 @@ const design = {
 
 const newsletter = { id: "n1", name: "Weekly Digest" };
 
-let previewBodies: { settings: typeof DEFAULT_DESIGN_SETTINGS; newsletterId?: string }[];
+const CODE = "<mjml><mj-body>{{newsletterName}}</mj-body></mjml>";
+const codeDesign = { ...design, id: "c1", name: "Hand made", mode: "code", compiledMjml: CODE };
+
+let previewBodies: { settings: typeof DEFAULT_DESIGN_SETTINGS; newsletterId?: string; mjml?: string }[];
+let previewResponse: () => ReturnType<typeof jsonResponse>;
 
 beforeEach(() => {
   previewBodies = [];
+  previewResponse = () => jsonResponse(200, { subject: "Sample", html: "<p>Preview body</p>", items: [], warnings: [] });
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+    if (url === "/api/templates/c1" && (!init?.method || init.method === "GET")) {
+      return Promise.resolve(jsonResponse(200, { template: codeDesign }));
+    }
+    if (url === "/api/templates/c1" && init?.method === "PATCH") {
+      const body = JSON.parse(init.body as string);
+      return Promise.resolve(jsonResponse(200, { template: { ...codeDesign, ...body } }));
+    }
+    if (url === "/api/templates/d1/convert-to-code") {
+      return Promise.resolve(jsonResponse(200, { template: { ...design, mode: "code", compiledMjml: CODE } }));
+    }
     if (url === "/api/templates/d1" && (!init?.method || init.method === "GET")) {
       return Promise.resolve(jsonResponse(200, { template: design }));
     }
     if (url === "/api/newsletters") return Promise.resolve(jsonResponse(200, { newsletters: [newsletter] }));
     if (url === "/api/templates/preview") {
       previewBodies.push(JSON.parse(init!.body as string));
-      return Promise.resolve(jsonResponse(200, { subject: "Sample", html: "<p>Preview body</p>", items: [] }));
+      return Promise.resolve(previewResponse());
     }
     if (url === "/api/templates/d1" && init?.method === "PATCH") {
       const body = JSON.parse(init.body as string);
@@ -54,9 +91,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderEditor() {
+function renderEditor(id = "d1") {
   return render(
-    <MemoryRouter initialEntries={["/designs/d1"]}>
+    <MemoryRouter initialEntries={[`/designs/${id}`]}>
       <Routes>
         <Route path="/designs/:id" element={<DesignEditorPage />} />
         <Route path="/designs" element={<div>Designs list</div>} />
@@ -147,5 +184,64 @@ describe("DesignEditorPage", () => {
     await screen.findByTitle("Design preview");
     // The iframe holds the email itself, not app UI.
     expect(await axe(container, { iframes: false })).toHaveNoViolations();
+  });
+
+  describe("code designs", () => {
+    it("previews the code, lists MJML warnings by line, and saves code with the text", async () => {
+      previewResponse = () =>
+        jsonResponse(200, {
+          subject: "Sample",
+          html: "<p>Code preview</p>",
+          items: [],
+          warnings: [{ line: 1, message: "Attribute bogus is illegal" }],
+        });
+      const user = userEvent.setup();
+      renderEditor("c1");
+      const editor = await screen.findByLabelText("Email markup (MJML)");
+      expect(await screen.findByTitle("Design preview")).toHaveAttribute("srcdoc", "<p>Code preview</p>");
+      expect(previewBodies[0]?.mjml).toBe(CODE);
+      expect(await screen.findByText("Line 1 (warning): Attribute bogus is illegal")).toBeInTheDocument();
+      expect(editor).toHaveAttribute("data-issue-lines", "1");
+      // Options that only apply to options designs aren't offered.
+      expect(screen.queryByText("Branding")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Edit as code" })).not.toBeInTheDocument();
+
+      await user.type(editor, " ");
+      await user.type(screen.getByLabelText("Intro (optional)"), "Hi");
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument());
+      const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH") as [string, RequestInit];
+      expect(JSON.parse(patch[1].body as string)).toMatchObject({
+        mode: "code",
+        compiledMjml: `${CODE} `,
+        settings: { content: { intro: "Hi" } },
+      });
+    });
+
+    it("shows a Handlebars error against its line instead of a preview update", async () => {
+      previewResponse = () =>
+        jsonResponse(422, {
+          error: "Line 3: {{/if}} closes a {{#each}} block.",
+          issues: { errors: [{ line: 3, message: "{{/if}} closes a {{#each}} block." }], warnings: [] },
+        });
+      renderEditor("c1");
+      expect(await screen.findByText("Line 3: {{/if}} closes a {{#each}} block.", { selector: "li" })).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent("Line 3: {{/if}} closes a {{#each}} block.");
+      expect(screen.getByLabelText("Email markup (MJML)")).toHaveAttribute("data-issue-lines", "3");
+    });
+
+    it("switches an options design to code after confirming", async () => {
+      const user = userEvent.setup();
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+      renderEditor();
+      await screen.findByTitle("Design preview");
+
+      await user.click(screen.getByRole("button", { name: "Edit as code" }));
+      expect(confirm).toHaveBeenCalled();
+      expect(await screen.findByLabelText("Email markup (MJML)")).toHaveValue(CODE);
+      expect(screen.queryByText("Branding")).not.toBeInTheDocument();
+      expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+      confirm.mockRestore();
+    });
   });
 });

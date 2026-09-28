@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Loader2, Plus, Save, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Loader2, Plus, Save, X } from "lucide-react";
 
+import { DesignCodeReference } from "@/components/design-code-reference";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,11 +14,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
+  type CodeCheck,
+  codeCheckFrom,
+  convertDesignToCode,
   getTemplate,
   listNewsletters,
   previewDesign,
   updateTemplate,
   type Newsletter,
+  type Template,
 } from "@/lib/api";
 import {
   DESIGN_KIND_LABELS,
@@ -31,6 +36,9 @@ import {
 } from "@/lib/design";
 import { EMAIL_FONT_OPTIONS } from "@/lib/email-fonts";
 import { cn } from "@/lib/utils";
+
+// CodeMirror is only needed for code designs, so it loads on demand.
+const CodeEditor = lazy(() => import("@/components/code-editor"));
 
 const PREVIEW_DELAY_MS = 400;
 const SAMPLE = "sample";
@@ -140,11 +148,24 @@ function CtaRows({ ctas, onChange }: { ctas: DesignCta[]; onChange: (ctas: Desig
   );
 }
 
+// What Save compares against: an options design's code is irrelevant, and a
+// code design's options (other than its text and buttons) are unused.
+function snapshotOf(name: string, settings: DesignSettings, mode: Template["mode"], code: string): string {
+  return JSON.stringify(mode === "code" ? { name, mode, content: settings.content, code } : { name, mode, settings });
+}
+
 export function DesignEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [settings, setSettings] = useState<DesignSettings | null>(null);
+  // A code design renders from `code`; `settings` then only supplies its
+  // intro, footer note, and buttons.
+  const [mode, setMode] = useState<Template["mode"]>("design");
+  const [code, setCode] = useState("");
+  const [codeVersion, setCodeVersion] = useState(0);
+  const [codeCheck, setCodeCheck] = useState<CodeCheck>({ errors: [], warnings: [] });
+  const [converting, setConverting] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -157,18 +178,24 @@ export function DesignEditorPage() {
   const [previewing, setPreviewing] = useState(false);
   const previewRequest = useRef(0);
 
-  const dirty = settings !== null && JSON.stringify({ name, settings }) !== savedSnapshot;
+  const dirty = settings !== null && snapshotOf(name, settings, mode, code) !== savedSnapshot;
   const ctasComplete = settings?.content.ctas.every(isCompleteCta) ?? true;
+
+  function load(template: Template) {
+    const loaded = withDesignDefaults(template.settings);
+    const loadedCode = template.compiledMjml ?? "";
+    setName(template.name);
+    setSettings(loaded);
+    setMode(template.mode);
+    setCode(loadedCode);
+    setCodeVersion((version) => version + 1);
+    setSavedSnapshot(snapshotOf(template.name, loaded, template.mode, loadedCode));
+  }
 
   useEffect(() => {
     if (!id) return;
     getTemplate(id)
-      .then(({ template }) => {
-        const loaded = withDesignDefaults(template.settings);
-        setName(template.name);
-        setSettings(loaded);
-        setSavedSnapshot(JSON.stringify({ name: template.name, settings: loaded }));
-      })
+      .then(({ template }) => load(template))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Couldn't load this design."));
     listNewsletters()
       .then(({ newsletters: loaded }) => setNewsletters(loaded))
@@ -187,14 +214,18 @@ export function DesignEditorPage() {
         ...settings,
         content: { ...settings.content, ctas: settings.content.ctas.filter(isCompleteCta) },
       };
-      previewDesign(previewable, previewSource === SAMPLE ? undefined : previewSource)
-        .then(({ html }) => {
+      const source = previewSource === SAMPLE ? undefined : previewSource;
+      previewDesign(previewable, source, mode === "code" ? code : undefined)
+        .then(({ html, warnings }) => {
           if (request !== previewRequest.current) return;
           setPreviewHtml(html);
           setPreviewError(null);
+          setCodeCheck({ errors: [], warnings: warnings ?? [] });
         })
         .catch((err) => {
           if (request !== previewRequest.current) return;
+          const check = codeCheckFrom(err);
+          if (check) setCodeCheck(check);
           setPreviewError(err instanceof ApiError ? err.message : "Couldn't update the preview.");
         })
         .finally(() => {
@@ -202,7 +233,7 @@ export function DesignEditorPage() {
         });
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [settings, previewSource]);
+  }, [settings, previewSource, mode, code]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -220,15 +251,42 @@ export function DesignEditorPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const { template } = await updateTemplate(id, { name, settings });
+      const { template } = await updateTemplate(
+        id,
+        mode === "code" ? { name, mode, settings, compiledMjml: code } : { name, mode, settings },
+      );
       const saved = withDesignDefaults(template.settings);
       setSettings(saved);
-      setSavedSnapshot(JSON.stringify({ name: template.name, settings: saved }));
+      setSavedSnapshot(snapshotOf(template.name, saved, template.mode, template.compiledMjml ?? ""));
       toast({ variant: "success", title: "Design saved", description: template.name });
     } catch (err) {
+      const check = codeCheckFrom(err);
+      if (check) setCodeCheck(check);
       setSaveError(err instanceof ApiError ? err.message : "Couldn't save this design.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleConvertToCode() {
+    if (!id) return;
+    if (dirty) {
+      toast({ variant: "destructive", title: "Save your changes first", description: "Then switch this design to code." });
+      return;
+    }
+    const confirmed = window.confirm(
+      "Edit this design as code from now on? You'll start from the markup its current options produce, and the options won't apply any more. To keep an options version, duplicate the design first.",
+    );
+    if (!confirmed) return;
+    setConverting(true);
+    try {
+      const { template } = await convertDesignToCode(id);
+      load(template);
+      toast({ variant: "success", title: "Now editing as code", description: template.name });
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Couldn't switch this design to code.");
+    } finally {
+      setConverting(false);
     }
   }
 
@@ -264,6 +322,37 @@ export function DesignEditorPage() {
     );
   }
 
+  const textAndButtons = (
+    <Section title="Text and buttons" defaultOpen>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="design-intro">Intro (optional)</Label>
+        <Textarea
+          id="design-intro"
+          rows={2}
+          placeholder="A note above the items, e.g. a quick update."
+          value={settings.content.intro}
+          onChange={(e) => update((c) => ({ ...c, content: { ...c.content, intro: e.target.value } }))}
+        />
+      </div>
+      <CtaRows
+        ctas={settings.content.ctas}
+        onChange={(ctas) => update((c) => ({ ...c, content: { ...c.content, ctas } }))}
+      />
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="design-footer">Footer note (optional)</Label>
+        <Textarea
+          id="design-footer"
+          rows={2}
+          placeholder="A note near the bottom, above the LatestArr credit line."
+          value={settings.content.footerNote}
+          onChange={(e) => update((c) => ({ ...c, content: { ...c.content, footerNote: e.target.value } }))}
+        />
+      </div>
+    </Section>
+  );
+
+  const codeIssues = [...codeCheck.errors, ...codeCheck.warnings];
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -281,8 +370,14 @@ export function DesignEditorPage() {
             className="max-w-sm font-brand text-lg font-semibold"
           />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {dirty ? <span className="text-sm text-muted-foreground">Unsaved changes</span> : null}
+          {mode === "design" ? (
+            <Button variant="outline" onClick={() => void handleConvertToCode()} disabled={converting || saving}>
+              {converting ? <Loader2 className="animate-spin" /> : <Code />}
+              Edit as code
+            </Button>
+          ) : null}
           <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim() || !ctasComplete}>
             {saving ? <Loader2 className="animate-spin" /> : <Save />}
             Save
@@ -295,265 +390,298 @@ export function DesignEditorPage() {
         </p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-3">
-          <Section title="Branding" defaultOpen>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="design-font">Font</Label>
-              <Select
-                id="design-font"
-                value={settings.font}
-                onChange={(e) => update((c) => ({ ...c, font: e.target.value }))}
-              >
-                {EMAIL_FONT_OPTIONS.map((font) => (
-                  <option key={font.value} value={font.value}>
-                    {font.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {COLORS.map(({ key, label }) => (
-                <div key={key} className="flex items-center gap-2">
-                  <input
-                    id={`design-color-${key}`}
-                    type="color"
-                    value={settings.colors[key]}
-                    onChange={(e) => update((c) => ({ ...c, colors: { ...c.colors, [key]: e.target.value } }))}
-                    className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
-                  />
-                  <div className="flex min-w-0 flex-col">
-                    <Label htmlFor={`design-color-${key}`}>{label}</Label>
-                    <span className="font-mono text-xs text-muted-foreground">{settings.colors[key]}</span>
+      <div
+        className={cn(
+          "grid gap-4",
+          mode === "code" ? "lg:grid-cols-2" : "lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]",
+        )}
+      >
+        {mode === "code" ? (
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">Email markup (MJML)</span>
+              <Suspense
+                fallback={
+                  <div className="flex h-96 items-center justify-center rounded-md border border-border text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    <span className="sr-only">Loading the code editor</span>
                   </div>
-                </div>
-              ))}
-            </div>
-            <SettingRow
-              label="Show the lookback line"
-              description={`"Here's what's new in the last 7 days" under the title.`}
-              htmlFor="design-lookback"
-              className="py-1"
-              control={
-                <Switch
-                  id="design-lookback"
-                  checked={settings.showLookbackLine}
-                  onCheckedChange={(checked) => update((c) => ({ ...c, showLookbackLine: checked }))}
-                />
-              }
-            />
-          </Section>
-
-          <Section title="Text and buttons" defaultOpen>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="design-intro">Intro (optional)</Label>
-              <Textarea
-                id="design-intro"
-                rows={2}
-                placeholder="A note above the items, e.g. a quick update."
-                value={settings.content.intro}
-                onChange={(e) => update((c) => ({ ...c, content: { ...c.content, intro: e.target.value } }))}
-              />
-            </div>
-            <CtaRows
-              ctas={settings.content.ctas}
-              onChange={(ctas) => update((c) => ({ ...c, content: { ...c.content, ctas } }))}
-            />
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="design-footer">Footer note (optional)</Label>
-              <Textarea
-                id="design-footer"
-                rows={2}
-                placeholder="A note near the bottom, above the LatestArr credit line."
-                value={settings.content.footerNote}
-                onChange={(e) => update((c) => ({ ...c, content: { ...c.content, footerNote: e.target.value } }))}
-              />
-            </div>
-          </Section>
-
-          <Section title="Layout" defaultOpen>
-            <fieldset className="flex flex-col gap-2">
-              <legend className="sr-only">Item layout</legend>
-              {LAYOUTS.map((layout) => (
-                <label
-                  key={layout.value}
-                  className={cn(
-                    "grid cursor-pointer grid-cols-[auto_1fr] items-center gap-x-3 rounded-md border border-border px-3 py-2 text-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                    settings.layout === layout.value && "border-primary bg-primary/5",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="design-layout"
-                    value={layout.value}
-                    checked={settings.layout === layout.value}
-                    onChange={() => update((c) => ({ ...c, layout: layout.value }))}
-                    className="row-span-2 accent-primary"
+                }
+              >
+                <div className="h-[60dvh]">
+                  <CodeEditor
+                    key={codeVersion}
+                    value={code}
+                    onChange={setCode}
+                    label="Email markup (MJML)"
+                    issues={[
+                      ...codeCheck.errors.map((issue) => ({ ...issue, severity: "error" as const })),
+                      ...codeCheck.warnings.map((issue) => ({ ...issue, severity: "warning" as const })),
+                    ]}
                   />
-                  <span className="font-medium">{layout.label}</span>
-                  <span className="text-xs text-muted-foreground">{layout.description}</span>
-                </label>
-              ))}
-            </fieldset>
-          </Section>
+                </div>
+              </Suspense>
+              {codeIssues.length > 0 ? (
+                <ul aria-label="Problems in the markup" className="flex flex-col gap-1 text-xs">
+                  {codeCheck.errors.map((issue, index) => (
+                    <li key={`e${index}`} className="text-destructive">
+                      Line {issue.line}: {issue.message}
+                    </li>
+                  ))}
+                  {codeCheck.warnings.map((issue, index) => (
+                    <li key={`w${index}`} className="text-muted-foreground">
+                      Line {issue.line} (warning): {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  MJML with Handlebars tags. See Variables and helpers below for what you can use.
+                </p>
+              )}
+            </div>
 
-          <Section title="Item details">
-            {DETAILS.map(({ key, label }) => (
+            {textAndButtons}
+
+            <Section title="Variables and helpers">
+              <DesignCodeReference />
+            </Section>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Section title="Branding" defaultOpen>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="design-font">Font</Label>
+                <Select
+                  id="design-font"
+                  value={settings.font}
+                  onChange={(e) => update((c) => ({ ...c, font: e.target.value }))}
+                >
+                  {EMAIL_FONT_OPTIONS.map((font) => (
+                    <option key={font.value} value={font.value}>
+                      {font.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {COLORS.map(({ key, label }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <input
+                      id={`design-color-${key}`}
+                      type="color"
+                      value={settings.colors[key]}
+                      onChange={(e) => update((c) => ({ ...c, colors: { ...c.colors, [key]: e.target.value } }))}
+                      className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
+                    />
+                    <div className="flex min-w-0 flex-col">
+                      <Label htmlFor={`design-color-${key}`}>{label}</Label>
+                      <span className="font-mono text-xs text-muted-foreground">{settings.colors[key]}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
               <SettingRow
-                key={key}
-                label={label}
-                htmlFor={`design-show-${key}`}
+                label="Show the lookback line"
+                description={`"Here's what's new in the last 7 days" under the title.`}
+                htmlFor="design-lookback"
                 className="py-1"
                 control={
                   <Switch
-                    id={`design-show-${key}`}
-                    checked={settings.show[key]}
-                    onCheckedChange={(checked) => update((c) => ({ ...c, show: { ...c.show, [key]: checked } }))}
+                    id="design-lookback"
+                    checked={settings.showLookbackLine}
+                    onCheckedChange={(checked) => update((c) => ({ ...c, showLookbackLine: checked }))}
                   />
                 }
               />
-            ))}
-          </Section>
+            </Section>
 
-          <Section title="Sections">
-            <SettingRow
-              label="Group by type"
-              description="A heading for each type (Movies, Books, ...), in the order below."
-              htmlFor="design-group"
-              className="py-1"
-              control={
-                <Switch
-                  id="design-group"
-                  checked={settings.sections.groupByType}
-                  onCheckedChange={(checked) =>
-                    update((c) => ({ ...c, sections: { ...c.sections, groupByType: checked } }))
-                  }
-                />
-              }
-            />
-            {settings.sections.groupByType ? (
-              <ol className="flex flex-col gap-1" aria-label="Section order">
-                {settings.sections.order.map((kind, index) => (
-                  <li key={kind} className="flex items-center justify-between rounded-md border border-border px-3 py-1 text-sm">
-                    {DESIGN_KIND_LABELS[kind]}
-                    <span className="flex">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Move ${DESIGN_KIND_LABELS[kind]} up`}
-                        disabled={index === 0}
-                        onClick={() => moveKind(index, -1)}
-                      >
-                        <ArrowUp />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Move ${DESIGN_KIND_LABELS[kind]} down`}
-                        disabled={index === settings.sections.order.length - 1}
-                        onClick={() => moveKind(index, 1)}
-                      >
-                        <ArrowDown />
-                      </Button>
-                    </span>
-                  </li>
+            {textAndButtons}
+
+            <Section title="Layout" defaultOpen>
+              <fieldset className="flex flex-col gap-2">
+                <legend className="sr-only">Item layout</legend>
+                {LAYOUTS.map((layout) => (
+                  <label
+                    key={layout.value}
+                    className={cn(
+                      "grid cursor-pointer grid-cols-[auto_1fr] items-center gap-x-3 rounded-md border border-border px-3 py-2 text-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
+                      settings.layout === layout.value && "border-primary bg-primary/5",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="design-layout"
+                      value={layout.value}
+                      checked={settings.layout === layout.value}
+                      onChange={() => update((c) => ({ ...c, layout: layout.value }))}
+                      className="row-span-2 accent-primary"
+                    />
+                    <span className="font-medium">{layout.label}</span>
+                    <span className="text-xs text-muted-foreground">{layout.description}</span>
+                  </label>
                 ))}
-              </ol>
-            ) : null}
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="design-limit">
-                {settings.sections.groupByType ? "Most items per section" : "Most items in total"}
-              </Label>
-              <Input
-                id="design-limit"
-                type="number"
-                min={1}
-                max={50}
-                placeholder="No limit"
-                value={settings.sections.limit ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value === "" ? null : Math.max(1, Math.min(50, Number(e.target.value)));
-                  update((c) => ({ ...c, sections: { ...c.sections, limit: value } }));
-                }}
-                className="w-32"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="design-empty">
-                {settings.sections.groupByType ? "When a section has nothing new" : "When there's nothing new"}
-              </Label>
-              <Select
-                id="design-empty"
-                value={settings.sections.empty}
-                onChange={(e) =>
-                  update((c) => ({ ...c, sections: { ...c.sections, empty: e.target.value as DesignEmptySection } }))
-                }
-              >
-                {EMPTY_OPTIONS.filter((option) => settings.sections.groupByType || option.value !== "link").map(
-                  (option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ),
-                )}
-              </Select>
-            </div>
-            <SettingRow
-              label="Most watched section"
-              description="Top items from sources that track plays (Plex and Tautulli)."
-              htmlFor="design-most-watched"
-              className="py-1"
-              control={
-                <Switch
-                  id="design-most-watched"
-                  checked={settings.sections.mostWatched.enabled}
-                  onCheckedChange={(checked) =>
-                    update((c) => ({
-                      ...c,
-                      sections: { ...c.sections, mostWatched: { ...c.sections.mostWatched, enabled: checked } },
-                    }))
+              </fieldset>
+            </Section>
+
+            <Section title="Item details">
+              {DETAILS.map(({ key, label }) => (
+                <SettingRow
+                  key={key}
+                  label={label}
+                  htmlFor={`design-show-${key}`}
+                  className="py-1"
+                  control={
+                    <Switch
+                      id={`design-show-${key}`}
+                      checked={settings.show[key]}
+                      onCheckedChange={(checked) => update((c) => ({ ...c, show: { ...c.show, [key]: checked } }))}
+                    />
                   }
                 />
-              }
-            />
-            {settings.sections.mostWatched.enabled ? (
+              ))}
+            </Section>
+
+            <Section title="Sections">
+              <SettingRow
+                label="Group by type"
+                description="A heading for each type (Movies, Books, ...), in the order below."
+                htmlFor="design-group"
+                className="py-1"
+                control={
+                  <Switch
+                    id="design-group"
+                    checked={settings.sections.groupByType}
+                    onCheckedChange={(checked) =>
+                      update((c) => ({ ...c, sections: { ...c.sections, groupByType: checked } }))
+                    }
+                  />
+                }
+              />
+              {settings.sections.groupByType ? (
+                <ol className="flex flex-col gap-1" aria-label="Section order">
+                  {settings.sections.order.map((kind, index) => (
+                    <li key={kind} className="flex items-center justify-between rounded-md border border-border px-3 py-1 text-sm">
+                      {DESIGN_KIND_LABELS[kind]}
+                      <span className="flex">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Move ${DESIGN_KIND_LABELS[kind]} up`}
+                          disabled={index === 0}
+                          onClick={() => moveKind(index, -1)}
+                        >
+                          <ArrowUp />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Move ${DESIGN_KIND_LABELS[kind]} down`}
+                          disabled={index === settings.sections.order.length - 1}
+                          onClick={() => moveKind(index, 1)}
+                        >
+                          <ArrowDown />
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="design-most-watched-count">How many</Label>
+                <Label htmlFor="design-limit">
+                  {settings.sections.groupByType ? "Most items per section" : "Most items in total"}
+                </Label>
                 <Input
-                  id="design-most-watched-count"
+                  id="design-limit"
                   type="number"
                   min={1}
-                  max={20}
-                  value={settings.sections.mostWatched.count}
+                  max={50}
+                  placeholder="No limit"
+                  value={settings.sections.limit ?? ""}
                   onChange={(e) => {
-                    const count = Math.max(1, Math.min(20, Number(e.target.value) || 1));
-                    update((c) => ({
-                      ...c,
-                      sections: { ...c.sections, mostWatched: { ...c.sections.mostWatched, count } },
-                    }));
+                    const value = e.target.value === "" ? null : Math.max(1, Math.min(50, Number(e.target.value)));
+                    update((c) => ({ ...c, sections: { ...c.sections, limit: value } }));
                   }}
                   className="w-32"
                 />
               </div>
-            ) : null}
-          </Section>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="design-empty">
+                  {settings.sections.groupByType ? "When a section has nothing new" : "When there's nothing new"}
+                </Label>
+                <Select
+                  id="design-empty"
+                  value={settings.sections.empty}
+                  onChange={(e) =>
+                    update((c) => ({ ...c, sections: { ...c.sections, empty: e.target.value as DesignEmptySection } }))
+                  }
+                >
+                  {EMPTY_OPTIONS.filter((option) => settings.sections.groupByType || option.value !== "link").map(
+                    (option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ),
+                  )}
+                </Select>
+              </div>
+              <SettingRow
+                label="Most watched section"
+                description="Top items from sources that track plays (Plex and Tautulli)."
+                htmlFor="design-most-watched"
+                className="py-1"
+                control={
+                  <Switch
+                    id="design-most-watched"
+                    checked={settings.sections.mostWatched.enabled}
+                    onCheckedChange={(checked) =>
+                      update((c) => ({
+                        ...c,
+                        sections: { ...c.sections, mostWatched: { ...c.sections.mostWatched, enabled: checked } },
+                      }))
+                    }
+                  />
+                }
+              />
+              {settings.sections.mostWatched.enabled ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="design-most-watched-count">How many</Label>
+                  <Input
+                    id="design-most-watched-count"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={settings.sections.mostWatched.count}
+                    onChange={(e) => {
+                      const count = Math.max(1, Math.min(20, Number(e.target.value) || 1));
+                      update((c) => ({
+                        ...c,
+                        sections: { ...c.sections, mostWatched: { ...c.sections.mostWatched, count } },
+                      }));
+                    }}
+                    className="w-32"
+                  />
+                </div>
+              ) : null}
+            </Section>
 
-          <Section title="Custom CSS">
-            <Label htmlFor="design-css">CSS applied to the email</Label>
-            <Textarea
-              id="design-css"
-              value={settings.customCss}
-              onChange={(e) => update((c) => ({ ...c, customCss: e.target.value }))}
-              placeholder="table { letter-spacing: 0.2px; }"
-              className="font-mono text-xs"
-              aria-describedby="design-css-hint"
-            />
-            <p id="design-css-hint" className="text-xs text-muted-foreground">
-              Styles are inlined into the email. Some email apps, Outlook especially, ignore parts of CSS, so
-              check with a test send.
-            </p>
-          </Section>
-        </div>
+            <Section title="Custom CSS">
+              <Label htmlFor="design-css">CSS applied to the email</Label>
+              <Textarea
+                id="design-css"
+                value={settings.customCss}
+                onChange={(e) => update((c) => ({ ...c, customCss: e.target.value }))}
+                placeholder="table { letter-spacing: 0.2px; }"
+                className="font-mono text-xs"
+                aria-describedby="design-css-hint"
+              />
+              <p id="design-css-hint" className="text-xs text-muted-foreground">
+                Styles are inlined into the email. Some email apps, Outlook especially, ignore parts of CSS, so
+                check with a test send.
+              </p>
+            </Section>
+          </div>
+        )}
 
         <div className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-4 lg:self-start">
           <div className="flex flex-wrap items-center gap-2">
