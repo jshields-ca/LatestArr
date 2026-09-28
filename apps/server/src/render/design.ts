@@ -3,21 +3,12 @@ import { EMAIL_FONTS, type EmailFont } from "./email-fonts.js";
 
 // A "design" is a set of options (colours, font, layout, what each item
 // shows, how items are grouped) that the renderer turns into MJML. Unlike a
-// hand-authored template it can't produce a broken email, and the default
-// settings reproduce the original built-in layout exactly (see
-// default-design.snapshot.test.ts).
+// hand-authored template it can't produce a broken email. The default
+// settings' output is recorded in default-design.snapshot.test.ts, so any
+// change to it is deliberate.
 
 export const DESIGN_KINDS = ["movie", "tv_episode", "tv_season", "book", "audiobook", "game"] as const;
 export type DesignKind = (typeof DESIGN_KINDS)[number];
-
-const KIND_HEADINGS: Record<DesignKind, string> = {
-  movie: "Movies",
-  tv_episode: "TV episodes",
-  tv_season: "TV seasons",
-  book: "Books",
-  audiobook: "Audiobooks",
-  game: "Games",
-};
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Colours must be 6-digit hex values like #c31d4c");
 
@@ -48,7 +39,9 @@ export const designSettingsSchema = z.object({
     .prefault({}),
   sections: z
     .object({
-      groupByType: z.boolean().default(false),
+      groupByType: z.boolean().default(true),
+      // Several new episodes of one series share a row.
+      groupEpisodes: z.boolean().default(true),
       order: z.array(z.enum(DESIGN_KINDS)).default([...DESIGN_KINDS]),
       limit: z.number().int().min(1).max(50).nullable().default(null),
       // What an empty section (or, ungrouped, an empty issue) shows: nothing,
@@ -109,6 +102,8 @@ function mix(a: string, b: string, amount: number): string {
 }
 
 interface Palette {
+  /** Behind the email's card. */
+  page: string;
   accent: string;
   /** Keeps a badge visible when a client drops its background. */
   badgeBorder: string;
@@ -131,6 +126,7 @@ function paletteFor(settings: DesignSettings): Palette {
   const defaults = DEFAULT_DESIGN_SETTINGS.colors;
   const neutralDefault = muted === defaults.muted && background === defaults.background;
   return {
+    page: mix(background, accent, 0.045),
     accent,
     badgeBorder: mix(accent, background, 0.6),
     background,
@@ -152,6 +148,7 @@ function darkPaletteFor(p: Palette): Palette {
   const background = mix(p.text, "#000000", 0.35);
   const text = mix(p.background, p.text, 0.1);
   return {
+    page: mix(background, "#000000", 0.45),
     background,
     text,
     accent: mix(p.accent, "#ffffff", 0.35),
@@ -179,7 +176,12 @@ function darkModeHead(p: Palette): string {
   // those with data-ogsb, text colours with data-ogsc)]
   const rules: [string[], string, boolean][] = [
     [
-      ["body", `[style*="background-color:${p.background}"]`, `[style*="background:${p.background}"]`],
+      ["body", `[style*="background-color:${p.page}"]`, `[style*="background:${p.page}"]`],
+      `background-color:${d.page} !important;`,
+      true,
+    ],
+    [
+      [`[style*="background-color:${p.background}"]`, `[style*="background:${p.background}"]`],
       `background-color:${d.background} !important;`,
       true,
     ],
@@ -227,19 +229,25 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
   const fallbackNote = withFallbackNote
     ? `{{#if isFallback}}<div style="font-size:12px;color:${p.subtle};margin-top:3px;">From the library</div>{{/if}}`
     : "";
+  const pill = (text: string, extra = "") =>
+    `<span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border:1px solid ${p.badgeBorder};border-radius:999px;padding:1px 8px;${extra}">${text}</span>`;
+  // A grouped series says how many episodes it stands for instead of its type.
   const badge = show.badge
-    ? `{{#if contentLabel}} <span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border:1px solid ${p.badgeBorder};border-radius:4px;padding:1px 6px;vertical-align:middle;">{{contentLabel}}</span>{{/if}}`
+    ? `{{#if episodeCount}} ${pill("{{episodeCount}} new episodes", "vertical-align:middle;")}{{else}}{{#if contentLabel}} ${pill("{{contentLabel}}", "vertical-align:middle;")}{{/if}}{{/if}}`
     : "";
   const linkedTitle = `{{#if externalUrl}}<a href="{{externalUrl}}" style="color:inherit;text-decoration:none;">{{title}}</a>{{else}}{{title}}{{/if}}`;
   // Left out entirely for an item with none of these, rather than leaving
   // an empty line.
   const details = (markup: string) => `{{#if detailsLine}}${markup}{{/if}}`;
+  const episodeList = (size: number) =>
+    `{{#if episodes}}<div style="margin-top:4px;">{{#each episodes}}<div style="font-size:${size}px;color:${p.muted};margin-top:2px;">{{#if externalUrl}}<a href="{{externalUrl}}" style="color:inherit;text-decoration:none;">{{subtitle}}</a>{{else}}{{subtitle}}{{/if}}</div>{{/each}}{{#if moreEpisodes}}<div style="font-size:${size}px;color:${p.subtle};margin-top:2px;">and {{moreEpisodes}} more</div>{{/if}}</div>{{/if}}`;
 
   if (settings.layout === "compact") {
-    return `<div style="padding:8px 0;border-bottom:1px solid ${p.border};font-family:${font};font-size:15px;color:${p.text};">` +
+    return `<div style="padding:9px 0;border-top:1px solid ${p.border};font-family:${font};font-size:15px;color:${p.text};">` +
       `<span style="font-weight:700;">${linkedTitle}</span>${badge}` +
       (show.subtitle ? `{{#if subtitle}} <span style="color:${p.muted};font-size:14px;">· {{subtitle}}</span>{{/if}}` : "") +
       (show.details ? details(`<span style="color:${p.accent};font-size:13px;font-weight:600;"> {{detailsLine}}</span>`) : "") +
+      (show.subtitle ? episodeList(13) : "") +
       (show.dates ? `<div style="font-size:12px;color:${p.subtle};margin-top:2px;">Added {{addedAtFormatted}}</div>` : "") +
       fallbackNote +
       `</div>`;
@@ -252,29 +260,39 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
     return `<div style="display:inline-block;width:50%;vertical-align:top;box-sizing:border-box;padding:0 12px 18px 0;font-family:${font};">` +
       poster +
       `<div style="font-weight:700;font-size:15px;color:${p.text};">${linkedTitle}</div>` +
-      (show.badge ? `{{#if contentLabel}}<div style="margin-top:3px;"><span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border:1px solid ${p.badgeBorder};border-radius:4px;padding:1px 6px;">{{contentLabel}}</span></div>{{/if}}` : "") +
+      (show.badge ? `<div style="margin-top:3px;">${badge.trim()}</div>` : "") +
       (show.subtitle ? `{{#if subtitle}}<div style="color:${p.muted};font-size:13px;margin-top:2px;">{{subtitle}}</div>{{/if}}` : "") +
       (show.details ? details(`<div style="font-size:12px;font-weight:600;color:${p.accent};margin-top:2px;">{{detailsLine}}</div>`) : "") +
       fallbackNote +
       `</div>`;
   }
 
-  // "cards", the original layout. With every option on this must stay
-  // byte-identical to the recorded default output.
-  const lines = [`        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">`, `        <tr>`];
+  // "cards": a poster beside the details, one row per item, rows divided
+  // by a hairline.
+  const lines = [
+    `        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${p.border};">`,
+    `        <tr>`,
+  ];
   if (show.poster) {
     lines.push(
-      `        {{#if posterUrl}}<td width="88" style="vertical-align:top;padding-right:14px;">{{#if externalUrl}}<a href="{{externalUrl}}">{{/if}}<img src="{{posterUrl}}" width="88" alt="{{title}} cover art" style="display:block;width:88px;max-width:88px;border-radius:8px;" />{{#if externalUrl}}</a>{{/if}}</td>{{/if}}`,
+      `        {{#if posterUrl}}<td width="72" style="vertical-align:top;padding:14px 14px 14px 0;">{{#if externalUrl}}<a href="{{externalUrl}}">{{/if}}<img src="{{posterUrl}}" width="72" alt="{{title}} cover art" style="display:block;width:72px;max-width:72px;border-radius:6px;" />{{#if externalUrl}}</a>{{/if}}</td>{{/if}}`,
     );
   }
-  lines.push(`        <td style="vertical-align:top;font-family:${font};">`);
-  lines.push(`          <div style="font-weight:700;font-size:18px;color:${p.text};">${linkedTitle}${badge}</div>`);
-  if (show.subtitle) lines.push(`          {{#if subtitle}}<div style="color:${p.muted};font-size:14px;margin-top:2px;">{{subtitle}}</div>{{/if}}`);
+  lines.push(`        <td style="vertical-align:top;padding:14px 0;font-family:${font};">`);
+  lines.push(`          <div style="font-weight:700;font-size:16px;line-height:1.3;color:${p.text};">${linkedTitle}${badge}</div>`);
+  if (show.subtitle) {
+    lines.push(`          {{#if subtitle}}<div style="color:${p.muted};font-size:14px;margin-top:3px;">{{subtitle}}</div>{{/if}}`);
+    lines.push(`          ${episodeList(14)}`);
+  }
   if (show.details) {
     lines.push(details(`          <div style="font-size:13px;font-weight:600;color:${p.accent};margin-top:3px;">{{detailsLine}}</div>`));
   }
-  if (show.overview) lines.push(`          {{#if overview}}<div style="font-size:14px;color:${p.text};margin-top:5px;line-height:1.4;">{{overview}}</div>{{/if}}`);
-  if (show.dates) lines.push(`          <div style="font-size:12px;color:${p.subtle};margin-top:5px;">Added {{addedAtFormatted}}{{#if releaseDateFormatted}} · Released {{releaseDateFormatted}}{{/if}}</div>`);
+  if (show.overview) {
+    lines.push(`          {{#if overviewShort}}<div style="font-size:14px;color:${p.text};margin-top:6px;line-height:1.45;">{{overviewShort}}</div>{{/if}}`);
+  }
+  if (show.dates) {
+    lines.push(`          <div style="font-size:12px;color:${p.subtle};margin-top:6px;">Added {{addedAtFormatted}}{{#if releaseDateFormatted}} · Released {{releaseDateFormatted}}{{/if}}</div>`);
+  }
   if (fallbackNote) lines.push(`          ${fallbackNote}`);
   lines.push(`        </td>`, `        </tr>`, `        </table>`);
   return lines.join("\n");
@@ -286,40 +304,51 @@ function wrapItems(settings: DesignSettings, inner: string): string {
   return settings.layout === "grid" ? `<div style="font-size:0;">${inner}</div>` : inner;
 }
 
-// Sections with a heading indent their items to line up with it (headings
-// are mj-text, which has 25px side padding). mjml places <mj-raw> content
-// directly inside the column's <tbody>, so the wrapper has to be a table
-// row: a <div> there gets moved out by the browser's HTML parser. The
-// original ungrouped list has no heading and stays flush, so the default
-// design's output is unchanged.
+// Items line up with the text above them (mj-text has 25px side padding).
+// mjml places <mj-raw> content directly inside the column's <tbody>, so
+// the wrapper has to be a table row: a <div> there gets moved out by the
+// browser's HTML parser.
 function wrapSectionItems(settings: DesignSettings, inner: string): string {
   return `<tr><td style="padding:0 25px;">${wrapItems(settings, inner)}</td></tr>`;
 }
 
-// The original "cards" list sits flush with the column (the recorded
-// Default output); the newer layouts line up with the title instead.
-function wrapUngroupedItems(settings: DesignSettings, inner: string): string {
-  return settings.layout === "cards" ? wrapItems(settings, inner) : wrapSectionItems(settings, inner);
-}
-
 function heading(text: string, p: Palette, font: string): string {
-  return `        <mj-text font-family="${font}" font-size="20px" font-weight="700" color="${p.text}" padding-bottom="4px">${text}</mj-text>`;
+  return `        <mj-text font-family="${font}" font-size="12px" font-weight="700" letter-spacing="1px" text-transform="uppercase" color="${p.accent}" padding-bottom="2px">${text}</mj-text>`;
 }
 
 function emptyMessage(p: Palette, font: string): string {
   return `        <mj-text font-family="${font}" font-size="14px" color="${p.muted}">Nothing new this time.</mj-text>`;
 }
 
+// Each section of a grouped newsletter: episodes and seasons share "TV".
+const SECTIONS: { kinds: DesignKind[]; heading: string; browse: string }[] = [
+  { kinds: ["movie"], heading: "Movies", browse: "movies" },
+  { kinds: ["tv_episode", "tv_season"], heading: "TV", browse: "TV" },
+  { kinds: ["book"], heading: "Books", browse: "books" },
+  { kinds: ["audiobook"], heading: "Audiobooks", browse: "audiobooks" },
+  { kinds: ["game"], heading: "Games", browse: "games" },
+];
+
+// Sections in the design's chosen order: each sits where its first kind is.
+function orderedSections(order: DesignKind[]) {
+  const rank = (kinds: DesignKind[]) => Math.min(...kinds.map((kind) => {
+    const index = order.indexOf(kind);
+    return index === -1 ? order.length : index;
+  }));
+  return [...SECTIONS].sort((a, b) => rank(a.kinds) - rank(b.kinds));
+}
+
 function ungroupedItems(settings: DesignSettings, p: Palette, font: string): string {
-  const { limit, empty } = settings.sections;
+  const { limit, empty, groupEpisodes } = settings.sections;
   const card = itemMarkup(settings, p, font, false);
-  const open = limit ? `{{#mediaList count="${limit}"}}` : `{{#each items}}`;
-  const close = limit ? `{{/mediaList}}` : `{{/each}}`;
+  const hash = [limit ? `count="${limit}"` : "", groupEpisodes ? `groupEpisodes="true"` : ""].filter(Boolean).join(" ");
+  const open = hash ? `{{#mediaList ${hash}}}` : `{{#each items}}`;
+  const close = hash ? `{{/mediaList}}` : `{{/each}}`;
   const list = [
-    `    <mj-section>`,
+    `    <mj-section padding="4px 0 12px">`,
     `      <mj-column>`,
     `        <mj-raw>`,
-    `        ${wrapUngroupedItems(settings, `${open}\n${card}\n        ${close}`)}`,
+    `        ${wrapSectionItems(settings, `${open}\n${card}\n        ${close}`)}`,
     `        </mj-raw>`,
     `      </mj-column>`,
     `    </mj-section>`,
@@ -329,11 +358,11 @@ function ungroupedItems(settings: DesignSettings, p: Palette, font: string): str
   if (empty === "random") {
     const fallbackCard = itemMarkup(settings, p, font, true);
     whenEmpty = [
-      `    <mj-section>`,
+      `    <mj-section padding="4px 0 12px">`,
       `      <mj-column>`,
       `        <mj-text font-family="${font}" font-size="14px" color="${p.muted}">Nothing new this time. Here are a few from the library:</mj-text>`,
       `        <mj-raw>`,
-      `        ${wrapUngroupedItems(settings, `{{#mediaList emptyFallback="random" fallbackCount="${limit ?? 5}"}}\n${fallbackCard}\n        {{/mediaList}}`)}`,
+      `        ${wrapSectionItems(settings, `{{#mediaList emptyFallback="random" fallbackCount="${limit ?? 5}"}}\n${fallbackCard}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,
       `      </mj-column>`,
       `    </mj-section>`,
@@ -342,9 +371,9 @@ function ungroupedItems(settings: DesignSettings, p: Palette, font: string): str
     whenEmpty = "";
   } else {
     whenEmpty = [
-      `    <mj-section>`,
+      `    <mj-section padding="4px 0 12px">`,
       `      <mj-column>`,
-      `        <mj-text font-family="${font}">No new items in this period.</mj-text>`,
+      emptyMessage(p, font),
       `      </mj-column>`,
       `    </mj-section>`,
     ].join("\n");
@@ -356,25 +385,27 @@ function ungroupedItems(settings: DesignSettings, p: Palette, font: string): str
 }
 
 function groupedItems(settings: DesignSettings, p: Palette, font: string): string {
-  const { limit, empty, order } = settings.sections;
-  const blocks = order.map((kind) => {
+  const { limit, empty, order, groupEpisodes } = settings.sections;
+  const blocks = orderedSections(order).map((section) => {
+    const contentType = section.kinds.join(",");
     const hash = [
-      `contentType="${kind}"`,
+      `contentType="${contentType}"`,
       limit ? `count="${limit}"` : "",
-      empty === "link" ? `emptyFallback="link" fallbackWrap="none" fallbackLinkLabel="Browse ${KIND_HEADINGS[kind].toLowerCase()}"` : "",
+      groupEpisodes ? `groupEpisodes="true"` : "",
+      empty === "link" ? `emptyFallback="link" fallbackWrap="none" fallbackLinkLabel="Browse ${section.browse}"` : "",
       empty === "random" ? `emptyFallback="random" fallbackCount="${limit ?? 5}"` : "",
     ]
       .filter(Boolean)
       .join(" ");
     const card = itemMarkup(settings, p, font, empty === "random");
     const body = [
-      `    <mj-section>`,
+      `    <mj-section padding="8px 0 4px">`,
       `      <mj-column>`,
-      heading(KIND_HEADINGS[kind], p, font),
+      heading(section.heading, p, font),
       `        <mj-raw>`,
       `        ${wrapSectionItems(settings, `{{#mediaList ${hash}}}\n${card}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,
-      empty === "message" ? `        {{#ifAnyItems contentType="${kind}"}}{{else}}\n${emptyMessage(p, font)}\n        {{/ifAnyItems}}` : "",
+      empty === "message" ? `        {{#ifAnyItems contentType="${contentType}"}}{{else}}\n${emptyMessage(p, font)}\n        {{/ifAnyItems}}` : "",
       `      </mj-column>`,
       `    </mj-section>`,
     ]
@@ -384,14 +415,17 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
     // are hidden; otherwise it only appears for content types this
     // newsletter's linked sources actually provide.
     return empty === "hide"
-      ? `    {{#ifAnyItems contentType="${kind}"}}\n${body}\n    {{/ifAnyItems}}`
-      : `    {{#ifKindLinked contentType="${kind}"}}\n${body}\n    {{/ifKindLinked}}`;
+      ? `    {{#ifAnyItems contentType="${contentType}"}}\n${body}\n    {{/ifAnyItems}}`
+      : `    {{#ifKindLinked contentType="${contentType}"}}\n${body}\n    {{/ifKindLinked}}`;
   });
 
+  // With nothing new, and no section left to say so (they're hidden, or no
+  // source is linked), one line says it for the whole issue.
+  const message = `    <mj-section>\n      <mj-column>\n        <mj-text font-family="${font}" font-size="14px" color="${p.muted}">No new items in this period.</mj-text>\n      </mj-column>\n    </mj-section>`;
   const nothingAtAll =
     empty === "hide"
-      ? `    {{#unless items.length}}\n    <mj-section>\n      <mj-column>\n        <mj-text font-family="${font}">No new items in this period.</mj-text>\n      </mj-column>\n    </mj-section>\n    {{/unless}}`
-      : "";
+      ? `    {{#unless items.length}}\n${message}\n    {{/unless}}`
+      : `    {{#unless items.length}}{{#unless hasLinkedSources}}\n${message}\n    {{/unless}}{{/unless}}`;
   return [...blocks, nothingAtAll].filter(Boolean).join("\n");
 }
 
@@ -401,7 +435,7 @@ function mostWatchedSection(settings: DesignSettings, p: Palette, font: string):
   const card = itemMarkup(settings, p, font, false);
   return [
     `    {{#ifAnyItems sort="mostWatched"}}`,
-    `    <mj-section>`,
+    `    <mj-section padding="8px 0 4px">`,
     `      <mj-column>`,
     heading("Most watched", p, font),
     `        <mj-raw>`,
@@ -420,17 +454,24 @@ function sanitizeCss(css: string): string {
   return css.replace(/</g, "").replace(/\{\{|\}\}/g, "");
 }
 
+// The email is a card on a softly tinted page: an accent bar across the
+// top, the name, date range, and counts, then the items, with the credits
+// below the card.
 export function buildDesignMjml(settings: DesignSettings): string {
   const p = paletteFor(settings);
   const font = EMAIL_FONTS[settings.font].stack;
   const css = sanitizeCss(settings.customCss).trim();
   const customCss = css ? `\n    <mj-style inline="inline">${css}</mj-style>` : "";
   const head = `\n  <mj-head>${darkModeHead(p)}${customCss}\n  </mj-head>`;
-  // Always explicit, so a client never has to guess the page colour.
-  const bodyOpen = `  <mj-body background-color="${p.background}">`;
 
-  const lookback = settings.showLookbackLine
-    ? `\n        {{#if lookbackDays}}\n        <mj-text font-family="${font}" font-size="15px" color="${p.muted}" padding-top="0">Here's what's new in the last {{lookbackDays}} days.</mj-text>\n        {{/if}}`
+  // Without a lookback window (a code path only tests use) there's no date
+  // range, so the counts stand alone.
+  const summary = settings.showLookbackLine
+    ? `
+        <mj-text font-family="${font}" font-size="14px" color="${p.muted}" padding-top="0">{{#if periodFormatted}}{{periodFormatted}} · {{/if}}{{#if itemCount}}{{itemCount}} new{{else}}Nothing new{{/if}}</mj-text>
+        {{#if kindCounts.length}}
+        <mj-text font-family="${font}" padding-top="2px" line-height="26px">{{#each kindCounts}}<span style="display:inline-block;font-size:12px;font-weight:600;color:${p.muted};background:${p.page};border:1px solid ${p.border};border-radius:999px;padding:2px 10px;margin:0 4px 4px 0;">{{this}}</span>{{/each}}</mj-text>
+        {{/if}}`
     : "";
 
   const items = settings.sections.groupByType ? groupedItems(settings, p, font) : ungroupedItems(settings, p, font);
@@ -438,17 +479,19 @@ export function buildDesignMjml(settings: DesignSettings): string {
 
   return `
 <mjml>${head}
-${bodyOpen}
-    <mj-section>
+  <mj-body background-color="${p.page}">
+    <mj-section padding="12px 0"><mj-column><mj-spacer height="8px" /></mj-column></mj-section>
+    <mj-wrapper background-color="${p.background}" border-top="4px solid ${p.accent}" border-radius="14px" padding="12px 0 16px">
+    <mj-section padding="8px 0 4px">
       <mj-column>
-        <mj-text font-family="${font}" font-size="28px" font-weight="700" color="${p.text}">{{newsletterName}}</mj-text>${lookback}
+        <mj-text font-family="${font}" font-size="26px" line-height="1.25" font-weight="700" color="${p.text}">{{newsletterName}}</mj-text>${summary}
         {{#if introText}}
-        <mj-text font-family="${font}" font-size="15px" color="${p.text}" padding-top="12px">{{introText}}</mj-text>
+        <mj-text font-family="${font}" font-size="15px" line-height="1.5" color="${p.text}" padding-top="8px">{{introText}}</mj-text>
         {{/if}}
       </mj-column>
     </mj-section>
     {{#if ctas.length}}
-    <mj-section>
+    <mj-section padding="0 0 8px">
       <mj-column>
         {{#each ctas}}
         <mj-button
@@ -460,6 +503,7 @@ ${bodyOpen}
           font-weight="600"
           border-radius="8px"
           inner-padding="10px 20px"
+          align="left"
           padding-top="0"
           padding-bottom="8px"
         >{{label}}</mj-button>
@@ -469,28 +513,21 @@ ${bodyOpen}
     {{/if}}
 ${items}${mostWatched ? `\n${mostWatched}` : ""}
     {{#if footerNote}}
-    <mj-section>
+    <mj-section padding="8px 0 0">
       <mj-column>
-        <mj-text font-family="${font}" font-size="13px" color="${p.muted}">{{footerNote}}</mj-text>
+        <mj-text font-family="${font}" font-size="14px" line-height="1.5" color="${p.muted}">{{footerNote}}</mj-text>
       </mj-column>
     </mj-section>
     {{/if}}
-    <mj-section>
+    </mj-wrapper>
+    <mj-section padding="16px 0 28px">
       <mj-column>
-        <mj-raw>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${p.border};padding-top:14px;">
-        <tr>
-        <td style="font-family:${font};font-size:13px;color:${p.subtle};">
-          Generated by LatestArr on {{generatedAtFormatted}}
-        </td>
-        <td align="right" style="font-family:${font};font-size:13px;color:${p.subtle};white-space:nowrap;">
-          <a href="https://github.com/jshields-ca/LatestArr" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${GITHUB_ICON_DATA_URI}" width="14" height="14" alt="" style="vertical-align:middle;margin-right:4px;" />GitHub</a>
-          &nbsp;&nbsp;
-          <a href="https://github.com/jshields-ca/LatestArr/issues" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${REPORT_ICON_DATA_URI}" width="14" height="14" alt="" style="vertical-align:middle;margin-right:4px;" />Report an issue</a>
-        </td>
-        </tr>
-        </table>
-        </mj-raw>
+        <mj-text font-family="${font}" font-size="12px" line-height="1.6" color="${p.subtle}" align="center">
+          Sent by LatestArr on {{generatedAtFormatted}}<br />
+          <a href="https://github.com/jshields-ca/LatestArr" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${GITHUB_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />GitHub</a>
+          &nbsp;·&nbsp;
+          <a href="https://github.com/jshields-ca/LatestArr/issues" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${REPORT_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />Report an issue</a>
+        </mj-text>
       </mj-column>
     </mj-section>
   </mj-body>

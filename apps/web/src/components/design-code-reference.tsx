@@ -33,6 +33,8 @@ export function DesignCodeReference() {
         <Entry code="{{newsletterName}}">The newsletter&apos;s name.</Entry>
         <Entry code="{{lookbackDays}}">How many days back this issue looks.</Entry>
         <Entry code="{{generatedAtFormatted}}">The send date, e.g. September 27, 2026.</Entry>
+        <Entry code="{{periodFormatted}} {{itemCount}}">The date range covered, e.g. Sep 21 – 28, 2026, and how many items are new.</Entry>
+        <Entry code="{{#each kindCounts}}{{this}}{{/each}}">A count per type, largest first, e.g. 23 episodes, 9 movies.</Entry>
         <Entry code="{{introText}} {{footerNote}}">From Text and buttons above; empty when not set.</Entry>
         <Entry code="{{#each ctas}}{{label}} {{url}}{{/each}}">The buttons from Text and buttons.</Entry>
       </Group>
@@ -43,6 +45,7 @@ export function DesignCodeReference() {
           for any.
         </Entry>
         <Entry code="{{title}} {{subtitle}} {{overview}}">Name, episode or author line, and summary.</Entry>
+        <Entry code="{{overviewShort}}">The summary cut to about two lines.</Entry>
         <Entry code="{{contentLabel}} {{kind}}">
           Badge text (Movie, Ebook, ...) and type: movie, tv_episode, tv_season, book, audiobook, or game.
         </Entry>
@@ -53,6 +56,10 @@ export function DesignCodeReference() {
         <Entry code="{{detailsLine}}">
           Runtime, pages, length, or platform, then rating, e.g. 1h 52m · 7.8/10. Empty when there are none.
         </Entry>
+        <Entry code="{{episodeCount}} {{#each episodes}}{{subtitle}}{{/each}} {{moreEpisodes}}">
+          On a row standing for several episodes of one show (groupEpisodes): how many, up to five of them with
+          their subtitle and externalUrl, and how many more weren&apos;t listed.
+        </Entry>
         <Entry code="{{isFallback}}">True for a library pick shown because nothing new was added.</Entry>
       </Group>
 
@@ -60,6 +67,8 @@ export function DesignCodeReference() {
         <Entry code={'{{#mediaList contentType="movie" sort="added" count="5"}}...{{/mediaList}}'}>
           Like each, filtered and trimmed. sort: added or mostWatched. order: sequential or random. showAll=&quot;true&quot;
           ignores count. emptyFallback: none, link (with fallbackLinkLabel), or random (with fallbackCount).
+          groupEpisodes=&quot;true&quot; folds a show&apos;s new episodes into one row. contentType can list several
+          types, e.g. &quot;tv_episode,tv_season&quot;.
         </Entry>
         <Entry code={'{{#ifAnyItems contentType="book"}}...{{else}}...{{/ifAnyItems}}'}>
           Whether that type (and sort) has anything to show, e.g. to hide a heading.

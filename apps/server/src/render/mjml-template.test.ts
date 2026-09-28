@@ -602,3 +602,73 @@ describe("releaseDateFormatted and contentLabel on rendered items", () => {
     expect(html).not.toContain("[Audiobook]");
   });
 });
+
+describe("the summary, grouping, and section helpers", () => {
+  const generatedAt = new Date("2026-09-28T12:00:00Z");
+  const render = (source: string, items: NewItem[], extra: Record<string, unknown> = {}) =>
+    renderMjmlTemplate(`<mjml><mj-body><mj-section><mj-column>${source}</mj-column></mj-section></mj-body></mjml>`, {
+      newsletterName: "Weekly Digest",
+      items,
+      generatedAt,
+      ...extra,
+    });
+  const episode = (n: number, series = "The Daily Show") =>
+    item({ id: `${series}-${n}`, title: series, kind: "tv_episode", subtitle: `S31E10${n} - Guest ${n}` });
+
+  it("folds several episodes of one series into one row, keeping the order and listing up to five", async () => {
+    const items = [
+      episode(1),
+      item({ title: "A Movie" }),
+      episode(2),
+      episode(1, "Futurama"),
+      ...[3, 4, 5, 6, 7].map((n) => episode(n)),
+    ];
+    const html = await render(
+      `{{#mediaList groupEpisodes="true"}}<mj-text>@@{{title}}|{{episodeCount}}|{{#each episodes}}{{subtitle}};{{/each}}|{{moreEpisodes}}@@</mj-text>{{/mediaList}}`,
+      items,
+    );
+    const rows = [...html.matchAll(/@@([^@]*)@@/g)].map((m) => m[1]);
+    expect(rows).toEqual([
+      "The Daily Show|7|S31E101 - Guest 1;S31E102 - Guest 2;S31E103 - Guest 3;S31E104 - Guest 4;S31E105 - Guest 5;|2",
+      "A Movie|||",
+      "Futurama|||",
+    ]);
+  });
+
+  it("filters on several content types at once", async () => {
+    const html = await render(
+      `{{#mediaList contentType="tv_episode,tv_season"}}<mj-text>({{title}})</mj-text>{{/mediaList}}{{#ifAnyItems contentType="book,game"}}<mj-text>(books)</mj-text>{{/ifAnyItems}}`,
+      [item({ title: "A Movie" }), item({ title: "Ep", kind: "tv_episode" }), item({ title: "Se", kind: "tv_season" })],
+    );
+    expect(html).toContain("(Ep)");
+    expect(html).toContain("(Se)");
+    expect(html).not.toContain("(A Movie)");
+    expect(html).not.toContain("(books)");
+  });
+
+  it("shows a type's section when a source provides it, or when it has items anyway", async () => {
+    const source = `{{#ifKindLinked contentType="book"}}<mj-text>(books)</mj-text>{{/ifKindLinked}}`;
+    expect(await render(source, [])).not.toContain("(books)");
+    expect(await render(source, [], { sourceLinksByContentType: { book: "https://books.example" } })).toContain("(books)");
+    expect(await render(source, [item({ kind: "book" })])).toContain("(books)");
+  });
+
+  it("gives the date range, the item count, and counts per type, largest first", async () => {
+    const source = `<mj-text>[{{periodFormatted}}|{{itemCount}}|{{#each kindCounts}}{{this}};{{/each}}]</mj-text>`;
+    const items = [item(), episode(1), episode(2), item({ kind: "tv_season" })];
+    expect(await render(source, items, { lookbackDays: 7 })).toContain("[Sep 21 – 28, 2026|4|2 episodes;1 movie;1 season;]");
+    expect(await render(source, [], { lookbackDays: 30 })).toContain("[Aug 29 – Sep 28, 2026|0|]");
+  });
+
+  it("cuts a long overview to about two lines at a word, and leaves a short one alone", async () => {
+    const long = "word ".repeat(60).trim();
+    const html = await render(`{{#each items}}<mj-text>@@{{overviewShort}}@@</mj-text>{{/each}}`, [
+      item({ overview: long }),
+      item({ overview: "Short." }),
+    ]);
+    const [cut, short] = [...html.matchAll(/@@([^@]*)@@/g)].map((m) => m[1]!);
+    expect(cut.endsWith("word…")).toBe(true);
+    expect(cut.length).toBeLessThanOrEqual(181);
+    expect(short).toBe("Short.");
+  });
+});

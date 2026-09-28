@@ -41,7 +41,7 @@ describe("design settings", () => {
       layout: "cards",
       colors: { accent: "#c31d4c", background: "#ffffff" },
       show: { poster: true, overview: true },
-      sections: { groupByType: false, empty: "message", mostWatched: { enabled: false, count: 5 } },
+      sections: { groupByType: true, groupEpisodes: true, empty: "message", mostWatched: { enabled: false, count: 5 } },
       customCss: "",
     });
     expect(design({ layout: "grid", show: { poster: false } })).toMatchObject({
@@ -86,7 +86,7 @@ describe("buildDesignMjml", () => {
 
   it("gives badges an outline, so they survive a client dropping their background", async () => {
     const html = await render(design({}));
-    expect(html).toMatch(/border:1px solid #[0-9a-f]{6};border-radius:4px;[^"]*">Movie</);
+    expect(html).toMatch(/border:1px solid #[0-9a-f]{6};border-radius:999px;[^"]*">Movie</);
   });
 
   it("renders the grid layout as posters side by side", async () => {
@@ -112,15 +112,48 @@ describe("buildDesignMjml", () => {
     expect(html).not.toContain("#c31d4c");
   });
 
-  it("can hide the lookback line", async () => {
+  it("can hide the date range and counts under the title", async () => {
     const shown = await render(DEFAULT_DESIGN_SETTINGS);
     const hidden = await render(design({ showLookbackLine: false }));
-    expect(shown).toContain("in the last 7 days");
-    expect(hidden).not.toContain("in the last 7 days");
+    expect(shown).toMatch(/[A-Z][a-z]{2} \d+ – [^<]*\d{4} · \d+ new/);
+    expect(hidden).not.toMatch(/ · \d+ new/);
+  });
+
+  it("groups a series' new episodes into one row by default, and lists them separately when that's off", async () => {
+    const episodes = [1, 2, 3].map((n) =>
+      item({ id: `e${n}`, title: "Night Shift", kind: "tv_episode", subtitle: `S02E0${n} - Part ${n}` }),
+    );
+    const grouped = await render(DEFAULT_DESIGN_SETTINGS, { items: episodes });
+    expect(grouped).toContain("3 new episodes");
+    expect(grouped.match(/>Night Shift[ <]/g)).toHaveLength(1);
+    expect(grouped).toContain("S02E03 - Part 3");
+
+    const separate = await render(design({ sections: { groupEpisodes: false } }), { items: episodes });
+    expect(separate).not.toContain("new episodes");
+    expect(separate.match(/>Night Shift[ <]/g)).toHaveLength(3);
+  });
+
+  it("puts TV episodes and seasons in one TV section", async () => {
+    const html = await render(DEFAULT_DESIGN_SETTINGS, {
+      items: [item({ title: "Ep", kind: "tv_episode" }), item({ title: "Se", kind: "tv_season" })],
+    });
+    expect(html.match(/>TV</g)).toHaveLength(1);
+    expect(html).not.toContain("TV episodes");
+  });
+
+  it("says there's nothing new when no section would appear", async () => {
+    const html = await render(DEFAULT_DESIGN_SETTINGS, { items: [] });
+    expect(html).toContain("No new items in this period.");
+    const withSource = await render(DEFAULT_DESIGN_SETTINGS, {
+      items: [],
+      sourceLinksByContentType: { movie: "https://plex.example" },
+    });
+    expect(withSource).not.toContain("No new items in this period.");
+    expect(withSource).toContain("Nothing new this time.");
   });
 
   it("caps the number of items when a limit is set", async () => {
-    const html = await render(design({ sections: { limit: 1 } }));
+    const html = await render(design({ sections: { groupByType: false, limit: 1 } }));
     expect(html).toContain("A Movie");
     expect(html).not.toContain("A Book");
   });

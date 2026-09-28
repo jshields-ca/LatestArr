@@ -2,10 +2,10 @@ import type { NewItem } from "@latestarr/adapter-core";
 import { describe, expect, it } from "vitest";
 import { renderDefaultNewsletterHtml } from "./newsletter-template.js";
 
-// Locks the default newsletter's exact output. The snapshots were recorded
-// from the hand-written default template before it became the "Default"
-// design, so an unintended change to what existing newsletters look like
-// fails here. Update them (vitest -u) only for a deliberate visual change.
+// Locks the Default design's exact output (last changed on purpose by the
+// refresh in #219), so an unintended change to what existing newsletters
+// look like fails here. Update them (vitest -u) only for a deliberate
+// visual change.
 
 const generatedAt = new Date("2026-01-20T12:00:00Z");
 
