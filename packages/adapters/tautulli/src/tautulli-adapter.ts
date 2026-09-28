@@ -255,7 +255,14 @@ export const tautulliAdapter: SourceAdapter = {
             ? new Date(item.originally_available_at)
             : undefined,
           genres: item.genres,
-          posterUrl: resolvePosterUrl(config.baseUrl, apiKey, item.thumb, item.art),
+          // Episodes use the series poster, so every image is the same
+          // portrait shape rather than some being wide video stills.
+          posterUrl: resolvePosterUrl(
+            config.baseUrl,
+            apiKey,
+            (kind === "tv_episode" && item.grandparent_thumb) || item.thumb,
+            item.art,
+          ),
           externalUrl: buildExternalUrl(config.publicUrl, machineIdentifier, item.rating_key),
           raw: item,
         });

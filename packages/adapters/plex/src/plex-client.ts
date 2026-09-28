@@ -14,6 +14,8 @@ export interface PlexMetadataItem {
   originallyAvailableAt?: string;
   summary?: string;
   thumb?: string;
+  /** An episode's series poster; its own thumb is a video still. */
+  grandparentThumb?: string;
   art?: string;
   grandparentTitle?: string;
   parentTitle?: string;

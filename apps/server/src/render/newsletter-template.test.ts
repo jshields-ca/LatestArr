@@ -157,6 +157,19 @@ describe("renderDefaultNewsletterHtml", () => {
     expect(html).toContain("1h 30m");
   });
 
+  it("leaves out the details line for an item with none, and never starts it with a separator", async () => {
+    const generatedAt = new Date("2026-01-20T12:00:00Z");
+    const bare = await renderDefaultNewsletterHtml({ newsletterName: "N", items: [item()], generatedAt });
+    expect(bare).not.toMatch(/font-weight:600;color:#c31d4c;margin-top:3px;"><\/div>/);
+
+    const ratingOnly = await renderDefaultNewsletterHtml({
+      newsletterName: "N",
+      items: [item({ rating: { source: "tmdb", value: 7.8, scale: 10 } })],
+      generatedAt,
+    });
+    expect(ratingOnly).toContain('margin-top:3px;">7.8/10</div>');
+  });
+
   it("shows a contentLabel badge next to the title when present", async () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",

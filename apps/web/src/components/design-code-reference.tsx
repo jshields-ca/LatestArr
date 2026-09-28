@@ -50,6 +50,9 @@ export function DesignCodeReference() {
         <Entry code="{{addedAtFormatted}} {{releaseDateFormatted}}">When it was added and released.</Entry>
         <Entry code="{{genres}} {{rating}} {{runtimeFormatted}}">Genres, rating like 8.1/10, and runtime like 1h 45m.</Entry>
         <Entry code="{{pageCount}} {{durationFormatted}} {{platform}}">Book pages, audiobook length, game platform.</Entry>
+        <Entry code="{{detailsLine}}">
+          Runtime, pages, length, or platform, then rating, e.g. 1h 52m · 7.8/10. Empty when there are none.
+        </Entry>
         <Entry code="{{isFallback}}">True for a library pick shown because nothing new was added.</Entry>
       </Group>
 

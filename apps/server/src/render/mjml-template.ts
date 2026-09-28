@@ -28,6 +28,9 @@ interface RenderableItem {
   pageCount?: number;
   durationFormatted?: string;
   platform?: string;
+  /** Runtime, pages, length, or platform, then rating, joined with " · ";
+   * absent when the item has none of them. */
+  detailsLine?: string;
   externalUrl?: string;
   /** Set only on an item substituted in by a Media List block's
    * emptyFallback="random" — lets a template's card markup mark it as a
@@ -114,8 +117,14 @@ function resolveContentLabel(item: NewItem): string {
 // isFallback is never set here — the mediaList helper below is the only
 // place that flags an item as a fallback suggestion, by spreading it onto
 // an already-mapped RenderableItem once it's decided to use it that way.
+function detailsLineOf(item: RenderableItem): string | undefined {
+  const size = item.runtimeFormatted ?? (item.pageCount ? `${item.pageCount} pages` : undefined) ?? item.durationFormatted;
+  const parts = [size, item.platform, item.rating].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 function toRenderable(item: NewItem): RenderableItem {
-  return {
+  const renderable: RenderableItem = {
     kind: item.kind,
     title: item.title,
     subtitle: item.subtitle,
@@ -140,6 +149,7 @@ function toRenderable(item: NewItem): RenderableItem {
     platform: item.platform,
     externalUrl: item.externalUrl,
   };
+  return { ...renderable, detailsLine: detailsLineOf(renderable) };
 }
 
 // Fisher-Yates, used by the mediaList helper's order="random" variant and

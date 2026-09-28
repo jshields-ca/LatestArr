@@ -219,6 +219,38 @@ describe("fetchRecentItems", () => {
     );
   });
 
+  it("uses the series poster for an episode, and its own thumb for a season", async () => {
+    mockIdentity();
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            {
+              ...baseItem,
+              ratingKey: "1",
+              type: "episode",
+              addedAt: 1700000000,
+              thumb: "/library/metadata/1/thumb/still",
+              grandparentThumb: "/library/metadata/9/thumb/poster",
+            },
+            {
+              ...baseItem,
+              ratingKey: "2",
+              type: "season",
+              addedAt: 1700000000,
+              thumb: "/library/metadata/2/thumb/season",
+              grandparentThumb: "/library/metadata/9/thumb/poster",
+            },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+    expect(new URL(items[0]!.posterUrl!).pathname).toBe("/library/metadata/9/thumb/poster");
+    expect(new URL(items[1]!.posterUrl!).pathname).toBe("/library/metadata/2/thumb/season");
+  });
+
   it("omits posterUrl when Plex gives no thumb", async () => {
     mockIdentity();
     mockFetch.mockResolvedValueOnce(
