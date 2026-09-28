@@ -110,6 +110,8 @@ function mix(a: string, b: string, amount: number): string {
 
 interface Palette {
   accent: string;
+  /** Keeps a badge visible when a client drops its background. */
+  badgeBorder: string;
   accentTint: string;
   background: string;
   text: string;
@@ -119,11 +121,18 @@ interface Palette {
 }
 
 function paletteFor(settings: DesignSettings): Palette {
-  const { accent, background, text, muted } = settings.colors;
+  // Lower-cased so the dark-mode rules below can match them in inline styles.
+  const [accent, background, text, muted] = [
+    settings.colors.accent,
+    settings.colors.background,
+    settings.colors.text,
+    settings.colors.muted,
+  ].map((colour) => colour.toLowerCase()) as [string, string, string, string];
   const defaults = DEFAULT_DESIGN_SETTINGS.colors;
   const neutralDefault = muted === defaults.muted && background === defaults.background;
   return {
     accent,
+    badgeBorder: mix(accent, background, 0.6),
     background,
     text,
     muted,
@@ -131,6 +140,73 @@ function paletteFor(settings: DesignSettings): Palette {
     subtle: neutralDefault ? DEFAULT_SUBTLE : mix(muted, background, 0.3),
     border: neutralDefault ? DEFAULT_BORDER : mix(muted, background, 0.8),
   };
+}
+
+function isLight(hex: string): boolean {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
+}
+
+// The design's colours for dark mode, derived from its light ones.
+function darkPaletteFor(p: Palette): Palette {
+  const background = mix(p.text, "#000000", 0.35);
+  const text = mix(p.background, p.text, 0.1);
+  return {
+    background,
+    text,
+    accent: mix(p.accent, "#ffffff", 0.35),
+    accentTint: mix(p.accent, background, 0.75),
+    badgeBorder: mix(mix(p.accent, "#ffffff", 0.35), background, 0.5),
+    muted: mix(p.muted, "#ffffff", 0.45),
+    subtle: mix(p.subtle, "#ffffff", 0.3),
+    border: mix(text, background, 0.85),
+  };
+}
+
+// Email clients honour dark mode in different ways: Apple Mail and others
+// apply prefers-color-scheme styles, Outlook.com marks the page with
+// data-ogsc/data-ogsb, and some (Thunderbird's dark toggle, Gmail's apps)
+// rewrite colours themselves when an email doesn't say it supports dark.
+// This declares support and swaps each of the design's inline colours for
+// its dark counterpart, matched by value, so no element needs its own
+// class. A design that is already dark is left as it is.
+function darkModeHead(p: Palette): string {
+  const declare = `<mj-raw><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></mj-raw>`;
+  if (!isLight(p.background)) return `
+    ${declare}`;
+  const d = darkPaletteFor(p);
+  // [selectors, declaration, whether it's a background (Outlook.com marks
+  // those with data-ogsb, text colours with data-ogsc)]
+  const rules: [string[], string, boolean][] = [
+    [
+      ["body", `[style*="background-color:${p.background}"]`, `[style*="background:${p.background}"]`],
+      `background-color:${d.background} !important;`,
+      true,
+    ],
+    [[`[style*="color:${p.text}"]`], `color:${d.text} !important;`, false],
+    [[`[style*="color:${p.muted}"]`], `color:${d.muted} !important;`, false],
+    [[`[style*="color:${p.subtle}"]`], `color:${d.subtle} !important;`, false],
+    [[`[style*="color:${p.accent}"]`], `color:${d.accent} !important;`, false],
+    [[`[style*="background:${p.accentTint}"]`], `background:${d.accentTint} !important;`, true],
+    [[`[style*="solid ${p.border}"]`], `border-color:${d.border} !important;`, false],
+    [[`[style*="solid ${p.badgeBorder}"]`], `border-color:${d.badgeBorder} !important;`, false],
+  ];
+  const css = (outlook: boolean) =>
+    rules
+      .map(([selectors, declaration, isBackground]) => {
+        const prefix = outlook ? (isBackground ? "[data-ogsb] " : "[data-ogsc] ") : "";
+        return `${selectors.map((selector) => prefix + selector).join(", ")} { ${declaration} }`;
+      })
+      .join("\n      ");
+  return `
+    ${declare}
+    <mj-style>
+      :root { color-scheme: light dark; supported-color-schemes: light dark; }
+      @media (prefers-color-scheme: dark) {
+      ${css(false)}
+      }
+      ${css(true)}
+    </mj-style>`;
 }
 
 // Inline SVG icons (Tabler's brand-github / alert-circle outlines, MIT
@@ -152,7 +228,7 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
     ? `{{#if isFallback}}<div style="font-size:12px;color:${p.subtle};margin-top:3px;">From the library</div>{{/if}}`
     : "";
   const badge = show.badge
-    ? `{{#if contentLabel}} <span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border-radius:4px;padding:2px 6px;vertical-align:middle;">{{contentLabel}}</span>{{/if}}`
+    ? `{{#if contentLabel}} <span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border:1px solid ${p.badgeBorder};border-radius:4px;padding:1px 6px;vertical-align:middle;">{{contentLabel}}</span>{{/if}}`
     : "";
   const linkedTitle = `{{#if externalUrl}}<a href="{{externalUrl}}" style="color:inherit;text-decoration:none;">{{title}}</a>{{else}}{{title}}{{/if}}`;
   // Left out entirely for an item with none of these, rather than leaving
@@ -176,7 +252,7 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
     return `<div style="display:inline-block;width:50%;vertical-align:top;box-sizing:border-box;padding:0 12px 18px 0;font-family:${font};">` +
       poster +
       `<div style="font-weight:700;font-size:15px;color:${p.text};">${linkedTitle}</div>` +
-      (show.badge ? `{{#if contentLabel}}<div style="margin-top:3px;"><span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border-radius:4px;padding:2px 6px;">{{contentLabel}}</span></div>{{/if}}` : "") +
+      (show.badge ? `{{#if contentLabel}}<div style="margin-top:3px;"><span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border:1px solid ${p.badgeBorder};border-radius:4px;padding:1px 6px;">{{contentLabel}}</span></div>{{/if}}` : "") +
       (show.subtitle ? `{{#if subtitle}}<div style="color:${p.muted};font-size:13px;margin-top:2px;">{{subtitle}}</div>{{/if}}` : "") +
       (show.details ? details(`<div style="font-size:12px;font-weight:600;color:${p.accent};margin-top:2px;">{{detailsLine}}</div>`) : "") +
       fallbackNote +
@@ -348,8 +424,10 @@ export function buildDesignMjml(settings: DesignSettings): string {
   const p = paletteFor(settings);
   const font = EMAIL_FONTS[settings.font].stack;
   const css = sanitizeCss(settings.customCss).trim();
-  const head = css ? `\n  <mj-head>\n    <mj-style inline="inline">${css}</mj-style>\n  </mj-head>` : "";
-  const bodyOpen = p.background.toLowerCase() === "#ffffff" ? `  <mj-body>` : `  <mj-body background-color="${p.background}">`;
+  const customCss = css ? `\n    <mj-style inline="inline">${css}</mj-style>` : "";
+  const head = `\n  <mj-head>${darkModeHead(p)}${customCss}\n  </mj-head>`;
+  // Always explicit, so a client never has to guess the page colour.
+  const bodyOpen = `  <mj-body background-color="${p.background}">`;
 
   const lookback = settings.showLookbackLine
     ? `\n        {{#if lookbackDays}}\n        <mj-text font-family="${font}" font-size="15px" color="${p.muted}" padding-top="0">Here's what's new in the last {{lookbackDays}} days.</mj-text>\n        {{/if}}`
