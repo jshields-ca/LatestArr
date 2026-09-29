@@ -2,10 +2,11 @@ import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { useAuth } from "@/components/auth-provider";
+import { ChangePasswordScreen } from "@/components/change-password-screen";
 import { Loader2 } from "lucide-react";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   const location = useLocation();
 
   if (status === "loading") {
@@ -18,6 +19,10 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (status === "unauthenticated") {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (user?.mustChangePassword) {
+    return <ChangePasswordScreen />;
   }
 
   return <>{children}</>;

@@ -15,6 +15,7 @@ import { RecipientsPage } from "@/pages/recipients-page";
 import { SetupPage } from "@/pages/setup-page";
 import { SmtpProfilesPage } from "@/pages/smtp-profiles-page";
 import { SourcesPage } from "@/pages/sources-page";
+import { UsersPage } from "@/pages/users-page";
 
 // Old bookmarks to the retired drag-and-drop editor open the same design
 // in the design editor.
@@ -44,6 +45,7 @@ export default function App() {
                   <Route path="/designs/:id" element={<DesignEditorPage />} />
                   <Route path="/templates" element={<Navigate to="/designs" replace />} />
                   <Route path="/notifications" element={<NotificationsPage />} />
+                  <Route path="/users" element={<UsersPage />} />
                   <Route path="/logs" element={<LogsPage />} />
                   <Route path="/templates/:id/edit" element={<TemplateEditRedirect />} />
                   <Route path="*" element={<NotFoundPage />} />
