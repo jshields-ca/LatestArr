@@ -36,17 +36,17 @@ The goal is simple: give something genuinely useful back to the *arr community.
 | Source | Content type | Connects via | Status |
 | --- | --- | --- | --- |
 | [Tautulli](https://tautulli.com/) | Movies, TV | Tautulli API | ✅ Implemented |
-| Plex (direct) | Movies, TV | Plex API | ✅ Implemented |
+| Plex (direct) | Movies, TV | Plex API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
 | [Jellyfin](https://jellyfin.org/) | Movies, TV, books, audiobooks | Jellyfin API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
 | [Emby](https://emby.media/) | Movies, TV, books, audiobooks | Emby API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
-| [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | ✅ Implemented |
+| [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
 | [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | OPDS | ✅ Implemented |
-| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | OPDS | ✅ Implemented |
-| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks | Audiobookshelf API | ✅ Implemented |
+| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | OPDS | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
+| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks | Audiobookshelf API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
 | [RomM](https://github.com/rommapp/romm) | Games | RomM API | ✅ Implemented |
 | Kavita, Komga, Calibre-Web, Immich, ... | Various | — | Under consideration |
 
-> **Help test Jellyfin and Emby.** Both are built from their published API docs, but haven't been confirmed on a real server yet. If you run either one, add it as a source and [tell us how it went](https://github.com/jshields-ca/LatestArr/issues/196): your server version, what worked, and any errors from the **Logs** page. Each moves to ✅ once someone confirms it works.
+> **Help test the 🧪 sources.** They're built from each app's published API and covered by tests, but haven't been confirmed on a real server yet. If you run one, add it as a source, send yourself a test newsletter, and tell us how it went: [Jellyfin and Emby](https://github.com/jshields-ca/LatestArr/issues/196), or [Plex (direct), BookLore, Grimmory, and Audiobookshelf](https://github.com/jshields-ca/LatestArr/issues/244). Include your server version, what worked, and any errors from the **Logs** page. Each moves to ✅ once someone confirms it works.
 
 BookLore, BookOrbit, and Grimmory are separate apps (forks of a common lineage) that all expose the same [OPDS](https://opds.io/) catalog protocol, so LatestArr talks to all three through one shared adapter rather than three separate integrations.
 
@@ -74,7 +74,7 @@ AI is LatestArr's lead developer: the code, tests, CI, and docs are written by [
 What keeps it honest:
 
 - **Automated checks on every change:** lint, typecheck, build, and tests (including axe-core accessibility checks) on two Node versions, plus a Docker build, all required to pass in CI.
-- **Real-world testing:** UI changes are checked in a real browser, and releases are run against the maintainer's own media servers. Where that isn't possible, as with Jellyfin and Emby today, the README says so.
+- **Real-world testing:** UI changes are checked in a real browser, and releases are run against the maintainer's own media servers. Where that isn't possible, the sources table above marks it 🧪 Needs testers.
 - **Security by design:** credentials encrypted at rest, server-side sessions, rate limiting, CSRF protection, and input validation on every route. Dependabot and CodeQL run continuously. See [`SECURITY.md`](SECURITY.md).
 
 None of this makes it bug-free. Treat AI authorship as a reason to read the code before trusting it with sensitive data, the same care you'd give any early-stage open-source project.
@@ -95,7 +95,7 @@ If you'd like to support development, [GitHub Sponsors](https://github.com/spons
 
 LatestArr is licensed under the [GNU General Public License v3.0](LICENSE). This is a copyleft license: if you distribute a modified version of LatestArr (including as a fork or a hosted service that distributes the code), your version must also be licensed under GPLv3 and its source made available. Third-party dependencies under permissive licenses (e.g. MIT) are used as libraries and do not change this obligation for LatestArr's own code.
 
-The Sources page's service logos (Tautulli, Plex, BookLore, BookOrbit, Grimmory, Audiobookshelf, RomM) are bundled from [selfh.st/icons](https://selfh.st/icons) under [CC BY 4.0](https://github.com/selfhst/icons/blob/main/LICENSE) — see [`apps/web/src/assets/logos/NOTICE.md`](apps/web/src/assets/logos/NOTICE.md) for per-file attribution. Each logo is also a trademark of its respective project, used here only to identify that source, not to imply endorsement.
+The Sources page's service logos (Tautulli, Plex, Jellyfin, Emby, BookLore, BookOrbit, Grimmory, Audiobookshelf, RomM) are bundled from [selfh.st/icons](https://selfh.st/icons) under [CC BY 4.0](https://github.com/selfhst/icons/blob/main/LICENSE) — see [`apps/web/src/assets/logos/NOTICE.md`](apps/web/src/assets/logos/NOTICE.md) for per-file attribution. Each logo is also a trademark of its respective project, used here only to identify that source, not to imply endorsement.
 
 ---
 
