@@ -1,5 +1,20 @@
 # @latestarr/server
 
+## 0.11.2
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @latestarr/adapter-audiobookshelf@0.11.2
+  - @latestarr/adapter-booklore-family@0.11.2
+  - @latestarr/adapter-core@0.11.2
+  - @latestarr/adapter-jellyfin@0.11.2
+  - @latestarr/adapter-plex@0.11.2
+  - @latestarr/adapter-romm@0.11.2
+  - @latestarr/adapter-tautulli@0.11.2
+  - @latestarr/crypto@0.11.2
+  - @latestarr/db@0.11.2
+
 ## 0.11.1
 
 ### Patch Changes
