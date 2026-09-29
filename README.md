@@ -99,4 +99,4 @@ The Sources page's service logos (Tautulli, Plex, Jellyfin, Emby, BookLore, Book
 
 ---
 
-Built by [Jeremy Shields](https://www.scootr.ca) — see more projects at [scootr.ca](https://www.scootr.ca/projects).
+Built by [Jeremy Shields](https://www.jeremyshields.ca) — see more projects at [scootr.ca](https://www.scootr.ca/projects).
