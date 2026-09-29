@@ -100,7 +100,8 @@ jobs:
           # root) would have left it, must still work.
           docker volume create latestarr-smoke-data
           docker run --rm -v latestarr-smoke-data:/app/data --entrypoint sh latestarr:ci -c "touch /app/data/from-old-image && chown -R root:root /app/data"
-          docker run -d --name latestarr-smoke -p 3000:3000 -v latestarr-smoke-data:/app/data latestarr:ci
+          # The server refuses to start without a valid ENCRYPTION_KEY.
+          docker run -d --name latestarr-smoke -p 3000:3000 -v latestarr-smoke-data:/app/data -e ENCRYPTION_KEY="$(openssl rand -base64 32)" latestarr:ci
           healthy=false
           for i in $(seq 1 30); do
             if curl -sf http://localhost:3000/health > /dev/null; then
