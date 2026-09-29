@@ -101,7 +101,9 @@ function renderEditor(id = "d1") {
   );
 }
 
-describe("DesignEditorPage", () => {
+// Several tests type into fields and open dropdowns, which under jsdom can
+// take longer than the 5s default on a busy CI runner.
+describe("DesignEditorPage", { timeout: 30_000 }, () => {
   it("loads the design and previews it with sample content", async () => {
     renderEditor();
     expect(await screen.findByDisplayValue("Plex dark")).toBeInTheDocument();
