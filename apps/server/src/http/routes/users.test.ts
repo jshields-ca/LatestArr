@@ -140,6 +140,11 @@ describe("users", () => {
     // Another admin can deactivate you, though.
     await addUser();
     const samCookie = cookieFrom(await login("sam@example.com", "temporary-password-1"));
+    await as(samCookie, {
+      method: "PATCH",
+      url: "/api/auth/me",
+      payload: { currentPassword: "temporary-password-1", newPassword: "sams-own-password" },
+    });
     const bySam = await as(samCookie, { method: "PATCH", url: `/api/users/${me.id}`, payload: { isActive: false } });
     expect(bySam.json().user.isActive).toBe(false);
   });

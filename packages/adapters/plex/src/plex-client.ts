@@ -1,4 +1,4 @@
-import { trimTrailingSlashes } from "@latestarr/adapter-core";
+import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
 
 export interface PlexLibrary {
   key: string;
@@ -80,8 +80,8 @@ export async function fetchImage(
     });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
-    const data = new Uint8Array(await response.arrayBuffer());
-    return { data, contentType };
+    const data = await readBytesCapped(response);
+    return data ? { data, contentType } : null;
   } catch {
     return null;
   }
@@ -97,7 +97,10 @@ async function callPlex<T>(
   // Plex Media Server defaults to XML; every endpoint honors this header to
   // return JSON instead, which is what the rest of this codebase's adapters
   // are built around.
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(SOURCE_REQUEST_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error(`Plex request failed with HTTP ${response.status}`);
   }

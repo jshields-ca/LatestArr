@@ -35,6 +35,8 @@ RUN pnpm --filter @latestarr/server deploy --prod --legacy /prod/server
 
 # ---- final runtime image --------------------------------------------------
 FROM node:24-alpine AS runtime
+# su-exec lets the entrypoint drop from root to the "node" user.
+RUN apk add --no-cache su-exec
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deploy /prod/server ./
@@ -44,7 +46,12 @@ COPY --from=deploy /prod/server ./
 # "/sources" the endpoint) now that both are served from this one origin.
 COPY --from=build /app/apps/web/dist ./public
 
+# The server runs as "node", never root (see entrypoint.sh).
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/latestarr-entrypoint
+RUN mkdir -p /app/data && chown node:node /app/data
+
 EXPOSE 3000
 VOLUME ["/app/data"]
 
+ENTRYPOINT ["latestarr-entrypoint"]
 CMD ["node", "dist/index.js"]

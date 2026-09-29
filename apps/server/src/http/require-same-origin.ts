@@ -30,6 +30,12 @@ export function requireSameOrigin() {
 
     const origin = request.headers.origin;
     const referer = request.headers.referer;
+    // A sandboxed iframe or data: page sends the literal Origin "null",
+    // which is never this app, so it's rejected rather than waved through
+    // like a request with no Origin at all.
+    if (origin === "null") {
+      return reply.code(403).send({ error: "Cross-origin request rejected" });
+    }
     const sourceHost = origin ? hostFromUrlLike(origin) : referer ? hostFromUrlLike(referer) : undefined;
     if (!sourceHost) return;
 

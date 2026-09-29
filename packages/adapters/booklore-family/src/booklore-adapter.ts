@@ -176,6 +176,7 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
       if (!item.posterUrl) return null;
       return fetchOpdsImage(
         item.posterUrl,
+        config.baseUrl,
         config.credentials.username ?? "",
         config.credentials.password ?? "",
       );

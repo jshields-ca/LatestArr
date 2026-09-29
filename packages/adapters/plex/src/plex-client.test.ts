@@ -40,6 +40,8 @@ describe("getLibraries", () => {
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>).Accept).toBe("application/json");
+    // A hung server can't stall a send or the scheduler.
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("preserves a subpath in the base URL", async () => {

@@ -1,4 +1,4 @@
-import { trimTrailingSlashes } from "@latestarr/adapter-core";
+import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
 import { XMLParser } from "fast-xml-parser";
 
 // BookLore (and its compatible forks BookOrbit and Grimmory) expose their
@@ -139,6 +139,14 @@ function buildUrl(baseUrl: string, path: string, params: Record<string, string> 
   return url;
 }
 
+function sameOrigin(url: string, baseUrl: string): boolean {
+  try {
+    return new URL(url).origin === new URL(baseUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
 function buildAuthHeader(username: string, password: string): string {
   return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 }
@@ -153,6 +161,7 @@ async function fetchOpdsFeed(
   const url = buildUrl(baseUrl, path, params);
   const response = await fetch(url, {
     headers: { Authorization: buildAuthHeader(username, password) },
+    signal: AbortSignal.timeout(SOURCE_REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new Error(`BookLore OPDS request failed with HTTP ${response.status}`);
@@ -192,18 +201,20 @@ const IMAGE_FETCH_TIMEOUT_MS = 10_000;
  */
 export async function fetchOpdsImage(
   imageUrl: string,
+  baseUrl: string,
   username: string,
   password: string,
 ): Promise<{ data: Uint8Array; contentType: string } | null> {
   try {
     const response = await fetch(imageUrl, {
-      headers: { Authorization: buildAuthHeader(username, password) },
+      // A cover the feed links on another host gets no credentials.
+      headers: sameOrigin(imageUrl, baseUrl) ? { Authorization: buildAuthHeader(username, password) } : {},
       signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
     });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
-    const data = new Uint8Array(await response.arrayBuffer());
-    return { data, contentType };
+    const data = await readBytesCapped(response);
+    return data ? { data, contentType } : null;
   } catch {
     return null;
   }

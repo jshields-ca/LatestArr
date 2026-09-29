@@ -45,6 +45,12 @@ function buildTransport(smtp: SmtpCredentials) {
     // unencrypted connection if the server doesn't offer it.
     requireTLS: !smtp.secure,
     auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
+    // Nodemailer waits up to 2 minutes to connect and 10 minutes on an idle
+    // socket by default; a mail server that stops answering shouldn't hold
+    // a send (or Test connection) that long.
+    connectionTimeout: 30_000,
+    greetingTimeout: 30_000,
+    socketTimeout: 60_000,
   });
 }
 

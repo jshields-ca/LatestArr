@@ -32,6 +32,9 @@ describe("verifySmtpConnection", () => {
       secure: false,
       requireTLS: true,
       auth: { user: "u", pass: "p" },
+      connectionTimeout: 30_000,
+      greetingTimeout: 30_000,
+      socketTimeout: 60_000,
     });
     expect(mockVerify).toHaveBeenCalled();
   });

@@ -435,7 +435,8 @@ export async function renderMjmlTemplate(
   // "soft" validation still returns best-effort HTML for a malformed
   // code design rather than aborting the send outright — a markup
   // mistake shouldn't take down a newsletter that otherwise has
-  // real content to deliver.
-  const { html } = await mjml2html(wrappedMjml, { validationLevel: "soft" });
+  // real content to deliver. ignoreIncludes (MJML 5's default, pinned
+  // here) stops a code design's <mj-include> reading files off the server.
+  const { html } = await mjml2html(wrappedMjml, { validationLevel: "soft", ignoreIncludes: true });
   return html;
 }

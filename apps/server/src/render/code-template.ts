@@ -53,7 +53,7 @@ export async function checkCodeTemplate(source: string): Promise<CodeCheck> {
   const markup = withoutHandlebars(source);
   const wrapped = /^\s*<mjml[\s>]/.test(markup) ? markup : `<mjml><mj-body>${markup}</mj-body></mjml>`;
   try {
-    const { errors } = await mjml2html(wrapped, { validationLevel: "soft" });
+    const { errors } = await mjml2html(wrapped, { validationLevel: "soft", ignoreIncludes: true });
     return { errors: [], warnings: errors.map((e) => ({ line: e.line, message: e.message })) };
   } catch (err) {
     return { errors: [{ line: 1, message: err instanceof Error ? err.message : String(err) }], warnings: [] };

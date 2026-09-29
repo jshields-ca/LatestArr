@@ -214,7 +214,7 @@ describe("fetchOpdsImage", () => {
       arrayBuffer: async () => new Uint8Array([9, 8, 7]).buffer,
     });
 
-    const result = await fetchOpdsImage("http://booklore.local:6060/api/v1/opds/cover/1", "admin", "secret");
+    const result = await fetchOpdsImage("http://booklore.local:6060/api/v1/opds/cover/1", "http://booklore.local:6060", "admin", "secret");
     expect(result).toEqual({ data: new Uint8Array([9, 8, 7]), contentType: "image/png" });
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
@@ -224,13 +224,13 @@ describe("fetchOpdsImage", () => {
 
   it("returns null instead of throwing on a non-2xx response", async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
-    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "admin", "wrong");
+    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "http://booklore.local:6060", "admin", "wrong");
     expect(result).toBeNull();
   });
 
   it("returns null instead of throwing when the request itself fails", async () => {
     mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
-    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "admin", "secret");
+    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "http://booklore.local:6060", "admin", "secret");
     expect(result).toBeNull();
   });
 
@@ -242,15 +242,32 @@ describe("fetchOpdsImage", () => {
       arrayBuffer: async () => new ArrayBuffer(0),
     });
 
-    await fetchOpdsImage("http://booklore.local:6060/api/v1/opds/cover/1", "admin", "secret");
+    await fetchOpdsImage("http://booklore.local:6060/api/v1/opds/cover/1", "http://booklore.local:6060", "admin", "secret");
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it("sends credentials only to the server's own address, never to a cover hosted elsewhere", async () => {
+    const image = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => new ArrayBuffer(1),
+    };
+    mockFetch.mockResolvedValueOnce(image).mockResolvedValueOnce(image);
+
+    await fetchOpdsImage("http://booklore.local:6060/api/v1/opds/cover/1", "http://booklore.local:6060", "admin", "secret");
+    await fetchOpdsImage("https://covers.example.com/1.jpg", "http://booklore.local:6060", "admin", "secret");
+
+    const headersOf = (call: number) => (mockFetch.mock.calls[call] as [string, RequestInit])[1].headers as Record<string, string>;
+    expect(headersOf(0).Authorization).toMatch(/^Basic /);
+    expect(headersOf(1).Authorization).toBeUndefined();
+  });
+
   it("returns null instead of throwing when the fetch is aborted (a timeout firing looks the same as any other rejection)", async () => {
     mockFetch.mockRejectedValueOnce(new DOMException("The operation was aborted.", "TimeoutError"));
-    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "admin", "secret");
+    const result = await fetchOpdsImage("http://booklore.local:6060/nope", "http://booklore.local:6060", "admin", "secret");
     expect(result).toBeNull();
   });
 });

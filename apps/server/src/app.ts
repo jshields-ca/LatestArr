@@ -13,7 +13,7 @@ import { plexAdapter } from "@latestarr/adapter-plex";
 import { rommAdapter } from "@latestarr/adapter-romm";
 import { tautulliAdapter } from "@latestarr/adapter-tautulli";
 import type { Db } from "@latestarr/db";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { loadOidcConfigFromEnv } from "./auth/oidc-config.js";
 import { requireSameOrigin } from "./http/require-same-origin.js";
 import { registerAuthRoutes } from "./http/routes/auth.js";
@@ -90,6 +90,18 @@ export async function buildApp(
   }) as unknown as FastifyInstance;
 
   await app.register(cookie);
+
+  // A client error (a bad body, too many requests) says what was wrong; a
+  // server error is logged in full but answers with a generic message, so
+  // internal details (SQL, file paths, stack frames) never reach the client.
+  app.setErrorHandler((err: FastifyError, request, reply) => {
+    const status = err.statusCode && err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 500;
+    if (status >= 500) {
+      request.log.error({ err }, `${request.method} ${request.url} failed`);
+      return reply.code(status).send({ error: "Something went wrong on the server. The Logs page has the details." });
+    }
+    return reply.code(status).send({ error: err.message });
+  });
 
   // CSP allows what the admin WebUI actually needs: 'unsafe-inline' on
   // style-src for Radix's inline positioning styles and the design code
