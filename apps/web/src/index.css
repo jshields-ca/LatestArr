@@ -235,7 +235,10 @@
     filter: drop-shadow(0 0 4px hsl(45 93% 58% / 0.85)) drop-shadow(0 0 12px hsl(45 93% 55% / 0.55));
   }
   .star-glow-intro {
-    animation: star-glow-pulse 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.5s 1 both;
+    /* backwards, not both: a finished animation that holds its last frame
+     * overrides normal styles, which would switch off the hover glow above
+     * for good. The pulse ends at the resting state, so there's nothing to hold. */
+    animation: star-glow-pulse 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.5s 1 backwards;
   }
   @keyframes star-glow-pulse {
     0% {
