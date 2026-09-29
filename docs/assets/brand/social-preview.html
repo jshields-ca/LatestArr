@@ -11,7 +11,10 @@
     background: radial-gradient(ellipse 55% 60% at 50% 42%, #3a1a2e 0%, #1a1424 45%, #0b0f1c 100%); color: #f3f5fa; font-family: "Plus Jakarta Sans", sans-serif; }
   .lockup { display: flex; align-items: center; gap: calc(var(--s) * 36px); }
   .lockup svg { width: calc(var(--s) * 156px); height: calc(var(--s) * 156px); filter: drop-shadow(0 14px 30px rgba(195, 29, 76, 0.35)); }
-  .word { font-family: "Newsreader", serif; font-size: calc(var(--s) * 124px); letter-spacing: -0.02em; line-height: 1; }
+  /* The wordmark has tall ascenders and no descenders, so its letters sit high
+     in its line box; this lowers them so their centre matches the icon's
+     (measured: 13.5px at 1280 wide). */
+  .word { font-family: "Newsreader", serif; font-size: calc(var(--s) * 124px); letter-spacing: -0.02em; line-height: 1; transform: translateY(calc(var(--s) * 13.5px)); }
   .word b { font-weight: 700; } .word span { font-weight: 500; }
   .tag { margin-top: calc(var(--s) * 44px); font-size: calc(var(--s) * 38px); color: #9aa4bd; text-align: center; line-height: 1.35; max-width: 84%; }
   .pills { display: flex; gap: calc(var(--s) * 14px); margin-top: calc(var(--s) * 40px); }
