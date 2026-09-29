@@ -12,6 +12,7 @@ type Content = DesignSettings["content"];
 
 function contentOf(newsletter: Newsletter): Content {
   return {
+    ...DEFAULT_DESIGN_SETTINGS.content,
     intro: newsletter.introText?.trim() ?? "",
     footerNote: newsletter.footerNote?.trim() ?? "",
     ctas: newsletter.ctas ?? [],
@@ -29,7 +30,9 @@ function isEmpty(content: Content): boolean {
 }
 
 function withContent(template: Template, content: Content): Record<string, unknown> {
-  return { ...parseDesignSettings(template.settings), content };
+  const current = parseDesignSettings(template.settings);
+  const { intro, footerNote, ctas } = content;
+  return { ...current, content: { ...current.content, intro, footerNote, ctas } };
 }
 
 /**

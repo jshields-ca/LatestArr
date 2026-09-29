@@ -29,6 +29,7 @@ import {
 } from "./embed-images.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { htmlToPlainText } from "../render/plain-text.js";
+import { buildSourceButtons, type SourceButton } from "../render/source-buttons.js";
 import {
   buildDesignMjml,
   DEFAULT_DESIGN_SETTINGS,
@@ -236,6 +237,17 @@ function buildSourceLinksByContentType(linkedSources: LinkedSource[]): Record<st
   return result;
 }
 
+function buildNewsletterSourceButtons(linkedSources: LinkedSource[]): SourceButton[] {
+  return buildSourceButtons(
+    linkedSources.map(({ link, source, adapter }) => ({
+      kind: source.kind,
+      name: source.name,
+      publicUrl: source.publicUrl,
+      kinds: (link.mediaTypeFilter as MediaKind[] | undefined) ?? adapter.capabilities.supportsMediaKinds,
+    })),
+  );
+}
+
 /** Unsaved design to preview with: options-based settings, or code (MJML)
  * plus the settings that carry its intro, footer note, and buttons. */
 export interface DesignOverride {
@@ -324,6 +336,7 @@ async function renderNewsletterContent(
     popularItems: popularPlaceholders.items,
     fallbackItems: fallbackPlaceholders.items,
     sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
+    sourceButtons: buildNewsletterSourceButtons(linkedSources),
     generatedAt,
     lookbackDays: newsletter.lookbackDays,
     ...designContentVariables(settings),

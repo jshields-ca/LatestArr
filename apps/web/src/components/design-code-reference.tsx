@@ -39,6 +39,10 @@ export function DesignCodeReference() {
         <Entry code="{{#each kindCounts}}{{this}}{{/each}}">A count per type, largest first, e.g. 23 episodes, 9 movies.</Entry>
         <Entry code="{{introText}} {{footerNote}}">From Text and buttons above; empty when not set.</Entry>
         <Entry code="{{#each ctas}}{{label}} {{url}}{{/each}}">The buttons from Text and buttons.</Entry>
+        <Entry code="{{#each sourceButtons}}{{label}} {{url}}{{/each}}">
+          A button per linked source with a public URL, e.g. Watch on Plex.{" "}
+          <code className="font-mono">{'{{#sourceButtonsFor contentType="movie"}}'}</code> gives just those for a type.
+        </Entry>
       </Group>
 
       <Group title="Items">

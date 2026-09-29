@@ -90,6 +90,11 @@ export async function renderDesignSample(settings: DesignSettings, mjml?: string
     // Every content type counts as "linked", so the preview also shows how
     // empty sections look (there's no sample audiobook, for example).
     sourceLinksByContentType: Object.fromEntries(DESIGN_KINDS.map((kind) => [kind, "https://example.com/library"])),
+    sourceButtons: [
+      { label: "Watch on Plex", url: "https://example.com/plex", kinds: ["movie", "tv_episode", "tv_season"] },
+      { label: "Read on BookLore", url: "https://example.com/books", kinds: ["book"] },
+      { label: "Play on RomM", url: "https://example.com/games", kinds: ["game"] },
+    ],
     generatedAt: now,
     lookbackDays: 7,
     ...designContentVariables(settings),

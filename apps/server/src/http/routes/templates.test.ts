@@ -222,7 +222,7 @@ describe("designs", () => {
       authed({ method: "POST", url: "/api/templates", payload: { name: "Words", settings: { content } } }),
     );
     expect(created.statusCode).toBe(201);
-    expect(created.json().template.settings.content).toEqual(content);
+    expect(created.json().template.settings.content).toMatchObject(content);
 
     const preview = await app.inject(
       authed({ method: "POST", url: "/api/templates/preview", payload: { settings: { content } } }),
