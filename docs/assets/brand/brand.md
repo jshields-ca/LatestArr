@@ -1,6 +1,6 @@
 # LatestArr brand assets
 
-The LatestArr icon is a **postage stamp with an L, lifted off a rose tile**: "delivered to your inbox", without the stock envelope. It was chosen in [#269](https://github.com/jshields-ca/LatestArr/issues/269). The exploration rounds are kept on the `design/icon-exploration` branch.
+The LatestArr icon is a **postage stamp with an L, lifted off a rose tile**: "delivered to your inbox", without the stock envelope. It was chosen in [#269](https://github.com/jshields-ca/LatestArr/issues/269). The four exploration rounds are archived under the [`archive/icon-exploration`](https://github.com/jshields-ca/LatestArr/tree/archive/icon-exploration/docs/assets/icon-exploration) tag.
 
 Everything here is generated. Change `generate.mjs`, then run:
 
