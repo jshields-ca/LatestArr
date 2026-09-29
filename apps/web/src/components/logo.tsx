@@ -1,5 +1,13 @@
-import type { SVGAttributes } from "react";
+import { useId, type SVGAttributes } from "react";
 
+import {
+  LOGO_COLOURS,
+  LOGO_FACE,
+  LOGO_HOLE_R,
+  LOGO_HOLES,
+  LOGO_L_PATH,
+  LOGO_SHADOW_DROP,
+} from "@/components/logo-geometry";
 import { cn } from "@/lib/utils";
 
 interface LogoMarkProps extends SVGAttributes<SVGSVGElement> {
@@ -7,15 +15,19 @@ interface LogoMarkProps extends SVGAttributes<SVGSVGElement> {
 }
 
 /**
- * An envelope with a spark reads as "a newsletter just arrived" — the
- * literal core concept of the app — and stays legible down to favicon
- * size (the spark's point-length is deliberately generous; a subtler
- * sparkle nearly disappeared at 16px).
+ * The LatestArr mark: a postage stamp with an L, lifted off a rose tile.
+ * "Delivered to your inbox" without the stock envelope. The geometry comes
+ * from docs/assets/brand/generate.mjs (via logo-geometry.ts), the same
+ * source as the favicon and brand files. IDs are per instance because the
+ * header can render the mark twice.
  */
 export function LogoMark({ size = 32, className, ...props }: LogoMarkProps) {
+  const id = useId().replace(/:/g, "");
+  const { x, y, size: face } = LOGO_FACE;
+  const holes = LOGO_HOLES.map(([cx, cy]) => <circle key={`${cx},${cy}`} cx={cx} cy={cy} r={LOGO_HOLE_R} />);
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="0 0 64 64"
       width={size}
       height={size}
       className={cn("shrink-0", className)}
@@ -23,26 +35,27 @@ export function LogoMark({ size = 32, className, ...props }: LogoMarkProps) {
       aria-label="LatestArr"
       {...props}
     >
-      <rect width="32" height="32" rx="9" fill="#ef5d86" />
-      <path
-        d="M8.5 13h13v8.5h-13z"
-        fill="none"
-        stroke="#0e1425"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8.5 13l6.5 5 6.5-5"
-        fill="none"
-        stroke="#0e1425"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24 3.4 L25.9 7.1 L29.6 9 L25.9 10.9 L24 14.6 L22.1 10.9 L18.4 9 L22.1 7.1 Z"
-        fill="#0e1425"
-      />
+      <defs>
+        <mask id={`${id}-stamp`} maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+          <rect x={x} y={y} width={face} height={face} fill="#fff" />
+          <g fill="#000">{holes}</g>
+        </mask>
+        <clipPath id={`${id}-below`}>
+          <rect x="0" y={y + face - 1} width="64" height={64 - y - face + 1} />
+        </clipPath>
+      </defs>
+      <rect width="64" height="64" rx="18" fill={LOGO_COLOURS.tile} />
+      <g clipPath={`url(#${id}-below)`}>
+        <rect
+          width="64"
+          height="64"
+          fill={LOGO_COLOURS.shadow}
+          mask={`url(#${id}-stamp)`}
+          transform={`translate(0 ${LOGO_SHADOW_DROP})`}
+        />
+      </g>
+      <rect width="64" height="64" fill={LOGO_COLOURS.paper} mask={`url(#${id}-stamp)`} />
+      <path d={LOGO_L_PATH} fill={LOGO_COLOURS.ink} />
     </svg>
   );
 }
