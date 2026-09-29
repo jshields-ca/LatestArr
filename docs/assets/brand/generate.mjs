@@ -1,5 +1,5 @@
 // LatestArr's icon: the lifted postage stamp (R4 from the #269 exploration,
-// on the design/icon-exploration branch), final pass. This script is the
+// archived under the archive/icon-exploration tag), final pass. This script is the
 // single source of truth for every icon file: it writes the SVGs here, the
 // web UI's favicon, and the PNG sizes (rendered with sharp from apps/server).
 // Run: node docs/assets/brand/generate.mjs
