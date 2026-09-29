@@ -5,7 +5,14 @@ import { createDb, runMigrations } from "@latestarr/db";
 import { buildApp } from "./app.js";
 import { logger } from "./logger.js";
 import { migrateContentIntoDesigns } from "./render/migrate-content-into-designs.js";
+import { encryptionKeyProblem } from "./secrets.js";
 import { startScheduler } from "./scheduler/engine.js";
+
+const keyProblem = encryptionKeyProblem();
+if (keyProblem) {
+  logger.fatal(keyProblem);
+  process.exit(1);
+}
 
 const databasePath = process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "latestarr.db");
 mkdirSync(path.dirname(databasePath), { recursive: true });

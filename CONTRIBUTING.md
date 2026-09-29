@@ -29,7 +29,7 @@ pnpm turbo run dev --env-mode=loose   # runs apps/server and apps/web in watch m
 pnpm turbo run lint typecheck build   # what CI runs on every PR
 ```
 
-`--env-mode=loose` matters: Turborepo's default `strict` env mode only passes through variables it's told about, which silently drops `ENCRYPTION_KEY` and makes every mutating request 500 with "ENCRYPTION_KEY environment variable is required" — confusing since `pnpm turbo run dev` alone looks like it started cleanly. `apps/web`'s Vite dev server proxies `/api` to `apps/server` on port 3000 (`apps/web/vite.config.ts`); the proxy also rewrites the outgoing `Origin` header to match, which the server's same-origin CSRF check needs to accept requests from Vite's own port.
+`--env-mode=loose` matters: Turborepo's default `strict` env mode only passes through variables it's told about, which silently drops `ENCRYPTION_KEY`, so the server exits at startup saying "ENCRYPTION_KEY isn't set" even though it's in your `.env`. `apps/web`'s Vite dev server proxies `/api` to `apps/server` on port 3000 (`apps/web/vite.config.ts`); the proxy also rewrites the outgoing `Origin` header to match, which the server's same-origin CSRF check needs to accept requests from Vite's own port.
 
 First run: visiting `http://localhost:5173` prompts you to create the first admin account, same as a fresh Docker deployment.
 
