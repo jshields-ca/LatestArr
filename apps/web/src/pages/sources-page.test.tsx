@@ -347,12 +347,24 @@ describe("SourcesPage", () => {
 
       await user.click(screen.getByRole("button", { name: "Add source" }));
       const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).queryByText(/support is new/)).not.toBeInTheDocument();
+      // Audiobookshelf, first alphabetically, needs testers too, tracked separately.
+      expect(within(dialog).getByRole("link", { name: "tell us how it went" })).toHaveAttribute(
+        "href",
+        "https://github.com/jshields-ca/LatestArr/issues/244",
+      );
+      expect(within(dialog).getByRole("link", { name: /Setup guide for Audiobookshelf/ })).toHaveAttribute(
+        "href",
+        "https://www.latestarr.app/docs/sources/audiobookshelf",
+      );
 
       selectOption(within(dialog).getByLabelText("Source type"), "Jellyfin");
       const hint = within(dialog).getByText("Create one in Jellyfin's Dashboard, under API Keys.");
       expect(within(dialog).getByLabelText("Jellyfin API key")).toHaveAttribute("aria-describedby", hint.id);
-      expect(within(dialog).getByText(/Jellyfin support is new/)).toBeInTheDocument();
+      expect(within(dialog).getByText(/Jellyfin support still needs testers/)).toBeInTheDocument();
+      expect(within(dialog).getByRole("link", { name: /Setup guide for Jellyfin/ })).toHaveAttribute(
+        "href",
+        "https://www.latestarr.app/docs/sources/jellyfin",
+      );
       // Example values match the chosen type, not Tautulli's.
       expect(within(dialog).getByLabelText("Base URL")).toHaveAttribute("placeholder", "http://localhost:8096");
       expect(within(dialog).getByLabelText("Name")).toHaveAttribute("placeholder", "Home Jellyfin");

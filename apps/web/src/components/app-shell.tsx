@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { Bug, Globe, Loader2, LogOut, Menu, Pencil, Scale, Sparkles, Star } from "lucide-react";
+import { BookOpen, Bug, Globe, Loader2, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
@@ -27,16 +27,19 @@ import { cn } from "@/lib/utils";
 
 const REPO_URL = "https://github.com/jshields-ca/LatestArr";
 const LICENSE_URL = "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE";
-const AUTHOR_URL = "https://www.scootr.ca";
+const SITE_URL = "https://www.latestarr.app";
+const DOCS_URL = "https://www.latestarr.app/docs";
+const DISCUSSIONS_URL = "https://github.com/jshields-ca/LatestArr/discussions";
+const MAINTAINER_URL = "https://www.jeremyshields.ca";
 
 // -m-1.5 p-1.5 grows the tap target to 28px without moving the icon.
 const iconLinkClassName =
   "-m-1.5 p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
 
-// The footer's attribution links get the tertiary informational-blue
+// The footer's project links get the tertiary informational-blue
 // treatment instead of plain muted-foreground (see the "Tertiary" note in
-// index.css) — they're secondary, non-navigational links (author site,
-// license, issue tracker), a good fit for tertiary's "calm, informational"
+// index.css) — they're secondary, non-navigational links (website, docs,
+// discussions, issue tracker, license), a good fit for tertiary's "calm, informational"
 // role, and a deliberately different color from the header's GitHub icon
 // link above so the two clusters stay visually distinct.
 const footerLinkClassName =
@@ -146,14 +149,20 @@ function ProjectInfoCard() {
 }
 
 /**
- * The real page footer (see item 5 of the design-polish pass): the
- * author/license/issue-tracker attribution that used to live behind the
- * sidebar's "About" info-icon popover, now visible at the bottom of every
- * page instead of hidden a click away. Rendered once per page, inside
+ * The real page footer: links to the website, docs, discussions, issue
+ * tracker, and license, and the same credit line as latestarr.app, visible
+ * at the bottom of every page. Rendered once per page, inside
  * `AppShell` below — not duplicated per-surface the way `ProjectInfoCard`
  * is, since there's only one page footer regardless of viewport width.
  */
 function AppFooter() {
+  const links = [
+    { href: SITE_URL, icon: Globe, label: "LatestArr.app" },
+    { href: DOCS_URL, icon: BookOpen, label: "Docs" },
+    { href: DISCUSSIONS_URL, icon: MessagesSquare, label: "Discussions" },
+    { href: `${REPO_URL}/issues`, icon: Bug, label: "Report an issue" },
+    { href: LICENSE_URL, icon: Scale, label: "GPLv3 license" },
+  ];
   return (
     // A faint tertiary tint on the footer's own background (on top of the
     // existing top border) ties it to the header's tertiary-glass
@@ -162,34 +171,29 @@ function AppFooter() {
     // a primary action area.
     <footer className="border-t border-tertiary/15 bg-tertiary/[0.03]">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-          <a
-            href={AUTHOR_URL}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(footerLinkClassName, "flex items-center gap-1.5")}
-          >
-            <Globe className="size-3.5 shrink-0" aria-hidden="true" />
-            Jeremy Shields
-          </a>
-          <a
-            href={LICENSE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(footerLinkClassName, "flex items-center gap-1.5")}
-          >
-            <Scale className="size-3.5 shrink-0" aria-hidden="true" />
-            GPLv3 license
-          </a>
-          <a
-            href={`${REPO_URL}/issues`}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(footerLinkClassName, "flex items-center gap-1.5")}
-          >
-            <Bug className="size-3.5 shrink-0" aria-hidden="true" />
-            Report an issue
-          </a>
+        <div className="flex flex-col gap-2">
+          <nav aria-label="LatestArr project links" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            {links.map(({ href, icon: Icon, label }) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(footerLinkClassName, "flex items-center gap-1.5")}
+              >
+                <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+                {label}
+              </a>
+            ))}
+          </nav>
+          {/* Matches latestarr.app: the project belongs to its contributors,
+              with the maintainer credited as its lead. */}
+          <p className="text-xs text-muted-foreground">
+            © 2026 LatestArr contributors · Led by{" "}
+            <a href={MAINTAINER_URL} target="_blank" rel="noreferrer" className={footerLinkClassName}>
+              Jeremy Shields
+            </a>
+          </p>
         </div>
         <Badge variant="tertiary" className="w-fit">
           <Sparkles className="size-3" aria-hidden="true" />

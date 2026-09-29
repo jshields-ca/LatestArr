@@ -4,6 +4,7 @@ import {
   Activity,
   BookOpen,
   Clapperboard,
+  ExternalLink,
   Gamepad2,
   Headphones,
   Loader2,
@@ -61,7 +62,25 @@ const KINDS_WITH_USER_IMPORT = new Set(["plex", "tautulli", "jellyfin", "emby", 
 // Loose on purpose: the server validates properly on import.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const TESTERS_ISSUE_URL = "https://github.com/jshields-ca/LatestArr/issues/196";
+// Where testers report back: Jellyfin and Emby, and the other sources not
+// yet confirmed on a real server. Matches the README's sources table.
+const JELLYFIN_EMBY_TESTERS_URL = "https://github.com/jshields-ca/LatestArr/issues/196";
+const SOURCE_TESTERS_URL = "https://github.com/jshields-ca/LatestArr/issues/244";
+
+// Each source type's setup guide on the docs site. The BookLore family
+// shares one page.
+const DOCS_BASE_URL = "https://www.latestarr.app/docs/sources";
+const DOCS_SLUG: Record<string, string> = {
+  tautulli: "tautulli",
+  plex: "plex",
+  jellyfin: "jellyfin",
+  emby: "emby",
+  booklore: "booklore-family",
+  bookorbit: "booklore-family",
+  grimmory: "booklore-family",
+  audiobookshelf: "audiobookshelf",
+  romm: "romm",
+};
 
 interface SourceKindField {
   key: string;
@@ -79,9 +98,9 @@ interface SourceKindConfig {
   opdsHint?: boolean;
   /** Where to find the credential, shown under its field. */
   fieldHint?: string;
-  /** Built from the API docs but not yet confirmed on a real server; asks
-   *  the admin to report how it went. */
-  needsTesters?: boolean;
+  /** Not yet confirmed on a real server: the issue where testers report
+   *  how it went. */
+  testersIssue?: string;
   /** Example values for the Name, Base URL, and Public URL fields. */
   examples: { name: string; baseUrl: string; publicUrl: string };
 }
@@ -100,6 +119,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   plex: {
     label: "Plex",
+    testersIssue: SOURCE_TESTERS_URL,
     examples: { name: "Home Plex", baseUrl: "http://localhost:32400", publicUrl: "https://plex.example.com" },
     description: "Connect directly to a Plex Media Server.",
     fields: [{ key: "token", label: "Plex token", type: "password" }],
@@ -110,7 +130,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
     description: "Connect to a Jellyfin server for movies, TV, books, and audiobooks.",
     fields: [{ key: "apiKey", label: "Jellyfin API key", type: "password" }],
     fieldHint: "Create one in Jellyfin's Dashboard, under API Keys.",
-    needsTesters: true,
+    testersIssue: JELLYFIN_EMBY_TESTERS_URL,
   },
   emby: {
     label: "Emby",
@@ -118,10 +138,11 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
     description: "Connect to an Emby server for movies, TV, books, and audiobooks.",
     fields: [{ key: "apiKey", label: "Emby API key", type: "password" }],
     fieldHint: "Create one in Emby's server settings, under API Keys.",
-    needsTesters: true,
+    testersIssue: JELLYFIN_EMBY_TESTERS_URL,
   },
   booklore: {
     label: "BookLore",
+    testersIssue: SOURCE_TESTERS_URL,
     examples: { name: "Books", baseUrl: "http://localhost:6060", publicUrl: "https://books.example.com" },
     description: "Connect to a BookLore OPDS catalog.",
     fields: [
@@ -142,6 +163,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   grimmory: {
     label: "Grimmory",
+    testersIssue: SOURCE_TESTERS_URL,
     examples: { name: "Books", baseUrl: "http://grimmory.local", publicUrl: "https://books.example.com" },
     description: "Connect to a Grimmory OPDS catalog.",
     fields: [
@@ -152,6 +174,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   audiobookshelf: {
     label: "Audiobookshelf",
+    testersIssue: SOURCE_TESTERS_URL,
     examples: { name: "Audiobooks", baseUrl: "http://localhost:13378", publicUrl: "https://audiobooks.example.com" },
     description: "Connect to an Audiobookshelf server.",
     fields: [{ key: "token", label: "Audiobookshelf API token", type: "password" }],
@@ -207,11 +230,11 @@ function OpdsHint({ id, label }: { id: string; label: string }) {
   );
 }
 
-function TestersNote({ label }: { label: string }) {
+function TestersNote({ label, issueUrl }: { label: string; issueUrl: string }) {
   return (
     <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-      {label} support is new and hasn&apos;t been confirmed on a real server yet. If you try it, please{" "}
-      <a href={TESTERS_ISSUE_URL} target="_blank" rel="noreferrer" className="font-medium text-primary underline">
+      {label} support still needs testers: it hasn&apos;t been confirmed on a real server yet. If you try it, please{" "}
+      <a href={issueUrl} target="_blank" rel="noreferrer" className="font-medium text-primary underline">
         tell us how it went
       </a>
       : your server version, what worked, and any errors from the Logs page.
@@ -328,6 +351,17 @@ function AddSourceDialog({
                 </option>
               ))}
             </Select>
+            {DOCS_SLUG[kind] ? (
+              <a
+                href={`${DOCS_BASE_URL}/${DOCS_SLUG[kind]}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-fit items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Setup guide for {config.label}
+                <ExternalLink className="size-3" aria-hidden="true" />
+              </a>
+            ) : null}
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="source-name">Name</Label>
@@ -389,7 +423,7 @@ function AddSourceDialog({
               {config.fieldHint}
             </p>
           ) : null}
-          {config.needsTesters ? <TestersNote label={config.label} /> : null}
+          {config.testersIssue ? <TestersNote label={config.label} issueUrl={config.testersIssue} /> : null}
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
