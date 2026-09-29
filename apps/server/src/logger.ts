@@ -17,7 +17,27 @@ const requestedLevel = process.env.LOG_LEVEL?.trim().toLowerCase() || "info";
 const validLevel = requestedLevel in pino.levels.values || requestedLevel === "silent";
 
 export const logger: Logger = pino(
-  { level: validLevel ? requestedLevel : "info" },
+  {
+    level: validLevel ? requestedLevel : "info",
+    // Nothing logs these today; this keeps a future log line (or an error
+    // carrying a request or config) from writing a secret out.
+    redact: {
+      paths: [
+        "req.headers.cookie",
+        "req.headers.authorization",
+        "*.password",
+        "*.passwordHash",
+        "*.currentPassword",
+        "*.newPassword",
+        "*.apiKey",
+        "*.token",
+        "*.credentials",
+        "*.clientSecret",
+        "*.authPass",
+      ],
+      censor: "[redacted]",
+    },
+  },
   pino.multistream([
     { stream: process.stdout, level: "trace" },
     { stream: logBufferStream, level: "trace" },

@@ -1,4 +1,4 @@
-import { trimTrailingSlashes } from "@latestarr/adapter-core";
+import { trimTrailingSlashes, readBytesCapped } from "@latestarr/adapter-core";
 
 // Jellyfin began as a fork of Emby, and the two still share most of their
 // REST API: the same /Items, /Library/MediaFolders, /Users, and image
@@ -164,7 +164,8 @@ export async function fetchImage(
     });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
-    return { data: new Uint8Array(await response.arrayBuffer()), contentType };
+    const data = await readBytesCapped(response);
+    return data ? { data, contentType } : null;
   } catch {
     return null;
   }

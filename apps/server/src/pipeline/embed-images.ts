@@ -8,6 +8,9 @@ import type { EmailAttachment } from "../mailer/send.js";
 // original (often multi-megabyte) cover art byte-for-byte.
 const THUMBNAIL_MAX_DIMENSION = 240;
 const THUMBNAIL_JPEG_QUALITY = 80;
+// Posters are a few megapixels; a source sending a huge (or deliberately
+// "bomb") image fails that one poster instead of using up the server's memory.
+const MAX_INPUT_PIXELS = 40_000_000;
 
 // A 1x1 fully transparent GIF, inlined — used in place of a poster that a
 // Media List block's own selection logic decided to show but that
@@ -113,7 +116,7 @@ export async function resolvePosterPlaceholders(
         const fetched = await source.adapter.fetchImageBytes(source.config, item);
         if (!fetched) return { token, image: null };
 
-        const resized = await sharp(Buffer.from(fetched.data))
+        const resized = await sharp(Buffer.from(fetched.data), { limitInputPixels: MAX_INPUT_PIXELS })
           .resize({
             width: THUMBNAIL_MAX_DIMENSION,
             height: THUMBNAIL_MAX_DIMENSION,

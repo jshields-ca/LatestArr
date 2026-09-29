@@ -491,7 +491,15 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         if (!row.renderedHtml) {
           return reply.code(404).send({ error: "No rendered copy available for this send" });
         }
-        return reply.type("text/html").send(row.renderedHtml);
+        // Opened on the app's own origin, so the email runs sandboxed: no
+        // scripts, no same-origin access to the API, just its markup and images.
+        return reply
+          .header(
+            "content-security-policy",
+            "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src * data:; style-src 'unsafe-inline' https:; font-src https: data:",
+          )
+          .type("text/html")
+          .send(row.renderedHtml);
       },
     );
   });

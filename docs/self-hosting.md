@@ -77,6 +77,27 @@ newsletter.example.com {
 }
 ```
 
+## Exposing LatestArr to the internet
+
+LatestArr is built to be reachable from the internet, but a few things are up to you:
+
+- **Always use HTTPS**, through the reverse proxy above with `TRUST_PROXY=true`, so the session cookie is marked `Secure`. Never publish port 3000 directly.
+- **Use strong passwords, or SSO.** Passwords must be at least 12 characters. Sign-in is limited to 10 attempts a minute per client IP, and failed attempts show on the Logs page.
+- **Keep `ENCRYPTION_KEY` secret and backed up.** It protects every source, SMTP, and webhook credential stored in the database.
+- **Keep the container updated.** Security fixes only go into the latest release (see [SECURITY.md](../SECURITY.md)).
+
+What LatestArr does for you:
+
+- Every API route except sign-in, first-run setup, and the version and health checks requires a signed-in user. A test checks this for every route, so a new route can't be left open by accident.
+- Sessions are random tokens stored hashed, in `HttpOnly`, `SameSite=Lax` cookies. Deactivating a user or resetting their password signs them out everywhere.
+- Changes are only accepted from the app's own origin (a CSRF defence), and responses carry a strict Content Security Policy and other security headers.
+- Someone given a temporary password can do nothing but choose a new one.
+- The container runs as an unprivileged user, not root.
+- Server errors are logged in full but never sent to the browser, and passwords, API keys, and tokens are never logged.
+- Requests to your sources time out after 30 seconds and images are capped at 20 MB, so a broken or hostile source can't hang a send.
+
+**About internal addresses:** sources, SMTP servers, and webhooks are usually on your own network, so any signed-in user can point LatestArr at an internal address, and **Test connection** reports whether it answered. That's intended, but it's another reason to give accounts only to people you trust with your network.
+
 ## Setting up OIDC/SSO
 
 LatestArr speaks generic OIDC via PKCE, so any standards-compliant provider works — this has been used with Authelia, Authentik, and Keycloak. Register a confidential client with your provider and set:

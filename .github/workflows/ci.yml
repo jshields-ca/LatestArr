@@ -96,7 +96,11 @@ jobs:
 
       - name: Smoke test the built image
         run: |
-          docker run -d --name latestarr-smoke -p 3000:3000 latestarr:ci
+          # A data volume left owned by root, as an older image (which ran as
+          # root) would have left it, must still work.
+          docker volume create latestarr-smoke-data
+          docker run --rm -v latestarr-smoke-data:/app/data --entrypoint sh latestarr:ci -c "touch /app/data/from-old-image && chown -R root:root /app/data"
+          docker run -d --name latestarr-smoke -p 3000:3000 -v latestarr-smoke-data:/app/data latestarr:ci
           healthy=false
           for i in $(seq 1 30); do
             if curl -sf http://localhost:3000/health > /dev/null; then
@@ -133,8 +137,20 @@ jobs:
             echo "GET /api/auth/providers returned $providers_status, expected 200"; docker logs latestarr-smoke; exit 1;
           fi
 
+          echo "Checking the server runs as the unprivileged node user..."
+          server_user="$(docker exec latestarr-smoke sh -c "stat -c %U /proc/1")"
+          if [ "$server_user" != "node" ]; then
+            echo "The server runs as $server_user, expected node"; docker logs latestarr-smoke; exit 1;
+          fi
+          data_owner="$(docker exec latestarr-smoke sh -c "stat -c %U /app/data/latestarr.db")"
+          if [ "$data_owner" != "node" ]; then
+            echo "The database is owned by $data_owner, expected node"; exit 1;
+          fi
+
           echo "All smoke checks passed"
 
       - name: Stop smoke test container
         if: always()
-        run: docker rm -f latestarr-smoke || true
+        run: |
+          docker rm -f latestarr-smoke || true
+          docker volume rm latestarr-smoke-data || true

@@ -1,4 +1,4 @@
-import { trimTrailingSlashes } from "@latestarr/adapter-core";
+import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
 
 export interface TautulliLibrary {
   section_id: string;
@@ -91,7 +91,7 @@ async function callTautulli<T>(
   params?: Record<string, string>,
 ): Promise<T> {
   const url = buildUrl(baseUrl, cmd, apiKey, params);
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(SOURCE_REQUEST_TIMEOUT_MS) });
   if (!response.ok) {
     throw new Error(`Tautulli request failed with HTTP ${response.status}`);
   }
@@ -192,8 +192,8 @@ export async function fetchImage(
     const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
-    const data = new Uint8Array(await response.arrayBuffer());
-    return { data, contentType };
+    const data = await readBytesCapped(response);
+    return data ? { data, contentType } : null;
   } catch {
     return null;
   }

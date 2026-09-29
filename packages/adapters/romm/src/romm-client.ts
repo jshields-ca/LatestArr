@@ -5,7 +5,7 @@
 // header shape as the OAuth2 access tokens the browser flow uses, so one
 // client works for both.
 
-import { trimTrailingSlashes } from "@latestarr/adapter-core";
+import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
 
 export interface RommPlatform {
   id: number;
@@ -47,6 +47,7 @@ async function callRomm<T>(
   const url = buildUrl(baseUrl, path, params);
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(SOURCE_REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new Error(`RomM request failed with HTTP ${response.status}`);
@@ -78,8 +79,8 @@ export async function fetchImage(
     const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
-    const data = new Uint8Array(await response.arrayBuffer());
-    return { data, contentType };
+    const data = await readBytesCapped(response);
+    return data ? { data, contentType } : null;
   } catch {
     return null;
   }

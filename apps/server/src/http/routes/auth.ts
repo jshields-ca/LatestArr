@@ -2,7 +2,7 @@ import { type Db, users } from "@latestarr/db";
 import { eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { hashPassword, verifyPassword } from "../../auth/password.js";
+import { hashPassword, verifyDummyPassword, verifyPassword } from "../../auth/password.js";
 import {
   createSession,
   deleteSession,
@@ -81,13 +81,19 @@ export function registerAuthRoutes(
       const { email, password, displayName } = body;
 
       const passwordHash = await hashPassword(password);
-      const [user] = await db
-        .insert(users)
-        .values({ email, displayName, passwordHash, role: "admin" })
-        .returning();
+      // Checked again inside one transaction with the insert: two
+      // bootstrap requests racing through the check above (hashing takes a
+      // while) must not both create an admin.
+      const user = db.transaction((tx) => {
+        if (tx.select({ id: users.id }).from(users).limit(1).all().length > 0) return undefined;
+        return tx.insert(users).values({ email, displayName, passwordHash, role: "admin" }).returning().get();
+      });
+      if (!user) {
+        return reply.code(403).send({ error: "Bootstrap is only available when no users exist yet" });
+      }
 
-      request.log.info({ userId: user!.id }, `Created the admin account ${email}`);
-      return reply.code(201).send({ user: sanitizeUser(user!) });
+      request.log.info({ userId: user.id }, `Created the admin account ${email}`);
+      return reply.code(201).send({ user: sanitizeUser(user) });
     },
   );
 
@@ -102,6 +108,7 @@ export function registerAuthRoutes(
       // Email addresses match regardless of case.
       const [user] = await db.select().from(users).where(eq(sql`lower(${users.email})`, email.trim().toLowerCase()));
       if (!user || !user.passwordHash || !user.isActive) {
+        await verifyDummyPassword(password);
         request.log.warn({ ip: request.ip }, `Failed sign-in attempt for ${email}`);
         return reply.code(401).send({ error: "Invalid email or password" });
       }
