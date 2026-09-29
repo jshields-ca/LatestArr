@@ -2,6 +2,8 @@
 
 Thanks for your interest in contributing! LatestArr is early-stage, so the project structure and conventions below will keep evolving — if something here is out of date, a PR fixing it is itself a welcome contribution.
 
+User documentation lives at [latestarr.app/docs](https://www.latestarr.app/docs). For questions, ideas, or to talk something through before you write code, use [GitHub Discussions](https://github.com/jshields-ca/LatestArr/discussions).
+
 ## Project structure
 
 LatestArr is a pnpm + Turborepo monorepo:
@@ -128,6 +130,10 @@ For screenshots, drag an image into any GitHub comment box, copy the link GitHub
 ## Reporting bugs / requesting features
 
 Use the issue templates (Bug report / Feature request / Adapter request) — they ask for the details needed to reproduce or evaluate the request. Please search existing issues first to avoid duplicates.
+
+Not sure it's a bug, or still shaping an idea? Start a thread in [Discussions](https://github.com/jshields-ca/LatestArr/discussions) instead; it can become an issue once it's concrete. Reports on how a 🧪 source worked on your setup are welcome there too.
+
+Spotted a mistake in the docs at latestarr.app? Open an issue with the `documentation` label, or mention it in Discussions.
 
 ## Security issues
 
