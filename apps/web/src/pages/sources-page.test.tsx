@@ -4,7 +4,7 @@ import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SourcesPage } from "./sources-page";
-import { selectOption } from "@/test/select";
+import { openSelect, selectOption } from "@/test/select";
 
 const fetchMock = vi.fn();
 
@@ -85,13 +85,32 @@ describe("SourcesPage", () => {
     expect(screen.queryByText("bookorbit")).not.toBeInTheDocument();
   });
 
-  it("shows a logo badge next to a source's kind label", async () => {
+  it("shows the service's logo as a source's icon, with its type as a label", async () => {
     mockLoad({ sources: [exampleSource] });
 
     const { container } = render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
 
     expect(container.querySelector('[data-kind="tautulli"] img')).toBeInTheDocument();
+    expect(screen.getByText("Tautulli")).toBeInTheDocument();
+  });
+
+  it("lists source types alphabetically, each with its logo", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [] });
+    render(<SourcesPage />);
+    await screen.findByText("No sources yet");
+
+    await user.click(screen.getByRole("button", { name: "Add source" }));
+    const dialog = await screen.findByRole("dialog");
+    openSelect(within(dialog).getByLabelText("Source type"));
+    const options = screen.getAllByRole("option");
+    const labels = options.map((option) => option.textContent);
+    expect(labels).toEqual([...labels].sort((a, b) => a!.localeCompare(b!)));
+    expect(labels).toContain("Jellyfin");
+    for (const kind of ["jellyfin", "emby"]) {
+      expect(document.querySelector(`[role="option"] [data-kind="${kind}"] img`)).toBeInTheDocument();
+    }
   });
 
   it("adds a new source through the dialog", async () => {
@@ -103,7 +122,8 @@ describe("SourcesPage", () => {
     await user.click(screen.getByRole("button", { name: "Add source" }));
     const dialog = await screen.findByRole("dialog");
 
-    expect(within(dialog).getByLabelText("Source type")).toHaveTextContent("Tautulli");
+    expect(within(dialog).getByLabelText("Source type")).toHaveTextContent("Audiobookshelf");
+    selectOption(within(dialog).getByLabelText("Source type"), "Tautulli");
     await user.type(within(dialog).getByLabelText("Name"), "Home Tautulli");
     await user.type(within(dialog).getByLabelText("Base URL"), "http://localhost:8181");
     await user.type(within(dialog).getByLabelText("Tautulli API key"), "secret-key");
@@ -131,6 +151,7 @@ describe("SourcesPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add source" }));
     const dialog = await screen.findByRole("dialog");
+    selectOption(within(dialog).getByLabelText("Source type"), "Tautulli");
 
     await user.type(within(dialog).getByLabelText("Name"), "Home Tautulli");
     await user.type(within(dialog).getByLabelText("Base URL"), "http://localhost:8181");
@@ -279,10 +300,10 @@ describe("SourcesPage", () => {
 
       await user.click(screen.getByRole("button", { name: "Add source" }));
       const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).getByLabelText("Tautulli API key")).toBeInTheDocument();
+      expect(within(dialog).getByLabelText("Audiobookshelf API token")).toBeInTheDocument();
 
       selectOption(within(dialog).getByLabelText("Source type"), "RomM");
-      expect(within(dialog).queryByLabelText("Tautulli API key")).not.toBeInTheDocument();
+      expect(within(dialog).queryByLabelText("Audiobookshelf API token")).not.toBeInTheDocument();
       expect(within(dialog).getByLabelText("RomM client API token")).toBeInTheDocument();
 
       selectOption(within(dialog).getByLabelText("Source type"), "BookLore");
