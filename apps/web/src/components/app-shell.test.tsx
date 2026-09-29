@@ -74,33 +74,37 @@ describe("AppShell", () => {
     expect(starLink).toHaveAttribute("href", "https://github.com/jshields-ca/LatestArr");
   });
 
-  it("shows exactly one scootr.ca author link, visible in the page footer without needing a click", async () => {
+  it("shows the project's links in the page footer without needing a click", async () => {
     renderShell();
     await screen.findByRole("link", { name: "View on GitHub" });
 
-    // No info-icon popover to open any more — the footer's attribution
-    // links are visible on the page immediately.
     expect(screen.queryByRole("button", { name: "About LatestArr" })).not.toBeInTheDocument();
-    expect(await screen.findAllByRole("link", { name: /Jeremy Shields/ })).toHaveLength(1);
-  });
-
-  it("shows a footer with a GPLv3 license link, an issue-tracker link, and an In Active Development badge", async () => {
-    renderShell();
-    await screen.findByRole("link", { name: "View on GitHub" });
-
-    const authorLink = screen.getByRole("link", { name: /Jeremy Shields/ });
-    expect(authorLink).toHaveAttribute("href", "https://www.scootr.ca");
-
-    const licenseLink = screen.getByRole("link", { name: /GPLv3 license/ });
-    expect(licenseLink).toHaveAttribute(
+    const footer = within(screen.getByRole("navigation", { name: "LatestArr project links" }));
+    expect(footer.getByRole("link", { name: /LatestArr.app/ })).toHaveAttribute("href", "https://www.latestarr.app");
+    expect(footer.getByRole("link", { name: /Docs/ })).toHaveAttribute("href", "https://www.latestarr.app/docs");
+    expect(footer.getByRole("link", { name: /Discussions/ })).toHaveAttribute(
+      "href",
+      "https://github.com/jshields-ca/LatestArr/discussions",
+    );
+    expect(footer.getByRole("link", { name: /Report an issue/ })).toHaveAttribute(
+      "href",
+      "https://github.com/jshields-ca/LatestArr/issues",
+    );
+    expect(footer.getByRole("link", { name: /GPLv3 license/ })).toHaveAttribute(
       "href",
       "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE",
     );
-
-    const issueLink = screen.getByRole("link", { name: /Report an issue/ });
-    expect(issueLink).toHaveAttribute("href", "https://github.com/jshields-ca/LatestArr/issues");
-
     expect(screen.getByText("In Active Development")).toBeInTheDocument();
+  });
+
+  it("credits the contributors, with the maintainer as project lead", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: "View on GitHub" });
+
+    expect(screen.getByText(/© 2026 LatestArr contributors/)).toBeInTheDocument();
+    const lead = screen.getAllByRole("link", { name: "Jeremy Shields" });
+    expect(lead).toHaveLength(1);
+    expect(lead[0]).toHaveAttribute("href", "https://www.jeremyshields.ca");
   });
 
   it("shows the running version once loaded", async () => {

@@ -221,14 +221,16 @@ function darkModeHead(p: Palette): string {
     </mj-style>`;
 }
 
-// Inline SVG icons (Tabler's brand-github / alert-circle outlines, MIT
-// licensed) as data: URIs: static and tiny, so no per-send fetch. Outlook
+// Inline SVG icons (Tabler's world / alert-circle outlines, MIT licensed)
+// as data: URIs: static and tiny, so no per-send fetch. The stroke is a
+// literal #hex: base64 content isn't URL-decoded, so %23 there would be an
+// invalid colour and an invisible icon. Outlook
 // doesn't show data: images, but the text label beside each carries the
 // meaning anyway.
-const GITHUB_ICON_DATA_URI =
-  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiUyMzk3ODQ5MCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik05IDE5Yy00LjMgMS40IC00LjMgLTIuNSAtNiAtM20xMiA1di0zLjVjMCAtMSAuMSAtMS40IC0uNSAtMmMyLjggLS4zIDUuNSAtMS40IDUuNSAtNmE0LjYgNC42IDAgMCAwIC0xLjMgLTMuMmE0LjIgNC4yIDAgMCAwIC0uMSAtMy4ycy0xLjEgLS4zIC0zLjUgMS4zYTEyLjMgMTIuMyAwIDAgMCAtNi4yIDBjLTIuNCAtMS42IC0zLjUgLTEuMyAtMy41IC0xLjNhNC4yIDQuMiAwIDAgMCAtLjEgMy4yYTQuNiA0LjYgMCAwIDAgLTEuMyAzLjJjMCA0LjYgMi43IDUuNyA1LjUgNmMtLjYgLjYgLS42IDEuMiAtLjUgMnYzLjUiIC8+PC9zdmc+";
+const WEBSITE_ICON_DATA_URI =
+  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Nzg0OTAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI5IiAvPjxwYXRoIGQ9Ik0zLjYgOWgxNi44IiAvPjxwYXRoIGQ9Ik0zLjYgMTVoMTYuOCIgLz48cGF0aCBkPSJNMTEuNSAzYTE3IDE3IDAgMCAwIDAgMTgiIC8+PHBhdGggZD0iTTEyLjUgM2ExNyAxNyAwIDAgMSAwIDE4IiAvPjwvc3ZnPg==";
 const REPORT_ICON_DATA_URI =
-  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiUyMzk3ODQ5MCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjkiIC8+PHBhdGggZD0iTTEyIDh2NCIgLz48cGF0aCBkPSJNMTIgMTZoLjAxIiAvPjwvc3ZnPg==";
+  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Nzg0OTAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI5IiAvPjxwYXRoIGQ9Ik0xMiA4djQiIC8+PHBhdGggZD0iTTEyIDE2aC4wMSIgLz48L3N2Zz4=";
 
 // One item's markup for the chosen layout. Plain HTML, so it always sits
 // inside an <mj-raw> (mjml silently drops bare HTML in a column). Every
@@ -597,7 +599,7 @@ ${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? al
       <mj-column>
         <mj-text font-family="${font}" font-size="12px" line-height="1.6" color="${p.subtle}" align="center">
           Sent by LatestArr on {{generatedAtFormatted}}<br />
-          <a href="https://github.com/jshields-ca/LatestArr" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${GITHUB_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />GitHub</a>
+          <a href="https://www.latestarr.app" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${WEBSITE_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />LatestArr.app</a>
           &nbsp;·&nbsp;
           <a href="https://github.com/jshields-ca/LatestArr/issues" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${REPORT_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />Report an issue</a>
         </mj-text>

@@ -28,7 +28,15 @@ export function DesignCodeReference() {
         Everything is escaped, so item text can&apos;t break your markup. HTML that isn&apos;t an MJML tag goes inside{" "}
         <code className="font-mono">&lt;mj-raw&gt;</code>. The{" "}
         <code className="font-mono">latestarr:dark-mode</code> comment in the head adds this design&apos;s dark-mode
-        colours when it&apos;s sent; delete it to leave them out.
+        colours when it&apos;s sent; delete it to leave them out.{" "}
+        <a
+          href="https://www.latestarr.app/docs/designs/code-mode"
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Code mode guide
+        </a>
       </p>
 
       <Group title="Newsletter">

@@ -245,14 +245,16 @@ describe("renderDefaultNewsletterHtml", () => {
     expect(html).not.toContain(" – ");
   });
 
-  it("includes a GitHub link and an issue-reporting link in the footer", async () => {
+  it("links the LatestArr website and issue reporting in the footer", async () => {
     const html = await renderDefaultNewsletterHtml({
       newsletterName: "Weekly Digest",
       items: [item()],
       generatedAt: new Date("2026-01-20T12:00:00Z"),
     });
 
-    expect(html).toContain('href="https://github.com/jshields-ca/LatestArr"');
+    expect(html).toContain('href="https://www.latestarr.app"');
+    expect(html).toContain("LatestArr.app");
+    expect(html).not.toContain('href="https://github.com/jshields-ca/LatestArr"');
     expect(html).toContain('href="https://github.com/jshields-ca/LatestArr/issues"');
     expect(html).toContain("Report an issue");
   });
