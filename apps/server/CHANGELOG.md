@@ -1,5 +1,43 @@
 # @latestarr/server
 
+## 0.11.1
+
+### Patch Changes
+
+- [#259](https://github.com/jshields-ca/LatestArr/pull/259) [`6af4e0c`](https://github.com/jshields-ca/LatestArr/commit/6af4e0c4f0b5090d76cd6ef52215c8b57c5405fa) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** LatestArr now checks `ENCRYPTION_KEY` when it starts. If the key is missing or invalid, it stops with a message saying how to generate one. Before, it started anyway, and saving a source or SMTP profile failed with a generic error.
+
+  <details>
+  <summary>Technical details</summary>
+  - `encryptionKeyProblem()` (`apps/server/src/secrets.ts`) requires `ENCRYPTION_KEY` to be base64 that decodes to exactly 32 bytes. `index.ts` logs the problem at `fatal` and exits 1 before touching the database.
+  - The wrong-length message warns that credentials already saved need the key they were saved with. ([#256](https://github.com/jshields-ca/LatestArr/issues/256))
+  - The CI smoke test now starts the container with a generated key, and `CONTRIBUTING.md` describes the new startup error for dev setups where Turborepo's strict env mode drops the key.
+
+  </details>
+
+- [#258](https://github.com/jshields-ca/LatestArr/pull/258) [`fa938dd`](https://github.com/jshields-ca/LatestArr/commit/fa938dd481afcfd061801147bd83be10336d9b90) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** LatestArr now points to its new home at [latestarr.app](https://www.latestarr.app). The web UI footer links the website, the docs, GitHub Discussions, issue reporting and the license, and credits LatestArr's contributors, as the site does. The Add source dialog links each source type's setup guide, and the Default design's email footer links LatestArr.app instead of GitHub.
+
+  <details>
+  <summary>Technical details</summary>
+  - **Web UI footer:** the links (LatestArr.app, Docs, Discussions, Report an issue, GPLv3 license) sit in a labelled `nav`, with "© 2026 LatestArr contributors · Led by Jeremy Shields" beneath, linking jeremyshields.ca. The old scootr.ca author link is gone. ([#251](https://github.com/jshields-ca/LatestArr/issues/251))
+  - **Add source dialog:** a "Setup guide for …" link to that type's page under `latestarr.app/docs/sources`. Plex, BookLore, Grimmory and Audiobookshelf now show the testers note too, linking [#244](https://github.com/jshields-ca/LatestArr/issues/244), to match the README; Jellyfin and Emby still link [#196](https://github.com/jshields-ca/LatestArr/issues/196).
+  - **Code mode:** the variables reference links the code mode guide.
+  - **Email footer:** the Default design links `https://www.latestarr.app` (with a globe icon) in place of the repository, and keeps "Report an issue". ([#252](https://github.com/jshields-ca/LatestArr/issues/252))
+  - **Footer icons fixed:** the email footer icons were never visible. Their SVG stroke colour was written `%23978490` inside base64, where it isn't URL-decoded, so it was an invalid colour. They now use a literal `[#978490](https://github.com/jshields-ca/LatestArr/issues/978490)`.
+  - The default design snapshots were re-recorded for the footer change.
+
+  </details>
+
+- Updated dependencies []:
+  - @latestarr/adapter-audiobookshelf@0.11.1
+  - @latestarr/adapter-booklore-family@0.11.1
+  - @latestarr/adapter-core@0.11.1
+  - @latestarr/adapter-jellyfin@0.11.1
+  - @latestarr/adapter-plex@0.11.1
+  - @latestarr/adapter-romm@0.11.1
+  - @latestarr/adapter-tautulli@0.11.1
+  - @latestarr/crypto@0.11.1
+  - @latestarr/db@0.11.1
+
 ## 0.11.0
 
 ### Minor Changes

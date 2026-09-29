@@ -1,5 +1,12 @@
 # @latestarr/adapter-audiobookshelf
 
+## 0.11.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @latestarr/adapter-core@0.11.1
+
 ## 0.11.0
 
 ### Minor Changes

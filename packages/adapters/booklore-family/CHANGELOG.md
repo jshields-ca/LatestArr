@@ -1,5 +1,12 @@
 # @latestarr/adapter-booklore-family
 
+## 0.11.1
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @latestarr/adapter-core@0.11.1
+
 ## 0.11.0
 
 ### Patch Changes
