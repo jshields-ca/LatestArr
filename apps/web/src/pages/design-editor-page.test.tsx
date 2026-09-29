@@ -192,6 +192,7 @@ describe("DesignEditorPage", () => {
     });
   });
 
+  // Typing a button and two dropdowns takes a few seconds under jsdom, more on CI.
   it("chooses where buttons go, and where the Where to watch buttons go", async () => {
     const user = userEvent.setup();
     renderEditor();
@@ -211,7 +212,7 @@ describe("DesignEditorPage", () => {
     await user.click(screen.getByRole("switch", { name: "Where to watch buttons" }));
     expect(screen.queryByLabelText("Where they go")).not.toBeInTheDocument();
     await waitFor(() => expect(previewBodies.at(-1)?.settings.content.sourceButtons.enabled).toBe(false));
-  });
+  }, 60000);
 
   it("has no accessibility violations", async () => {
     const { container } = renderEditor();
