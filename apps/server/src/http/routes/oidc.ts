@@ -99,6 +99,7 @@ export function registerOidcRoutes(app: FastifyInstance, db: Db): void {
         issuer: oidcConfig.issuer,
         subject: claims.sub,
         email: typeof claims.email === "string" ? claims.email : undefined,
+        emailVerified: claims.email_verified === true,
         name: typeof claims.name === "string" ? claims.name : undefined,
       });
 

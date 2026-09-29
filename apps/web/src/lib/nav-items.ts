@@ -7,6 +7,7 @@ import {
   Palette,
   ScrollText,
   BellRing,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,5 +25,6 @@ export const navItems: NavItem[] = [
   { to: "/newsletters", label: "Newsletters", icon: Send },
   { to: "/designs", label: "Designs", icon: Palette },
   { to: "/notifications", label: "Notifications", icon: BellRing },
+  { to: "/users", label: "Users", icon: UserCog },
   { to: "/logs", label: "Logs", icon: ScrollText },
 ];

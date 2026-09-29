@@ -88,6 +88,19 @@ LatestArr speaks generic OIDC via PKCE, so any standards-compliant provider work
 
 Local username/password login stays available alongside OIDC once it's configured — enabling SSO doesn't disable the account you bootstrapped with.
 
+SSO never creates accounts by itself after the first one. To let someone in with SSO, add them on the **Users** page with the email address their provider uses, and leave the password blank. The first time they sign in with SSO, LatestArr links their SSO identity to that account, as long as the provider marks the email as verified (`email_verified`).
+
+## Users
+
+Everyone who can sign in is listed under **Users**, and every user has full admin access; separate roles are planned. From there you can:
+
+- **Add a user** with a temporary password you share with them yourself. They choose their own password the first time they sign in. Leave the password blank for someone who will only use SSO.
+- **Reset a password** to a new temporary one. This signs them out everywhere.
+- **Deactivate** someone to sign them out at once and stop them signing in, or **reactivate** them later.
+- **Delete** a user. Designs they created are kept.
+
+You can't deactivate or delete your own account, so there's always at least one admin who can sign in. Change your own name or password from the pencil button in the header.
+
 ## Logs
 
 The **Logs** page in the web UI shows the server's recent activity, newest first: every newsletter send (manual, scheduled, or caught up after downtime) with how many recipients it reached, recipients that couldn't be delivered to, sources that couldn't be reached, sign-ins and failed sign-in attempts, and each settings change along with the admin who made it. Expand an entry to see its details. The same lines go to `docker logs latestarr`.

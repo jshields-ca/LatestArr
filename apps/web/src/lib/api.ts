@@ -54,6 +54,42 @@ export interface AuthUser {
   displayName: string;
   role: string;
   isActive: boolean;
+  /** Signed in with a temporary password an admin set; a new one must be
+   * chosen before using the app. */
+  mustChangePassword?: boolean;
+}
+
+export interface ManagedUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  hasPassword: boolean;
+  ssoLinked: boolean;
+}
+
+export function listUsers(): Promise<{ users: ManagedUser[] }> {
+  return apiFetch<{ users: ManagedUser[] }>("/users");
+}
+
+// No password: the person signs in with SSO only.
+export function createUser(input: { email: string; displayName: string; password?: string }): Promise<{ user: ManagedUser }> {
+  return apiFetch<{ user: ManagedUser }>("/users", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateUser(
+  id: string,
+  input: { displayName?: string; isActive?: boolean; password?: string },
+): Promise<{ user: ManagedUser }> {
+  return apiFetch<{ user: ManagedUser }>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function deleteUser(id: string): Promise<void> {
+  return apiFetch<void>(`/users/${id}`, { method: "DELETE" });
 }
 
 export interface AuthProviders {
