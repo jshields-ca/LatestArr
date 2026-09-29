@@ -12,6 +12,11 @@ import { fireEvent, screen } from "@testing-library/react";
  * Select noticeably slower to settle (still correct, just slow), which
  * compounds badly once a form has more than one dropdown.
  */
+/** Opens one of this app's <Select>s, to inspect its options. */
+export function openSelect(trigger: HTMLElement) {
+  clickViaPointerEvents(trigger);
+}
+
 export function selectOption(trigger: HTMLElement, optionName: string | RegExp) {
   clickViaPointerEvents(trigger);
   const option = screen.getByRole("option", { name: optionName });

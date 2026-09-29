@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import {
   ApiError,
+  getNotificationSettings,
   listGroups,
   listNewsletters,
   listRecipients,
@@ -27,6 +28,7 @@ import {
   listSmtpProfiles,
   listSources,
   listTemplates,
+  listUsers,
   type Newsletter,
   type Recipient,
   type RecipientGroup,
@@ -84,6 +86,7 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
       )}
       <div className="flex flex-col gap-0.5">
         <span className="flex items-center gap-2 text-sm font-medium">
+          {item.done ? <span className="sr-only">Done: </span> : null}
           {item.label}
           {item.optional ? <Badge variant="accent">Optional</Badge> : null}
         </span>
@@ -193,6 +196,9 @@ export function DashboardPage() {
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [newsletters, setNewsletters] = useState<Newsletter[] | null>(null);
   const [recentRuns, setRecentRuns] = useState<RecentRun[] | null>(null);
+  // Only feed the optional checklist items, so a failure just leaves them unticked.
+  const [alertsOn, setAlertsOn] = useState(false);
+  const [userCount, setUserCount] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checklistExpanded, setChecklistExpandedState] = useState(readStoredChecklistExpanded);
 
@@ -213,6 +219,14 @@ export function DashboardPage() {
     listSmtpProfiles().then(({ smtpProfiles }) => setSmtpProfiles(smtpProfiles)).catch(fail);
     listTemplates().then(({ templates }) => setTemplates(templates)).catch(fail);
     listNewsletters().then(({ newsletters }) => setNewsletters(newsletters)).catch(fail);
+    getNotificationSettings()
+      .then(({ settings }) =>
+        setAlertsOn((settings.onFailure || settings.onPartialFailure) && (settings.email.enabled || settings.webhook.enabled)),
+      )
+      .catch(() => undefined);
+    listUsers()
+      .then(({ users }) => setUserCount(users.length))
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -298,6 +312,22 @@ export function DashboardPage() {
       description: "Link a source, a recipient group, and a schedule.",
       href: "/newsletters",
       done: (newsletters?.length ?? 0) > 0,
+    },
+    {
+      key: "alerts",
+      label: "Get failure alerts",
+      description: "Hear by email or webhook when a newsletter fails to send.",
+      href: "/notifications",
+      done: alertsOn,
+      optional: true,
+    },
+    {
+      key: "users",
+      label: "Add another admin",
+      description: "A second account means you're never locked out if one is lost.",
+      href: "/users",
+      done: userCount > 1,
+      optional: true,
     },
   ];
 

@@ -26,6 +26,20 @@ function jsonResponse(status: number, body: unknown) {
   return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve(body) };
 }
 
+const alertsOff = {
+  onFailure: true,
+  onPartialFailure: false,
+  email: { enabled: false, smtpProfileId: null, to: "" },
+  webhook: { enabled: false, format: "generic", hasUrl: false, urlHost: null },
+};
+const oneUser = [{ id: "u1" }];
+
+// The two optional checklist items' lookups, which follow the six lists.
+function mockOptionalLoad(settings: unknown = alertsOff, users: unknown[] = oneUser) {
+  fetchMock.mockResolvedValueOnce(jsonResponse(200, { settings }));
+  fetchMock.mockResolvedValueOnce(jsonResponse(200, { users }));
+}
+
 // DashboardPage fetches all six lists in parallel on mount, in this order.
 function mockEmptyLoad() {
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
@@ -34,6 +48,7 @@ function mockEmptyLoad() {
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletters: [] }));
+  mockOptionalLoad();
 }
 
 const exampleNewsletter = {
@@ -71,6 +86,7 @@ function mockCompleteLoad() {
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [{ id: "smtp1" }] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletters: [exampleNewsletter] }));
+  mockOptionalLoad();
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { sendRuns: [exampleSendRun] }));
 }
 
@@ -90,8 +106,25 @@ describe("DashboardPage", () => {
     expect(await screen.findByText("Getting started")).toBeInTheDocument();
     expect(screen.getByText("Connect a source")).toBeInTheDocument();
     expect(screen.getByText("Create a newsletter")).toBeInTheDocument();
-    expect(screen.getByText("Optional")).toBeInTheDocument();
+    expect(screen.getAllByText("Optional")).toHaveLength(3);
+    expect(screen.getByRole("link", { name: /^Get failure alerts/ })).toHaveAttribute("href", "/notifications");
+    expect(screen.getByRole("link", { name: /^Add another admin/ })).toHaveAttribute("href", "/users");
     expect(screen.queryByText("Setup checklist")).not.toBeInTheDocument();
+  });
+
+  it("ticks the optional alerts and admin steps once they're set up", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { templates: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletters: [] }));
+    mockOptionalLoad({ ...alertsOff, webhook: { ...alertsOff.webhook, enabled: true, hasUrl: true } }, [{ id: "u1" }, { id: "u2" }]);
+    renderDashboard();
+
+    expect(await screen.findByRole("link", { name: /^Done:s*Get failure alerts/ })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /^Done:s*Add another admin/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^Connect a source/ })).toBeInTheDocument();
   });
 
   it("shows stats and a collapsed setup-complete summary once every required step is done", async () => {

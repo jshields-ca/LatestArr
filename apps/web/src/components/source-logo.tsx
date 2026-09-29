@@ -1,7 +1,9 @@
 import audiobookshelfLogo from "@/assets/logos/audiobookshelf.svg";
 import booklorelogo from "@/assets/logos/booklore.svg";
 import bookorbitLogo from "@/assets/logos/bookorbit.svg";
+import embyLogo from "@/assets/logos/emby.svg";
 import grimmoryLogo from "@/assets/logos/grimmory.svg";
+import jellyfinLogo from "@/assets/logos/jellyfin.svg";
 import plexLogo from "@/assets/logos/plex.svg";
 import rommLogo from "@/assets/logos/romm.svg";
 import tautulliLogo from "@/assets/logos/tautulli.svg";
@@ -20,6 +22,8 @@ import { cn } from "@/lib/utils";
 const LOGO_SRC: Record<string, string> = {
   tautulli: tautulliLogo,
   plex: plexLogo,
+  jellyfin: jellyfinLogo,
+  emby: embyLogo,
   booklore: booklorelogo,
   bookorbit: bookorbitLogo,
   grimmory: grimmoryLogo,
@@ -28,6 +32,10 @@ const LOGO_SRC: Record<string, string> = {
 };
 
 const GRIMMORY_NEEDS_PLATE = new Set(["grimmory"]);
+
+export function hasSourceLogo(kind: string): boolean {
+  return kind in LOGO_SRC;
+}
 
 export interface SourceLogoProps {
   kind: string;

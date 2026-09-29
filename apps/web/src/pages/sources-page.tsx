@@ -33,7 +33,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import { ListRow } from "@/components/list-row";
-import { SourceLogo } from "@/components/source-logo";
+import { hasSourceLogo, SourceLogo } from "@/components/source-logo";
 import {
   ApiError,
   addGroupMember,
@@ -186,9 +186,18 @@ const KIND_ICON: Record<string, LucideIcon> = {
   romm: Gamepad2,
 };
 
+function kindLabel(kind: string): string {
+  return KIND_CONFIG[kind]?.label ?? kind;
+}
+
+// Alphabetical by display name, so the Source type list is easy to scan.
+function sortKinds(kinds: string[]): string[] {
+  return [...kinds].sort((a, b) => kindLabel(a).localeCompare(kindLabel(b)));
+}
+
 // Used before the server's own list of registered kinds has loaded, so the
 // dialog is usable immediately rather than waiting on a second request.
-const FALLBACK_KINDS = Object.keys(KIND_CONFIG);
+const FALLBACK_KINDS = sortKinds(Object.keys(KIND_CONFIG));
 
 function OpdsHint({ id, label }: { id: string; label: string }) {
   return (
@@ -313,7 +322,7 @@ function AddSourceDialog({
                 <option key={k} value={k}>
                   <span className="flex items-center gap-2">
                     <SourceLogo kind={k} />
-                    {KIND_CONFIG[k]?.label ?? k}
+                    {kindLabel(k)}
                   </span>
                 </option>
               ))}
@@ -854,22 +863,23 @@ function SourceRow({
   }
 
   const Icon = KIND_ICON[source.kind] ?? Server;
-  const kindLabel = KIND_CONFIG[source.kind]?.label ?? source.kind;
 
   return (
     <ListRow
       leading={
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-          <Icon className="size-4" aria-hidden="true" />
-        </span>
+        // The service's own logo when one is bundled; a category icon otherwise.
+        hasSourceLogo(source.kind) ? (
+          <SourceLogo kind={source.kind} className="size-9" />
+        ) : (
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <Icon className="size-4" aria-hidden="true" />
+          </span>
+        )
       }
       primary={
         <>
           <p className="truncate font-medium">{source.name}</p>
-          <Badge variant="neutral">
-            <SourceLogo kind={source.kind} className="size-3.5" />
-            {kindLabel}
-          </Badge>
+          <Badge variant="neutral">{kindLabel(source.kind)}</Badge>
           <StatusBadge status={source.status} />
         </>
       }
@@ -941,7 +951,7 @@ export function SourcesPage() {
     // loading.
     listSourceKinds()
       .then(({ kinds: loaded }) => {
-        if (loaded.length > 0) setKinds(loaded);
+        if (loaded.length > 0) setKinds(sortKinds(loaded));
       })
       .catch(() => undefined);
     // Only needed for ImportSourceUsersDialog's "reuse an existing group"
