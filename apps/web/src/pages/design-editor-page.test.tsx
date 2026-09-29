@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_DESIGN_SETTINGS } from "@/lib/design";
+import { selectOption } from "@/test/select";
 import { DesignEditorPage } from "./design-editor-page";
 
 // CodeMirror needs real layout; a textarea stands in with the same contract.
@@ -186,7 +187,30 @@ describe("DesignEditorPage", () => {
       intro: "Hey folks!",
       footerNote: "",
       ctas: [{ label: "Open Plex", url: "https://app.plex.tv" }],
+      ctaPlacement: "afterIntro",
+      sourceButtons: { enabled: true, placement: "end" },
     });
+  });
+
+  it("chooses where buttons go, and where the Where to watch buttons go", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    // Only offered once there is a button to place.
+    expect(screen.queryByLabelText("Where your buttons go")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    await user.type(screen.getByLabelText("Button 1 label"), "Requests");
+    await user.type(screen.getByLabelText("Button 1 URL"), "https://requests.example.com");
+    selectOption(screen.getByLabelText("Where your buttons go"), "Above the intro");
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.content.ctaPlacement).toBe("beforeIntro"));
+
+    selectOption(screen.getByLabelText("Where they go"), /Under each section/);
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.content.sourceButtons.placement).toBe("sections"));
+
+    await user.click(screen.getByRole("switch", { name: "Where to watch buttons" }));
+    expect(screen.queryByLabelText("Where they go")).not.toBeInTheDocument();
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.content.sourceButtons.enabled).toBe(false));
   });
 
   it("has no accessibility violations", async () => {

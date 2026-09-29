@@ -26,9 +26,11 @@ import {
 } from "@/lib/api";
 import {
   type DesignCta,
+  type DesignCtaPlacement,
   type DesignEmptySection,
   type DesignLayout,
   type DesignSettings,
+  type DesignSourceButtonPlacement,
   isCompleteCta,
   moveSection,
   orderedSections,
@@ -71,6 +73,19 @@ const EMPTY_OPTIONS: { value: DesignEmptySection; label: string }[] = [
   { value: "hide", label: "Leave it out" },
   { value: "link", label: "Link to the library" },
   { value: "random", label: "Show a few from the library" },
+];
+
+const CTA_PLACEMENTS: { value: DesignCtaPlacement; label: string }[] = [
+  { value: "afterIntro", label: "Below the intro" },
+  { value: "beforeIntro", label: "Above the intro" },
+  { value: "end", label: "At the end, after the footer note" },
+];
+
+// Under each section needs sections; the server puts them after the items otherwise.
+const SOURCE_BUTTON_PLACEMENTS: { value: DesignSourceButtonPlacement; label: string }[] = [
+  { value: "end", label: "After the items" },
+  { value: "sections", label: "Under each section (Movies, TV, Games, ...)" },
+  { value: "top", label: "Near the top" },
 ];
 
 function Section({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
@@ -336,6 +351,76 @@ export function DesignEditorPage() {
         ctas={settings.content.ctas}
         onChange={(ctas) => update((c) => ({ ...c, content: { ...c.content, ctas } }))}
       />
+      {mode === "design" && settings.content.ctas.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="design-cta-placement">Where your buttons go</Label>
+          <Select
+            id="design-cta-placement"
+            value={settings.content.ctaPlacement}
+            onChange={(e) =>
+              update((c) => ({ ...c, content: { ...c.content, ctaPlacement: e.target.value as DesignCtaPlacement } }))
+            }
+          >
+            {CTA_PLACEMENTS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+      ) : null}
+      {mode === "design" ? (
+        <>
+          <SettingRow
+            label="Where to watch buttons"
+            description="A button for each linked source with a public URL, like Watch on Plex or Play on RomM."
+            htmlFor="design-source-buttons"
+            className="py-1"
+            control={
+              <Switch
+                id="design-source-buttons"
+                checked={settings.content.sourceButtons.enabled}
+                onCheckedChange={(checked) =>
+                  update((c) => ({
+                    ...c,
+                    content: { ...c.content, sourceButtons: { ...c.content.sourceButtons, enabled: checked } },
+                  }))
+                }
+              />
+            }
+          />
+          {settings.content.sourceButtons.enabled ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="design-source-button-placement">Where they go</Label>
+              <Select
+                id="design-source-button-placement"
+                value={
+                  settings.content.sourceButtons.placement === "sections" && !settings.sections.groupByType
+                    ? "end"
+                    : settings.content.sourceButtons.placement
+                }
+                onChange={(e) =>
+                  update((c) => ({
+                    ...c,
+                    content: {
+                      ...c.content,
+                      sourceButtons: { ...c.content.sourceButtons, placement: e.target.value as DesignSourceButtonPlacement },
+                    },
+                  }))
+                }
+              >
+                {SOURCE_BUTTON_PLACEMENTS.filter((option) => settings.sections.groupByType || option.value !== "sections").map(
+                  (option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ),
+                )}
+              </Select>
+            </div>
+          ) : null}
+        </>
+      ) : null}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="design-footer">Footer note (optional)</Label>
         <Textarea

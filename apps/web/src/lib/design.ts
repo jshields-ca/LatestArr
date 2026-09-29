@@ -13,6 +13,18 @@ export interface DesignCta {
 
 export const MAX_DESIGN_CTAS = 4;
 
+export type DesignCtaPlacement = "beforeIntro" | "afterIntro" | "end";
+export type DesignSourceButtonPlacement = "top" | "sections" | "end";
+
+export interface DesignContent {
+  intro: string;
+  footerNote: string;
+  ctas: DesignCta[];
+  ctaPlacement: DesignCtaPlacement;
+  // "Watch on Plex"-style buttons for linked sources with a public URL.
+  sourceButtons: { enabled: boolean; placement: DesignSourceButtonPlacement };
+}
+
 export interface DesignSettings {
   font: string;
   colors: { accent: string; background: string; text: string; muted: string };
@@ -27,7 +39,7 @@ export interface DesignSettings {
     empty: DesignEmptySection;
     mostWatched: { enabled: boolean; count: number };
   };
-  content: { intro: string; footerNote: string; ctas: DesignCta[] };
+  content: DesignContent;
   customCss: string;
 }
 
@@ -45,7 +57,13 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     empty: "message",
     mostWatched: { enabled: false, count: 5 },
   },
-  content: { intro: "", footerNote: "", ctas: [] },
+  content: {
+    intro: "",
+    footerNote: "",
+    ctas: [],
+    ctaPlacement: "afterIntro",
+    sourceButtons: { enabled: true, placement: "end" },
+  },
   customCss: "",
 };
 
@@ -63,7 +81,11 @@ export function withDesignDefaults(settings: Partial<DesignSettings> | null | un
       ...value.sections,
       mostWatched: { ...DEFAULT_DESIGN_SETTINGS.sections.mostWatched, ...value.sections?.mostWatched },
     },
-    content: { ...DEFAULT_DESIGN_SETTINGS.content, ...value.content },
+    content: {
+      ...DEFAULT_DESIGN_SETTINGS.content,
+      ...value.content,
+      sourceButtons: { ...DEFAULT_DESIGN_SETTINGS.content.sourceButtons, ...value.content?.sourceButtons },
+    },
   };
 }
 

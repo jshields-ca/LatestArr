@@ -222,7 +222,8 @@ function TestersNote({ label }: { label: string }) {
 function PublicUrlHint({ id }: { id: string }) {
   return (
     <p id={id} className="text-xs text-muted-foreground">
-      The address your recipients can actually reach — leave blank to use the address above. Useful when
+      The address your recipients can actually reach, used for item links and a design&apos;s Where to watch
+      buttons (like Watch on Plex) — leave blank to use the address above for links. Useful when
       the address above is internal-only (e.g. a Tailscale IP or an API host like Tautulli that isn&apos;t
       itself the link you want people to click).
     </p>

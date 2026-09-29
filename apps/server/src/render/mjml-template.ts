@@ -1,6 +1,7 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import Handlebars from "handlebars";
 import mjml2html from "mjml";
+import type { SourceButton } from "./source-buttons.js";
 
 // Every design renders through here: MJML containing Handlebars tokens
 // (e.g. {{#each items}}), whether generated from a design's options
@@ -82,6 +83,10 @@ export interface MjmlRenderContext {
    * template renders as a row of buttons. Bound as {{#each ctas}} for any
    * template that references it. */
   ctas?: { label: string; url: string }[];
+  /** "Watch on Plex"-style buttons, one per linked source with a public
+   * URL (source-buttons.ts). Bound as {{#each sourceButtons}}, or
+   * {{#sourceButtonsFor contentType="movie"}} for one section's. */
+  sourceButtons?: SourceButton[];
 }
 
 function formatDate(date: Date): string {
@@ -339,6 +344,21 @@ Handlebars.registerHelper("ifAnyItems", function ifAnyItems(
   return hasAny ? options.fn(this) : options.inverse(this);
 });
 
+// The source buttons for sources providing any of these content types (a
+// comma list), or all of them without one; the else block runs when none do.
+Handlebars.registerHelper("sourceButtonsFor", function sourceButtonsFor(
+  this: { sourceButtons?: SourceButton[] },
+  options: Handlebars.HelperOptions,
+) {
+  const { contentType } = options.hash as { contentType?: string };
+  const wanted = contentType?.split(",").map((kind) => kind.trim());
+  const buttons = (this.sourceButtons ?? []).filter(
+    (button) => !wanted || button.kinds.some((kind) => wanted.includes(kind)),
+  );
+  if (buttons.length === 0) return options.inverse(this);
+  return buttons.map((button) => options.fn(button)).join("");
+});
+
 // True when one of the newsletter's linked sources provides this content
 // type, so a design only shows a "Books" section (even an empty one) for a
 // newsletter that actually has a book source. Also true whenever there are
@@ -402,6 +422,7 @@ export async function renderMjmlTemplate(
     introText: context.introText,
     footerNote: context.footerNote,
     ctas: context.ctas ?? [],
+    sourceButtons: context.sourceButtons ?? [],
   });
 
   // A code design may be a bare fragment (just its section/column content,

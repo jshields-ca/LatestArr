@@ -205,6 +205,57 @@ describe("buildDesignMjml", () => {
     });
   });
 
+  describe("buttons", () => {
+    const ctas = [{ label: "Request something", url: "https://requests.example" }];
+    const sourceButtons = [
+      { label: "Watch on Plex", url: "https://plex.example", kinds: ["movie", "tv_episode", "tv_season"] },
+      { label: "Read on BookLore", url: "https://books.example", kinds: ["book"] },
+    ];
+    const context = {
+      ctas,
+      introText: "Hello there",
+      footerNote: "See you soon",
+      sourceButtons,
+      sourceLinksByContentType: { movie: "https://plex.example", book: "https://books.example" },
+    };
+    const order = (html: string, ...markers: string[]) => markers.map((marker) => html.indexOf(marker));
+    const ascending = (positions: number[]) => positions.every((pos, i) => pos > -1 && (i === 0 || pos > positions[i - 1]!));
+
+    it("puts your buttons after the intro, and a button per source after the items, by default", async () => {
+      const html = await render(DEFAULT_DESIGN_SETTINGS, context);
+      expect(ascending(order(html, "Hello there", "Request something", "A Movie", "A Book", "Watch on Plex", "See you soon"))).toBe(true);
+      expect(html).toContain('href="https://plex.example"');
+      expect(html).toContain("Read on BookLore");
+    });
+
+    it("can put your buttons above the intro or at the very end", async () => {
+      const before = await render(design({ content: { ctaPlacement: "beforeIntro" } }), context);
+      expect(ascending(order(before, "Weekly Digest", "Request something", "Hello there"))).toBe(true);
+      const end = await render(design({ content: { ctaPlacement: "end" } }), context);
+      expect(ascending(order(end, "Hello there", "A Book", "See you soon", "Request something"))).toBe(true);
+    });
+
+    it("puts each source's button under the sections it provides", async () => {
+      const html = await render(
+        design({ sections: { groupByType: true, order: ["movie", "book"] }, content: { sourceButtons: { placement: "sections" } } }),
+        context,
+      );
+      expect(ascending(order(html, ">Movies<", "A Movie", "Watch on Plex", ">Books<", "A Book", "Read on BookLore"))).toBe(true);
+    });
+
+    it("puts source buttons near the top, or leaves them out", async () => {
+      const top = await render(design({ content: { sourceButtons: { placement: "top" } } }), context);
+      expect(ascending(order(top, "Request something", "Watch on Plex", "A Movie"))).toBe(true);
+      const off = await render(design({ content: { sourceButtons: { enabled: false } } }), context);
+      expect(off).not.toContain("Watch on Plex");
+    });
+
+    it("renders no button markup when there are none", async () => {
+      const html = await render(DEFAULT_DESIGN_SETTINGS);
+      expect(html).not.toContain("Watch on");
+    });
+  });
+
   it("adds a Most watched section from the popular pool", async () => {
     const popular = item({ title: "Everyone Watched This" });
     const html = await render(design({ sections: { mostWatched: { enabled: true, count: 3 } } }), {

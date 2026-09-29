@@ -66,6 +66,16 @@ export const designSettingsSchema = z.object({
         .array(z.object({ label: z.string().trim().min(1).max(40), url: z.url({ protocol: /^https?$/ }) }))
         .max(4)
         .default([]),
+      // Where those buttons go: above or below the intro, or at the end.
+      ctaPlacement: z.enum(["beforeIntro", "afterIntro", "end"]).default("afterIntro"),
+      // "Watch on Plex"-style buttons for linked sources with a public URL:
+      // near the top, under each section (grouped designs), or after the items.
+      sourceButtons: z
+        .object({
+          enabled: z.boolean().default(true),
+          placement: z.enum(["top", "sections", "end"]).default("end"),
+        })
+        .prefault({}),
     })
     .prefault({}),
   customCss: z.string().max(10_000).default(""),
@@ -316,6 +326,27 @@ function heading(text: string, p: Palette, font: string): string {
   return `        <mj-text font-family="${font}" font-size="12px" font-weight="700" letter-spacing="1px" text-transform="uppercase" color="${p.accent}" padding-bottom="2px">${text}</mj-text>`;
 }
 
+// A button for the current {label, url}: filled in the accent for the
+// design's own buttons, outlined for "Watch on Plex"-style source buttons.
+function button(p: Palette, font: string, style: "primary" | "secondary"): string {
+  const colors =
+    style === "primary"
+      ? `background-color="${p.accent}"\n          color="#ffffff"`
+      : `background-color="${p.background}"\n          color="${p.accent}"\n          border="1px solid ${p.accent}"`;
+  return `        <mj-button
+          href="{{url}}"
+          ${colors}
+          font-family="${font}"
+          font-size="14px"
+          font-weight="600"
+          border-radius="8px"
+          inner-padding="${style === "primary" ? "10px 20px" : "9px 19px"}"
+          align="left"
+          padding-top="0"
+          padding-bottom="8px"
+        >{{label}}</mj-button>`;
+}
+
 function emptyMessage(p: Palette, font: string): string {
   return `        <mj-text font-family="${font}" font-size="14px" color="${p.muted}">Nothing new this time.</mj-text>`;
 }
@@ -386,7 +417,9 @@ function ungroupedItems(settings: DesignSettings, p: Palette, font: string): str
 
 function groupedItems(settings: DesignSettings, p: Palette, font: string): string {
   const { limit, empty, order, groupEpisodes } = settings.sections;
-  const blocks = orderedSections(order).map((section) => {
+  const { sourceButtons } = settings.content;
+  const perSection = sourceButtons.enabled && sourceButtons.placement === "sections";
+  const blocks =orderedSections(order).map((section) => {
     const contentType = section.kinds.join(",");
     const hash = [
       `contentType="${contentType}"`,
@@ -406,6 +439,9 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
       `        ${wrapSectionItems(settings, `{{#mediaList ${hash}}}\n${card}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,
       empty === "message" ? `        {{#ifAnyItems contentType="${contentType}"}}{{else}}\n${emptyMessage(p, font)}\n        {{/ifAnyItems}}` : "",
+      perSection
+        ? `        {{#sourceButtonsFor contentType="${contentType}"}}\n${button(p, font, "secondary")}\n        {{/sourceButtonsFor}}`
+        : "",
       `      </mj-column>`,
       `    </mj-section>`,
     ]
@@ -489,48 +525,73 @@ export function buildDesignMjml(settings: DesignSettings, options: { darkModeMar
   const items = settings.sections.groupByType ? groupedItems(settings, p, font) : ungroupedItems(settings, p, font);
   const mostWatched = mostWatchedSection(settings, p, font);
 
-  return `
-<mjml>${head}
-  <mj-body background-color="${p.page}">
-    <mj-section padding="12px 0"><mj-column><mj-spacer height="8px" /></mj-column></mj-section>
-    <mj-wrapper background-color="${p.background}" border-top="4px solid ${p.accent}" border-radius="14px" padding="12px 0 16px">
-    <mj-section padding="8px 0 4px">
-      <mj-column>
-        <mj-text font-family="${font}" font-size="26px" line-height="1.25" font-weight="700" color="${p.text}">{{newsletterName}}</mj-text>${summary}
-        {{#if introText}}
-        <mj-text font-family="${font}" font-size="15px" line-height="1.5" color="${p.text}" padding-top="8px">{{introText}}</mj-text>
-        {{/if}}
-      </mj-column>
-    </mj-section>
+  const { ctaPlacement, sourceButtons } = settings.content;
+  const ctas = `
     {{#if ctas.length}}
     <mj-section padding="0 0 8px">
       <mj-column>
         {{#each ctas}}
-        <mj-button
-          href="{{url}}"
-          background-color="${p.accent}"
-          color="#ffffff"
-          font-family="${font}"
-          font-size="14px"
-          font-weight="600"
-          border-radius="8px"
-          inner-padding="10px 20px"
-          align="left"
-          padding-top="0"
-          padding-bottom="8px"
-        >{{label}}</mj-button>
+${button(p, font, "primary")}
         {{/each}}
       </mj-column>
     </mj-section>
-    {{/if}}
-${items}${mostWatched ? `\n${mostWatched}` : ""}
+    {{/if}}`;
+  // Under each section needs sections; without them the buttons go after the items.
+  const sourcePlacement = !sourceButtons.enabled
+    ? null
+    : sourceButtons.placement === "sections" && !settings.sections.groupByType
+      ? "end"
+      : sourceButtons.placement;
+  const allSourceButtons = `
+    {{#if sourceButtons.length}}
+    <mj-section padding="4px 0 8px">
+      <mj-column>
+        {{#each sourceButtons}}
+${button(p, font, "secondary")}
+        {{/each}}
+      </mj-column>
+    </mj-section>
+    {{/if}}`;
+  const title = `
+        <mj-text font-family="${font}" font-size="26px" line-height="1.25" font-weight="700" color="${p.text}">{{newsletterName}}</mj-text>${summary}`;
+  const intro = `
+        <mj-text font-family="${font}" font-size="15px" line-height="1.5" color="${p.text}" padding-top="8px">{{introText}}</mj-text>`;
+  // Buttons above the intro sit between the heading and the intro, so the
+  // intro gets a section of its own.
+  const header =
+    ctaPlacement === "beforeIntro"
+      ? `
+    <mj-section padding="8px 0 4px">
+      <mj-column>${title}
+      </mj-column>
+    </mj-section>${ctas}
+    {{#if introText}}
+    <mj-section padding="0 0 4px">
+      <mj-column>${intro}
+      </mj-column>
+    </mj-section>
+    {{/if}}`
+      : `
+    <mj-section padding="8px 0 4px">
+      <mj-column>${title}
+        {{#if introText}}${intro}
+        {{/if}}
+      </mj-column>
+    </mj-section>${ctaPlacement === "afterIntro" ? ctas : ""}`;
+
+  return `
+<mjml>${head}
+  <mj-body background-color="${p.page}">
+    <mj-section padding="12px 0"><mj-column><mj-spacer height="8px" /></mj-column></mj-section>
+    <mj-wrapper background-color="${p.background}" border-top="4px solid ${p.accent}" border-radius="14px" padding="12px 0 16px">${header}${sourcePlacement === "top" ? allSourceButtons : ""}
+${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? allSourceButtons : ""}
     {{#if footerNote}}
     <mj-section padding="8px 0 0">
       <mj-column>
         <mj-text font-family="${font}" font-size="14px" line-height="1.5" color="${p.muted}">{{footerNote}}</mj-text>
       </mj-column>
     </mj-section>
-    {{/if}}
+    {{/if}}${ctaPlacement === "end" ? ctas.replace('padding="0 0 8px"', 'padding="12px 0 0"') : ""}
     </mj-wrapper>
     <mj-section padding="16px 0 28px">
       <mj-column>

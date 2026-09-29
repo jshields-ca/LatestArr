@@ -68,7 +68,7 @@ describe("migrateContentIntoDesigns", () => {
     expect(design!.settings).toEqual({
       ...DEFAULT_DESIGN_SETTINGS,
       font: "georgia",
-      content: { intro: "Hey folks!", footerNote: "Bye", ctas: buttons },
+      content: { ...DEFAULT_DESIGN_SETTINGS.content, intro: "Hey folks!", footerNote: "Bye", ctas: buttons },
     });
   });
 
