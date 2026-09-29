@@ -1,5 +1,83 @@
 # @latestarr/db
 
+## 0.11.0
+
+### Minor Changes
+
+- [#206](https://github.com/jshields-ca/LatestArr/pull/206) [`586a3b6`](https://github.com/jshields-ca/LatestArr/commit/586a3b686d504b0db46d5c34e6fecaa4d50a25b4) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Design how your newsletters look without drag-and-drop. The new **Designs** page (it replaces Templates) lets you pick colours, font, and layout (cards, compact list, or grid); choose which details each item shows; group items by type in your own order; decide what an empty section shows; add a "Most watched" section; and add custom CSS. A live preview updates as you change things, with sample content or any of your real newsletters. Existing newsletters look exactly as before: they use the Default design, which you can duplicate as a starting point.
+
+  **Fixed:** Buttons no longer need a separate "Save buttons" click. They now live in the design and save with everything else.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Part of [#199](https://github.com/jshields-ca/LatestArr/issues/199) (phases 1 and 2; phase 1's renderer shipped in [#205](https://github.com/jshields-ca/LatestArr/issues/205)) and closes [#197](https://github.com/jshields-ca/LatestArr/issues/197).
+
+  - Web: `pages/designs-page.tsx` (list, with the built-in Default shown first; create from Default, duplicate, delete) and `pages/design-editor-page.tsx` (settings in collapsible sections, with a sticky preview that re-renders 400 ms after the last change through `POST /templates/preview`, ignoring stale responses; unsaved-changes indicator and leave warning; explicit Save). Nav item and route `/designs`; `/templates` redirects there.
+  - Newsletter Content panel: `DesignPicker` replaces the Template picker (Default and your designs, with Edit linking to the design editor), saving with an inline `SaveStatus` instead of a toast. The intro, footer note, buttons, and font moved into the design in [#207](https://github.com/jshields-ca/LatestArr/issues/207).
+  - `lib/design.ts` mirrors the server's design settings shape and defaults (`withDesignDefaults` fills options missing from older saved designs).
+  - Server: the ungrouped compact and grid layouts line up with the title, like grouped sections; ungrouped cards stays flush so the Default design's recorded output is unchanged.
+
+  </details>
+
+- [#210](https://github.com/jshields-ca/LatestArr/pull/210) [`7159892`](https://github.com/jshields-ca/LatestArr/commit/71598927c31c910b27368e39e554984e95b3aa54) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** The old drag-and-drop template editor is gone, replaced by designs. Templates you built with it become code designs automatically. They send exactly as before, and you can now edit them in the code editor with a live preview. The web app is also much smaller: the drag-and-drop editor alone was a 2.3 MB download.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#199](https://github.com/jshields-ca/LatestArr/issues/199).
+
+  - Removed `grapesjs` and `grapesjs-mjml`, `apps/web/src/lib/grapesjs-*` and `pages/template-editor-page.tsx` (and their tests), and the `cdnjs.cloudflare.com` style and font CSP sources the editor's icon font needed. `/templates/:id/edit` redirects to `/designs/:id`.
+  - Migration `0007_retire_drag_and_drop` drops `templates.design_json` (the editor's own project state) and `templates.compiled_html` (never read). A template that was never saved from the editor has no markup and always sent with Default, so it becomes an options design with the default settings.
+  - `POST /templates` with only a name now creates an options design. `PATCH` changes `mode` only when it's given explicitly, so saving a code design's text and buttons can't turn it back into an options design.
+  - README, self-hosting guide, and CONTRIBUTING describe designs instead of drag-and-drop.
+
+  </details>
+
+- [#203](https://github.com/jshields-ca/LatestArr/pull/203) [`1760569`](https://github.com/jshields-ca/LatestArr/commit/1760569a54163bc88a565e9854e614f113a4f08f) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** A newsletter can skip its scheduled send when there's nothing new, so recipients don't get an empty email. It's on for newsletters you create from now on; existing newsletters keep sending as before until you turn it on under **Delivery**. Skipped sends show in History as "Skipped (nothing new)", and **Send now** always sends.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#194](https://github.com/jshields-ca/LatestArr/issues/194).
+
+  - `newsletters.skip_when_empty` (migration `0005_confused_penance.sql`, default `false` so existing rows are unchanged); `POST /newsletters` sets it to `true` unless given, and `PATCH` accepts it.
+  - New `skipped` send-run status (the column is TypeScript-enum text, so no migration). In `run-newsletter.ts`, after rendering, a scheduled or catch-up run with zero newly added items and the option on is marked `skipped` without storing HTML or emailing anyone, and logs `Skipped "…": nothing new in the last N days`. The skipped run keeps its `startedAt`, so missed-send catch-up treats it as handled rather than retrying. A custom template's empty-section fallback content doesn't count as "new". Manual Send now is never skipped.
+  - Web: a switch in the Details form's Delivery section, saved with **Save changes**; History and the Dashboard show "Skipped (nothing new)".
+
+  </details>
+
+- [#230](https://github.com/jshields-ca/LatestArr/pull/230) [`cb8fb8e`](https://github.com/jshields-ca/LatestArr/commit/cb8fb8e03b0d4a2e03772b9d193599ca8f7fdb0e) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** More than one person can manage LatestArr. The new **Users** page lets you add people with a temporary password, which they replace with their own the first time they sign in. You can also reset passwords, deactivate or reactivate accounts, and delete users. Everyone has full admin access for now. With SSO set up, add someone with the email their provider uses, and they can sign in with SSO straight away.
+
+  **Fixed:** Deactivating an account now signs it out immediately; before, an open session kept working until it expired. Sign-in email addresses are no longer case-sensitive.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#227](https://github.com/jshields-ca/LatestArr/issues/227).
+
+  - Server: `GET/POST /users` and `PATCH/DELETE /users/:id`, admin-only. Users can't deactivate or delete themselves, and a last-active-admin check is kept as a safeguard. Deleting a user clears `templates.createdBy` and keeps the design. Deactivating or resetting a password ends that user's sessions (`deleteUserSessions`). Changes are logged with who made them.
+  - Migration `0008_user_management` adds `users.must_change_password`, set on accounts created or reset by an admin. `PATCH /auth/me` clears it on a password change, refuses reusing the current password, and ends the user's other sessions.
+  - `getSessionUser` rejects sessions of deactivated users. Login matches email case-insensitively.
+  - OIDC links a new SSO identity to an existing active account with the same email when `email_verified` is true. It still never creates accounts once one exists.
+  - Web: a Users page (nav item, `/users`) with add, reset-password, deactivate, and delete; `ProtectedRoute` shows a "Choose a new password" screen while `mustChangePassword` is set. The self-hosting guide gains a Users section and notes on SSO linking.
+  - The `role` column already allows editor and viewer. Enforcing those roles is a follow-up.
+
+  </details>
+
+- [#208](https://github.com/jshields-ca/LatestArr/pull/208) [`fae90c9`](https://github.com/jshields-ca/LatestArr/commit/fae90c9d32ce0bd94b337c0f8c8fb21ddb2ed2f0) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** A newsletter's intro, footer note, buttons, and font are now part of its design, set in the design editor where the live preview shows them. The newsletter's settings keep to what goes out, when, and to whom. When you upgrade, each newsletter's existing text, buttons, and font move into a design automatically, so every email looks exactly as before. A newsletter on Default with any of those set gets its own copy of Default, named after it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#207](https://github.com/jshields-ca/LatestArr/issues/207) (part of [#199](https://github.com/jshields-ca/LatestArr/issues/199)).
+
+  - Design settings gain `content: { intro, footerNote, ctas }` (up to 4 buttons, http(s) links only). The pipeline passes them to every template as `{{introText}}`, `{{footerNote}}`, and `{{#each ctas}}`, so code templates keep working. The Default design no longer takes a per-newsletter font.
+  - `render/migrate-content-into-designs.ts` runs once at startup (flagged by the `migration.contentIntoDesigns` settings key). Newsletters sharing a design with different text get a copy each; newsletters with no text keep the original. The old `newsletters` columns stay unused for one release so you can roll back.
+  - The newsletter API no longer accepts `emailFont`, `introText`, `footerNote`, or `ctas`. The design editor gets a "Text and buttons" section; Save waits until every button is complete, and half-finished buttons are left out of the preview.
+
+  </details>
+
 ## 0.10.0
 
 ### Minor Changes
