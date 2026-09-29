@@ -1,0 +1,16 @@
+# Shown alongside the issue templates on "New issue", so questions and
+# ideas go to Discussions and security reports stay private.
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and help
+    url: https://github.com/jshields-ca/LatestArr/discussions/categories/q-a
+    about: Setting something up, or not sure it's a bug? Ask in Discussions.
+  - name: Ideas and feedback
+    url: https://github.com/jshields-ca/LatestArr/discussions/categories/ideas
+    about: Talk through a feature idea before it becomes a request.
+  - name: Documentation
+    url: https://www.latestarr.app/docs
+    about: Install, configure, and troubleshoot LatestArr.
+  - name: Report a security vulnerability
+    url: https://github.com/jshields-ca/LatestArr/security/advisories/new
+    about: Please report security problems privately, not as a public issue.

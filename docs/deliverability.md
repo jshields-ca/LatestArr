@@ -1,5 +1,7 @@
 # Email deliverability
 
+> This guide is also on the docs site: **[latestarr.app/docs/email-delivery/deliverability](https://www.latestarr.app/docs/email-delivery/deliverability)**.
+
 A digest newsletter that lands in spam is worse than useless — recipients stop trusting it and stop opening it even once it's fixed. This covers the two things that actually move the needle: sender authentication (SPF/DKIM/DMARC) and a few LatestArr-specific settings.
 
 ## Why authentication matters here specifically

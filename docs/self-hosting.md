@@ -1,6 +1,8 @@
 # Self-hosting LatestArr
 
-A full walkthrough from a fresh checkout to a first sent newsletter. If you just want the fastest path, the [README's Getting started](../README.md#getting-started) section is the short version of steps 1–3 below.
+> The full, up-to-date documentation is at **[latestarr.app/docs](https://www.latestarr.app/docs)**. This file is a single-page copy of the essentials that ships with the code.
+
+A full walkthrough from a fresh checkout to a first sent newsletter. If you just want the fastest path, the [README's Quick start](../README.md#quick-start) section is the short version of steps 1–3 below.
 
 ## 1. Prerequisites
 

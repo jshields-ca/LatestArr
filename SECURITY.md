@@ -25,10 +25,10 @@ makes sense.
 
 Instead, report it privately using one of these methods:
 
-1. **Preferred:** [GitHub Security Advisories](../../security/advisories/new) for
+1. **Preferred:** [GitHub Security Advisories](https://github.com/jshields-ca/LatestArr/security/advisories/new) for
    this repository — this lets us discuss and fix the issue privately before
    public disclosure.
-2. **Alternative:** email **jeremy.shields@gmail.com** with details.
+2. **Alternative:** email **jeremy@scootr.ca** with details.
 
 Please include:
 
