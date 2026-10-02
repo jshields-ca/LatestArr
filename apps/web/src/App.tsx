@@ -7,12 +7,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { DesignEditorPage } from "@/pages/design-editor-page";
 import { DesignsPage } from "@/pages/designs-page";
+import { ForgotPasswordPage } from "@/pages/forgot-password-page";
 import { LoginPage } from "@/pages/login-page";
 import { LogsPage } from "@/pages/logs-page";
 import { NotificationsPage } from "@/pages/notifications-page";
 import { NewslettersPage } from "@/pages/newsletters-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { RecipientsPage } from "@/pages/recipients-page";
+import { ResetPasswordPage } from "@/pages/reset-password-page";
 import { SetupPage } from "@/pages/setup-page";
 import { SmtpProfilesPage } from "@/pages/smtp-profiles-page";
 import { SourcesPage } from "@/pages/sources-page";
@@ -31,6 +33,8 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/setup" element={<SetupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/*"
           element={

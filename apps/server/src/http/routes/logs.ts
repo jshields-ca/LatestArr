@@ -1,6 +1,7 @@
 import type { Db } from "@latestarr/db";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { recentAuditEvents } from "../../audit.js";
 import { getRecentLogs } from "../../log-buffer.js";
 import { requireAuth } from "../require-auth.js";
 
@@ -29,7 +30,10 @@ export function registerLogRoutes(app: FastifyInstance, db: Db): void {
       const { limit, level } = parsed.data;
       const minLevel = level ? LEVEL_VALUES[level] : undefined;
 
-      const entries = getRecentLogs(500)
+      // The server's own recent lines, plus security events recorded by the
+      // recovery command (which runs as a separate process), newest first.
+      const entries = [...getRecentLogs(500), ...recentAuditEvents(db, 100)]
+        .sort((a, b) => b.time - a.time)
         .filter((entry) => minLevel === undefined || entry.level >= minLevel)
         .slice(0, limit ?? 200)
         .map((entry) => ({ ...entry, levelLabel: LEVEL_NAMES[entry.level] ?? "info" }));

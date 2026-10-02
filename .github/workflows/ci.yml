@@ -148,6 +148,23 @@ jobs:
             echo "The database is owned by $data_owner, expected node"; exit 1;
           fi
 
+          echo "Checking the recovery command, run as root like a plain docker exec..."
+          curl -sf -X POST http://localhost:3000/api/auth/bootstrap -H "Content-Type: application/json" \
+            -d '{"email":"admin@example.com","password":"a-smoke-test-password","displayName":"Admin"}' > /dev/null
+          docker exec latestarr-smoke node dist/cli.js list-admins | grep -q "admin@example.com" \
+            || { echo "list-admins didn't list the admin"; exit 1; }
+          temp_password="$(docker exec latestarr-smoke node dist/cli.js reset-password --email admin@example.com | sed -n 's/^  \(.*\)$/\1/p')"
+          [ -n "$temp_password" ] || { echo "reset-password didn't print a temporary password"; exit 1; }
+          login_status="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/auth/login \
+            -H "Content-Type: application/json" -d "{\"email\":\"admin@example.com\",\"password\":\"$temp_password\"}")"
+          if [ "$login_status" != "200" ]; then
+            echo "Signing in with the temporary password returned $login_status"; docker logs latestarr-smoke; exit 1;
+          fi
+          root_files="$(docker exec latestarr-smoke find /app/data -user root)"
+          if [ -n "$root_files" ]; then
+            echo "The recovery command left root-owned files the server can't write: $root_files"; exit 1;
+          fi
+
           echo "All smoke checks passed"
 
       - name: Stop smoke test container

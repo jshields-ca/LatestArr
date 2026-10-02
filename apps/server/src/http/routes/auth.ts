@@ -4,6 +4,14 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { hashPassword, verifyDummyPassword, verifyPassword } from "../../auth/password.js";
 import {
+  clearResetTokens,
+  consumeResetToken,
+  createResetToken,
+  recentlySent,
+  resetLinkOrigin,
+  sendResetEmail,
+} from "../../auth/password-reset.js";
+import {
   createSession,
   deleteSession,
   deleteUserSessions,
@@ -47,6 +55,23 @@ const updateMeSchema = z.object({
     .optional(),
 });
 
+const resetRequestSchema = z.object({
+  email: z.email("Enter your email address"),
+});
+
+const resetConfirmSchema = z.object({
+  token: z.string().min(1, "This reset link isn't complete. Open it from the email again."),
+  newPassword: z
+    .string()
+    .min(MIN_PASSWORD_LENGTH, `The password must be at least ${MIN_PASSWORD_LENGTH} characters`),
+});
+
+// The same answer whether or not the account exists, so the form can't be
+// used to find out who has one.
+const RESET_REQUESTED = {
+  message: "If that email belongs to an account that can use a reset link, we've sent one. It works for 30 minutes.",
+};
+
 export interface AuthRouteOptions {
   oidcEnabled: boolean;
 }
@@ -56,14 +81,80 @@ export function registerAuthRoutes(
   db: Db,
   options: AuthRouteOptions = { oidcEnabled: false },
 ): void {
-  app.get("/auth/providers", async (_request, reply) => {
+  app.get("/auth/providers", async (request, reply) => {
     const existing = await db.select({ id: users.id }).from(users).limit(1);
     return reply.send({
       local: true,
       oidc: options.oidcEnabled,
       needsSetup: existing.length === 0,
+      // Whether "Forgot password?" can email a link from here.
+      passwordReset: "origin" in resetLinkOrigin(db, request.host),
     });
   });
+
+  // Emails a reset link when the account exists, is active, has a password,
+  // and wasn't sent one in the last couple of minutes. The reply never says
+  // which, and the email is sent after replying, so timing doesn't either.
+  app.post(
+    "/auth/password-reset/request",
+    { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } },
+    async (request, reply) => {
+      const body = parseBody(resetRequestSchema, request.body, reply);
+      if (!body) return reply;
+      const email = body.email.trim().toLowerCase();
+
+      const link = resetLinkOrigin(db, request.host);
+      if (!("origin" in link)) {
+        const why =
+          link.unavailable === "no_system_mail"
+            ? "no SMTP profile is chosen for system email"
+            : `WEB_ORIGIN (${process.env.WEB_ORIGIN ?? "not set"}) doesn't match the address it was asked from (${request.host}), so the link would be broken`;
+        request.log.warn({ ip: request.ip }, `Didn't send a password reset link for ${email}: ${why}`);
+        return reply.code(202).send(RESET_REQUESTED);
+      }
+
+      const [user] = await db.select().from(users).where(eq(sql`lower(${users.email})`, email));
+      if (!user || !user.isActive || !user.passwordHash) {
+        request.log.info({ ip: request.ip }, `Password reset asked for ${email}, which has no account that can use one`);
+        return reply.code(202).send(RESET_REQUESTED);
+      }
+      if (recentlySent(db, user.id)) {
+        request.log.info({ ip: request.ip, userId: user.id }, `Password reset asked again for ${email}; a link was sent moments ago`);
+        return reply.code(202).send(RESET_REQUESTED);
+      }
+
+      const token = createResetToken(db, user.id);
+      request.log.info({ ip: request.ip, userId: user.id }, `Password reset asked for ${email}`);
+      void sendResetEmail(db, user, token, link.origin, request.log);
+      return reply.code(202).send(RESET_REQUESTED);
+    },
+  );
+
+  // Sets a new password from a reset link, signs the account out everywhere,
+  // and leaves signing in to the person (with the new password).
+  app.post(
+    "/auth/password-reset/confirm",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const body = parseBody(resetConfirmSchema, request.body, reply);
+      if (!body) return reply;
+      const passwordHash = await hashPassword(body.newPassword);
+      const userId = consumeResetToken(db, body.token);
+      const [user] = userId ? await db.select().from(users).where(eq(users.id, userId)) : [];
+      if (!user || !user.isActive || !user.passwordHash) {
+        request.log.warn({ ip: request.ip }, "A password reset link was used that had expired or was already used");
+        return reply.code(400).send({ error: "This reset link has expired or was already used. Ask for a new one." });
+      }
+      await db
+        .update(users)
+        .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
+        .where(eq(users.id, user.id));
+      await deleteUserSessions(db, user.id);
+      clearResetTokens(db, user.id);
+      request.log.info({ ip: request.ip, userId: user.id }, `${user.email} reset their password with an email link`);
+      return reply.code(204).send();
+    },
+  );
 
   app.post(
     "/auth/bootstrap",
@@ -223,8 +314,11 @@ export function registerAuthRoutes(
 
     const [updated] = await db.update(users).set(updates).where(eq(users.id, currentUser.id)).returning();
     // A new password signs out every other session, e.g. one opened with a
-    // temporary password.
-    if (updates.passwordHash) await deleteUserSessions(db, currentUser.id, token);
+    // temporary password, and cancels any reset link.
+    if (updates.passwordHash) {
+      await deleteUserSessions(db, currentUser.id, token);
+      clearResetTokens(db, currentUser.id);
+    }
     const changed = [updates.displayName !== undefined && "display name", updates.passwordHash && "password"].filter(Boolean);
     request.log.info({ userId: currentUser.id }, `${currentUser.email} changed their ${changed.join(" and ")}`);
 

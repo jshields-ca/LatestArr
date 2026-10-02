@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Loader2, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { KeyRound, Loader2, Pencil, Plus, Send, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListRow } from "@/components/list-row";
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
+import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,11 +27,14 @@ import {
   ApiError,
   createSmtpProfile,
   deleteSmtpProfile,
+  getSystemMail,
   listSmtpProfiles,
+  saveSystemMail,
   sendTestEmail,
   testSmtpProfile,
   updateSmtpProfile,
   type SmtpProfile,
+  type SystemMailSettings,
 } from "@/lib/api";
 
 // Port 465 is "implicit TLS" (the socket is wrapped in TLS before any SMTP
@@ -675,6 +679,91 @@ function SmtpProfileRow({
   );
 }
 
+function resetLinksStatus(settings: SystemMailSettings): string {
+  if (settings.resetLinks.available) {
+    return "People can reset a forgotten password with an emailed link, from the sign-in page.";
+  }
+  switch (settings.resetLinks.reason) {
+    case "no_system_mail":
+      return "Choose a profile to let people reset a forgotten password with an emailed link.";
+    case "no_web_origin":
+      return "Reset links are off: set WEB_ORIGIN to the address people use to reach LatestArr, then restart it.";
+    case "origin_mismatch":
+      return `Reset links are off: WEB_ORIGIN is ${settings.webOrigin ?? "not set"}, but you're using ${window.location.origin}, so the links would be broken. Set WEB_ORIGIN to the address people use, then restart LatestArr.`;
+  }
+}
+
+// The profile LatestArr sends its own email through: password reset links.
+function SystemEmailCard({ profiles }: { profiles: SmtpProfile[] }) {
+  const [settings, setSettings] = useState<SystemMailSettings | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSystemMail()
+      .then(setSettings)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Couldn't load the system email setting."));
+  }, [profiles]);
+
+  async function choose(smtpProfileId: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await saveSystemMail(smtpProfileId || null);
+      setSettings(saved);
+      toast({ variant: "success", title: smtpProfileId ? "System email turned on" : "System email turned off" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save the system email setting.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start gap-3 space-y-0">
+        <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <CardTitle className="text-base">System email</CardTitle>
+          <CardDescription>The profile LatestArr uses for its own email, like password reset links.</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Label htmlFor="system-mail-profile" className="sr-only">
+            System email profile
+          </Label>
+          <Select
+            id="system-mail-profile"
+            className="w-64"
+            value={settings?.smtpProfileId ?? ""}
+            disabled={!settings || saving}
+            onChange={(e) => void choose(e.target.value)}
+          >
+            <option value="">Off</option>
+            {profiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </Select>
+          {saving ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Saving" /> : null}
+        </div>
+        {settings ? (
+          <p className={settings.resetLinks.available ? "text-sm text-muted-foreground" : "text-sm text-amber-800 dark:text-amber-400"}>
+            {resetLinksStatus(settings)}
+          </p>
+        ) : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SmtpProfilesPage() {
   const [profiles, setProfiles] = useState<SmtpProfile[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -718,6 +807,8 @@ export function SmtpProfilesPage() {
           </CardHeader>
         </Card>
       ) : null}
+
+      {profiles && profiles.length > 0 ? <SystemEmailCard profiles={profiles} /> : null}
 
       {profiles && profiles.length > 0 ? (
         <div className="flex flex-col gap-3">

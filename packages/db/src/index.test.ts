@@ -45,10 +45,12 @@ describe("migrations", () => {
 
     expect(tableNames).toEqual(
       [
+        "audit_events",
         "newsletter_recipient_groups",
         "newsletter_sources",
         "newsletters",
         "oidc_identities",
+        "password_reset_tokens",
         "recipient_group_members",
         "recipient_groups",
         "recipients",

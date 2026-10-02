@@ -25,6 +25,7 @@ import { registerRecipientGroupRoutes } from "./http/routes/recipient-groups.js"
 import { registerRecipientRoutes } from "./http/routes/recipients.js";
 import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
+import { registerSystemMailRoutes } from "./http/routes/system-mail.js";
 import { registerTemplateRoutes } from "./http/routes/templates.js";
 import { registerUserRoutes } from "./http/routes/users.js";
 import { logger } from "./logger.js";
@@ -176,6 +177,7 @@ export async function buildApp(
       registerUserRoutes(api, db);
       registerLogRoutes(api, db);
       registerNotificationRoutes(api, db);
+      registerSystemMailRoutes(api, db);
     },
     { prefix: "/api" },
   );

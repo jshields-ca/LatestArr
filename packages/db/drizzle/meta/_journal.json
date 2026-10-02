@@ -64,6 +64,13 @@
       "when": 1790628630912,
       "tag": "0008_user_management",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790959149050,
+      "tag": "0009_password_recovery",
+      "breakpoints": true
     }
   ]
 }
