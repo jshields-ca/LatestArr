@@ -121,6 +121,15 @@ To contribute code, see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the dev setup, 
 
 If you'd like to support development, [GitHub Sponsors](https://github.com/sponsors/jshields-ca) is open, and a star on the repo helps others find it.
 
+## Star history
+
+<a href="https://star-history.com/#jshields-ca/LatestArr&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=jshields-ca/LatestArr&type=Date&theme=dark" />
+    <img alt="LatestArr's GitHub stars over time" src="https://api.star-history.com/svg?repos=jshields-ca/LatestArr&type=Date" />
+  </picture>
+</a>
+
 ## License
 
 LatestArr is licensed under the [GNU General Public License v3.0](LICENSE). It's a copyleft license: if you distribute a modified version of LatestArr (including as a fork, or a hosted service that distributes the code), your version must also be licensed under GPLv3 with its source available. Third-party dependencies under permissive licenses (such as MIT) are used as libraries and don't change that for LatestArr's own code.
