@@ -23,6 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { ApiError, getVersion, updateCurrentUser } from "@/lib/api";
 import { navItems } from "@/lib/nav-items";
+import { hasRole, ROLE_LABELS } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const REPO_URL = "https://github.com/jshields-ca/LatestArr";
@@ -325,6 +326,11 @@ function UserSummary() {
         <p className="truncate text-xs text-muted-foreground" title={user?.email || undefined}>
           {user?.email}
         </p>
+        {/* Editors and viewers see their role, so missing pages and
+            buttons make sense. */}
+        {user && user.role !== "admin" ? (
+          <p className="text-xs text-muted-foreground">{ROLE_LABELS[user.role]} access</p>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <EditProfileDialog />
@@ -348,9 +354,12 @@ function UserSummary() {
 // real grouping emerges as the nav grows, add a `group` field there and
 // section this list by it.
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
+  const { user } = useAuth();
+  // Pages someone can't use aren't listed (the server refuses them anyway).
+  const items = navItems.filter((item) => hasRole(user?.role, item.minRole));
   return (
     <nav className="flex flex-col gap-1" aria-label="Main navigation">
-      {navItems.map(({ to, label, icon: Icon }) => (
+      {items.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 
 import { type AuthUser, getCurrentUser, login as apiLogin, logout as apiLogout } from "@/lib/api";
+import { hasRole, type Role } from "@/lib/roles";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -58,6 +59,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 // prefilled email) and should still render without an AuthProvider.
 export function useOptionalAuth() {
   return useContext(AuthContext);
+}
+
+/**
+ * Whether the signed-in user has at least `role`, for hiding what they
+ * can't use. Outside an AuthProvider (a page rendered on its own in a
+ * test) everything shows; the server is what enforces roles.
+ */
+export function useHasRole(role: Role): boolean {
+  const context = useContext(AuthContext);
+  if (!context) return true;
+  return hasRole(context.user?.role, role);
 }
 
 export function useAuth() {

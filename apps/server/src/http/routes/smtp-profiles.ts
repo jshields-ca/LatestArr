@@ -50,7 +50,7 @@ interface IdParams {
 
 export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "editor", write: "admin" }));
 
     scope.post("/smtp-profiles", async (request, reply) => {
       const body = parseBody(createSmtpProfileSchema, request.body, reply);

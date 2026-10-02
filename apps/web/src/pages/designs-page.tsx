@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Copy, Loader2, Pencil, Plus } from "lucide-react";
+import { Copy, Eye, Loader2, Pencil, Plus } from "lucide-react";
 
+import { useHasRole } from "@/components/auth-provider";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,8 @@ function ColorSwatches({ settings }: { settings: DesignSettings }) {
 
 export function DesignsPage() {
   const navigate = useNavigate();
+  // Viewers can open and preview designs, but not add, copy, or delete them.
+  const canEdit = useHasRole("editor");
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
@@ -172,7 +175,7 @@ export function DesignsPage() {
       <PageHeader
         title="Designs"
         description="How your newsletters look and read: colours, font, layout, the intro and buttons, and how items are grouped. Newsletters use the Default design until you pick another."
-        actions={templates ? <NewDesignDialog /> : null}
+        actions={templates && canEdit ? <NewDesignDialog /> : null}
       />
 
       {loadError ? (
@@ -200,16 +203,18 @@ export function DesignsPage() {
             }
             secondary={<p className="text-sm text-muted-foreground">Used by any newsletter without its own design.</p>}
             actions={
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={duplicating !== null}
-                onClick={() => void duplicate("default", "My design", DEFAULT_DESIGN_SETTINGS)}
-                aria-label="Duplicate Default"
-              >
-                {duplicating === "default" ? <Loader2 className="animate-spin" /> : <Copy />}
-                Duplicate
-              </Button>
+              !canEdit ? null : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={duplicating !== null}
+                  onClick={() => void duplicate("default", "My design", DEFAULT_DESIGN_SETTINGS)}
+                  aria-label="Duplicate Default"
+                >
+                  {duplicating === "default" ? <Loader2 className="animate-spin" /> : <Copy />}
+                  Duplicate
+                </Button>
+              )
             }
           />
           {designs.map((template) => {
@@ -233,30 +238,37 @@ export function DesignsPage() {
                 actions={
                   <>
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={`/designs/${template.id}`} aria-label={`Edit ${template.name}`}>
-                        <Pencil />
-                        Edit
+                      <Link
+                        to={`/designs/${template.id}`}
+                        aria-label={`${canEdit ? "Edit" : "View"} ${template.name}`}
+                      >
+                        {canEdit ? <Pencil /> : <Eye />}
+                        {canEdit ? "Edit" : "View"}
                       </Link>
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={duplicating !== null}
-                      onClick={() => void duplicate(template.id, `${template.name} (copy)`, settings, template)}
-                      aria-label={`Duplicate ${template.name}`}
-                    >
-                      {duplicating === template.id ? <Loader2 className="animate-spin" /> : <Copy />}
-                      Duplicate
-                    </Button>
-                    <ConfirmDeleteButton
-                      label={`Delete ${template.name}`}
-                      onConfirm={() => remove(template)}
-                      prompt={
-                        usedBy.length > 0
-                          ? `Delete? ${usedBy.length === 1 ? "Its newsletter" : `Its ${usedBy.length} newsletters`} will use Default.`
-                          : undefined
-                      }
-                    />
+                    {!canEdit ? null : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={duplicating !== null}
+                          onClick={() => void duplicate(template.id, `${template.name} (copy)`, settings, template)}
+                          aria-label={`Duplicate ${template.name}`}
+                        >
+                          {duplicating === template.id ? <Loader2 className="animate-spin" /> : <Copy />}
+                          Duplicate
+                        </Button>
+                        <ConfirmDeleteButton
+                          label={`Delete ${template.name}`}
+                          onConfirm={() => remove(template)}
+                          prompt={
+                            usedBy.length > 0
+                              ? `Delete? ${usedBy.length === 1 ? "Its newsletter" : `Its ${usedBy.length} newsletters`} will use Default.`
+                              : undefined
+                          }
+                      />
+                    </>
+                    )}
                   </>
                 }
               />

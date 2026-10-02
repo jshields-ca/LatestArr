@@ -52,7 +52,7 @@ docker run -d \
 
 ## 4. First run
 
-Visit `http://localhost:3000` (or wherever you've exposed it). The first thing you'll see is an admin account creation form — this only appears when the database has zero users, and the endpoint that creates it refuses once one exists, so it can't be used to create a second admin later (add more users the normal way, once that's supported, or share the one admin account for now).
+Visit `http://localhost:3000` (or wherever you've exposed it). The first thing you'll see is an admin account creation form — this only appears when the database has zero users, and the endpoint that creates it refuses once one exists, so it can't be used to create a second admin later. Add more people from the **Users** page instead.
 
 After creating the admin account and logging in, the dashboard shows a setup checklist:
 
@@ -115,14 +115,23 @@ SSO never creates accounts by itself after the first one. To let someone in with
 
 ## Users
 
-Everyone who can sign in is listed under **Users**, and every user has full admin access; separate roles are planned. From there you can:
+Everyone who can sign in is listed under **Users**, with their role. Only admins can open the page.
 
-- **Add a user** with a temporary password you share with them yourself. They choose their own password the first time they sign in. Leave the password blank for someone who will only use SSO.
+| Role | Can |
+| --- | --- |
+| **Viewer** | See newsletters, designs, previews, and send history (without recipients' email addresses), and which sources are connected. Can't change anything. |
+| **Editor** | Everything a viewer can, plus create, edit, and delete newsletters and designs, send newsletters and tests, and manage recipients and groups. |
+| **Admin** | Everything, including sources, SMTP profiles, notifications, users, and the Logs page. |
+
+Pages and buttons someone's role doesn't allow are hidden, and the server refuses those requests as well. From the Users page you can:
+
+- **Add a user** with a role and a temporary password you share with them yourself. They choose their own password the first time they sign in. Leave the password blank for someone who will only use SSO. New users are viewers unless you choose otherwise.
+- **Change someone's role.** It takes effect on their next click; they don't need to sign in again.
 - **Reset a password** to a new temporary one. This signs them out everywhere.
 - **Deactivate** someone to sign them out at once and stop them signing in, or **reactivate** them later.
 - **Delete** a user. Designs they created are kept.
 
-You can't deactivate or delete your own account, so there's always at least one admin who can sign in. Change your own name or password from the pencil button in the header.
+You can't deactivate, delete, or change the role of your own account, and the last active admin can't be removed, so there's always at least one admin who can sign in. Change your own name or password from the pencil button in the header.
 
 ## Logs
 

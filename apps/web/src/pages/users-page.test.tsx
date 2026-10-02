@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { selectOption } from "@/test/select";
+
 import { UsersPage } from "./users-page";
 
 vi.mock("@/components/auth-provider", () => ({
@@ -74,6 +76,10 @@ describe("UsersPage", () => {
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("Name"), "Riley");
     await user.type(within(dialog).getByLabelText("Email"), "riley@example.com");
+    // New people are viewers unless you choose more.
+    expect(within(dialog).getByLabelText("Role")).toHaveTextContent("Viewer");
+    selectOption(within(dialog).getByLabelText("Role"), "Editor");
+    expect(within(dialog).getByText(/Also manages newsletters/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Add user" }));
     expect(within(dialog).getByRole("alert")).toHaveTextContent("Set a temporary password");
 
@@ -84,6 +90,7 @@ describe("UsersPage", () => {
       email: "riley@example.com",
       displayName: "Riley",
       password: "a-temporary-password",
+      role: "editor",
     });
     expect(await screen.findByText("Riley")).toBeInTheDocument();
   });
@@ -102,6 +109,16 @@ describe("UsersPage", () => {
     await user.type(within(dialog).getByLabelText("Temporary password"), "another-temporary-1");
     await user.click(within(dialog).getByRole("button", { name: "Reset password" }));
     await waitFor(() => expect(calls.filter((c) => c.method === "PATCH").at(-1)?.body).toEqual({ password: "another-temporary-1" }));
+  });
+
+  it("changes someone else's role, but not your own", async () => {
+    render(<UsersPage />);
+    await screen.findByText("Sam");
+    // Your own role shows as a badge, not a picker.
+    expect(screen.queryByRole("combobox", { name: "Role for Admin" })).not.toBeInTheDocument();
+    selectOption(screen.getByRole("combobox", { name: "Role for Sam" }), "Viewer");
+    await waitFor(() => expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ role: "viewer" }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Role for Sam" })).toHaveTextContent("Viewer"));
   });
 
   it("has no accessibility violations", async () => {

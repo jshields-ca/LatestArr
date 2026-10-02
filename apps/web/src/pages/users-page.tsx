@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
+import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
@@ -28,6 +29,7 @@ import {
   updateUser,
   type ManagedUser,
 } from "@/lib/api";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type Role } from "@/lib/roles";
 
 const MIN_PASSWORD_LENGTH = 12;
 
@@ -40,11 +42,33 @@ function lastSignIn(user: ManagedUser): string {
   return `Last signed in ${new Date(user.lastLoginAt).toLocaleDateString(undefined, { dateStyle: "medium" })}`;
 }
 
+function isRole(value: string): value is Role {
+  return (ROLES as readonly string[]).includes(value);
+}
+
+function RoleField({ id, value, onChange }: { id: string; value: Role; onChange: (role: Role) => void }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>Role</Label>
+      <Select id={id} value={value} onChange={(e) => isRole(e.target.value) && onChange(e.target.value)}>
+        {ROLES.map((role) => (
+          <option key={role} value={role}>
+            {ROLE_LABELS[role]}
+          </option>
+        ))}
+      </Select>
+      <p className="text-xs text-muted-foreground">{ROLE_DESCRIPTIONS[value]}</p>
+    </div>
+  );
+}
+
 function AddUserDialog({ ssoEnabled, onAdded }: { ssoEnabled: boolean; onAdded: (user: ManagedUser) => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // The least access unless the admin chooses more, like the server.
+  const [role, setRole] = useState<Role>("viewer");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +78,7 @@ function AddUserDialog({ ssoEnabled, onAdded }: { ssoEnabled: boolean; onAdded: 
       setName("");
       setEmail("");
       setPassword("");
+      setRole("viewer");
       setError(null);
     }
   }
@@ -71,7 +96,7 @@ function AddUserDialog({ ssoEnabled, onAdded }: { ssoEnabled: boolean; onAdded: 
     }
     setSaving(true);
     try {
-      const { user } = await createUser({ email, displayName: name, password: password || undefined });
+      const { user } = await createUser({ email, displayName: name, password: password || undefined, role });
       onAdded(user);
       toast({ variant: "success", title: "User added", description: user.email });
       setOpen(false);
@@ -93,7 +118,7 @@ function AddUserDialog({ ssoEnabled, onAdded }: { ssoEnabled: boolean; onAdded: 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a user</DialogTitle>
-          <DialogDescription>They&apos;ll have full admin access, the same as you.</DialogDescription>
+          <DialogDescription>Choose what they can do. You can change it later.</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <div className="flex flex-col gap-1.5">
@@ -104,6 +129,7 @@ function AddUserDialog({ ssoEnabled, onAdded }: { ssoEnabled: boolean; onAdded: 
             <Label htmlFor="user-email">Email</Label>
             <Input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
+          <RoleField id="user-role" value={role} onChange={setRole} />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="user-password">Temporary password{ssoEnabled ? " (optional)" : ""}</Label>
             <Input
@@ -232,6 +258,19 @@ export function UsersPage() {
     setUsers((prev) => (prev ?? []).map((u) => (u.id === updated.id ? updated : u)));
   }
 
+  async function setRole(user: ManagedUser, role: Role) {
+    setBusy(user.id);
+    try {
+      const { user: updated } = await updateUser(user.id, { role });
+      replace(updated);
+      toast({ variant: "success", title: "Role changed", description: `${updated.displayName}: ${ROLE_LABELS[role]}` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Couldn't change the role", description: errorMessage(err, "") || undefined });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function setActive(user: ManagedUser, isActive: boolean) {
     setBusy(user.id);
     try {
@@ -261,7 +300,7 @@ export function UsersPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Users"
-        description="Everyone who can sign in to LatestArr. Each user has full admin access."
+        description="Everyone who can sign in to LatestArr, and what they can do."
         actions={users ? <AddUserDialog ssoEnabled={ssoEnabled} onAdded={(u) => setUsers((prev) => [...(prev ?? []), u])} /> : null}
       />
 
@@ -289,6 +328,8 @@ export function UsersPage() {
                   <>
                     <p className="truncate font-medium">{user.displayName}</p>
                     {isMe ? <Badge variant="neutral">You</Badge> : null}
+                    {/* Your own role is fixed here; another admin changes it. */}
+                    {isMe && isRole(user.role) ? <Badge variant="accent">{ROLE_LABELS[user.role]}</Badge> : null}
                     {!user.isActive ? <Badge variant="destructive">Deactivated</Badge> : null}
                     {user.mustChangePassword ? <Badge variant="neutral">Temporary password</Badge> : null}
                     {user.ssoLinked ? <Badge variant="neutral">SSO</Badge> : null}
@@ -302,6 +343,19 @@ export function UsersPage() {
                 actions={
                   isMe ? null : (
                     <>
+                      <Select
+                        className="h-8 w-28"
+                        aria-label={`Role for ${user.displayName}`}
+                        value={user.role}
+                        disabled={busy === user.id}
+                        onChange={(e) => isRole(e.target.value) && void setRole(user, e.target.value)}
+                      >
+                        {ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {ROLE_LABELS[role]}
+                          </option>
+                        ))}
+                      </Select>
                       <ResetPasswordDialog user={user} onSaved={replace} />
                       <Button
                         variant="outline"
@@ -324,7 +378,9 @@ export function UsersPage() {
       ) : null}
 
       <p className="text-sm text-muted-foreground">
-        Change your own name or password from the pencil button at the top of the page.
+        Change your own name or password from the pencil button at the top of the page. Viewers see newsletters,
+        designs, and send history. Editors also manage newsletters, designs, and recipients, and can send. Admins can
+        do everything, including sources, SMTP, notifications, users, and logs.
       </p>
     </div>
   );

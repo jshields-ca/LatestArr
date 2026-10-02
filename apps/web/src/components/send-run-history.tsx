@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, Clock, ExternalLink, Loader2, TriangleAlert, XCircle } from "lucide-react";
 
+import { useHasRole } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,14 +73,17 @@ function recipientStatusVariant(
 // was included, a link to the actual rendered copy) is only worth the
 // extra request when someone asks to see it.
 function SendRunDetails({ run }: { run: SendRun }) {
+  // Recipients' email addresses are for editors and admins.
+  const showRecipients = useHasRole("editor");
   const [recipients, setRecipients] = useState<SendRunRecipientResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!showRecipients) return;
     listSendRunRecipients(run.newsletterId, run.id)
       .then(({ recipients: loaded }) => setRecipients(loaded))
       .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load recipients."));
-  }, [run.newsletterId, run.id]);
+  }, [run.newsletterId, run.id, showRecipients]);
 
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-3">
@@ -98,35 +102,37 @@ function SendRunDetails({ run }: { run: SendRun }) {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Recipients
-        </span>
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : recipients === null ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Loading recipients...
-          </div>
-        ) : recipients.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No recipients recorded for this send.</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {recipients.map((recipient) => (
-              <li
-                key={recipient.recipientId}
-                className="flex flex-wrap items-center justify-between gap-2 text-sm"
-              >
-                <span className="truncate">{recipient.displayName || recipient.email}</span>
-                <Badge variant={recipientStatusVariant(recipient.status)}>{recipient.status}</Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {showRecipients ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Recipients
+          </span>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : recipients === null ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading recipients...
+            </div>
+          ) : recipients.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recipients recorded for this send.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {recipients.map((recipient) => (
+                <li
+                  key={recipient.recipientId}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                  <span className="truncate">{recipient.displayName || recipient.email}</span>
+                  <Badge variant={recipientStatusVariant(recipient.status)}>{recipient.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       <a
         href={sendRunHtmlUrl(run.newsletterId, run.id)}

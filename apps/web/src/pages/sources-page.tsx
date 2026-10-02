@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { useHasRole } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -845,6 +846,7 @@ function SourceRow({
   onChanged,
   onDeleted,
   onStatusChange,
+  canManage,
 }: {
   source: SourceConnection;
   groups: RecipientGroup[];
@@ -852,6 +854,8 @@ function SourceRow({
   onChanged: (source: SourceConnection) => void;
   onDeleted: (id: string) => void;
   onStatusChange: (id: string, status: SourceConnection["status"], lastError: string | null) => void;
+  /** Admins only: test, import users, edit, and delete. */
+  canManage: boolean;
 }) {
   const [state, setState] = useState<RowState>({
     testing: false,
@@ -925,7 +929,7 @@ function SourceRow({
         </>
       }
       actions={
-        state.confirmingDelete ? (
+        !canManage ? null : state.confirmingDelete ? (
           <>
             <span className="text-sm text-muted-foreground">Delete this source?</span>
             <Button
@@ -972,6 +976,7 @@ function SourceRow({
 }
 
 export function SourcesPage() {
+  const isAdmin = useHasRole("admin");
   const [sources, setSources] = useState<SourceConnection[] | null>(null);
   const [kinds, setKinds] = useState<string[]>(FALLBACK_KINDS);
   const [groups, setGroups] = useState<RecipientGroup[]>([]);
@@ -991,19 +996,26 @@ export function SourcesPage() {
       .catch(() => undefined);
     // Only needed for ImportSourceUsersDialog's "reuse an existing group"
     // check — a failure here just means every import creates a fresh
-    // group instead of reusing one, not worth its own error state.
-    listGroups()
-      .then(({ groups: loaded }) => setGroups(loaded))
-      .catch(() => undefined);
-  }, []);
+    // group instead of reusing one, not worth its own error state. Admins
+    // only, like the dialog.
+    if (isAdmin) {
+      listGroups()
+        .then(({ groups: loaded }) => setGroups(loaded))
+        .catch(() => undefined);
+    }
+  }, [isAdmin]);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Sources"
-        description="Connect and manage Tautulli, Plex, and other media source connections."
+        description={
+          isAdmin
+            ? "Connect and manage Tautulli, Plex, and other media source connections."
+            : "The media servers LatestArr reads from. Only admins can change them."
+        }
         actions={
-          sources ? (
+          sources && isAdmin ? (
             <AddSourceDialog
               kinds={kinds}
               onCreated={(source) => setSources((prev) => [...(prev ?? []), source])}
@@ -1029,7 +1041,11 @@ export function SourcesPage() {
         <Card>
           <CardHeader>
             <CardTitle>No sources yet</CardTitle>
-            <CardDescription>Add a source to start pulling in recently-added content.</CardDescription>
+            <CardDescription>
+              {isAdmin
+                ? "Add a source to start pulling in recently-added content."
+                : "An admin needs to add a source before newsletters have anything to send."}
+            </CardDescription>
           </CardHeader>
         </Card>
       ) : null}
@@ -1040,6 +1056,7 @@ export function SourcesPage() {
             <SourceRow
               key={source.id}
               source={source}
+              canManage={isAdmin}
               groups={groups}
               onGroupsChange={(updater) => setGroups(updater)}
               onChanged={(updated) =>

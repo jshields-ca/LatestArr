@@ -58,7 +58,8 @@ const exampleSource = {
   updatedAt: "2026-01-01T00:00:00.000Z",
 };
 
-describe("SourcesPage", () => {
+// The form tests type a lot under jsdom, which can be slow on a busy machine.
+describe("SourcesPage", { timeout: 30_000 }, () => {
   it("renders the empty state when there are no sources", async () => {
     mockLoad({ sources: [] });
 

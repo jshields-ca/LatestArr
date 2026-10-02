@@ -79,12 +79,15 @@ export default function CodeEditor({
   issues,
   label,
   resetKey,
+  readOnly = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   issues: CodeIssue[];
   label: string;
   resetKey?: string;
+  /** Shows the code without letting it change, e.g. for viewers. */
+  readOnly?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -105,6 +108,8 @@ export default function CodeEditor({
           lintGutter(),
           theme,
           EditorView.lineWrapping,
+          EditorState.readOnly.of(readOnly),
+          EditorView.editable.of(!readOnly),
           EditorView.contentAttributes.of({ "aria-label": label }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChangeRef.current(update.state.doc.toString());
@@ -118,7 +123,7 @@ export default function CodeEditor({
       view.current = null;
     };
     // `value` only seeds the editor; later edits come from the editor itself.
-  }, [resetKey, label]);
+  }, [resetKey, label, readOnly]);
 
   useEffect(() => {
     const editor = view.current;

@@ -64,7 +64,7 @@ function publicView(value: NotificationSettings) {
 
 export function registerNotificationRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "admin", write: "admin" }));
 
     scope.get("/notifications", async (_request, reply) => {
       return reply.send({ settings: publicView(await loadNotificationSettings(db)) });
