@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
+import { RequireRole } from "@/components/require-role";
 import { Toaster } from "@/components/ui/toaster";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { DesignEditorPage } from "@/pages/design-editor-page";
@@ -38,15 +39,15 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/sources" element={<SourcesPage />} />
-                  <Route path="/recipients" element={<RecipientsPage />} />
-                  <Route path="/smtp" element={<SmtpProfilesPage />} />
+                  <Route path="/recipients" element={<RequireRole minRole="editor"><RecipientsPage /></RequireRole>} />
+                  <Route path="/smtp" element={<RequireRole minRole="admin"><SmtpProfilesPage /></RequireRole>} />
                   <Route path="/newsletters" element={<NewslettersPage />} />
                   <Route path="/designs" element={<DesignsPage />} />
                   <Route path="/designs/:id" element={<DesignEditorPage />} />
                   <Route path="/templates" element={<Navigate to="/designs" replace />} />
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                  <Route path="/users" element={<UsersPage />} />
-                  <Route path="/logs" element={<LogsPage />} />
+                  <Route path="/notifications" element={<RequireRole minRole="admin"><NotificationsPage /></RequireRole>} />
+                  <Route path="/users" element={<RequireRole minRole="admin"><UsersPage /></RequireRole>} />
+                  <Route path="/logs" element={<RequireRole minRole="admin"><LogsPage /></RequireRole>} />
                   <Route path="/templates/:id/edit" element={<TemplateEditRedirect />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>

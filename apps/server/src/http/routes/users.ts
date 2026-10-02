@@ -1,15 +1,15 @@
 import { type Db, oidcIdentities, templates, users } from "@latestarr/db";
 import { and, eq, ne, sql } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { hashPassword } from "../../auth/password.js";
-import { deleteUserSessions, getSessionUser, SESSION_COOKIE } from "../../auth/session.js";
+import { ROLES } from "../../auth/roles.js";
+import { deleteUserSessions, SESSION_COOKIE } from "../../auth/session.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
 import { MIN_PASSWORD_LENGTH } from "./auth.js";
 
-// Everyone who can sign in is an admin for now; the role column already
-// allows editor and viewer for when roles are enforced.
+// Admins only. See auth/roles.ts for what each role can do.
 
 const passwordSchema = z
   .string()
@@ -20,11 +20,14 @@ const createUserSchema = z.object({
   email: z.email("A valid email is required"),
   displayName: z.string().trim().min(1, "A name is required"),
   password: passwordSchema.optional(),
+  // The least access unless an admin chooses more.
+  role: z.enum(ROLES).default("viewer"),
 });
 
 const updateUserSchema = z.object({
   displayName: z.string().trim().min(1).optional(),
   isActive: z.boolean().optional(),
+  role: z.enum(ROLES).optional(),
   // Sets a new temporary password, to be changed at the next sign-in.
   password: passwordSchema.optional(),
 });
@@ -51,20 +54,6 @@ async function publicUser(db: Db, user: User) {
   };
 }
 
-async function signedInUser(db: Db, request: FastifyRequest) {
-  const token = request.cookies[SESSION_COOKIE];
-  return token ? getSessionUser(db, token) : null;
-}
-
-function requireAdmin(db: Db) {
-  return async function requireAdminHook(request: FastifyRequest, reply: FastifyReply) {
-    const user = await signedInUser(db, request);
-    if (user?.role !== "admin") {
-      return reply.code(403).send({ error: "Only admins can manage users" });
-    }
-  };
-}
-
 async function otherActiveAdmins(db: Db, excludingId: string): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)` })
@@ -75,8 +64,7 @@ async function otherActiveAdmins(db: Db, excludingId: string): Promise<number> {
 
 export function registerUserRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
-    scope.addHook("preHandler", requireAdmin(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "admin", write: "admin" }));
 
     scope.get("/users", async (_request, reply) => {
       const rows = await db.select().from(users).orderBy(users.createdAt);
@@ -96,27 +84,37 @@ export function registerUserRoutes(app: FastifyInstance, db: Db): void {
         .values({
           email,
           displayName: body.displayName,
-          role: "admin",
+          role: body.role,
           passwordHash: body.password ? await hashPassword(body.password) : null,
           mustChangePassword: Boolean(body.password),
         })
         .returning();
-      request.log.info({ targetUserId: user!.id }, `Added user ${email}`);
+      request.log.info({ targetUserId: user!.id }, `Added user ${email} as ${body.role}`);
       return reply.code(201).send({ user: await publicUser(db, user!) });
     });
 
     scope.patch<{ Params: IdParams }>("/users/:id", async (request, reply) => {
       const body = parseBody(updateUserSchema, request.body, reply);
       if (!body) return reply;
-      const me = await signedInUser(db, request);
+      const me = request.sessionUser;
       const [target] = await db.select().from(users).where(eq(users.id, request.params.id));
       if (!target) return reply.code(404).send({ error: "Not found" });
+      const roleChanged = body.role !== undefined && body.role !== target.role;
+
+      if (roleChanged) {
+        if (target.id === me?.id) {
+          return reply.code(400).send({ error: "You can't change your own role. Ask another admin." });
+        }
+        if (target.role === "admin" && target.isActive && (await otherActiveAdmins(db, target.id)) === 0) {
+          return reply.code(400).send({ error: "There must always be at least one active admin" });
+        }
+      }
 
       if (body.isActive === false) {
         if (target.id === me?.id) {
           return reply.code(400).send({ error: "You can't deactivate your own account" });
         }
-        if ((await otherActiveAdmins(db, target.id)) === 0) {
+        if (target.role === "admin" && (await otherActiveAdmins(db, target.id)) === 0) {
           return reply.code(400).send({ error: "There must always be at least one active admin" });
         }
       }
@@ -126,6 +124,7 @@ export function registerUserRoutes(app: FastifyInstance, db: Db): void {
         .set({
           ...(body.displayName !== undefined && { displayName: body.displayName }),
           ...(body.isActive !== undefined && { isActive: body.isActive }),
+          ...(roleChanged && { role: body.role }),
           ...(body.password !== undefined && {
             passwordHash: await hashPassword(body.password),
             mustChangePassword: true,
@@ -144,6 +143,7 @@ export function registerUserRoutes(app: FastifyInstance, db: Db): void {
         body.displayName !== undefined && "renamed",
         body.isActive === false && "deactivated",
         body.isActive === true && "reactivated",
+        roleChanged && `changed from ${target.role} to ${body.role}`,
         body.password !== undefined && "given a new temporary password",
       ].filter(Boolean);
       request.log.info({ targetUserId: target.id }, `User ${target.email} ${changes.join(", ") || "saved"}`);
@@ -151,13 +151,13 @@ export function registerUserRoutes(app: FastifyInstance, db: Db): void {
     });
 
     scope.delete<{ Params: IdParams }>("/users/:id", async (request, reply) => {
-      const me = await signedInUser(db, request);
+      const me = request.sessionUser;
       const [target] = await db.select().from(users).where(eq(users.id, request.params.id));
       if (!target) return reply.code(204).send();
       if (target.id === me?.id) {
         return reply.code(400).send({ error: "You can't delete your own account" });
       }
-      if (target.isActive && (await otherActiveAdmins(db, target.id)) === 0) {
+      if (target.role === "admin" && target.isActive && (await otherActiveAdmins(db, target.id)) === 0) {
         return reply.code(400).send({ error: "There must always be at least one active admin" });
       }
       // Designs they created stay; they just lose the author.

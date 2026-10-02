@@ -105,7 +105,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
   }
 
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "viewer", write: "editor" }));
 
     scope.post("/newsletters", async (request, reply) => {
       const body = parseBody(createNewsletterSchema, request.body, reply);
@@ -394,7 +394,8 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
 
     // An optional `design` previews unsaved design settings against this
     // newsletter's real items.
-    scope.post<{ Params: IdParams }>("/newsletters/:id/preview", async (request, reply) => {
+    // Previewing changes nothing, so viewers can too.
+    scope.post<{ Params: IdParams }>("/newsletters/:id/preview", { config: { minRole: "viewer" } }, async (request, reply) => {
       const body = parseBody(previewSchema, request.body ?? {}, reply);
       if (!body) return reply;
       try {
@@ -452,6 +453,8 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
 
     scope.get<{ Params: SendRunParams }>(
       "/newsletters/:id/send-runs/:runId/recipients",
+      // Recipients' email addresses are for editors and admins.
+      { config: { minRole: "editor" } },
       async (request, reply) => {
         const rows = await db
           .select({

@@ -42,7 +42,7 @@ interface IdParams {
 
 export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "editor", write: "editor" }));
 
     scope.post("/recipients", async (request, reply) => {
       const body = parseBody(createRecipientSchema, request.body, reply);

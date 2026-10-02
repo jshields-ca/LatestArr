@@ -65,7 +65,7 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
   // only — adding it directly on `app` would apply it to every route on the
   // instance, including /auth/* and /health.
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "viewer", write: "admin" }));
 
     scope.post("/sources", async (request, reply) => {
       const body = parseBody(createSourceSchema, request.body, reply);
@@ -184,7 +184,8 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
       return reply.send(result);
     });
 
-    scope.get<{ Params: IdParams }>("/sources/:id/libraries", async (request, reply) => {
+    // Editors pick libraries and users when setting up a newsletter.
+    scope.get<{ Params: IdParams }>("/sources/:id/libraries", { config: { minRole: "editor" } }, async (request, reply) => {
       const [row] = await db
         .select()
         .from(sourceConnections)
@@ -212,7 +213,7 @@ export function registerSourceRoutes(app: FastifyInstance, db: Db): void {
     // type has no known users" apart from "it has zero users right now"
     // — the former hides the whole Import action, the latter would show
     // it with an empty result.
-    scope.get<{ Params: IdParams }>("/sources/:id/users", async (request, reply) => {
+    scope.get<{ Params: IdParams }>("/sources/:id/users", { config: { minRole: "editor" } }, async (request, reply) => {
       const [row] = await db
         .select()
         .from(sourceConnections)

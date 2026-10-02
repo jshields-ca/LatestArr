@@ -37,7 +37,7 @@ interface GroupMemberParams {
 
 export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "editor", write: "editor" }));
 
     scope.post("/recipient-groups", async (request, reply) => {
       const body = parseBody(createGroupSchema, request.body, reply);

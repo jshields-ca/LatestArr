@@ -5,6 +5,7 @@ import { createDb, type Db, runMigrations } from "@latestarr/db";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../app.js";
+import { hasRole, ROLES, type Role } from "../auth/roles.js";
 
 let dir: string;
 let db: Db;
@@ -70,6 +71,97 @@ const PUBLIC = new Set([
   "GET /api/auth/oidc/login",
   "GET /api/auth/oidc/callback",
 ]);
+
+// The role each signed-in route needs (see auth/roles.ts). A new route
+// fails the test below until it's added here, so every route's access is a
+// deliberate choice.
+const ROLE_NEEDED: Record<string, Role> = {
+  "GET /api/auth/me": "viewer",
+  "PATCH /api/auth/me": "viewer",
+
+  "GET /api/newsletters": "viewer",
+  "GET /api/newsletters/:id": "viewer",
+  "GET /api/newsletters/:id/send-runs": "viewer",
+  "GET /api/newsletters/:id/send-runs/:runId/html": "viewer",
+  "POST /api/newsletters/:id/preview": "viewer",
+  "GET /api/templates": "viewer",
+  "GET /api/templates/:id": "viewer",
+  "POST /api/templates/preview": "viewer",
+  "GET /api/sources": "viewer",
+  "GET /api/sources/kinds": "viewer",
+  "GET /api/sources/:id": "viewer",
+
+  "POST /api/newsletters": "editor",
+  "PATCH /api/newsletters/:id": "editor",
+  "DELETE /api/newsletters/:id": "editor",
+  "POST /api/newsletters/:id/sources": "editor",
+  "DELETE /api/newsletters/:id/sources/:sourceConnectionId": "editor",
+  "POST /api/newsletters/:id/recipient-groups": "editor",
+  "DELETE /api/newsletters/:id/recipient-groups/:groupId": "editor",
+  "POST /api/newsletters/:id/send-now": "editor",
+  "POST /api/newsletters/:id/send-test": "editor",
+  "GET /api/newsletters/:id/send-runs/:runId/recipients": "editor",
+  "POST /api/templates": "editor",
+  "PATCH /api/templates/:id": "editor",
+  "DELETE /api/templates/:id": "editor",
+  "POST /api/templates/:id/convert-to-code": "editor",
+  "GET /api/sources/:id/libraries": "editor",
+  "GET /api/sources/:id/users": "editor",
+  "GET /api/recipients": "editor",
+  "POST /api/recipients": "editor",
+  "POST /api/recipients/import": "editor",
+  "GET /api/recipients/:id": "editor",
+  "GET /api/recipients/:id/groups": "editor",
+  "PATCH /api/recipients/:id": "editor",
+  "DELETE /api/recipients/:id": "editor",
+  "GET /api/recipient-groups": "editor",
+  "POST /api/recipient-groups": "editor",
+  "GET /api/recipient-groups/:id": "editor",
+  "PATCH /api/recipient-groups/:id": "editor",
+  "DELETE /api/recipient-groups/:id": "editor",
+  "POST /api/recipient-groups/:id/members": "editor",
+  "DELETE /api/recipient-groups/:id/members/:recipientId": "editor",
+  "GET /api/smtp-profiles": "editor",
+  "GET /api/smtp-profiles/:id": "editor",
+
+  "POST /api/sources": "admin",
+  "PATCH /api/sources/:id": "admin",
+  "DELETE /api/sources/:id": "admin",
+  "POST /api/sources/:id/test": "admin",
+  "POST /api/smtp-profiles": "admin",
+  "PATCH /api/smtp-profiles/:id": "admin",
+  "DELETE /api/smtp-profiles/:id": "admin",
+  "POST /api/smtp-profiles/:id/test": "admin",
+  "POST /api/smtp-profiles/:id/send-test": "admin",
+  "GET /api/notifications": "admin",
+  "PUT /api/notifications": "admin",
+  "POST /api/notifications/test": "admin",
+  "GET /api/users": "admin",
+  "POST /api/users": "admin",
+  "PATCH /api/users/:id": "admin",
+  "DELETE /api/users/:id": "admin",
+  "GET /api/logs": "admin",
+};
+
+async function signInAs(admin: string, role: Role): Promise<string> {
+  const email = `${role}@example.com`;
+  await app.inject({
+    method: "POST",
+    url: "/api/users",
+    cookies: { latestarr_session: admin },
+    payload: { email, displayName: role, password: "temporary-password-1", role },
+  });
+  const cookie = cookieFrom(
+    await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: "temporary-password-1" } }),
+  );
+  await app.inject({
+    method: "PATCH",
+    url: "/api/auth/me",
+    cookies: { latestarr_session: cookie },
+    payload: { currentPassword: "temporary-password-1", newPassword: `${role}-own-password` },
+  });
+  return cookie;
+}
 
 describe("security", () => {
   it("requires a session for every route that isn't deliberately public", async () => {
@@ -151,6 +243,89 @@ describe("security", () => {
     const response = await app.inject({ method: "GET", url: "/health" });
     expect(response.headers["content-security-policy"]).toContain("frame-ancestors 'self'");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
+  });
+
+  it("gives every signed-in route a deliberate role", async () => {
+    await app.ready();
+    const signedIn = registeredRoutes()
+      .filter(({ method }) => method !== "HEAD")
+      .map(({ method, url }) => `${method} ${url}`)
+      .filter((route) => !PUBLIC.has(route));
+    expect(signedIn.filter((route) => !(route in ROLE_NEEDED))).toEqual([]);
+    expect(Object.keys(ROLE_NEEDED).filter((route) => !signedIn.includes(route))).toEqual([]);
+  });
+
+  it("refuses each route to roles below the one it needs, and allows the rest", async () => {
+    const admin = await bootstrapAndLogin();
+    const cookies: Record<Role, string> = {
+      admin,
+      editor: await signInAs(admin, "editor"),
+      viewer: await signInAs(admin, "viewer"),
+    };
+    const wrong: string[] = [];
+    for (const [route, needed] of Object.entries(ROLE_NEEDED)) {
+      const [method, url] = route.split(" ") as [string, string];
+      // Changing your own name or password works for everyone, and is
+      // covered by the auth tests; skip it so the sessions stay valid.
+      if (route === "PATCH /api/auth/me") continue;
+      const concrete = url.replace(/:[A-Za-z]+/g, "00000000-0000-0000-0000-000000000000");
+      for (const role of ROLES) {
+        const response = await app.inject({
+          method: method as "GET",
+          url: concrete,
+          cookies: { latestarr_session: cookies[role] },
+          payload: method === "GET" ? undefined : {},
+        });
+        const refused = response.statusCode === 403 && response.json().code === "role_required";
+        if (refused === hasRole(role, needed)) wrong.push(`${role}: ${route} -> ${response.statusCode}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it("applies a role change at once, and keeps at least one admin", async () => {
+    const admin = await bootstrapAndLogin();
+    const editor = await signInAs(admin, "editor");
+    const users = (await app.inject({ method: "GET", url: "/api/users", cookies: { latestarr_session: admin } })).json()
+      .users as { id: string; email: string }[];
+    const adminId = users.find((u) => u.email === "admin@example.com")!.id;
+    const editorId = users.find((u) => u.email === "editor@example.com")!.id;
+
+    // An admin can't demote themselves, even with another admin around.
+    const self = await app.inject({
+      method: "PATCH",
+      url: `/api/users/${adminId}`,
+      cookies: { latestarr_session: admin },
+      payload: { role: "viewer" },
+    });
+    expect(self.statusCode).toBe(400);
+
+    const blocked = await app.inject({ method: "GET", url: "/api/users", cookies: { latestarr_session: editor } });
+    expect(blocked.statusCode).toBe(403);
+    await app.inject({
+      method: "PATCH",
+      url: `/api/users/${editorId}`,
+      cookies: { latestarr_session: admin },
+      payload: { role: "admin" },
+    });
+    expect((await app.inject({ method: "GET", url: "/api/users", cookies: { latestarr_session: editor } })).statusCode).toBe(200);
+
+    // With two admins, the promoted one can demote the original. That
+    // leaves one admin, who can't demote themselves.
+    const demote = await app.inject({
+      method: "PATCH",
+      url: `/api/users/${adminId}`,
+      cookies: { latestarr_session: editor },
+      payload: { role: "editor" },
+    });
+    expect(demote.statusCode).toBe(200);
+    const last = await app.inject({
+      method: "PATCH",
+      url: `/api/users/${editorId}`,
+      cookies: { latestarr_session: editor },
+      payload: { role: "viewer" },
+    });
+    expect(last.statusCode).toBe(400);
   });
 
   it("sets the session cookie HttpOnly and SameSite", async () => {

@@ -56,7 +56,7 @@ interface IdParams {
 
 export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "viewer", write: "editor" }));
 
     scope.post("/templates", async (request, reply) => {
       const body = parseBody(createTemplateSchema, request.body, reply);
@@ -79,7 +79,7 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
 
     // Renders design settings (saved or not), for the design editor's live
     // preview. Registered before "/templates/:id" routes; POST-only anyway.
-    scope.post("/templates/preview", async (request, reply) => {
+    scope.post("/templates/preview", { config: { minRole: "viewer" } }, async (request, reply) => {
       const body = parseBody(previewDesignSchema, request.body, reply);
       if (!body) return reply;
       const { settings, mjml, newsletterId } = body;

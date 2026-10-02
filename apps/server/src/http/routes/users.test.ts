@@ -53,7 +53,7 @@ async function addUser(payload: Record<string, unknown> = {}) {
   const response = await as(adminCookie, {
     method: "POST",
     url: "/api/users",
-    payload: { email: "Sam@Example.com", displayName: "Sam", password: "temporary-password-1", ...payload },
+    payload: { email: "Sam@Example.com", displayName: "Sam", password: "temporary-password-1", role: "admin", ...payload },
   });
   return response;
 }
@@ -158,6 +158,43 @@ describe("users", () => {
     expect(design).toMatchObject({ name: "Theirs", createdBy: null });
     const list = (await as(adminCookie, { method: "GET", url: "/api/users" })).json().users;
     expect(list).toHaveLength(1);
+  });
+
+  it("adds someone as a viewer unless a role is chosen, and rejects unknown roles", async () => {
+    const plain = await addUser({ role: undefined });
+    expect(plain.json().user.role).toBe("viewer");
+    const editor = await addUser({ email: "ed@example.com", role: "editor" });
+    expect(editor.json().user.role).toBe("editor");
+    expect((await addUser({ email: "x@example.com", role: "owner" })).statusCode).toBe(400);
+  });
+
+  it("changes a role, and the last admin rule only applies to admins", async () => {
+    const { user } = (await addUser({ role: "editor" })).json();
+    const changed = await as(adminCookie, { method: "PATCH", url: `/api/users/${user.id}`, payload: { role: "viewer" } });
+    expect(changed.json().user.role).toBe("viewer");
+    // A viewer can be deactivated and deleted while there's only one admin.
+    const off = await as(adminCookie, { method: "PATCH", url: `/api/users/${user.id}`, payload: { isActive: false } });
+    expect(off.statusCode).toBe(200);
+    expect((await as(adminCookie, { method: "DELETE", url: `/api/users/${user.id}` })).statusCode).toBe(204);
+  });
+
+  it("doesn't let editors or viewers manage users", async () => {
+    await addUser({ role: "editor" });
+    const samCookie = cookieFrom(await login("sam@example.com", "temporary-password-1"));
+    await as(samCookie, {
+      method: "PATCH",
+      url: "/api/auth/me",
+      payload: { currentPassword: "temporary-password-1", newPassword: "sams-own-password" },
+    });
+    const list = await as(samCookie, { method: "GET", url: "/api/users" });
+    expect(list.statusCode).toBe(403);
+    expect(list.json()).toMatchObject({ code: "role_required", role: "admin" });
+    const add = await as(samCookie, {
+      method: "POST",
+      url: "/api/users",
+      payload: { email: "new@example.com", displayName: "New", role: "admin" },
+    });
+    expect(add.statusCode).toBe(403);
   });
 
   it("requires signing in", async () => {

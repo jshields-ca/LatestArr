@@ -19,7 +19,7 @@ const querySchema = z.object({
 
 export function registerLogRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
-    scope.addHook("preHandler", requireAuth(db));
+    scope.addHook("preHandler", requireAuth(db, { read: "admin", write: "admin" }));
 
     scope.get("/logs", async (request, reply) => {
       const parsed = querySchema.safeParse(request.query);

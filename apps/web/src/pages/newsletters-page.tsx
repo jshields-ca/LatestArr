@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { Check, Eye, Loader2, Pencil, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
 
-import { useOptionalAuth } from "@/components/auth-provider";
+import { useHasRole, useOptionalAuth } from "@/components/auth-provider";
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { ListRow } from "@/components/list-row";
 import { SendRunHistoryList } from "@/components/send-run-history";
@@ -754,6 +754,8 @@ function NewsletterDetailsForm({
 // to a single address as a test.
 function NewsletterPreviewDialog({ newsletter }: { newsletter: Newsletter }) {
   const auth = useOptionalAuth();
+  // Viewers can preview; sending a test is for editors and admins.
+  const canSendTest = useHasRole("editor");
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<NewsletterPreview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -811,7 +813,8 @@ function NewsletterPreviewDialog({ newsletter }: { newsletter: Newsletter }) {
         <DialogHeader>
           <DialogTitle>Preview: {newsletter.name}</DialogTitle>
           <DialogDescription>
-            What the next send would contain right now. Nothing is emailed until you send a test.
+            What the next send would contain right now.
+            {canSendTest ? " Nothing is emailed until you send a test." : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -849,37 +852,46 @@ function NewsletterPreviewDialog({ newsletter }: { newsletter: Newsletter }) {
           </div>
         ) : null}
 
-        <form className="flex flex-col gap-2 border-t border-border pt-4" onSubmit={handleSendTest} noValidate>
-          <Label htmlFor={`newsletter-test-to-${newsletter.id}`}>Send a test to</Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              id={`newsletter-test-to-${newsletter.id}`}
-              type="email"
-              value={testTo}
-              onChange={(e) => setTestTo(e.target.value)}
-              placeholder="you@example.com"
-              disabled={sendingTest}
-            />
-            <div className="flex gap-2">
-              <Button type="submit" disabled={sendingTest || !testTo}>
-                {sendingTest ? <Loader2 className="animate-spin" /> : <Send />}
-                Send test
-              </Button>
-              <Button type="button" variant="outline" onClick={() => void load()} disabled={loading}>
-                <RefreshCw />
-                Refresh
-              </Button>
-            </div>
+        {!canSendTest ? (
+          <div className="flex justify-end border-t border-border pt-4">
+            <Button type="button" variant="outline" onClick={() => void load()} disabled={loading}>
+              <RefreshCw />
+              Refresh
+            </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Sent only to this address, with &quot;[Test]&quot; in the subject. It isn&apos;t added to History.
-          </p>
-          {testError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {testError}
+        ) : (
+          <form className="flex flex-col gap-2 border-t border-border pt-4" onSubmit={handleSendTest} noValidate>
+            <Label htmlFor={`newsletter-test-to-${newsletter.id}`}>Send a test to</Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id={`newsletter-test-to-${newsletter.id}`}
+                type="email"
+                value={testTo}
+                onChange={(e) => setTestTo(e.target.value)}
+                placeholder="you@example.com"
+                disabled={sendingTest}
+              />
+              <div className="flex gap-2">
+                <Button type="submit" disabled={sendingTest || !testTo}>
+                  {sendingTest ? <Loader2 className="animate-spin" /> : <Send />}
+                  Send test
+                </Button>
+                <Button type="button" variant="outline" onClick={() => void load()} disabled={loading}>
+                  <RefreshCw />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sent only to this address, with &quot;[Test]&quot; in the subject. It isn&apos;t added to History.
             </p>
-          ) : null}
-        </form>
+            {testError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {testError}
+              </p>
+            ) : null}
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -902,6 +914,9 @@ function NewsletterCard({
   onChanged: (newsletter: Newsletter) => void;
   onDeleted: (id: string) => void;
 }) {
+  // Viewers see everything here read-only; editors and admins can change
+  // and send.
+  const canEdit = useHasRole("editor");
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
   const [toggling, setToggling] = useState(false);
@@ -1026,43 +1041,47 @@ function NewsletterCard({
               id={`newsletter-enabled-${newsletter.id}`}
               checked={newsletter.isEnabled}
               onCheckedChange={(checked) => void handleToggleEnabled(checked)}
-              disabled={toggling}
+              disabled={toggling || !canEdit}
             />
             Enabled
           </label>
           <NewsletterPreviewDialog newsletter={newsletter} />
-          {/* Reachable without expanding the row — previously only lived
-              inside the Details tab, right next to Save changes, which
-              read as two unrelated actions crowded together. */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void handleSendNow()}
-            disabled={sending}
-          >
-            {sending ? <Loader2 className="animate-spin" /> : <Send />}
-            Send now
-          </Button>
-          {confirmingDelete ? (
+          {!canEdit ? null : (
             <>
-              <span className="text-sm text-muted-foreground">Delete?</span>
-              <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
-                {deleting ? <Loader2 className="animate-spin" /> : null}
-                Confirm
+              {/* Reachable without expanding the row — previously only lived
+                  inside the Details tab, right next to Save changes, which
+                  read as two unrelated actions crowded together. */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleSendNow()}
+                disabled={sending}
+              >
+                {sending ? <Loader2 className="animate-spin" /> : <Send />}
+                Send now
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-                Cancel
-              </Button>
+              {confirmingDelete ? (
+                <>
+                  <span className="text-sm text-muted-foreground">Delete?</span>
+                  <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
+                    {deleting ? <Loader2 className="animate-spin" /> : null}
+                    Confirm
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Delete ${newsletter.name}`}
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  <Trash2 />
+                </Button>
+              )}
             </>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Delete ${newsletter.name}`}
-              onClick={() => setConfirmingDelete(true)}
-            >
-              <Trash2 />
-            </Button>
           )}
         </>
       }
@@ -1100,45 +1119,53 @@ function NewsletterCard({
                   and Content (Template/Sources/Groups, right) grouped as
                   their own panels instead of one long flat stack of boxes.
                   Below sm they stack, same as every other two-column form
-                  section in this app. */}
-              <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
-                <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
+                  section in this app. A disabled fieldset makes every
+                  control inside read-only for viewers. */}
+              <fieldset disabled={!canEdit} className="min-w-0">
+                {!canEdit ? (
+                  <p className="pb-3 text-sm text-muted-foreground">
+                    You have viewer access, so these settings are read-only.
+                  </p>
+                ) : null}
+                <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
+                  <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
 
-                <div className="flex flex-col gap-4 rounded-md border border-border p-3">
-                  <SubsectionHeading>Content</SubsectionHeading>
+                  <div className="flex flex-col gap-4 rounded-md border border-border p-3">
+                    <SubsectionHeading>Content</SubsectionHeading>
 
-                  {detailError ? (
-                    <p role="alert" className="text-sm text-destructive">
-                      {detailError}
-                    </p>
-                  ) : null}
+                    {detailError ? (
+                      <p role="alert" className="text-sm text-destructive">
+                        {detailError}
+                      </p>
+                    ) : null}
 
-                  {!detail && !detailError ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      Loading details...
-                    </div>
-                  ) : null}
+                    {!detail && !detailError ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="size-4 animate-spin" />
+                        Loading details...
+                      </div>
+                    ) : null}
 
-                  {detail ? (
-                    <>
-                      <DesignPicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
-                      <LinkedSources
-                        newsletterId={newsletter.id}
-                        sources={detail.sources}
-                        allSources={allSources}
-                        onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
-                      />
-                      <LinkedGroups
-                        newsletterId={newsletter.id}
-                        groups={detail.recipientGroups}
-                        allGroups={allGroups}
-                        onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
-                      />
-                    </>
-                  ) : null}
+                    {detail ? (
+                      <>
+                        <DesignPicker newsletter={newsletter} templates={allTemplates} onChanged={onChanged} />
+                        <LinkedSources
+                          newsletterId={newsletter.id}
+                          sources={detail.sources}
+                          allSources={allSources}
+                          onChange={(sources) => setDetail((d) => (d ? { ...d, sources } : d))}
+                        />
+                        <LinkedGroups
+                          newsletterId={newsletter.id}
+                          groups={detail.recipientGroups}
+                          allGroups={allGroups}
+                          onChange={(recipientGroups) => setDetail((d) => (d ? { ...d, recipientGroups } : d))}
+                        />
+                      </>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
+              </fieldset>
             </TabsContent>
 
             <TabsContent value="history">
@@ -1152,6 +1179,7 @@ function NewsletterCard({
 }
 
 export function NewslettersPage() {
+  const canEdit = useHasRole("editor");
   const [newsletters, setNewsletters] = useState<Newsletter[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [allSources, setAllSources] = useState<SourceConnection[]>([]);
@@ -1168,30 +1196,37 @@ export function NewslettersPage() {
       .catch(() => {
         // Surfaced via each newsletter's own "Sources" section if it matters there.
       });
-    listGroups()
-      .then(({ groups }) => setAllGroups(groups))
-      .catch(() => {
-        // Surfaced via each newsletter's own "Recipient groups" section.
-      });
-    listSmtpProfiles()
-      .then(({ smtpProfiles: profiles }) => setSmtpProfiles(profiles))
-      .catch(() => {
-        // The add-newsletter dialog just shows no SMTP options if this fails.
-      });
+    // Only editors and admins can pick groups and SMTP profiles.
+    if (canEdit) {
+      listGroups()
+        .then(({ groups }) => setAllGroups(groups))
+        .catch(() => {
+          // Surfaced via each newsletter's own "Recipient groups" section.
+        });
+      listSmtpProfiles()
+        .then(({ smtpProfiles: profiles }) => setSmtpProfiles(profiles))
+        .catch(() => {
+          // The add-newsletter dialog just shows no SMTP options if this fails.
+        });
+    }
     listTemplates()
       .then(({ templates: loaded }) => setAllTemplates(loaded))
       .catch(() => {
         // The template picker just shows the default-layout option if this fails.
       });
-  }, []);
+  }, [canEdit]);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Newsletters"
-        description="Build, schedule, and send digests from your connected sources."
+        description={
+          canEdit
+            ? "Build, schedule, and send digests from your connected sources."
+            : "The digests LatestArr sends, with previews and send history."
+        }
         actions={
-          newsletters ? (
+          newsletters && canEdit ? (
             <AddNewsletterDialog
               smtpProfiles={smtpProfiles}
               templates={allTemplates}
@@ -1218,7 +1253,7 @@ export function NewslettersPage() {
         <Card>
           <CardHeader>
             <CardTitle>No newsletters yet</CardTitle>
-            <CardDescription>Add one to start sending digests on a schedule.</CardDescription>
+            <CardDescription>{canEdit ? "Add one to start sending digests on a schedule." : "None have been set up yet."}</CardDescription>
           </CardHeader>
         </Card>
       ) : null}

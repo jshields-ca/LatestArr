@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Loader2, Plus, Save, X } from "lucide-react";
 
 import { DesignCodeReference } from "@/components/design-code-reference";
+import { useHasRole } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -171,6 +172,8 @@ function snapshotOf(name: string, settings: DesignSettings, mode: Template["mode
 }
 
 export function DesignEditorPage() {
+  // Viewers can open a design and preview it, but not change it.
+  const canEdit = useHasRole("editor");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -449,23 +452,28 @@ export function DesignEditorPage() {
           <Input
             id="design-name"
             value={name}
+            readOnly={!canEdit}
             onChange={(e) => setName(e.target.value)}
             className="max-w-sm font-brand text-lg font-semibold"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {dirty ? <span className="text-sm text-muted-foreground">Unsaved changes</span> : null}
-          {mode === "design" ? (
-            <Button variant="outline" onClick={() => void handleConvertToCode()} disabled={converting || saving}>
-              {converting ? <Loader2 className="animate-spin" /> : <Code />}
-              Edit as code
+        {!canEdit ? (
+          <span className="text-sm text-muted-foreground">Read-only: you have viewer access</span>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            {dirty ? <span className="text-sm text-muted-foreground">Unsaved changes</span> : null}
+            {mode === "design" ? (
+              <Button variant="outline" onClick={() => void handleConvertToCode()} disabled={converting || saving}>
+                {converting ? <Loader2 className="animate-spin" /> : <Code />}
+                Edit as code
+              </Button>
+            ) : null}
+            <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim() || !ctasComplete}>
+              {saving ? <Loader2 className="animate-spin" /> : <Save />}
+              Save
             </Button>
-          ) : null}
-          <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim() || !ctasComplete}>
-            {saving ? <Loader2 className="animate-spin" /> : <Save />}
-            Save
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
       {saveError ? (
         <p role="alert" className="text-sm text-destructive">
@@ -480,7 +488,7 @@ export function DesignEditorPage() {
         )}
       >
         {mode === "code" ? (
-          <div className="flex min-w-0 flex-col gap-3">
+          <fieldset disabled={!canEdit} className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Email markup (MJML)</span>
               <Suspense
@@ -494,6 +502,7 @@ export function DesignEditorPage() {
                 <div className="h-[60dvh]">
                   <CodeEditor
                     key={codeVersion}
+                    readOnly={!canEdit}
                     value={code}
                     onChange={setCode}
                     label="Email markup (MJML)"
@@ -529,9 +538,9 @@ export function DesignEditorPage() {
             <Section title="Variables and helpers">
               <DesignCodeReference />
             </Section>
-          </div>
+          </fieldset>
         ) : (
-          <div className="flex flex-col gap-3">
+          <fieldset disabled={!canEdit} className="flex min-w-0 flex-col gap-3">
             <Section title="Branding" defaultOpen>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="design-font">Font</Label>
@@ -778,7 +787,7 @@ export function DesignEditorPage() {
                 check with a test send.
               </p>
             </Section>
-          </div>
+          </fieldset>
         )}
 
         <div className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-4 lg:self-start">

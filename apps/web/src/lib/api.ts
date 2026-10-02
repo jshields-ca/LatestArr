@@ -1,4 +1,5 @@
 import type { DesignSettings } from "./design";
+import type { Role } from "./roles";
 
 export class ApiError extends Error {
   status: number;
@@ -52,7 +53,7 @@ export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
-  role: string;
+  role: Role;
   isActive: boolean;
   /** Signed in with a temporary password an admin set; a new one must be
    * chosen before using the app. */
@@ -63,7 +64,7 @@ export interface ManagedUser {
   id: string;
   email: string;
   displayName: string;
-  role: string;
+  role: Role;
   isActive: boolean;
   mustChangePassword: boolean;
   lastLoginAt: string | null;
@@ -77,13 +78,13 @@ export function listUsers(): Promise<{ users: ManagedUser[] }> {
 }
 
 // No password: the person signs in with SSO only.
-export function createUser(input: { email: string; displayName: string; password?: string }): Promise<{ user: ManagedUser }> {
+export function createUser(input: { email: string; displayName: string; password?: string; role: Role }): Promise<{ user: ManagedUser }> {
   return apiFetch<{ user: ManagedUser }>("/users", { method: "POST", body: JSON.stringify(input) });
 }
 
 export function updateUser(
   id: string,
-  input: { displayName?: string; isActive?: boolean; password?: string },
+  input: { displayName?: string; isActive?: boolean; password?: string; role?: Role },
 ): Promise<{ user: ManagedUser }> {
   return apiFetch<{ user: ManagedUser }>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(input) });
 }

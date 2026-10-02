@@ -11,20 +11,24 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import type { Role } from "@/lib/roles";
+
 export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  /** The role needed to see this page (see lib/roles.ts). */
+  minRole: Role;
 }
 
 export const navItems: NavItem[] = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/sources", label: "Sources", icon: Server },
-  { to: "/recipients", label: "Recipients", icon: Users },
-  { to: "/smtp", label: "SMTP Profiles", icon: Mail },
-  { to: "/newsletters", label: "Newsletters", icon: Send },
-  { to: "/designs", label: "Designs", icon: Palette },
-  { to: "/notifications", label: "Notifications", icon: BellRing },
-  { to: "/users", label: "Users", icon: UserCog },
-  { to: "/logs", label: "Logs", icon: ScrollText },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, minRole: "viewer" },
+  { to: "/sources", label: "Sources", icon: Server, minRole: "viewer" },
+  { to: "/recipients", label: "Recipients", icon: Users, minRole: "editor" },
+  { to: "/smtp", label: "SMTP Profiles", icon: Mail, minRole: "admin" },
+  { to: "/newsletters", label: "Newsletters", icon: Send, minRole: "viewer" },
+  { to: "/designs", label: "Designs", icon: Palette, minRole: "viewer" },
+  { to: "/notifications", label: "Notifications", icon: BellRing, minRole: "admin" },
+  { to: "/users", label: "Users", icon: UserCog, minRole: "admin" },
+  { to: "/logs", label: "Logs", icon: ScrollText, minRole: "admin" },
 ];

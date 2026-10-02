@@ -29,7 +29,7 @@
 - **Check before it goes out.** Preview the next issue with real items, and send yourself a test.
 - **Know when it fails.** Alerts by email, Discord, Slack, ntfy, Apprise, or JSON webhook, and a Logs page that shows what happened.
 - **Good delivery habits.** Sends through your own mail server or provider, one message per recipient, with posters embedded and a plain-text version. Dark-mode aware.
-- **Built to be exposed.** Local accounts or SSO (OIDC), several admins, encrypted credentials, rate limiting, CSRF protection, and a strict CSP. Runs as a non-root container.
+- **Built to be exposed.** Local accounts or SSO (OIDC), admin, editor, and viewer roles, encrypted credentials, rate limiting, CSRF protection, and a strict CSP. Runs as a non-root container.
 - **Accessible.** Automated accessibility checks on every change, and it works by keyboard and on your phone.
 
 ## Supported sources
@@ -89,7 +89,7 @@ This repository keeps [`docs/self-hosting.md`](docs/self-hosting.md) and [`docs/
 
 - **Pre-1.0.** Usable today, with rough edges and occasional breaking changes. Back up before updating.
 - **Limited real-world testing.** Testing so far is the maintainer's own setup; the 🧪 sources above still need testers.
-- **Known gaps:** no unsubscribe link yet (an admin deactivates recipients instead; see [Unsubscribe](https://www.latestarr.app/docs/email-delivery/unsubscribe)), every user is a full admin until [roles](https://github.com/jshields-ca/LatestArr/issues/257) land, and Gmail's mobile apps apply their own dark mode.
+- **Known gaps:** no unsubscribe link yet (an admin deactivates recipients instead; see [Unsubscribe](https://www.latestarr.app/docs/email-delivery/unsubscribe)), and Gmail's mobile apps apply their own dark mode.
 
 ## How it's built
 

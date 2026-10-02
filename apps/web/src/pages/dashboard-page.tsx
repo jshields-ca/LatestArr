@@ -6,6 +6,7 @@ import {
   ListChecks,
   Loader2,
   Mail,
+  Palette,
   Send,
   Server,
   Users,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { useHasRole } from "@/components/auth-provider";
 import { SendRunHistoryList } from "@/components/send-run-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -189,6 +191,8 @@ function StatCard({
 type RecentRun = SendRun & { newsletterName: string };
 
 export function DashboardPage() {
+  const isAdmin = useHasRole("admin");
+  const canEdit = useHasRole("editor");
   const [sources, setSources] = useState<SourceConnection[] | null>(null);
   const [recipients, setRecipients] = useState<Recipient[] | null>(null);
   const [groups, setGroups] = useState<RecipientGroup[] | null>(null);
@@ -214,20 +218,29 @@ export function DashboardPage() {
       );
     }
     listSources().then(({ sources }) => setSources(sources)).catch(fail);
-    listRecipients().then(({ recipients }) => setRecipients(recipients)).catch(fail);
-    listGroups().then(({ groups }) => setGroups(groups)).catch(fail);
-    listSmtpProfiles().then(({ smtpProfiles }) => setSmtpProfiles(smtpProfiles)).catch(fail);
+    // Each role loads only what it can see; the rest stays empty.
+    if (canEdit) {
+      listRecipients().then(({ recipients }) => setRecipients(recipients)).catch(fail);
+      listGroups().then(({ groups }) => setGroups(groups)).catch(fail);
+      listSmtpProfiles().then(({ smtpProfiles }) => setSmtpProfiles(smtpProfiles)).catch(fail);
+    } else {
+      setRecipients([]);
+      setGroups([]);
+      setSmtpProfiles([]);
+    }
     listTemplates().then(({ templates }) => setTemplates(templates)).catch(fail);
     listNewsletters().then(({ newsletters }) => setNewsletters(newsletters)).catch(fail);
-    getNotificationSettings()
-      .then(({ settings }) =>
-        setAlertsOn((settings.onFailure || settings.onPartialFailure) && (settings.email.enabled || settings.webhook.enabled)),
-      )
-      .catch(() => undefined);
-    listUsers()
-      .then(({ users }) => setUserCount(users.length))
-      .catch(() => undefined);
-  }, []);
+    if (isAdmin) {
+      getNotificationSettings()
+        .then(({ settings }) =>
+          setAlertsOn((settings.onFailure || settings.onPartialFailure) && (settings.email.enabled || settings.webhook.enabled)),
+        )
+        .catch(() => undefined);
+      listUsers()
+        .then(({ users }) => setUserCount(users.length))
+        .catch(() => undefined);
+    }
+  }, [canEdit, isAdmin]);
 
   useEffect(() => {
     if (newsletters === null) return;
@@ -331,7 +344,9 @@ export function DashboardPage() {
     },
   ];
 
-  const requiredDone = checklist.filter((item) => !item.optional).every((item) => item.done);
+  // Setting up is an admin's job, so editors and viewers skip the
+  // checklist and go straight to what's running.
+  const requiredDone = !isAdmin || checklist.filter((item) => !item.optional).every((item) => item.done);
   const showFullChecklist = !requiredDone || checklistExpanded;
 
   const sourcesWithErrors = sources?.filter((s) => s.status === "error").length ?? 0;
@@ -404,12 +419,14 @@ export function DashboardPage() {
         title="Dashboard"
         description={
           requiredDone
-            ? "Your setup is complete — here's what's running."
+            ? isAdmin
+              ? "Your setup is complete — here's what's running."
+              : "Here's what's running."
             : "Finish setting up LatestArr to send your first newsletter."
         }
       />
 
-      {checklistSection}
+      {isAdmin ? checklistSection : null}
 
       {requiredDone ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -421,15 +438,30 @@ export function DashboardPage() {
             icon={Server}
             accent="sky"
           />
-          <StatCard
-            label="Recipients"
-            value={recipients?.length ?? 0}
-            secondary={`${groups?.length ?? 0} group${groups?.length === 1 ? "" : "s"}`}
-            href="/recipients"
-            icon={Users}
-            accent="violet"
-          />
-          <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" icon={Mail} accent="amber" />
+          {canEdit ? (
+            <StatCard
+              label="Recipients"
+              value={recipients?.length ?? 0}
+              secondary={`${groups?.length ?? 0} group${groups?.length === 1 ? "" : "s"}`}
+              href="/recipients"
+              icon={Users}
+              accent="violet"
+            />
+          ) : null}
+          {isAdmin ? (
+            <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" icon={Mail} accent="amber" />
+          ) : null}
+          {!isAdmin ? (
+            <StatCard
+              label="Designs"
+              value={(templates?.length ?? 0) + 1}
+              secondary="Including Default"
+              href="/designs"
+              icon={Palette}
+              accent="amber"
+            />
+          ) : null}
+
           <StatCard
             label="Newsletters"
             value={newsletters?.length ?? 0}
