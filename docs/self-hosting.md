@@ -145,7 +145,7 @@ If you've forgotten your password, from the most common case to the last resort:
    docker exec -it latestarr node dist/cli.js reset-password --email you@example.com
    ```
 
-   It prints a temporary password once, signs that account out everywhere, reactivates it if it was deactivated, and asks for a new password at the next sign-in. Forgotten which email you used? `docker exec -it latestarr node dist/cli.js list-admins` lists the admins. Both are recorded on the **Logs** page.
+   It asks you to type the new password twice, without showing it, then signs that account out everywhere and reactivates it if it was deactivated. Nothing secret is printed. For a script, pipe the password in instead: `printf %s "$PASSWORD" | docker exec -i latestarr node dist/cli.js reset-password --email you@example.com --password-stdin`. Forgotten which email you used? `docker exec -it latestarr node dist/cli.js list-admins` lists the admins. Both are recorded on the **Logs** page.
 
 **Signing in with SSO?** Your password lives with your SSO provider, so reset it there. If the provider itself is down, the recovery command can give your account a password as well.
 

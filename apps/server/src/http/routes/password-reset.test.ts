@@ -216,14 +216,19 @@ describe("password reset by email", () => {
 });
 
 describe("the recovery command", () => {
-  function run(args: string[]) {
+  /** Runs the CLI, answering its password prompts in order (null: no terminal). */
+  function run(args: string[], answers: (string | null)[] = []) {
     const out: string[] = [];
     const err: string[] = [];
-    return runCli(db, args, { out: (line) => out.push(line), err: (line) => err.push(line) }).then((code) => ({
-      code,
-      out: out.join("\n"),
-      err: err.join("\n"),
-    }));
+    const prompts: { prompt: string; fromStdin: boolean }[] = [];
+    return runCli(db, args, {
+      out: (line) => out.push(line),
+      err: (line) => err.push(line),
+      readPassword: async (prompt, { fromStdin }) => {
+        prompts.push({ prompt, fromStdin });
+        return answers.shift() ?? null;
+      },
+    }).then((code) => ({ code, out: out.join("\n"), err: err.join("\n"), prompts }));
   }
 
   it("lists the admins", async () => {
@@ -232,7 +237,7 @@ describe("the recovery command", () => {
     expect(out).toBe("admin@example.com");
   });
 
-  it("gives an account a temporary password, signs it out, reactivates it, and logs it", async () => {
+  it("sets a password typed twice at a hidden prompt, signs the account out, reactivates it, and logs it", async () => {
     const added = await as(admin, {
       method: "POST",
       url: "/api/users",
@@ -241,19 +246,42 @@ describe("the recovery command", () => {
     const sam = cookieFrom(await login("sam@example.com", "temporary-password-1"));
     await as(admin, { method: "PATCH", url: `/api/users/${added.json().user.id}`, payload: { isActive: false } });
 
-    const { code, out } = await run(["reset-password", "--email", "SAM@example.com"]);
-    expect(code).toBe(0);
-    const password = out.split("\n").find((line) => line.startsWith("  "))!.trim();
-    expect(password).toHaveLength(24);
-    expect(out).toContain("active again");
+    const result = await run(["reset-password", "--email", "SAM@example.com"], ["sams-recovered-password", "sams-recovered-password"]);
+    expect(result.code).toBe(0);
+    expect(result.prompts).toEqual([
+      { prompt: "New password for sam@example.com: ", fromStdin: false },
+      { prompt: "Type it again: ", fromStdin: false },
+    ]);
+    // Nothing secret is printed.
+    expect(result.out).not.toContain("sams-recovered-password");
+    expect(result.out).toContain("active again");
 
     expect((await as(sam, { method: "GET", url: "/api/auth/me" })).statusCode).toBe(401);
-    const signedIn = await login("sam@example.com", password);
+    const signedIn = await login("sam@example.com", "sams-recovered-password");
     expect(signedIn.statusCode).toBe(200);
-    expect(signedIn.json().user.mustChangePassword).toBe(true);
+    // They chose it themselves, so there's no forced change.
+    expect(signedIn.json().user.mustChangePassword).toBe(false);
 
     const logs = (await as(admin, { method: "GET", url: "/api/logs" })).json().logs as { msg: string; source?: string }[];
-    expect(logs.find((entry) => entry.source === "cli")?.msg).toBe("Recovery command gave sam@example.com a temporary password");
+    expect(logs.find((entry) => entry.source === "cli")?.msg).toBe("Recovery command set a new password for sam@example.com");
+  });
+
+  it("reads one line from a pipe with --password-stdin, without asking twice", async () => {
+    const result = await run(["reset-password", "--email", "admin@example.com", "--password-stdin"], ["piped-in-password-1"]);
+    expect(result.code).toBe(0);
+    expect(result.prompts).toEqual([{ prompt: "New password for admin@example.com: ", fromStdin: true }]);
+    expect((await login("admin@example.com", "piped-in-password-1")).statusCode).toBe(200);
+  });
+
+  it("changes nothing when the passwords don't match, are too short, or there's no terminal", async () => {
+    const mismatch = await run(["reset-password", "--email", "admin@example.com"], ["a-long-new-password", "a-different-password"]);
+    expect(mismatch.code).toBe(1);
+    expect(mismatch.err).toContain("didn't match");
+    const short = await run(["reset-password", "--email", "admin@example.com"], ["short"]);
+    expect(short.err).toContain("at least 12 characters");
+    const noTerminal = await run(["reset-password", "--email", "admin@example.com"], [null]);
+    expect(noTerminal.err).toContain("docker exec with -it");
+    expect((await login("admin@example.com", PASSWORD)).statusCode).toBe(200);
   });
 
   it("explains a missing or unknown email", async () => {
