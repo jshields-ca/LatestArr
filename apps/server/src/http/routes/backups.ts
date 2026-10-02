@@ -9,7 +9,7 @@ import { runBackup, type BackupScheduler } from "../../backups/runner.js";
 import {
   BackupAlreadyRunningError,
   type BackupContext,
-  backupPath,
+  findBackup,
   listBackups,
   loadBackupSettings,
   loadLastRun,
@@ -133,28 +133,24 @@ export function registerBackupRoutes(app: FastifyInstance, db: Db, options: Back
     scope.get<{ Params: FilenameParams }>("/backups/:filename/download", async (request, reply) => {
       const ctx = options.ctx;
       if (!ctx) return unavailable(reply);
-      const file = backupPath(ctx.backupDir, request.params.filename);
-      if (!file) return reply.code(404).send({ error: "Not found" });
-      try {
-        await stat(file);
-      } catch {
-        return reply.code(404).send({ error: "Not found" });
-      }
-      request.log.warn({ filename: request.params.filename }, `Downloaded the backup ${request.params.filename}`);
+      const found = await findBackup(ctx.backupDir, request.params.filename);
+      if (!found) return reply.code(404).send({ error: "Not found" });
+      const { filename } = found.file;
+      request.log.warn({ filename }, `Downloaded the backup ${filename}`);
       return reply
-        .header("content-disposition", `attachment; filename="${request.params.filename}"`)
+        .header("content-disposition", `attachment; filename="${filename}"`)
         .header("cache-control", "no-store")
         .type("application/zip")
-        .send(createReadStream(file));
+        .send(createReadStream(found.path));
     });
 
     scope.delete<{ Params: FilenameParams }>("/backups/:filename", async (request, reply) => {
       const ctx = options.ctx;
       if (!ctx) return unavailable(reply);
-      const file = backupPath(ctx.backupDir, request.params.filename);
-      if (!file) return reply.code(404).send({ error: "Not found" });
-      await rm(file, { force: true });
-      request.log.warn({ filename: request.params.filename }, `Deleted the backup ${request.params.filename}`);
+      const found = await findBackup(ctx.backupDir, request.params.filename);
+      if (!found) return reply.code(404).send({ error: "Not found" });
+      await rm(found.path, { force: true });
+      request.log.warn({ filename: found.file.filename }, `Deleted the backup ${found.file.filename}`);
       return reply.code(204).send();
     });
   });

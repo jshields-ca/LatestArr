@@ -13,7 +13,7 @@ import { runBackup } from "./runner.js";
 import {
   type BackupContext,
   type BackupFile,
-  backupPath,
+  findBackup,
   backupsToKeep,
   createBackup,
   keyFingerprint,
@@ -116,9 +116,10 @@ describe("backup archives", () => {
     writeFileSync(path.join(ctx.backupDir, "notes.txt"), "not a backup");
     const files = await listBackups(ctx.backupDir);
     expect(files.map((f) => f.trigger)).toEqual(["scheduled", "manual"]);
-    expect(backupPath(ctx.backupDir, "../latestarr.db")).toBeNull();
-    expect(backupPath(ctx.backupDir, "notes.txt")).toBeNull();
-    expect(backupPath(ctx.backupDir, "latestarr-backup-20260929T030000Z-v0.12.0-manual.zip/../../x")).toBeNull();
+    expect(await findBackup(ctx.backupDir, "../latestarr.db")).toBeNull();
+    expect(await findBackup(ctx.backupDir, "notes.txt")).toBeNull();
+    expect(await findBackup(ctx.backupDir, `${files[0]!.filename}/../../x`)).toBeNull();
+    expect((await findBackup(ctx.backupDir, files[0]!.filename))?.path).toBe(path.join(ctx.backupDir, files[0]!.filename));
   });
 
   it("records a failure, alerts, and keeps older backups when a backup can't be written", async () => {

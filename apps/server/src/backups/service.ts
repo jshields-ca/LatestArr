@@ -149,10 +149,16 @@ export async function listBackups(backupDir: string): Promise<BackupFile[]> {
   return files.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
-/** The path of a backup by name, or null if the name isn't a backup (so never a path outside the folder). */
-export function backupPath(backupDir: string, filename: string): string | null {
-  return parseBackupFilename(filename) ? path.join(backupDir, filename) : null;
+/**
+ * Finds a backup in the folder by name. The path is built from the folder's
+ * own listing, never from the name asked for, so no request can reach a
+ * file outside the folder or one that isn't a backup.
+ */
+export async function findBackup(backupDir: string, filename: string): Promise<{ file: BackupFile; path: string } | null> {
+  const match = (await listBackups(backupDir)).find((file) => file.filename === filename);
+  return match ? { file: match, path: path.join(backupDir, match.filename) } : null;
 }
+
 
 const RESTORE_README = `This is a LatestArr backup.
 
