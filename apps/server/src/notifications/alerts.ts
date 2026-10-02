@@ -12,6 +12,7 @@ export type WebhookFormat = (typeof WEBHOOK_FORMATS)[number];
 export interface NotificationSettings {
   onFailure: boolean;
   onPartialFailure: boolean;
+  onBackupFailure: boolean;
   email: { enabled: boolean; smtpProfileId: string | null; to: string };
   webhook: { enabled: boolean; format: WebhookFormat; url: string | null };
 }
@@ -28,6 +29,7 @@ const SETTINGS_KEY = "notifications";
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   onFailure: true,
   onPartialFailure: true,
+  onBackupFailure: true,
   email: { enabled: false, smtpProfileId: null, to: "" },
   webhook: { enabled: false, format: "discord", url: null },
 };
@@ -39,6 +41,8 @@ export async function loadNotificationSettings(db: Db): Promise<NotificationSett
   return {
     onFailure: stored.onFailure,
     onPartialFailure: stored.onPartialFailure,
+    // Saved before backups existed: on, like a new install.
+    onBackupFailure: stored.onBackupFailure ?? true,
     email: stored.email,
     webhook: {
       enabled: stored.webhook.enabled,
@@ -52,6 +56,7 @@ export async function saveNotificationSettings(db: Db, value: NotificationSettin
   const stored: StoredNotificationSettings = {
     onFailure: value.onFailure,
     onPartialFailure: value.onPartialFailure,
+    onBackupFailure: value.onBackupFailure,
     email: value.email,
     webhook: {
       enabled: value.webhook.enabled,
@@ -88,7 +93,7 @@ function messageFor(alert: FailureAlert): AlertMessage {
   return { title, body };
 }
 
-function webhookRequest(format: WebhookFormat, message: AlertMessage, alert: FailureAlert | null): RequestInit {
+function webhookRequest(format: WebhookFormat, message: AlertMessage, alert: FailureAlert | null, event?: string): RequestInit {
   const json = (payload: unknown): RequestInit => ({
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -110,7 +115,7 @@ function webhookRequest(format: WebhookFormat, message: AlertMessage, alert: Fai
       return json({ title: message.title, body: message.body, type: "failure" });
     case "json":
       return json({
-        event: alert ? `newsletter.${alert.kind}` : "test",
+        event: alert ? `newsletter.${alert.kind}` : (event ?? "test"),
         title: message.title,
         message: message.body,
         newsletter: alert ? { id: alert.newsletterId, name: alert.newsletterName } : null,
@@ -132,6 +137,7 @@ async function deliver(
   config: NotificationSettings,
   message: AlertMessage,
   alert: FailureAlert | null,
+  event?: string,
 ): Promise<DeliveryResult[]> {
   const results: DeliveryResult[] = [];
 
@@ -159,7 +165,7 @@ async function deliver(
     try {
       if (!config.webhook.url) throw new Error("No webhook URL is set");
       const response = await fetch(config.webhook.url, {
-        ...webhookRequest(config.webhook.format, message, alert),
+        ...webhookRequest(config.webhook.format, message, alert, event),
         signal: AbortSignal.timeout(10_000),
       });
       if (!response.ok) throw new Error(`The webhook responded with HTTP ${response.status}`);
@@ -214,6 +220,32 @@ export async function sendFailureAlert(db: Db, alert: FailureAlert, log: Logger)
     }
   } catch (err) {
     log.warn({ err }, `Couldn't send an alert about "${alert.newsletterName}"`);
+  }
+}
+
+// Never throws, like sendFailureAlert. At most one an hour.
+export async function sendBackupFailureAlert(db: Db, reason: string, log: Logger): Promise<void> {
+  try {
+    const config = await loadNotificationSettings(db);
+    if (!config.onBackupFailure || (!config.email.enabled && !config.webhook.enabled)) return;
+    const last = lastAlertAt.get("backup");
+    if (last !== undefined && Date.now() - last < RATE_LIMIT_MS) {
+      log.debug("Skipped a repeat backup alert (one per hour)");
+      return;
+    }
+    lastAlertAt.set("backup", Date.now());
+    const message = {
+      title: "LatestArr: a backup failed",
+      body: `${reason}
+
+Open the Backups page in LatestArr for details. Older backups are kept until a new one succeeds.`,
+    };
+    for (const result of await deliver(db, config, message, null, "backup.failed")) {
+      if (result.ok) log.info({ destination: result.destination }, `Sent a ${result.destination} alert about the failed backup`);
+      else log.warn({ destination: result.destination, reason: result.error }, `Couldn't send a ${result.destination} alert about the failed backup: ${result.error}`);
+    }
+  } catch (err) {
+    log.warn({ err }, "Couldn't send an alert about the failed backup");
   }
 }
 

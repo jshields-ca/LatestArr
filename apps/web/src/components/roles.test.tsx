@@ -104,7 +104,7 @@ describe("roles in the web app", () => {
     renderAs("admin", <AppShell>Page</AppShell>);
     nav = (await screen.findAllByRole("navigation", { name: "Main navigation" }))[0]!;
     await within(nav).findByRole("link", { name: "Users" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(9);
+    expect(within(nav).getAllByRole("link")).toHaveLength(10);
     expect(screen.queryByText(/access$/)).not.toBeInTheDocument();
   });
 

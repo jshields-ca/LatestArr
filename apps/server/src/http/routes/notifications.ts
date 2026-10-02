@@ -15,6 +15,8 @@ const settingsSchema = z
   .object({
     onFailure: z.boolean(),
     onPartialFailure: z.boolean(),
+    // Optional so a client from before backups keeps working.
+    onBackupFailure: z.boolean().optional(),
     email: z.object({
       enabled: z.boolean(),
       smtpProfileId: z.string().min(1).nullable(),
@@ -37,6 +39,7 @@ type SettingsBody = z.infer<typeof settingsSchema>;
 function merge(body: SettingsBody, saved: NotificationSettings): NotificationSettings {
   return {
     ...body,
+    onBackupFailure: body.onBackupFailure ?? saved.onBackupFailure,
     webhook: {
       enabled: body.webhook.enabled,
       format: body.webhook.format,

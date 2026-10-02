@@ -4,6 +4,7 @@
 //
 //   docker exec -it latestarr node dist/cli.js reset-password --email you@example.com
 //   docker exec -it latestarr node dist/cli.js list-admins
+//   docker exec -it latestarr node dist/cli.js restore <backup file>
 //
 // The new password is typed at a hidden prompt, never printed or passed as
 // an argument (which would show in the shell's history and `ps`). It's
@@ -20,6 +21,8 @@ import { hashPassword } from "./auth/password.js";
 import { clearResetTokens } from "./auth/password-reset.js";
 import { deleteUserSessions } from "./auth/session.js";
 import { MIN_PASSWORD_LENGTH } from "./http/routes/auth.js";
+import { cancelStagedRestore, type CheckedBackup, checkBackup, resolveBackupFile, stageRestore } from "./backups/restore.js";
+import { defaultBackupDir } from "./backups/service.js";
 
 const USAGE = `LatestArr recovery commands
 
@@ -29,6 +32,14 @@ const USAGE = `LatestArr recovery commands
                                      --password-stdin to read the password
                                      from a pipe instead, for scripts.
   list-admins                        Show the admin accounts' email addresses.
+  check-backup <file>                Check a backup can be restored here.
+  restore <file>                     Restore a backup the next time LatestArr
+                                     starts. The current database is kept.
+                                     Add --ignore-key-mismatch to restore one
+                                     made with a different ENCRYPTION_KEY.
+  restore --cancel                   Don't restore after all.
+
+A <file> is a path, or a backup's name in the backup folder.
 
 In Docker: docker exec -it latestarr node dist/cli.js <command>`;
 
@@ -43,8 +54,76 @@ export interface CliIo {
   readPassword: (prompt: string, options: { fromStdin: boolean }) => Promise<string | null>;
 }
 
-export async function runCli(db: Db, args: string[], io: CliIo): Promise<number> {
+/** Where things are, for the backup commands. */
+export interface CliPaths {
+  databasePath: string;
+  backupDir: string;
+  encryptionKey: string;
+}
+
+function describeBackup(checked: CheckedBackup, io: CliIo): void {
+  const { manifest } = checked;
+  const counts = Object.entries(manifest.counts)
+    .map(([table, n]) => `${n} ${table.replace(/_/g, " ")}`)
+    .join(", ");
+  io.out(`${path.basename(checked.file)}`);
+  io.out(`  Made ${manifest.createdAt} by LatestArr ${manifest.version} (${manifest.trigger})`);
+  io.out(`  Contains ${counts}`);
+  io.out("  Passes SQLite's integrity check");
+  io.out(
+    checked.keyMatches
+      ? "  Made with this server's ENCRYPTION_KEY"
+      : "  Made with a DIFFERENT ENCRYPTION_KEY: its saved credentials can't be read with this server's key",
+  );
+}
+
+export async function runCli(db: Db, args: string[], io: CliIo, paths?: CliPaths): Promise<number> {
   const [command, ...rest] = args;
+
+  if ((command === "check-backup" || command === "restore") && paths) {
+    if (command === "restore" && rest.includes("--cancel")) {
+      const cancelled = await cancelStagedRestore(paths.databasePath);
+      io.out(cancelled ? "Cancelled: nothing will be restored." : "There was no restore waiting.");
+      if (cancelled) recordAuditEvent(db, "Recovery command cancelled a waiting restore", { source: "cli" });
+      return 0;
+    }
+    const name = rest.find((arg) => !arg.startsWith("--"));
+    if (!name) {
+      io.err(`Which backup? Add its file name, from the Backups page or ${paths.backupDir}.`);
+      return 2;
+    }
+    let checked: CheckedBackup;
+    try {
+      checked = await checkBackup(resolveBackupFile(name, paths.backupDir), db, paths.encryptionKey, path.dirname(paths.databasePath));
+    } catch (err) {
+      io.err(`Can't use this backup: ${err instanceof Error ? err.message : String(err)}`);
+      return 1;
+    }
+    describeBackup(checked, io);
+    if (checked.newerThanThis) {
+      io.err("It was made by a newer version of LatestArr than this one. Upgrade LatestArr first, then restore it.");
+      return 1;
+    }
+    if (command === "check-backup") return 0;
+
+    if (!checked.keyMatches && !rest.includes("--ignore-key-mismatch")) {
+      io.err("");
+      io.err("Not restored. Set ENCRYPTION_KEY to the key of the install this backup came from, restart, and try again.");
+      io.err("Or add --ignore-key-mismatch to restore it anyway, then enter every source's and SMTP profile's credentials again.");
+      return 1;
+    }
+    await stageRestore(checked, paths.databasePath);
+    recordAuditEvent(db, `Recovery command staged a restore from ${path.basename(checked.file)}`, {
+      source: "cli",
+      backup: path.basename(checked.file),
+      keyMatches: checked.keyMatches,
+    });
+    io.out("");
+    io.out("Ready. Restart LatestArr to restore it (docker restart latestarr).");
+    io.out("The current database is kept beside it, renamed latestarr.db.before-restore-<time>.");
+    io.out("Changed your mind? Run: node dist/cli.js restore --cancel");
+    return 0;
+  }
 
   if (command === "list-admins") {
     const admins = db.select().from(users).where(eq(users.role, "admin")).orderBy(users.createdAt).all();
@@ -186,11 +265,16 @@ async function main(): Promise<void> {
   // The running server has already done this; it's a no-op unless this
   // copy of LatestArr is newer than the database.
   runMigrations(db);
-  const code = await runCli(db, process.argv.slice(2), {
-    out: console.log,
-    err: console.error,
-    readPassword: (prompt, { fromStdin }) => (fromStdin ? readStdinLine() : promptHidden(prompt)),
-  });
+  const code = await runCli(
+    db,
+    process.argv.slice(2),
+    {
+      out: console.log,
+      err: console.error,
+      readPassword: (prompt, { fromStdin }) => (fromStdin ? readStdinLine() : promptHidden(prompt)),
+    },
+    { databasePath, backupDir: defaultBackupDir(databasePath), encryptionKey: process.env.ENCRYPTION_KEY ?? "" },
+  );
   db.$client.close();
   process.exit(code);
 }

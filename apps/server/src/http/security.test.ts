@@ -145,6 +145,11 @@ const ROLE_NEEDED: Record<string, Role> = {
   "GET /api/logs": "admin",
   "GET /api/settings/system-mail": "admin",
   "PUT /api/settings/system-mail": "admin",
+  "GET /api/backups": "admin",
+  "POST /api/backups": "admin",
+  "PUT /api/backups/settings": "admin",
+  "GET /api/backups/:filename/download": "admin",
+  "DELETE /api/backups/:filename": "admin",
 };
 
 async function signInAs(admin: string, role: Role): Promise<string> {
