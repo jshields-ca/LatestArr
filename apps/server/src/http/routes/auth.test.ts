@@ -35,7 +35,7 @@ describe("GET /auth/providers", () => {
   it("reports needsSetup true and oidc false before any user exists", async () => {
     const response = await app.inject({ method: "GET", url: "/api/auth/providers" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ local: true, oidc: false, needsSetup: true });
+    expect(response.json()).toEqual({ local: true, oidc: false, needsSetup: true, passwordReset: false });
   });
 
   it("reports needsSetup false once a user exists", async () => {
@@ -46,7 +46,7 @@ describe("GET /auth/providers", () => {
     });
 
     const response = await app.inject({ method: "GET", url: "/api/auth/providers" });
-    expect(response.json()).toEqual({ local: true, oidc: false, needsSetup: false });
+    expect(response.json()).toEqual({ local: true, oidc: false, needsSetup: false, passwordReset: false });
   });
 });
 

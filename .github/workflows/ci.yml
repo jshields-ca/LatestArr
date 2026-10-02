@@ -148,6 +148,28 @@ jobs:
             echo "The database is owned by $data_owner, expected node"; exit 1;
           fi
 
+          echo "Checking the recovery command, run as root like a plain docker exec..."
+          curl -sf -X POST http://localhost:3000/api/auth/bootstrap -H "Content-Type: application/json" \
+            -d '{"email":"admin@example.com","password":"a-smoke-test-password","displayName":"Admin"}' > /dev/null
+          docker exec latestarr-smoke node dist/cli.js list-admins | grep -q "admin@example.com" \
+            || { echo "list-admins didn't list the admin"; exit 1; }
+          printf 'a-recovered-smoke-password\n' \
+            | docker exec -i latestarr-smoke node dist/cli.js reset-password --email admin@example.com --password-stdin \
+            || { echo "reset-password failed"; exit 1; }
+          login_status="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/auth/login \
+            -H "Content-Type: application/json" -d '{"email":"admin@example.com","password":"a-recovered-smoke-password"}')"
+          if [ "$login_status" != "200" ]; then
+            echo "Signing in with the recovered password returned $login_status"; docker logs latestarr-smoke; exit 1;
+          fi
+          # Without a terminal or a pipe, it must refuse rather than hang.
+          if docker exec latestarr-smoke node dist/cli.js reset-password --email admin@example.com < /dev/null; then
+            echo "reset-password without a terminal should have failed"; exit 1;
+          fi
+          root_files="$(docker exec latestarr-smoke find /app/data -user root)"
+          if [ -n "$root_files" ]; then
+            echo "The recovery command left root-owned files the server can't write: $root_files"; exit 1;
+          fi
+
           echo "All smoke checks passed"
 
       - name: Stop smoke test container

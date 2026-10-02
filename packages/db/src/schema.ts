@@ -65,6 +65,34 @@ export const sessions = sqliteTable("sessions", {
   userAgent: text("user_agent"),
 });
 
+// A "forgot password" email link. Only a hash of the token is stored, so
+// the database alone can't be used to reset anyone's password. Each link
+// works once, until expiresAt.
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+});
+
+// Security events recorded outside the server process (the recovery
+// command run with `docker exec`), so they still reach the Logs page,
+// which otherwise only sees the server's own log lines.
+export const auditEvents = sqliteTable("audit_events", {
+  id: id(),
+  time: integer("time", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  // A pino level: 30 info, 40 warn.
+  level: integer("level").notNull().default(30),
+  message: text("message").notNull(),
+  detail: text("detail", { mode: "json" }).$type<Record<string, unknown>>(),
+});
+
 export const sourceConnections = sqliteTable("source_connections", {
   id: id(),
   name: text("name").notNull(),

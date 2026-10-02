@@ -3,6 +3,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { hashPassword } from "../../auth/password.js";
+import { clearResetTokens } from "../../auth/password-reset.js";
 import { ROLES } from "../../auth/roles.js";
 import { deleteUserSessions, SESSION_COOKIE } from "../../auth/session.js";
 import { requireAuth } from "../require-auth.js";
@@ -138,6 +139,7 @@ export function registerUserRoutes(app: FastifyInstance, db: Db): void {
       // except an admin resetting their own password stays signed in here.
       if (body.isActive === false || body.password !== undefined) {
         await deleteUserSessions(db, target.id, target.id === me?.id ? request.cookies[SESSION_COOKIE] : undefined);
+        clearResetTokens(db, target.id);
       }
       const changes = [
         body.displayName !== undefined && "renamed",

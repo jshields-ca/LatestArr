@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ApiError, getAuthProviders } from "@/lib/api";
+import { RECOVERY_DOCS_URL } from "@/lib/links";
 
 interface LocationState {
   from?: { pathname: string };
@@ -23,6 +24,7 @@ export function LoginPage() {
 
   const [oidcAvailable, setOidcAvailable] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [resetByEmail, setResetByEmail] = useState(false);
   const [checkingProviders, setCheckingProviders] = useState(true);
 
   const [email, setEmail] = useState("");
@@ -35,6 +37,7 @@ export function LoginPage() {
       .then((providers) => {
         setOidcAvailable(providers.oidc);
         setNeedsSetup(providers.needsSetup);
+        setResetByEmail(Boolean(providers.passwordReset));
       })
       .catch(() => {
         // If the API is unreachable, the login form still renders — the
@@ -90,7 +93,14 @@ export function LoginPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-baseline justify-between gap-2">
+                <Label htmlFor="password">Password</Label>
+                {resetByEmail ? (
+                  <Link to="/forgot-password" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+                    Forgot password?
+                  </Link>
+                ) : null}
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -125,6 +135,18 @@ export function LoginPage() {
                 <a href="/api/auth/oidc/login">Continue with SSO</a>
               </Button>
             </>
+          ) : null}
+
+          {/* Without email resets, say where to go instead of leaving
+              someone stuck. */}
+          {!checkingProviders && !resetByEmail ? (
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              Forgot your password? Ask another admin to reset it, or see{" "}
+              <a href={RECOVERY_DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                what to do if you&apos;re locked out
+              </a>
+              .
+            </p>
           ) : null}
         </CardContent>
       </Card>

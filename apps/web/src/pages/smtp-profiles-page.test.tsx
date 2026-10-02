@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { selectOption } from "@/test/select";
+
 import { SmtpProfilesPage } from "./smtp-profiles-page";
 
 const fetchMock = vi.fn();
@@ -261,5 +263,37 @@ describe("SmtpProfilesPage", () => {
     await screen.findByRole("dialog");
 
     expect(await axe(document.body)).toHaveNoViolations();
+  });
+});
+
+describe("System email", () => {
+  function answer(routes: Record<string, (init?: RequestInit) => unknown>) {
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const route = routes[`${init?.method ?? "GET"} ${url}`];
+      if (!route) throw new Error(`Unexpected fetch to ${init?.method ?? "GET"} ${url}`);
+      return Promise.resolve(route(init));
+    });
+  }
+
+  it("chooses the profile for reset links, and says when WEB_ORIGIN would break them", async () => {
+    const saved: unknown[] = [];
+    answer({
+      "GET /api/smtp-profiles": () => jsonResponse(200, { smtpProfiles: [exampleProfile] }),
+      "GET /api/settings/system-mail": () =>
+        jsonResponse(200, { smtpProfileId: null, resetLinks: { available: false, reason: "no_system_mail" }, webOrigin: null }),
+      "PUT /api/settings/system-mail": (init) => {
+        saved.push(JSON.parse(init!.body as string));
+        return jsonResponse(200, {
+          smtpProfileId: "s1",
+          resetLinks: { available: false, reason: "origin_mismatch" },
+          webOrigin: "http://localhost:3000",
+        });
+      },
+    });
+    render(<SmtpProfilesPage />);
+    expect(await screen.findByText(/Choose a profile to let people reset/)).toBeInTheDocument();
+    selectOption(screen.getByLabelText("System email profile"), "Primary");
+    await waitFor(() => expect(saved).toEqual([{ smtpProfileId: "s1" }]));
+    expect(await screen.findByText(/WEB_ORIGIN is http:\/\/localhost:3000/)).toBeInTheDocument();
   });
 });

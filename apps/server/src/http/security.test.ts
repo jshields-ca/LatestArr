@@ -67,6 +67,8 @@ const PUBLIC = new Set([
   "GET /api/auth/providers",
   "POST /api/auth/bootstrap",
   "POST /api/auth/login",
+  "POST /api/auth/password-reset/request",
+  "POST /api/auth/password-reset/confirm",
   "POST /api/auth/logout",
   "GET /api/auth/oidc/login",
   "GET /api/auth/oidc/callback",
@@ -141,6 +143,8 @@ const ROLE_NEEDED: Record<string, Role> = {
   "PATCH /api/users/:id": "admin",
   "DELETE /api/users/:id": "admin",
   "GET /api/logs": "admin",
+  "GET /api/settings/system-mail": "admin",
+  "PUT /api/settings/system-mail": "admin",
 };
 
 async function signInAs(admin: string, role: Role): Promise<string> {

@@ -3,6 +3,7 @@ import { type Db, smtpProfiles } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { loadSystemMail, saveSystemMail } from "../../auth/password-reset.js";
 import { smtpCredentialsFor } from "../../mailer/credentials.js";
 import { sendEmail, verifySmtpConnection } from "../../mailer/send.js";
 import { getEncryptionKey } from "../../secrets.js";
@@ -129,6 +130,10 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
       const [deleted] = await db.delete(smtpProfiles).where(eq(smtpProfiles.id, request.params.id)).returning();
       if (deleted) {
         request.log.info({ smtpProfileId: deleted.id }, `Deleted SMTP profile "${deleted.name}"`);
+        if (loadSystemMail(db).smtpProfileId === deleted.id) {
+          saveSystemMail(db, { smtpProfileId: null });
+          request.log.warn(`System email is off: its SMTP profile "${deleted.name}" was deleted`);
+        }
       }
       return reply.code(204).send();
     });

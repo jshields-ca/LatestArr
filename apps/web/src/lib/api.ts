@@ -97,10 +97,46 @@ export interface AuthProviders {
   local: boolean;
   oidc: boolean;
   needsSetup: boolean;
+  /** Whether "Forgot password?" can email a reset link. */
+  passwordReset?: boolean;
 }
 
 export function getAuthProviders(): Promise<AuthProviders> {
   return apiFetch<AuthProviders>("/auth/providers");
+}
+
+/** Always answers the same way, whether or not the account exists. */
+export function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>("/auth/password-reset/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+  return apiFetch<void>("/auth/password-reset/confirm", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
+  });
+}
+
+export type ResetLinksUnavailableReason = "no_system_mail" | "no_web_origin" | "origin_mismatch";
+
+export interface SystemMailSettings {
+  smtpProfileId: string | null;
+  resetLinks: { available: true } | { available: false; reason: ResetLinksUnavailableReason };
+  webOrigin: string | null;
+}
+
+export function getSystemMail(): Promise<SystemMailSettings> {
+  return apiFetch<SystemMailSettings>("/settings/system-mail");
+}
+
+export function saveSystemMail(smtpProfileId: string | null): Promise<SystemMailSettings> {
+  return apiFetch<SystemMailSettings>("/settings/system-mail", {
+    method: "PUT",
+    body: JSON.stringify({ smtpProfileId }),
+  });
 }
 
 export function getVersion(): Promise<{ version: string }> {

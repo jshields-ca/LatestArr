@@ -24,7 +24,7 @@ Open `.env` and set:
   openssl rand -base64 32
   ```
   Store this somewhere durable outside the repo (a password manager, a secrets store). If you lose it, every encrypted credential in the database becomes unreadable — sources, SMTP profiles, and OIDC config would all need to be re-entered.
-- **`WEB_ORIGIN`** (optional) — the externally-reachable URL of this instance, e.g. `https://newsletter.example.com`. Only matters if you're exposing this beyond `localhost` or enabling OIDC (some providers validate the redirect URI's origin). Defaults to `http://localhost:3000`.
+- **`WEB_ORIGIN`** (optional) — the externally-reachable URL of this instance, e.g. `https://newsletter.example.com`. Matters if you're exposing this beyond `localhost`, enabling OIDC (some providers validate the redirect URI's origin), or using password reset emails (the links point here). Defaults to `http://localhost:3000`.
 - The four `OIDC_*` variables (optional) — see [Setting up OIDC/SSO](#setting-up-oidcsso) below. Leave all four blank for local username/password auth only, which is the default and requires no configuration.
 
 Every variable is documented in [`.env.example`](../.env.example).
@@ -132,6 +132,22 @@ Pages and buttons someone's role doesn't allow are hidden, and the server refuse
 - **Delete** a user. Designs they created are kept.
 
 You can't deactivate, delete, or change the role of your own account, and the last active admin can't be removed, so there's always at least one admin who can sign in. Change your own name or password from the pencil button in the header.
+
+## Locked out?
+
+If you've forgotten your password, from the most common case to the last resort:
+
+1. **Ask another admin.** On the **Users** page they can **Reset password** for you. You get a temporary password, are signed out everywhere, and choose your own at your next sign-in. This is why the setup checklist suggests a second admin account.
+2. **Use "Forgot password?" on the sign-in page.** It emails you a link that works once, for 30 minutes. It's only there once an admin has chosen a **System email** profile on the **SMTP Profiles** page, and `WEB_ORIGIN` matches the address you use for LatestArr (otherwise the links would be broken, and the SMTP Profiles page says so). Asking always gives the same answer, so it doesn't reveal which emails have accounts, and an account gets at most one email every couple of minutes.
+3. **Use the recovery command on the server.** It works even without email. Anyone who can run commands on the host already controls the install, so that's the proof of ownership:
+
+   ```bash
+   docker exec -it latestarr node dist/cli.js reset-password --email you@example.com
+   ```
+
+   It asks you to type the new password twice, without showing it, then signs that account out everywhere and reactivates it if it was deactivated. Nothing secret is printed. For a script, pipe the password in instead: `printf %s "$PASSWORD" | docker exec -i latestarr node dist/cli.js reset-password --email you@example.com --password-stdin`. Forgotten which email you used? `docker exec -it latestarr node dist/cli.js list-admins` lists the admins. Both are recorded on the **Logs** page.
+
+**Signing in with SSO?** Your password lives with your SSO provider, so reset it there. If the provider itself is down, the recovery command can give your account a password as well.
 
 ## Logs
 
