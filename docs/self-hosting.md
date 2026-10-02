@@ -159,8 +159,46 @@ The page keeps the most recent 500 entries in memory, so it starts empty after a
 
 The **Notifications** page can alert you when a scheduled newsletter fails to send or only reaches some of its recipients: by email through one of your SMTP profiles, and/or through a webhook (Discord, Slack, ntfy, Apprise, or generic JSON). Manual **Send now** results don't alert, since you see those yourself, and alerts for the same newsletter are limited to one per hour. Use **Send test alert** to check a destination before saving. If the problem is your mail server, an email alert can't get through either, so a webhook is the more reliable choice.
 
-## Backups and upgrades
+## Backups
 
-**Back up**: the `latestarr-data` volume (the entire SQLite database) and your `ENCRYPTION_KEY`. Losing the key while keeping the database means every encrypted credential in it is unrecoverable; losing the volume without the key is just a normal "restore from backup."
+LatestArr backs up its database every day at 03:00 and keeps the last seven. Change the schedule and what's kept on the **Backups** page (admins only), where you can also **Back up now**, download, or delete a backup.
 
-**Upgrade**: pull the new image tag and `docker compose up -d` again — migrations run automatically against the existing database on container start, and there's no separate migration step to run by hand. Read the relevant [`CHANGELOG.md`](../CHANGELOG.md) entries first if you're skipping several versions.
+- **Each backup is one `.zip` file**, named like `latestarr-backup-20260929T030000Z-v0.12.0-scheduled.zip`. It holds the database and a `manifest.json` (version, time, item counts, and a fingerprint of your key, never the key itself).
+- **Made while LatestArr runs**, using SQLite's online backup, and checked with SQLite's integrity check before it's kept. A backup that fails is reported on the Backups and Logs pages, and with a failure alert if you've set those up (Notifications → "A backup fails").
+- **Retention** keeps either the most recent _N_, or the newest from each of the last few days, weeks, and months. Old backups are only removed after a new one succeeds, and the newest one is always kept.
+- **Before an upgrade**, when a new version starts on your database for the first time, it backs up first (marked "Before upgrade"). The last three of those are kept regardless of retention, so an upgrade can always be undone.
+
+**Where they go:** `/app/data/backups` by default, which is on the same volume as the database, so a failed disk takes both. Set `BACKUP_PATH` to a folder on another disk, a NAS mount, or somewhere your host's own backup tool already copies offsite:
+
+```yaml
+services:
+  latestarr:
+    environment:
+      BACKUP_PATH: /backups
+    volumes:
+      - latestarr-data:/app/data
+      - /mnt/nas/latestarr-backups:/backups
+```
+
+**Keep `ENCRYPTION_KEY` safe, separately.** Backups don't include it, on purpose. Without it, a restored backup's source and SMTP passwords can't be read (everything else still works, and you can enter those again).
+
+**Backups are sensitive.** They hold every recipient's email address and your send history. Only admins can download them, and each download is logged.
+
+### Restoring a backup
+
+The recovery command checks a backup and swaps it in the next time LatestArr starts. Your current database is kept beside it, renamed `latestarr.db.before-restore-<time>`, in case you change your mind.
+
+1. **Check it** (optional): `docker exec -it latestarr node dist/cli.js check-backup <file>`. This shows when it was made and by which version, what it contains, and whether it was made with this server's `ENCRYPTION_KEY`.
+2. **Restore it:** `docker exec -it latestarr node dist/cli.js restore <file>`. `<file>` is a backup's name from the Backups page, or a path inside the container.
+3. **Restart:** `docker restart latestarr`.
+
+To restore a backup you downloaded, copy it into the backup folder first, e.g. `docker cp latestarr-backup-….zip latestarr:/app/data/backups/`.
+
+- **A different key:** the restore stops and explains. Set `ENCRYPTION_KEY` to the key of the install the backup came from, restart, and run it again. Or add `--ignore-key-mismatch` and enter the sources' and SMTP profiles' credentials again afterwards. LatestArr also warns at startup when its key can't read the saved credentials.
+- **A newer version:** a backup made by a newer LatestArr won't restore on an older one. Upgrade first.
+- **Changed your mind before restarting?** `docker exec -it latestarr node dist/cli.js restore --cancel`.
+- **Without the container** (it won't start at all): stop it, unzip the backup, and put its `latestarr.db` in place of the one in the data volume, removing `latestarr.db-wal` and `latestarr.db-shm` beside it. Then start it.
+
+## Upgrading
+
+Pull the new image tag and `docker compose up -d` again. Migrations run automatically when the container starts, right after the automatic pre-upgrade backup, so there's no separate step to run by hand. Read the relevant [`CHANGELOG.md`](../CHANGELOG.md) entries first if you're skipping several versions.

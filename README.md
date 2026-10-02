@@ -29,6 +29,7 @@
 - **Check before it goes out.** Preview the next issue with real items, and send yourself a test.
 - **Know when it fails.** Alerts by email, Discord, Slack, ntfy, Apprise, or JSON webhook, and a Logs page that shows what happened.
 - **Good delivery habits.** Sends through your own mail server or provider, one message per recipient, with posters embedded and a plain-text version. Dark-mode aware.
+- **Backed up for you.** Daily checked backups with retention, one before every upgrade, and a recovery command to restore one or get back in if you're locked out.
 - **Built to be exposed.** Local accounts or SSO (OIDC), admin, editor, and viewer roles, encrypted credentials, rate limiting, CSRF protection, and a strict CSP. Runs as a non-root container.
 - **Accessible.** Automated accessibility checks on every change, and it works by keyboard and on your phone.
 
@@ -70,7 +71,7 @@ Open `http://localhost:3000`, create the admin account, and follow the checklist
 - Before sending to real people, read [Deliverability](https://www.latestarr.app/docs/email-delivery/deliverability) (SPF, DKIM, and DMARC), or your digests may land in spam.
 - Exposing it to the internet? Put it behind a [reverse proxy with HTTPS](https://www.latestarr.app/docs/installation/reverse-proxy). It works just as well on your LAN or a VPN; only your SMTP server needs to reach recipients.
 
-**Upgrading:** back up the `latestarr-data` volume and your key, then `docker compose pull && docker compose up -d`. Migrations run automatically. See [Upgrading and backups](https://www.latestarr.app/docs/installation/upgrading).
+**Upgrading:** `docker compose pull && docker compose up -d`. LatestArr backs up its database first, then migrates it. Keep a copy of your `ENCRYPTION_KEY` somewhere safe; backups don't include it. See [Upgrading and backups](https://www.latestarr.app/docs/installation/upgrading).
 
 ## Documentation
 

@@ -714,6 +714,7 @@ export type WebhookFormat = "discord" | "slack" | "ntfy" | "apprise" | "json";
 export interface NotificationSettings {
   onFailure: boolean;
   onPartialFailure: boolean;
+  onBackupFailure: boolean;
   email: { enabled: boolean; smtpProfileId: string | null; to: string };
   // The saved URL is never sent back, only whether one exists and its host.
   webhook: { enabled: boolean; format: WebhookFormat; hasUrl: boolean; urlHost: string | null };
@@ -722,6 +723,7 @@ export interface NotificationSettings {
 export interface NotificationSettingsInput {
   onFailure: boolean;
   onPartialFailure: boolean;
+  onBackupFailure: boolean;
   email: { enabled: boolean; smtpProfileId: string | null; to: string };
   // Omit url to keep the saved one.
   webhook: { enabled: boolean; format: WebhookFormat; url?: string | null };
@@ -746,4 +748,54 @@ export function sendTestAlert(input: NotificationSettingsInput): Promise<{ resul
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export type BackupTrigger = "scheduled" | "manual" | "pre-upgrade";
+
+export interface BackupFile {
+  filename: string;
+  createdAt: string;
+  version: string;
+  trigger: BackupTrigger;
+  sizeBytes: number;
+}
+
+export type BackupRetention =
+  | { mode: "count"; keep: number }
+  | { mode: "calendar"; daily: number; weekly: number; monthly: number };
+
+export interface BackupSettings {
+  enabled: boolean;
+  scheduleCron: string;
+  timezone: string;
+  retention: BackupRetention;
+}
+
+export interface BackupOverview {
+  backups: BackupFile[];
+  settings: BackupSettings;
+  lastRun: { at: string; ok: boolean; trigger: BackupTrigger; filename?: string; error?: string } | null;
+  nextRun: string | null;
+  location: { path: string; fromEnv: boolean; sameDiskAsDatabase: boolean | null };
+}
+
+export function getBackups(): Promise<BackupOverview> {
+  return apiFetch<BackupOverview>("/backups");
+}
+
+export function createBackupNow(): Promise<{ backup: BackupFile }> {
+  return apiFetch<{ backup: BackupFile }>("/backups", { method: "POST" });
+}
+
+export function saveBackupSettings(settings: BackupSettings): Promise<BackupOverview> {
+  return apiFetch<BackupOverview>("/backups/settings", { method: "PUT", body: JSON.stringify(settings) });
+}
+
+export function deleteBackup(filename: string): Promise<void> {
+  return apiFetch<void>(`/backups/${encodeURIComponent(filename)}`, { method: "DELETE" });
+}
+
+/** A plain link target: the browser downloads the file itself. */
+export function backupDownloadUrl(filename: string): string {
+  return `/api/backups/${encodeURIComponent(filename)}/download`;
 }

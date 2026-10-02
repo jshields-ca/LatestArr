@@ -41,6 +41,7 @@ export function NotificationsPage() {
 
   const [onFailure, setOnFailure] = useState(true);
   const [onPartialFailure, setOnPartialFailure] = useState(true);
+  const [onBackupFailure, setOnBackupFailure] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [smtpProfileId, setSmtpProfileId] = useState("");
   const [emailTo, setEmailTo] = useState("");
@@ -58,6 +59,7 @@ export function NotificationsPage() {
     setSaved(settings);
     setOnFailure(settings.onFailure);
     setOnPartialFailure(settings.onPartialFailure);
+    setOnBackupFailure(settings.onBackupFailure ?? true);
     setEmailEnabled(settings.email.enabled);
     setSmtpProfileId(settings.email.smtpProfileId ?? "");
     setEmailTo(settings.email.to);
@@ -82,6 +84,7 @@ export function NotificationsPage() {
     return {
       onFailure,
       onPartialFailure,
+      onBackupFailure,
       email: { enabled: emailEnabled, smtpProfileId: smtpProfileId || null, to: emailTo },
       webhook: { enabled: webhookEnabled, format: webhookFormat, ...(webhookUrl && { url: webhookUrl }) },
     };
@@ -145,7 +148,7 @@ export function NotificationsPage() {
               <CardTitle>When to alert</CardTitle>
               <CardDescription>
                 Only scheduled and catch-up sends alert, since you see Send now results yourself. At most one alert
-                per newsletter per hour.
+                per newsletter, or for backups, per hour.
               </CardDescription>
             </CardHeader>
             <CardContent className="divide-y divide-border py-0">
@@ -161,6 +164,12 @@ export function NotificationsPage() {
                 control={
                   <Switch id="alert-on-partial" checked={onPartialFailure} onCheckedChange={setOnPartialFailure} />
                 }
+              />
+              <SettingRow
+                label="A backup fails"
+                description="Scheduled or manual. Older backups are kept until a new one succeeds."
+                htmlFor="alert-on-backup"
+                control={<Switch id="alert-on-backup" checked={onBackupFailure} onCheckedChange={setOnBackupFailure} />}
               />
             </CardContent>
           </Card>

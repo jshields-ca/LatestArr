@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
 import { RequireRole } from "@/components/require-role";
 import { Toaster } from "@/components/ui/toaster";
+import { BackupsPage } from "@/pages/backups-page";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { DesignEditorPage } from "@/pages/design-editor-page";
 import { DesignsPage } from "@/pages/designs-page";
@@ -51,6 +52,7 @@ export default function App() {
                   <Route path="/templates" element={<Navigate to="/designs" replace />} />
                   <Route path="/notifications" element={<RequireRole minRole="admin"><NotificationsPage /></RequireRole>} />
                   <Route path="/users" element={<RequireRole minRole="admin"><UsersPage /></RequireRole>} />
+                  <Route path="/backups" element={<RequireRole minRole="admin"><BackupsPage /></RequireRole>} />
                   <Route path="/logs" element={<RequireRole minRole="admin"><LogsPage /></RequireRole>} />
                   <Route path="/templates/:id/edit" element={<TemplateEditRedirect />} />
                   <Route path="*" element={<NotFoundPage />} />

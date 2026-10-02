@@ -17,6 +17,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { loadOidcConfigFromEnv } from "./auth/oidc-config.js";
 import { requireSameOrigin } from "./http/require-same-origin.js";
 import { registerAuthRoutes } from "./http/routes/auth.js";
+import { type BackupRouteOptions, registerBackupRoutes } from "./http/routes/backups.js";
 import { registerLogRoutes } from "./http/routes/logs.js";
 import { registerNewsletterRoutes } from "./http/routes/newsletters.js";
 import { registerNotificationRoutes } from "./http/routes/notifications.js";
@@ -38,7 +39,7 @@ import type { SchedulerHandle } from "./scheduler/engine.js";
 // the identical file one level up from src/ — so this works unmodified in
 // both environments without needing to bundle package.json specially.
 const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "package.json");
-const appVersion = (JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version: string }).version;
+export const appVersion = (JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version: string }).version;
 
 registerAdapter(tautulliAdapter);
 registerAdapter(plexAdapter);
@@ -57,6 +58,9 @@ export interface BuildAppOptions {
   // the frontend separately on its own port) — only apps/server/src/index.ts
   // passes a real path, and only once it's built into the Docker image.
   staticRoot?: string;
+  // The database's backup folder and schedule. Tests that don't exercise
+  // backups leave it out, and the backup routes then answer 503.
+  backups?: BackupRouteOptions;
 }
 
 // scheduler is optional and undefined in every test: starting real cron
@@ -178,6 +182,7 @@ export async function buildApp(
       registerLogRoutes(api, db);
       registerNotificationRoutes(api, db);
       registerSystemMailRoutes(api, db);
+      registerBackupRoutes(api, db, options.backups ?? {});
     },
     { prefix: "/api" },
   );
