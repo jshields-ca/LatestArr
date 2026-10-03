@@ -13,13 +13,13 @@
   },
   "dependencies": {
     "@latestarr/adapter-core": "workspace:*",
-    "fast-xml-parser": "^5.0.0"
+    "fast-xml-parser": "^5.11.2"
   },
   "devDependencies": {
     "@latestarr/config": "workspace:*",
     "@types/node": "^24.19.0",
     "eslint": "^10.10.0",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.2"
   }
 }
