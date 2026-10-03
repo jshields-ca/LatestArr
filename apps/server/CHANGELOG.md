@@ -1,5 +1,98 @@
 # @latestarr/server
 
+## 0.12.0
+
+### Minor Changes
+
+- [#277](https://github.com/jshields-ca/LatestArr/pull/277) [`31615b2`](https://github.com/jshields-ca/LatestArr/commit/31615b2d20e5c5fc3c1e0a1dd315ca2ba8bade4b) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Automatic backups. LatestArr now backs up its database every day at 03:00 and keeps the last seven, with no downtime. It also backs up before every upgrade. The new **Backups** page (admins only) changes the schedule and what's kept, and can **Back up now**, download, or delete a backup. Point `BACKUP_PATH` at another disk or a NAS so a failed disk can't take both the database and its backups. To restore one, run `docker exec -it latestarr node dist/cli.js restore <file>` and restart.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#263](https://github.com/jshields-ca/LatestArr/issues/263).
+  - **Snapshots** use SQLite's online backup API (`better-sqlite3`'s `backup()`), never a raw file copy.
+    - Each snapshot is switched out of WAL mode and must pass `PRAGMA integrity_check` before it's kept.
+    - It's packed into one ZIP with `manifest.json` (version, migration count, item counts, and an `ENCRYPTION_KEY` fingerprint, never the key) and a README.
+    - The file is written under a temporary name and renamed, so a crash never leaves a half-written backup.
+    - The ZIP writer and reader are small and in-house (`backups/zip.ts`), using Node's `zlib` deflate and `crc32`, so there's no new dependency.
+  - **Names:** `latestarr-backup-<UTC time>-v<version>-<scheduled|manual|pre-upgrade>.zip`. The folder itself is the list of backups, so it stays right after a restore or a manual copy. Download and delete only accept names matching this pattern, so no other path can be reached.
+  - **Retention:** keep the newest _N_ (default 7), or calendar rules (the newest of each of the last _D_ days, _W_ weeks, and _M_ months).
+    - The newest backup is always kept, and so are the 3 newest pre-upgrade backups.
+    - Pruning only runs after a backup succeeds.
+  - **Schedule:** on by default, daily at 03:00 in the server's time zone (`TZ`), with the same schedule picker as newsletters.
+  - **Pre-upgrade backup:** taken at startup, before migrations, whenever the version that last ran the database (now saved as `appVersion`) differs from this one. Databases from before 0.12 are labelled "earlier".
+  - **Failures** are logged, shown on the Backups page, and sent as a failure alert (new **A backup fails** option, on by default, at most one an hour).
+  - **Restore** uses the recovery CLI:
+    - `check-backup <file>` reports the version, contents, integrity, and whether the key matches.
+    - `restore <file>` stages a checked database (`restore-pending.db`), and the next start swaps it in, keeping the old one as `latestarr.db.before-restore-<time>`. `restore --cancel` undoes the staging.
+    - It refuses a backup made with another key (unless `--ignore-key-mismatch`) or by a newer version.
+    - At startup, LatestArr warns if `ENCRYPTION_KEY` can't decrypt the saved credentials.
+  - **Routes:** `GET`/`POST /backups`, `PUT /backups/settings`, `GET /backups/:filename/download`, `DELETE /backups/:filename`, all admin only.
+    - Downloads are `no-store` and logged at warn level.
+    - The page warns when backups share the database's disk (same device id).
+  - `docker/entrypoint.sh` gives the `node` user a separate `BACKUP_PATH` mount. Backup files are written `0600`.
+  - Docs: a new "Backups" section with "Restoring a backup" in `docs/self-hosting.md`, plus `BACKUP_PATH` in `.env.example`.
+
+  </details>
+
+- [#276](https://github.com/jshields-ca/LatestArr/pull/276) [`e071447`](https://github.com/jshields-ca/LatestArr/commit/e0714475552f1f690bcaf8b267b4b7ae0a0a1c11) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** A way back in when you forget your password. Choose a **System email** profile on the SMTP Profiles page, and the sign-in page gets a **Forgot password?** link that emails you a one-time reset link. Without email, there's a recovery command for whoever runs the server: `docker exec -it latestarr node dist/cli.js reset-password --email you@example.com` asks you for a new password. Another admin can still reset your password from the Users page.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#264](https://github.com/jshields-ca/LatestArr/issues/264).
+  - **Reset links:** `POST /auth/password-reset/request` and `/confirm`.
+    - Tokens are 32 random bytes, stored as SHA-256 hashes in the new `password_reset_tokens` table. They work once, for 30 minutes.
+    - A new link cancels older ones, and an account gets at most one email every 2 minutes. Requests are rate limited (5 per 15 minutes per IP).
+    - The answer is the same whether or not the account exists, and the email is sent after replying, so timing doesn't reveal it either. SSO-only and deactivated accounts never get a link.
+    - Using a link sets the password, signs the account out everywhere, and cancels other links. So does any other password change.
+  - **Links are built from `WEB_ORIGIN`, never the request's Host header.** When the address in use doesn't match `WEB_ORIGIN` (say, a proxy in front of an install still set to localhost), email resets stay off rather than sending a broken link, and the SMTP Profiles page explains why.
+  - The token travels in the URL fragment (`/reset-password#token=…`), which browsers never send to a server, so it can't reach access logs. The page removes it from the address bar.
+  - **System email:** `GET`/`PUT /settings/system-mail` (admin only), stored in `settings`. Deleting the chosen profile turns it off. `/auth/providers` now says whether resets are available.
+  - **Recovery command** (`dist/cli.js`):
+    - `reset-password --email` asks for the new password twice at a hidden prompt (or reads one line with `--password-stdin`), signs the account out everywhere, and reactivates it if needed. The password is never printed, passed as an argument, or read from the environment.
+    - `list-admins` lists the admins.
+    - When run as root (the default for `docker exec`), it switches to the data folder's owner first, so SQLite never leaves root-owned files the server can't write.
+    - Its actions are written to a new `audit_events` table, which the Logs page merges in.
+  - CI's Docker smoke test now runs both commands as root, signs in with a password piped to `--password-stdin`, checks it refuses without a terminal, and checks no root-owned files are left in `/app/data`.
+  - Docs: a "Locked out?" section in `docs/self-hosting.md`, and `WEB_ORIGIN`'s role in reset links.
+
+  </details>
+
+- [#274](https://github.com/jshields-ca/LatestArr/pull/274) [`559eda9`](https://github.com/jshields-ca/LatestArr/commit/559eda95d74ed5c84ce08982722a565bf45a87e9) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Users can now be admins, editors, or viewers. Viewers see newsletters, designs, previews, and send history without being able to change anything. Editors can also create and send newsletters, edit designs, and manage recipients. Admins can do everything, including sources, SMTP, notifications, users, and logs. Choose a role when you add someone, or change it from the Users page. Existing users stay admins.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#257](https://github.com/jshields-ca/LatestArr/issues/257). Roles are enforced on the server: `requireAuth(db, { read, write })` gives each route group the role it needs for `GET` and for changes, and a route can ask for a different one with `config: { minRole }` (previews are open to viewers; `GET /sources/:id/libraries` and `/users`, recipient lists, and a send's recipient results need an editor).
+  - A refused request answers `403` with `code: "role_required"` and the role needed, and is logged.
+  - `security.test.ts` lists every signed-in route with the role it needs, fails when a new route isn't listed, and checks each route against all three roles.
+  - `POST /users` takes a `role` (default `viewer`) and `PATCH /users/:id` can change it. Admins can't change their own role, and the last active admin can't be demoted, deactivated, or deleted. Role changes apply on the next request.
+  - The web app hides the pages and controls a role can't use: the sidebar is filtered, admin-only pages show a "No access" card, newsletters and designs are read-only for viewers (a disabled `fieldset`, and a read-only code editor), and pages only fetch what the role can read.
+  - The SMTP Profiles page is admin-only; editors still get the profile list for choosing one on a newsletter.
+
+  </details>
+
+### Patch Changes
+
+- [#279](https://github.com/jshields-ca/LatestArr/pull/279) [`70dda5f`](https://github.com/jshields-ca/LatestArr/commit/70dda5f6ed52a9d5d09d34465677776e87646a6e) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** Updated two third-party libraries with published security fixes, so LatestArr isn't exposed to their denial-of-service and address-matching bugs.
+
+  <details>
+  <summary>Technical details</summary>
+  - `ip-address` 10.7.0 → 10.7.3 (via `@fastify/rate-limit`, so it ships in the server): fixes an unbounded parse diagnostic on long input that could stall the process, and `isInSubnet()` comparing IPv4 and IPv6 addresses as one address space.
+  - `brace-expansion` 1.1.18 → 1.1.21 and 5.0.9 → 5.0.12 (via `minimatch`, build and lint tooling): fixes stack exhaustion on nested or comma-heavy brace patterns and quadratic-time expansion.
+  - Lockfile-only change (`pnpm update --depth Infinity`), within each parent's allowed range. Clears Dependabot alerts [#61](https://github.com/jshields-ca/LatestArr/issues/61)–[#68](https://github.com/jshields-ca/LatestArr/issues/68).
+
+  </details>
+
+- Updated dependencies [[`31615b2`](https://github.com/jshields-ca/LatestArr/commit/31615b2d20e5c5fc3c1e0a1dd315ca2ba8bade4b), [`e071447`](https://github.com/jshields-ca/LatestArr/commit/e0714475552f1f690bcaf8b267b4b7ae0a0a1c11)]:
+  - @latestarr/db@0.12.0
+  - @latestarr/adapter-audiobookshelf@0.12.0
+  - @latestarr/adapter-booklore-family@0.12.0
+  - @latestarr/adapter-core@0.12.0
+  - @latestarr/adapter-jellyfin@0.12.0
+  - @latestarr/adapter-plex@0.12.0
+  - @latestarr/adapter-romm@0.12.0
+  - @latestarr/adapter-tautulli@0.12.0
+  - @latestarr/crypto@0.12.0
+
 ## 0.11.2
 
 ### Patch Changes
