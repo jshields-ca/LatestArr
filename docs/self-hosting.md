@@ -159,6 +159,8 @@ The page keeps the most recent 500 entries in memory, so it starts empty after a
 
 The **Notifications** page can alert you when a scheduled newsletter fails to send or only reaches some of its recipients: by email through one of your SMTP profiles, and/or through a webhook (Discord, Slack, ntfy, Apprise, or generic JSON). Manual **Send now** results don't alert, since you see those yourself, and alerts for the same newsletter are limited to one per hour. Use **Send test alert** to check a destination before saving. If the problem is your mail server, an email alert can't get through either, so a webhook is the more reliable choice.
 
+**If LatestArr stops during a send** (a crash, a restart, an upgrade), it closes that send the next time it starts. The newsletter's **History** shows who got it before the stop, the send is marked partly sent (or failed, if nobody got it), and you're alerted. It isn't resent automatically, and missed-send catch-up counts it as that period's send, so nobody who already got it receives a duplicate. To reach the rest, use **Send now**, which goes to everyone, or wait for the next scheduled send.
+
 ## Backups
 
 LatestArr backs up its database every day at 03:00 and keeps the last seven. Change the schedule and what's kept on the **Backups** page (admins only), where you can also **Back up now**, download, or delete a backup.

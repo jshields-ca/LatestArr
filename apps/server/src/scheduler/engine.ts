@@ -2,6 +2,7 @@ import { type Db, newsletters, sendRuns } from "@latestarr/db";
 import { Cron } from "croner";
 import { desc, eq } from "drizzle-orm";
 import { logger as defaultLogger, type Logger } from "../logger.js";
+import { closeInterruptedSends } from "../pipeline/interrupted-sends.js";
 import { runNewsletter, type SendTrigger } from "../pipeline/run-newsletter.js";
 
 export interface CronLike {
@@ -138,6 +139,9 @@ export async function startScheduler(
   db: Db,
   options: SchedulerOptions = {},
 ): Promise<SchedulerHandle> {
+  // Before catch-up: a send left running by a stop would otherwise block
+  // this newsletter's sends for good (#280).
+  await closeInterruptedSends(db, options.log ?? defaultLogger);
   const handle: SchedulerHandle = { jobs: new Map() };
   await refreshScheduler(handle, db, options);
   await runMissedNewsletters(db, options);

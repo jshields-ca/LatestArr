@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, newsletters, runMigrations, sendRuns, type Db } from "@latestarr/db";
+import { createDb, newsletters, recipients, runMigrations, sendRunRecipientResults, sendRuns, type Db } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLogBuffer, getRecentLogs } from "../log-buffer.js";
@@ -253,5 +253,47 @@ describe("logging", () => {
     expect(logsMatching('Catching up "Weekly Digest"')[0]?.level).toBe(30);
     const skipped = logsMatching(`Didn't send newsletter "Weekly Digest"`);
     expect(skipped.map((entry) => entry.trigger)).toEqual(["scheduled", "catch-up"]);
+  });
+});
+
+describe("interrupted sends (#280)", () => {
+  async function interruptedRun(newsletterId: string, sent: number, total: number) {
+    const [run] = await db
+      .insert(sendRuns)
+      .values({ newsletterId, status: "running", startedAt: new Date(Date.now() - 60_000), recipientCount: total })
+      .returning();
+    for (let i = 0; i < sent; i++) {
+      const [recipient] = await db.insert(recipients).values({ email: `r${i}@example.com` }).returning();
+      await db.insert(sendRunRecipientResults).values({ sendRunId: run!.id, recipientId: recipient!.id, status: "sent" });
+    }
+    return run!;
+  }
+
+  it("closes a send left running by a stop, saying who got it, without resending", async () => {
+    const newsletter = await createNewsletter({ scheduleCron: "0 9 * * *" });
+    await db.update(newsletters).set({ createdAt: new Date(Date.now() - 30 * 86_400_000) }).where(eq(newsletters.id, newsletter.id));
+    const run = await interruptedRun(newsletter.id, 2, 3);
+
+    await startScheduler(db, { cronFactory: fakeCronFactory });
+
+    const [closed] = await db.select().from(sendRuns).where(eq(sendRuns.id, run.id));
+    expect(closed!.status).toBe("partial_failure");
+    expect(closed!.finishedAt).not.toBeNull();
+    expect(closed!.error).toContain("LatestArr stopped during this send, after reaching 2 of 3 recipients");
+    // Catch-up counts the interrupted send, so nothing is sent again.
+    expect(await db.select().from(sendRuns)).toHaveLength(1);
+    expect(getRecentLogs().some((entry) => String(entry.msg).includes('Send of "Weekly Digest" was interrupted'))).toBe(true);
+  });
+
+  it("marks one that reached nobody as failed, and stops blocking later sends", async () => {
+    const newsletter = await createNewsletter();
+    const run = await interruptedRun(newsletter.id, 0, 5);
+
+    await startScheduler(db, { cronFactory: fakeCronFactory });
+
+    const [closed] = await db.select().from(sendRuns).where(eq(sendRuns.id, run.id));
+    expect(closed!.status).toBe("failed");
+    expect(closed!.error).toContain("Nobody got it");
+    expect(await db.select().from(sendRuns).where(eq(sendRuns.status, "running"))).toHaveLength(0);
   });
 });
