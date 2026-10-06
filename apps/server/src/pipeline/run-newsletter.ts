@@ -590,6 +590,12 @@ async function executeRun(
 
     const recipientRows = await resolveRecipients(db, newsletterId);
     const activeRecipients = recipientRows.filter((recipient) => recipient.isActive);
+    // Recorded before sending, so a send interrupted partway (see
+    // interrupted-sends.ts) can still say how many it was meant to reach.
+    await db
+      .update(sendRuns)
+      .set({ itemCountIncluded: items.length, recipientCount: activeRecipients.length })
+      .where(eq(sendRuns.id, sendRunId));
 
     let sentCount = 0;
     let failedCount = 0;
