@@ -88,7 +88,7 @@ const NEUTRAL_SOURCE_BUTTONS: SourceButton[] = [
 ];
 
 // The buttons the connected sources would add, so the sample says "Read on
-// Book Orbit" for someone using Book Orbit, not a fixed "Read on BookLore"
+// BookOrbit" for someone using BookOrbit, not a fixed "Read on BookLore"
 // (#291). A source with no public URL gets a stand-in one: a real send
 // leaves it out, but the sample shows where its button would go.
 export function sampleSourceButtons(sources: SourceButtonInput[]): SourceButton[] {

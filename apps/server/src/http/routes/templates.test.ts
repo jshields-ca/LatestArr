@@ -231,7 +231,7 @@ describe("designs", () => {
       authed({ method: "POST", url: "/api/templates/preview", payload: { settings: {} } }),
     );
     const html = preview.json().html as string;
-    expect(html).toContain("Read on Book Orbit");
+    expect(html).toContain("Read on BookOrbit");
     expect(html).toContain("Watch on Plex");
     expect(html).toContain('href="https://plex.example.com"');
     expect(html).not.toContain("BookLore");

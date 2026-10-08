@@ -1,6 +1,6 @@
 import audiobookshelfLogo from "@/assets/logos/audiobookshelf.svg";
 import booklorelogo from "@/assets/logos/booklore.svg";
-import bookorbitLogo from "@/assets/logos/bookorbit.svg";
+import bookorbitLogo from "@/assets/logos/bookorbit.webp";
 import embyLogo from "@/assets/logos/emby.svg";
 import grimmoryLogo from "@/assets/logos/grimmory.svg";
 import jellyfinLogo from "@/assets/logos/jellyfin.svg";
@@ -10,7 +10,8 @@ import tautulliLogo from "@/assets/logos/tautulli.svg";
 import { cn } from "@/lib/utils";
 
 // Every logo below is a full-color brand mark that already paints its own
-// circular/rounded backing shape edge-to-edge (see NOTICE.md next to the
+// circular/rounded backing shape edge-to-edge (BookOrbit's is a book with
+// its own light edges, which reads on either background) (see NOTICE.md next to the
 // source files for where each one comes from and its license), so it stays
 // legible on both a light and a dark page background without any theme-
 // aware swapping — except Grimmory's, which is drawn transparent with a
@@ -54,10 +55,10 @@ export function SourceLogo({ kind, label, className }: SourceLogoProps) {
 
   return (
     <span
-      // Vite inlines these (they're all well under the default 4KB
-      // assetsInlineLimit) as `data:image/svg+xml,...` URLs rather than
-      // file paths, so `kind` isn't otherwise recoverable from the
-      // rendered DOM — this attribute is a hook for that, not for styling.
+      // Vite inlines most of these (under the default 4KB
+      // assetsInlineLimit) as `data:` URLs rather than file paths, so
+      // `kind` isn't otherwise recoverable from the rendered DOM — this
+      // attribute is a hook for that, not for styling.
       data-kind={kind}
       className={cn(
         "inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full",
