@@ -298,6 +298,58 @@ describe("RecipientsPage", () => {
     );
   });
 
+  // #286: changes made in the edit panel used to show in the Groups section
+  // only after a page refresh.
+  it(
+    "updates the Groups section straight away when the edit panel changes groups",
+    async () => {
+      const user = userEvent.setup();
+      const members: Record<string, (typeof alice)[]> = { g1: [] };
+      const vips = { ...everyoneGroup, id: "g2", name: "VIPs" };
+      fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+        if (url === "/api/recipient-groups" && method === "GET")
+          return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+        if (url === "/api/recipient-groups" && method === "POST") {
+          members.g2 = [];
+          return Promise.resolve(jsonResponse(201, { group: vips }));
+        }
+        if (url === "/api/recipients/r1/groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+        const member = url.match(/^\/api\/recipient-groups\/(g\d)\/members$/);
+        if (member && method === "POST") {
+          members[member[1]!] = [alice];
+          return Promise.resolve({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+        }
+        const group = url.match(/^\/api\/recipient-groups\/(g\d)$/);
+        if (group) return Promise.resolve(jsonResponse(200, { group: everyoneGroup, members: members[group[1]!] }));
+        throw new Error(`Unexpected fetch to ${method} ${url}`);
+      });
+
+      render(<RecipientsPage />);
+      await screen.findByText("Everyone");
+      await user.click(screen.getByRole("button", { name: "Everyone" }));
+      expect(await screen.findByText("No members yet.")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Edit alice@example.com" }));
+      const dialog = await screen.findByRole("dialog");
+      await within(dialog).findByText("Not in any groups yet.");
+      selectOption(within(dialog).getByLabelText("Add to a group"), "Everyone");
+      await user.click(within(dialog).getByRole("button", { name: "Add" }));
+      await user.type(within(dialog).getByLabelText("New group name"), "VIPs");
+      await user.click(within(dialog).getByRole("button", { name: "Create group" }));
+      await within(dialog).findByText("VIPs");
+
+      // Closed without pressing Save changes, as the tester did.
+      await user.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+      expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "VIPs" })).toBeInTheDocument();
+    },
+    150000,
+  );
+
   // The "Add a recipient to this group" control is a real Radix Select
   // now, not a native <select> — jsdom's lack of real layout/pointer-
   // capture support makes the *next* async Testing Library call after
