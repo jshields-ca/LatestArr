@@ -71,6 +71,13 @@
       "when": 1790959149050,
       "tag": "0009_password_recovery",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791472808548,
+      "tag": "0010_send_to_the_rest",
+      "breakpoints": true
     }
   ]
 }

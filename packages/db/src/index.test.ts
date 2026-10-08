@@ -54,6 +54,7 @@ describe("migrations", () => {
         "recipient_group_members",
         "recipient_groups",
         "recipients",
+        "send_run_attachments",
         "send_run_recipient_results",
         "send_runs",
         "sessions",

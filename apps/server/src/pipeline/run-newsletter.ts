@@ -13,13 +13,14 @@ import {
   newsletters,
   recipientGroupMembers,
   recipients,
+  sendRunAttachments,
   sendRunRecipientResults,
   sendRuns,
   smtpProfiles,
   sourceConnections,
   templates,
 } from "@latestarr/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { smtpCredentialsFor } from "../mailer/credentials.js";
 import { sendEmail, type EmailAttachment, type SmtpCredentials } from "../mailer/send.js";
 import {
@@ -352,7 +353,29 @@ async function renderNewsletterContent(
   return { html: resolved.html, text: htmlToPlainText(resolved.html), attachments: resolved.attachments, items };
 }
 
-async function resolveRecipients(db: Db, newsletterId: string) {
+// The images a send embeds, kept so "Send to the rest" can send the same
+// email later (#283). Only the newsletter's latest send can be finished
+// that way, so earlier sends' images are dropped here, which keeps this to
+// one send's images per newsletter.
+async function keepAttachmentsForLatestSend(
+  db: Db,
+  newsletterId: string,
+  sendRunId: string,
+  attachments: EmailAttachment[],
+): Promise<void> {
+  const earlier = db
+    .select({ id: sendRuns.id })
+    .from(sendRuns)
+    .where(and(eq(sendRuns.newsletterId, newsletterId), ne(sendRuns.id, sendRunId)));
+  await db.delete(sendRunAttachments).where(inArray(sendRunAttachments.sendRunId, earlier));
+  if (attachments.length > 0) {
+    await db.insert(sendRunAttachments).values(
+      attachments.map(({ cid, filename, contentType, content }) => ({ sendRunId, cid, filename, contentType, content })),
+    );
+  }
+}
+
+export async function resolveRecipients(db: Db, newsletterId: string) {
   const groupLinks = await db
     .select()
     .from(newsletterRecipientGroups)
@@ -424,7 +447,7 @@ export async function runNewsletter(
   }
 }
 
-async function loadNewsletter(db: Db, newsletterId: string): Promise<Newsletter> {
+export async function loadNewsletter(db: Db, newsletterId: string): Promise<Newsletter> {
   const [newsletter] = await db.select().from(newsletters).where(eq(newsletters.id, newsletterId));
   if (!newsletter) {
     throw new NewsletterNotFoundError(newsletterId);
@@ -437,7 +460,7 @@ interface Sender {
   from: string;
 }
 
-async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender> {
+export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender> {
   if (!newsletter.smtpProfileId) {
     throw new NewsletterMisconfiguredError("Newsletter has no SMTP profile configured");
   }
@@ -585,8 +608,10 @@ async function executeRun(
       .set({
         itemsSnapshot: items.map((item) => ({ title: item.title, kind: item.kind })),
         renderedHtml: html,
+        subject,
       })
       .where(eq(sendRuns.id, sendRunId));
+    await keepAttachmentsForLatestSend(db, newsletterId, sendRunId, attachments);
 
     const recipientRows = await resolveRecipients(db, newsletterId);
     const activeRecipients = recipientRows.filter((recipient) => recipient.isActive);

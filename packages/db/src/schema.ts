@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { blob, sqliteTable, text, integer, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 const id = () =>
   text("id")
@@ -272,6 +272,25 @@ export const sendRuns = sqliteTable("send_runs", {
   // themselves are sent as attachments, not inlined into this column) —
   // not large enough to justify separate blob storage.
   renderedHtml: text("rendered_html"),
+  // The subject it went out with, stored with renderedHtml so "Send to the
+  // rest" (#283) can send the same email. Null for sends from before 0.12.
+  subject: text("subject"),
+  // When someone last used "Send to the rest" on this send.
+  restSentAt: integer("rest_sent_at", { mode: "timestamp" }),
+});
+
+// The images embedded in a send (posters, as cid: attachments), so "Send to
+// the rest" (#283) can send the same email later. Kept only for each
+// newsletter's latest send: they're removed when the next send renders.
+export const sendRunAttachments = sqliteTable("send_run_attachments", {
+  id: id(),
+  sendRunId: text("send_run_id")
+    .notNull()
+    .references(() => sendRuns.id, { onDelete: "cascade" }),
+  cid: text("cid").notNull(),
+  filename: text("filename").notNull(),
+  contentType: text("content_type").notNull(),
+  content: blob("content", { mode: "buffer" }).notNull(),
 });
 
 export const sendRunRecipientResults = sqliteTable("send_run_recipient_results", {
