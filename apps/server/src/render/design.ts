@@ -58,8 +58,12 @@ export const designSettingsSchema = z.object({
   // use them too, and they are escaped like any other value.
   content: z
     .object({
+      // Markdown (bold, italic, links, lists; see notes.ts), each with
+      // its own alignment.
       intro: z.string().trim().max(2000).default(""),
+      introAlign: z.enum(["left", "center", "right"]).default("left"),
       footerNote: z.string().trim().max(2000).default(""),
+      footerAlign: z.enum(["left", "center", "right"]).default("left"),
       // A handful of quick links (Plex app, "browse the library"), not a
       // general-purpose link list.
       ctas: z
@@ -96,7 +100,7 @@ export function parseDesignSettings(value: unknown): DesignSettings {
 // template) reads.
 export function designContentVariables(settings: DesignSettings) {
   const { intro, footerNote, ctas } = settings.content;
-  return { introText: intro || undefined, footerNote: footerNote || undefined, ctas };
+  return { introText: intro || undefined, footerNote: footerNote || undefined, ctas, noteLinkColor: settings.colors.accent };
 }
 
 // The original palette's hand-tuned tint, border, and "subtle" shades. A
@@ -580,7 +584,7 @@ ${button(p, font, "secondary")}
   const title = `
         <mj-text font-family="${font}" font-size="26px" line-height="1.25" font-weight="700" color="${p.text}">{{newsletterName}}</mj-text>${summary}`;
   const intro = `
-        <mj-text font-family="${font}" font-size="15px" line-height="1.5" color="${p.text}" padding-top="8px">{{introText}}</mj-text>`;
+        <mj-text font-family="${font}" font-size="15px" line-height="1.5" color="${p.text}" padding-top="8px" align="${settings.content.introAlign}">{{introText}}</mj-text>`;
   // Buttons above the intro sit between the heading and the intro, so the
   // intro gets a section of its own.
   const header =
@@ -613,7 +617,7 @@ ${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? al
     {{#if footerNote}}
     <mj-section padding="8px 0 0">
       <mj-column>
-        <mj-text font-family="${font}" font-size="14px" line-height="1.5" color="${p.muted}">{{footerNote}}</mj-text>
+        <mj-text font-family="${font}" font-size="14px" line-height="1.5" color="${p.muted}" align="${settings.content.footerAlign}">{{footerNote}}</mj-text>
       </mj-column>
     </mj-section>
     {{/if}}${ctaPlacement === "end" ? ctas.replace('padding="0 0 8px"', 'padding="12px 0 0"') : ""}
