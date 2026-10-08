@@ -1,6 +1,13 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import { describe, expect, it } from "vitest";
-import { buildDesignMjml, DEFAULT_DESIGN_SETTINGS, type DesignSettings, designSettingsSchema, parseDesignSettings } from "./design.js";
+import {
+  buildDesignMjml,
+  DEFAULT_DESIGN_SETTINGS,
+  designContentVariables,
+  type DesignSettings,
+  designSettingsSchema,
+  parseDesignSettings,
+} from "./design.js";
 import { renderDesignSample } from "./design-sample.js";
 import { type MjmlRenderContext, renderMjmlTemplate } from "./mjml-template.js";
 
@@ -233,6 +240,28 @@ describe("buildDesignMjml", () => {
       expect(html).toContain("An Old Game");
       expect(html).toContain("From the library");
     });
+  });
+
+  // #290: Markdown in the notes, links in the design's accent, and each
+  // note's alignment.
+  it("formats the intro and footer note, with their own alignment", async () => {
+    const settings = design({
+      colors: { accent: "#1A7F5A" },
+      content: {
+        intro: "**Big** week. See [the list](https://list.example)",
+        introAlign: "center",
+        footerNote: "Thanks!",
+        footerAlign: "right",
+      },
+    });
+    const html = await render(settings, designContentVariables(settings));
+    expect(html).toContain('<strong>Big</strong> week. See <a href="https://list.example" style="color:#1a7f5a;');
+    expect(html).toMatch(/text-align:center;[^"]*"\s*><strong>Big<\/strong>/);
+    expect(html).toMatch(/text-align:right;[^"]*"\s*>Thanks!</);
+  });
+
+  it("keeps notes left-aligned by default", () => {
+    expect(DEFAULT_DESIGN_SETTINGS.content).toMatchObject({ introAlign: "left", footerAlign: "left" });
   });
 
   describe("buttons", () => {

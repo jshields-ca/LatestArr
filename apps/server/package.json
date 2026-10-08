@@ -31,6 +31,7 @@
     "fastify": "^5.12.5",
     "handlebars": "^4.7.0",
     "html-to-text": "^10.0.1",
+    "markdown-it": "^15.0.2",
     "mjml": "^5.4.1",
     "nodemailer": "^10.0.12",
     "openid-client": "^6.1.0",

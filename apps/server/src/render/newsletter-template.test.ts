@@ -334,8 +334,9 @@ describe("renderDefaultNewsletterHtml", () => {
         footerNote: "Thanks!\nThe admin",
       });
 
-      expect(html).toContain("Hi all,<br>New this week:<br><br>&lt;b&gt;Movies&lt;/b&gt; &amp; shows");
-      expect(html).toContain("Thanks!<br>The admin");
+      expect(html).toContain('<p style="margin:0 0 10px;">Hi all,<br>\nNew this week:</p>');
+      expect(html).toContain('<p style="margin:0;">&lt;b&gt;Movies&lt;/b&gt; &amp; shows</p>');
+      expect(html).toContain("Thanks!<br>\nThe admin");
       expect(html).not.toContain("<b>Movies</b>");
     });
 

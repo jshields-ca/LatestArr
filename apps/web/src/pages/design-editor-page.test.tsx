@@ -213,11 +213,27 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH") as [string, RequestInit];
     expect(JSON.parse(patch[1].body as string).settings.content).toEqual({
       intro: "Hey folks!",
+      introAlign: "left",
       footerNote: "",
+      footerAlign: "left",
       ctas: [{ label: "Open Plex", url: "https://app.plex.tv" }],
       ctaPlacement: "afterIntro",
       sourceButtons: { enabled: true, placement: "end" },
     });
+  });
+
+  // #290: each note has its own alignment, and says what formatting works.
+  it("sets the intro and footer note alignment, and explains the formatting", async () => {
+    renderEditor();
+    await screen.findByTitle("Design preview");
+    expect(screen.getByLabelText("Intro (optional)")).toHaveAccessibleDescription(/\*\*bold\*\*/);
+
+    selectOption(screen.getByLabelText("Intro alignment"), "Centre");
+    selectOption(screen.getByLabelText("Footer note alignment"), "Right");
+
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.content).toMatchObject({ introAlign: "center", footerAlign: "right" }),
+    );
   });
 
   // Typing a button and two dropdowns takes a few seconds under jsdom, more on CI.

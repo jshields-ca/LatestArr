@@ -29,6 +29,7 @@ import {
 import {
   type DesignCta,
   type DesignCtaPlacement,
+  type DesignTextAlign,
   type DesignEmptySection,
   type DesignLayout,
   type DesignSettings,
@@ -76,6 +77,67 @@ const EMPTY_OPTIONS: { value: DesignEmptySection; label: string }[] = [
   { value: "link", label: "Link to the library" },
   { value: "random", label: "Show a few from the library" },
 ];
+
+const TEXT_ALIGNS: { value: DesignTextAlign; label: string }[] = [
+  { value: "left", label: "Left" },
+  { value: "center", label: "Centre" },
+  { value: "right", label: "Right" },
+];
+
+// The Intro or Footer note: Markdown text, with its alignment when the
+// design's options build the layout (a code design places it itself).
+function NoteField({
+  id,
+  label,
+  placeholder,
+  value,
+  align,
+  showAlign,
+  onChange,
+  onAlignChange,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  value: string;
+  align: DesignTextAlign;
+  showAlign: boolean;
+  onChange: (value: string) => void;
+  onAlignChange: (align: DesignTextAlign) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-end justify-between gap-2">
+        <Label htmlFor={id}>{label}</Label>
+        {showAlign ? (
+          <Select
+            aria-label={`${label.replace(" (optional)", "")} alignment`}
+            value={align}
+            onChange={(e) => onAlignChange(e.target.value as DesignTextAlign)}
+            className="h-8 w-28"
+          >
+            {TEXT_ALIGNS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        ) : null}
+      </div>
+      <Textarea
+        id={id}
+        rows={3}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-describedby={`${id}-hint`}
+      />
+      <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+        Supports **bold**, *italic*, [link text](https://example.com), and lists starting with - or 1.
+      </p>
+    </div>
+  );
+}
 
 const CTA_PLACEMENTS: { value: DesignCtaPlacement; label: string }[] = [
   { value: "afterIntro", label: "Below the intro" },
@@ -342,16 +404,16 @@ export function DesignEditorPage() {
 
   const textAndButtons = (
     <Section title="Text and buttons" defaultOpen>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="design-intro">Intro (optional)</Label>
-        <Textarea
-          id="design-intro"
-          rows={2}
-          placeholder="A note above the items, e.g. a quick update."
-          value={settings.content.intro}
-          onChange={(e) => update((c) => ({ ...c, content: { ...c.content, intro: e.target.value } }))}
-        />
-      </div>
+      <NoteField
+        id="design-intro"
+        label="Intro (optional)"
+        placeholder="A note above the items, e.g. a quick update."
+        value={settings.content.intro}
+        align={settings.content.introAlign}
+        showAlign={mode === "design"}
+        onChange={(intro) => update((c) => ({ ...c, content: { ...c.content, intro } }))}
+        onAlignChange={(introAlign) => update((c) => ({ ...c, content: { ...c.content, introAlign } }))}
+      />
       <CtaRows
         ctas={settings.content.ctas}
         onChange={(ctas) => update((c) => ({ ...c, content: { ...c.content, ctas } }))}
@@ -426,16 +488,16 @@ export function DesignEditorPage() {
           ) : null}
         </>
       ) : null}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="design-footer">Footer note (optional)</Label>
-        <Textarea
-          id="design-footer"
-          rows={2}
-          placeholder="A note near the bottom, above the LatestArr credit line."
-          value={settings.content.footerNote}
-          onChange={(e) => update((c) => ({ ...c, content: { ...c.content, footerNote: e.target.value } }))}
-        />
-      </div>
+      <NoteField
+        id="design-footer"
+        label="Footer note (optional)"
+        placeholder="A note near the bottom, above the LatestArr credit line."
+        value={settings.content.footerNote}
+        align={settings.content.footerAlign}
+        showAlign={mode === "design"}
+        onChange={(footerNote) => update((c) => ({ ...c, content: { ...c.content, footerNote } }))}
+        onAlignChange={(footerAlign) => update((c) => ({ ...c, content: { ...c.content, footerAlign } }))}
+      />
     </Section>
   );
 

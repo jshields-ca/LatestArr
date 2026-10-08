@@ -15,10 +15,14 @@ export const MAX_DESIGN_CTAS = 4;
 
 export type DesignCtaPlacement = "beforeIntro" | "afterIntro" | "end";
 export type DesignSourceButtonPlacement = "top" | "sections" | "end";
+export type DesignTextAlign = "left" | "center" | "right";
 
 export interface DesignContent {
+  // Markdown: bold, italic, links, and lists.
   intro: string;
+  introAlign: DesignTextAlign;
   footerNote: string;
+  footerAlign: DesignTextAlign;
   ctas: DesignCta[];
   ctaPlacement: DesignCtaPlacement;
   // "Watch on Plex"-style buttons for linked sources with a public URL.
@@ -59,7 +63,9 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   },
   content: {
     intro: "",
+    introAlign: "left",
     footerNote: "",
+    footerAlign: "left",
     ctas: [],
     ctaPlacement: "afterIntro",
     sourceButtons: { enabled: true, placement: "end" },
