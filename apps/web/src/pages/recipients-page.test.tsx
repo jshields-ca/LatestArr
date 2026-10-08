@@ -350,39 +350,139 @@ describe("RecipientsPage", () => {
     150000,
   );
 
-  // The "Add a recipient to this group" control is a real Radix Select
-  // now, not a native <select> — jsdom's lack of real layout/pointer-
-  // capture support makes the *next* async Testing Library call after
-  // opening/closing one noticeably slower to settle than in a real
-  // browser (measured ~35s locally, but CI runner variance pushed this
-  // specific test past 70s on one run), so this gets a generous explicit
-  // timeout rather than the 5s default.
-  it(
-    "expands a group and adds an existing recipient as a member",
-    async () => {
-      const user = userEvent.setup();
-      fetchMock.mockImplementation((url: string) => {
-        if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+  // #287: a searchable picker, sorted by name, instead of a plain dropdown
+  // in the order people were added.
+  describe("adding people to a group", () => {
+    const people = [
+      { ...alice, id: "r1", email: "zed@example.com", displayName: "Zed" },
+      { ...alice, id: "r2", email: "effuse@example.com", displayName: "Effuse" },
+      { ...alice, id: "r3", email: "2fast@example.com", displayName: null },
+      { ...alice, id: "r4", email: "old@example.com", displayName: "Émile", isActive: false },
+    ];
+
+    function mockGroupWithMembers() {
+      fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+        if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: people }));
         if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
         if (url === "/api/recipient-groups/g1")
           return Promise.resolve(jsonResponse(200, { group: everyoneGroup, members: [] }));
+        if (url === "/api/recipient-groups/g1/members" && init?.method === "POST")
+          return Promise.resolve({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
         throw new Error(`Unexpected fetch to ${url}`);
       });
+    }
 
+    async function openGroup(user: ReturnType<typeof userEvent.setup>) {
       render(<RecipientsPage />);
       await screen.findByText("Everyone");
-
       await user.click(screen.getByRole("button", { name: "Everyone" }));
-      expect(await screen.findByText("No members yet.")).toBeInTheDocument();
+      await screen.findByText("No members yet.");
+      return screen.getByRole("combobox", { name: "Add a recipient to this group" });
+    }
 
-      fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-      selectOption(screen.getByLabelText("Add a recipient to this group"), "Alice");
-      await user.click(screen.getByRole("button", { name: "Add" }));
+    it("lists people by name, numbers first, and marks inactive ones", async () => {
+      const user = userEvent.setup();
+      mockGroupWithMembers();
+      const picker = await openGroup(user);
 
-      expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();
-    },
-    150000,
-  );
+      await user.click(picker);
+      const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+      expect(options.map((option) => option.textContent)).toEqual([
+        "2fast@example.com",
+        "Effuseeffuse@example.com",
+        "Émileold@example.com · inactive",
+        "Zedzed@example.com",
+      ]);
+    });
+
+    it("narrows the list by name or email as you type, ignoring case and accents", async () => {
+      const user = userEvent.setup();
+      mockGroupWithMembers();
+      const picker = await openGroup(user);
+
+      await user.type(picker, "EFF");
+      expect(within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent)).toEqual([
+        "Effuseeffuse@example.com",
+      ]);
+      await user.clear(picker);
+      await user.type(picker, "emile");
+      expect(screen.getAllByRole("option")).toHaveLength(1);
+      await user.clear(picker);
+      await user.type(picker, "zed@");
+      expect(screen.getByRole("option", { name: /^Zed/ })).toBeInTheDocument();
+      await user.clear(picker);
+      await user.type(picker, "nobody");
+      expect(screen.getByText("Nobody matches.")).toBeInTheDocument();
+    });
+
+    it("adds people by click or keyboard, one after another, without closing", async () => {
+      const user = userEvent.setup();
+      mockGroupWithMembers();
+      const picker = await openGroup(user);
+
+      await user.type(picker, "eff");
+      await user.click(screen.getByRole("option", { name: /^Effuse/ }));
+      expect(await screen.findByLabelText("Remove effuse@example.com from group")).toBeInTheDocument();
+      expect(picker).toHaveValue("");
+      expect(picker).toHaveFocus();
+
+      await user.type(picker, "z");
+      await user.keyboard("{Enter}");
+      expect(await screen.findByLabelText("Remove zed@example.com from group")).toBeInTheDocument();
+
+      // Arrow keys move through the list; people already added are gone from it.
+      await user.keyboard("{ArrowDown}{ArrowDown}");
+      expect(picker).toHaveAttribute("aria-expanded", "true");
+      const active = document.getElementById(picker.getAttribute("aria-activedescendant")!);
+      expect(active?.textContent).toBe("Émileold@example.com · inactive");
+      await user.keyboard("{Escape}");
+      expect(picker).toHaveAttribute("aria-expanded", "false");
+
+      const adds = fetchMock.mock.calls.filter(([url]) => url === "/api/recipient-groups/g1/members");
+      expect(adds.map(([, init]) => JSON.parse((init as RequestInit).body as string).recipientId)).toEqual(["r2", "r1"]);
+    });
+
+    it("has no accessibility violations with the list open", async () => {
+      const user = userEvent.setup();
+      mockGroupWithMembers();
+      const picker = await openGroup(user);
+      await user.click(picker);
+      await screen.findByRole("listbox");
+      // The list is in a portal, outside the render container.
+      expect(await axe(document.body, { rules: { region: { enabled: false } } })).toHaveNoViolations();
+    });
+  });
+
+  it("sorts the recipient list by name naturally, ignoring case and accents", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients")
+        return Promise.resolve(
+          jsonResponse(200, {
+            recipients: [
+              { ...alice, id: "a", displayName: "item 10", email: "a@example.com" },
+              { ...alice, id: "b", displayName: "Item 2", email: "b@example.com" },
+              { ...alice, id: "c", displayName: "éclair", email: "c@example.com" },
+              { ...alice, id: "d", displayName: "Echo", email: "d@example.com" },
+            ],
+          }),
+        );
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    render(<RecipientsPage />);
+    await screen.findByText("Echo");
+    const table = screen.getByRole("table", { name: "Recipients" });
+    const names = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0]!.textContent);
+    expect(names.map((name) => name?.split("@")[0])).toEqual([
+      expect.stringMatching(/^Echo/),
+      expect.stringMatching(/^éclair/),
+      expect.stringMatching(/^Item 2/),
+      expect.stringMatching(/^item 10/),
+    ]);
+  });
 
   it("edits a group's name through the edit dialog", async () => {
     const user = userEvent.setup();
