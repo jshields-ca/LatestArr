@@ -1,4 +1,5 @@
-import { type Db, newsletters, templates } from "@latestarr/db";
+import { getAdapter } from "@latestarr/adapter-core";
+import { type Db, newsletters, sourceConnections, templates } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -90,7 +91,14 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         warnings = check.warnings;
       }
       if (!newsletterId) {
-        const html = await renderDesignSample(settings, mjml);
+        const sources = await db
+          .select({ kind: sourceConnections.kind, name: sourceConnections.name, publicUrl: sourceConnections.publicUrl })
+          .from(sourceConnections);
+        const html = await renderDesignSample(
+          settings,
+          mjml,
+          sources.map((source) => ({ ...source, kinds: getAdapter(source.kind)?.capabilities.supportsMediaKinds ?? [] })),
+        );
         return reply.send({ subject: "Sample newsletter", html, items: [], warnings });
       }
       try {

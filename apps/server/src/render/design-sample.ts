@@ -1,6 +1,7 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import { buildDesignMjml, DESIGN_KINDS, type DesignSettings, designContentVariables, expandDarkModeMarker } from "./design.js";
 import { renderMjmlTemplate } from "./mjml-template.js";
+import { buildSourceButtons, type SourceButton, type SourceButtonInput } from "./source-buttons.js";
 
 // Made-up content for previewing a design that isn't attached to a
 // newsletter yet. Posters are small inline SVGs so the preview needs no
@@ -77,9 +78,37 @@ function sampleItems(now: Date): NewItem[] {
   ];
 }
 
+// With no sources connected yet, neutral labels rather than a guess at
+// which apps someone uses.
+const NEUTRAL_SOURCE_BUTTONS: SourceButton[] = [
+  { label: "Watch now", url: "https://example.com/watch", kinds: ["movie", "tv_episode", "tv_season"] },
+  { label: "Read now", url: "https://example.com/read", kinds: ["book"] },
+  { label: "Listen now", url: "https://example.com/listen", kinds: ["audiobook"] },
+  { label: "Play now", url: "https://example.com/play", kinds: ["game"] },
+];
+
+// The buttons the connected sources would add, so the sample says "Read on
+// Book Orbit" for someone using Book Orbit, not a fixed "Read on BookLore"
+// (#291). A source with no public URL gets a stand-in one: a real send
+// leaves it out, but the sample shows where its button would go.
+export function sampleSourceButtons(sources: SourceButtonInput[]): SourceButton[] {
+  if (sources.length === 0) return NEUTRAL_SOURCE_BUTTONS;
+  return buildSourceButtons(
+    sources.map((source, index) => ({
+      ...source,
+      publicUrl: source.publicUrl?.trim() || `https://example.com/source-${index + 1}`,
+    })),
+  );
+}
+
 // Renders a design with sample items: its options, or `mjml` (a code-mode
-// design) with the design's text and buttons.
-export async function renderDesignSample(settings: DesignSettings, mjml?: string): Promise<string> {
+// design) with the design's text and buttons. `sources` are the connected
+// sources, for the buttons that link to them.
+export async function renderDesignSample(
+  settings: DesignSettings,
+  mjml?: string,
+  sources: SourceButtonInput[] = [],
+): Promise<string> {
   const now = new Date();
   const items = sampleItems(now);
   return renderMjmlTemplate(mjml ? expandDarkModeMarker(mjml, settings) : buildDesignMjml(settings), {
@@ -90,11 +119,7 @@ export async function renderDesignSample(settings: DesignSettings, mjml?: string
     // Every content type counts as "linked", so the preview also shows how
     // empty sections look (there's no sample audiobook, for example).
     sourceLinksByContentType: Object.fromEntries(DESIGN_KINDS.map((kind) => [kind, "https://example.com/library"])),
-    sourceButtons: [
-      { label: "Watch on Plex", url: "https://example.com/plex", kinds: ["movie", "tv_episode", "tv_season"] },
-      { label: "Read on BookLore", url: "https://example.com/books", kinds: ["book"] },
-      { label: "Play on RomM", url: "https://example.com/games", kinds: ["game"] },
-    ],
+    sourceButtons: sampleSourceButtons(sources),
     generatedAt: now,
     lookbackDays: 7,
     ...designContentVariables(settings),

@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, runMigrations, type Db } from "@latestarr/db";
+import { createDb, runMigrations, sourceConnections, type Db } from "@latestarr/db";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../app.js";
@@ -213,6 +213,29 @@ describe("designs", () => {
     expect(body.subject).toBe("Sample newsletter");
     expect(body.html).toContain("The Quiet Harbour");
     expect(body.html).toContain("display:inline-block;width:50%");
+  });
+
+  // #291: the sample always said "Read on BookLore", whatever was connected.
+  it("labels the sample's source buttons after the connected sources", async () => {
+    const neutral = await app.inject(
+      authed({ method: "POST", url: "/api/templates/preview", payload: { settings: {} } }),
+    );
+    expect(neutral.json().html).toContain("Read now");
+    expect(neutral.json().html).not.toContain("BookLore");
+
+    await db.insert(sourceConnections).values([
+      { name: "Books", kind: "bookorbit", baseUrl: "http://bookorbit.local", credentialsEncrypted: "x" },
+      { name: "Plex", kind: "plex", baseUrl: "http://plex.local", publicUrl: "https://plex.example.com", credentialsEncrypted: "x" },
+    ]);
+    const preview = await app.inject(
+      authed({ method: "POST", url: "/api/templates/preview", payload: { settings: {} } }),
+    );
+    const html = preview.json().html as string;
+    expect(html).toContain("Read on Book Orbit");
+    expect(html).toContain("Watch on Plex");
+    expect(html).toContain('href="https://plex.example.com"');
+    expect(html).not.toContain("BookLore");
+    expect(html).not.toContain("Read now");
   });
 
   it("keeps a design's intro, footer note, and up to 4 buttons, and shows them in the preview", async () => {
