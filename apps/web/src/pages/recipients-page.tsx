@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Plus, Search, Upload, X } from "lucide-react";
 
@@ -43,6 +43,23 @@ import {
 } from "@/lib/api";
 import { parseRecipientImportText } from "@/lib/recipient-import";
 import { cn } from "@/lib/utils";
+
+// The edit panel and the Groups section both show group membership. The
+// panel reports its changes here so the section updates without a page
+// refresh (#286): a new group joins the list, and open groups reload their
+// members.
+interface GroupSync {
+  /** Bumped whenever the edit panel changes someone's groups. */
+  membershipVersion: number;
+  groupCreated: (group: RecipientGroup) => void;
+  membershipChanged: () => void;
+}
+
+const GroupSyncContext = createContext<GroupSync>({
+  membershipVersion: 0,
+  groupCreated: () => {},
+  membershipChanged: () => {},
+});
 
 function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) => void }) {
   const [open, setOpen] = useState(false);
@@ -326,6 +343,7 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const sync = useContext(GroupSyncContext);
 
   useEffect(() => {
     Promise.all([listGroups(), getRecipientGroups(recipientId)])
@@ -346,6 +364,7 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
       const added = allGroups?.find((g) => g.id === selectedId);
       if (added) setMemberGroups((prev) => [...(prev ?? []), added]);
       setSelectedId("");
+      sync.membershipChanged();
       toast({ variant: "success", title: "Added to group", description: added?.name });
     } catch (err) {
       toast({
@@ -363,6 +382,7 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
     try {
       await removeGroupMember(group.id, recipientId);
       setMemberGroups((prev) => (prev ?? []).filter((g) => g.id !== group.id));
+      sync.membershipChanged();
       toast({ variant: "success", title: "Removed from group", description: group.name });
     } catch (err) {
       toast({
@@ -381,8 +401,11 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
     setCreatingGroup(true);
     try {
       const { group } = await createGroup({ name });
-      await addGroupMember(group.id, recipientId);
+      // Listed straight away, so it shows even if adding them to it fails.
+      sync.groupCreated(group);
       setAllGroups((prev) => [...(prev ?? []), group]);
+      await addGroupMember(group.id, recipientId);
+      sync.membershipChanged();
       setMemberGroups((prev) => [...(prev ?? []), group]);
       setNewGroupName("");
       toast({ variant: "success", title: "Group created and added", description: group.name });
@@ -1099,12 +1122,23 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
   const [selectedId, setSelectedId] = useState("");
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const { membershipVersion } = useContext(GroupSyncContext);
 
+  // Reloads when the edit panel changes anyone's groups. The current list
+  // stays up while it does, and a slower earlier load can't overwrite it.
   useEffect(() => {
+    let current = true;
     getGroupMembers(groupId)
-      .then(({ members: loaded }) => setMembers(loaded))
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load members."));
-  }, [groupId]);
+      .then(({ members: loaded }) => {
+        if (current) setMembers(loaded);
+      })
+      .catch((err) => {
+        if (current) setLoadError(err instanceof ApiError ? err.message : "Failed to load members.");
+      });
+    return () => {
+      current = false;
+    };
+  }, [groupId, membershipVersion]);
 
   const availableToAdd = allRecipients.filter(
     (r) => !members?.some((m) => m.id === r.id),
@@ -1267,16 +1301,17 @@ function GroupCard({
   );
 }
 
-function GroupsSection({ allRecipients }: { allRecipients: Recipient[] }) {
-  const [groups, setGroups] = useState<RecipientGroup[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listGroups()
-      .then(({ groups: loaded }) => setGroups(loaded))
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load groups."));
-  }, []);
-
+function GroupsSection({
+  allRecipients,
+  groups,
+  loadError,
+  setGroups,
+}: {
+  allRecipients: Recipient[];
+  groups: RecipientGroup[] | null;
+  loadError: string | null;
+  setGroups: (updater: (prev: RecipientGroup[] | null) => RecipientGroup[] | null) => void;
+}) {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4">
@@ -1329,22 +1364,46 @@ export function RecipientsPage() {
   const [recipients, setRecipients] = useState<Recipient[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const [groups, setGroups] = useState<RecipientGroup[] | null>(null);
+  const [groupsLoadError, setGroupsLoadError] = useState<string | null>(null);
+  const [membershipVersion, setMembershipVersion] = useState(0);
+
   useEffect(() => {
     listRecipients()
       .then(({ recipients: loaded }) => setRecipients(loaded))
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load recipients."));
+    listGroups()
+      .then(({ groups: loaded }) => setGroups(loaded))
+      .catch((err) => setGroupsLoadError(err instanceof ApiError ? err.message : "Failed to load groups."));
   }, []);
 
-  return (
-    <div className="flex flex-col gap-8">
-      <PageHeader title="Recipients" description="Manage recipients and the groups newsletters send to." />
+  const groupSync = useMemo<GroupSync>(
+    () => ({
+      membershipVersion,
+      groupCreated: (group) =>
+        setGroups((prev) => (prev && !prev.some((g) => g.id === group.id) ? [...prev, group] : prev)),
+      membershipChanged: () => setMembershipVersion((v) => v + 1),
+    }),
+    [membershipVersion],
+  );
 
-      <RecipientsSection
-        recipients={recipients}
-        loadError={loadError}
-        onRecipientsChange={(updater) => setRecipients((prev) => updater(prev ?? []))}
-      />
-      <GroupsSection allRecipients={recipients ?? []} />
-    </div>
+  return (
+    <GroupSyncContext.Provider value={groupSync}>
+      <div className="flex flex-col gap-8">
+        <PageHeader title="Recipients" description="Manage recipients and the groups newsletters send to." />
+
+        <RecipientsSection
+          recipients={recipients}
+          loadError={loadError}
+          onRecipientsChange={(updater) => setRecipients((prev) => updater(prev ?? []))}
+        />
+        <GroupsSection
+          allRecipients={recipients ?? []}
+          groups={groups}
+          loadError={groupsLoadError}
+          setGroups={setGroups}
+        />
+      </div>
+    </GroupSyncContext.Provider>
   );
 }
