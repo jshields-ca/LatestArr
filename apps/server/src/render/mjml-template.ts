@@ -403,6 +403,20 @@ function formatPeriod(end: Date, days: number): string {
   return `${month(start)} ${start.getDate()} – ${endPart}, ${end.getFullYear()}`;
 }
 
+// The Intro and Footer note are plain text typed into a text box. HTML runs
+// their lines together (#289), so each line is escaped on its own and
+// joined with <br>. A blank line, or several, leaves one empty line
+// between paragraphs.
+export function textWithLineBreaks(text: string | undefined): Handlebars.SafeString | undefined {
+  if (!text) return undefined;
+  const html = text
+    .replace(/\r\n?/g, "\n")
+    .split(/\n[ \t]*\n\s*/)
+    .map((paragraph) => paragraph.split("\n").map((line) => Handlebars.escapeExpression(line)).join("<br>"))
+    .join("<br><br>");
+  return new Handlebars.SafeString(html);
+}
+
 export async function renderMjmlTemplate(
   mjmlSource: string,
   context: MjmlRenderContext,
@@ -419,8 +433,8 @@ export async function renderMjmlTemplate(
     periodFormatted: context.lookbackDays ? formatPeriod(context.generatedAt, context.lookbackDays) : undefined,
     itemCount: context.items.length,
     kindCounts: kindCounts(context.items),
-    introText: context.introText,
-    footerNote: context.footerNote,
+    introText: textWithLineBreaks(context.introText),
+    footerNote: textWithLineBreaks(context.footerNote),
     ctas: context.ctas ?? [],
     sourceButtons: context.sourceButtons ?? [],
   });
