@@ -112,6 +112,32 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     expect(previewBodies[0]).toEqual({ settings: DEFAULT_DESIGN_SETTINGS });
   });
 
+  // The preview iframe would otherwise follow the browser's dark mode, where
+  // a design's dark version makes Background and Text look swapped (#285).
+  it("previews in Light by default and switches to Dark, remembering the choice", async () => {
+    window.localStorage.removeItem("latestarr:email-preview-scheme");
+    previewResponse = () =>
+      jsonResponse(200, {
+        subject: "Sample",
+        html: "<style>@media (prefers-color-scheme: dark) { p { color:#fff; } }</style><p>Preview body</p>",
+        items: [],
+        warnings: [],
+      });
+    const user = userEvent.setup();
+    renderEditor();
+    const frame = await screen.findByTitle("Design preview");
+    const light = screen.getByRole("button", { name: "Light" });
+    const dark = screen.getByRole("button", { name: "Dark" });
+    expect(light).toHaveAttribute("aria-pressed", "true");
+    expect(frame.getAttribute("srcdoc")).toContain("@media (max-width: -1px)");
+
+    await user.click(dark);
+    expect(dark).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTitle("Design preview").getAttribute("srcdoc")).toContain("@media (min-width: 0px)");
+    expect(window.localStorage.getItem("latestarr:email-preview-scheme")).toBe("dark");
+    window.localStorage.removeItem("latestarr:email-preview-scheme");
+  });
+
   it("re-previews after a change, marks it unsaved, and saves settings and name together", async () => {
     const user = userEvent.setup();
     renderEditor();

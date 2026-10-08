@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Check, Eye, Loader2, Pencil, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
 
 import { useHasRole, useOptionalAuth } from "@/components/auth-provider";
+import { EmailPreviewFrame, PreviewSchemeToggle, usePreviewScheme } from "@/components/email-preview-frame";
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { ListRow } from "@/components/list-row";
 import { SendRunHistoryList } from "@/components/send-run-history";
@@ -758,6 +759,7 @@ function NewsletterPreviewDialog({ newsletter }: { newsletter: Newsletter }) {
   const canSendTest = useHasRole("editor");
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<NewsletterPreview | null>(null);
+  const [previewScheme, setPreviewScheme] = usePreviewScheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testTo, setTestTo] = useState("");
@@ -832,22 +834,25 @@ function NewsletterPreviewDialog({ newsletter }: { newsletter: Newsletter }) {
 
         {preview && !loading ? (
           <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-sm">
-              <span className="text-muted-foreground">Subject: </span>
-              {preview.subject}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Subject: </span>
+                {preview.subject}
+              </p>
+              <div className="ml-auto">
+                <PreviewSchemeToggle scheme={previewScheme} onChange={setPreviewScheme} />
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground">
               {preview.items.length === 0
                 ? "Nothing new in the lookback window."
                 : `${preview.items.length} ${preview.items.length === 1 ? "item" : "items"} from the last ${newsletter.lookbackDays} days.`}
             </p>
-            {/* Sandboxed with no scripts or same-origin access; popups are
-                allowed so the email's own links open in a new tab. */}
-            <iframe
+            <EmailPreviewFrame
               title={`Email preview for ${newsletter.name}`}
-              srcDoc={preview.html}
-              sandbox="allow-popups allow-popups-to-escape-sandbox"
-              className="h-[60dvh] w-full rounded-md border border-border bg-white"
+              html={preview.html}
+              scheme={previewScheme}
+              className="h-[60dvh]"
             />
           </div>
         ) : null}

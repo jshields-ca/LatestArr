@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Loader2, Plus, Save, X } from "lucide-react";
 
 import { DesignCodeReference } from "@/components/design-code-reference";
+import { EmailPreviewFrame, PreviewSchemeToggle, usePreviewScheme } from "@/components/email-preview-frame";
 import { useHasRole } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -196,6 +197,7 @@ export function DesignEditorPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const previewRequest = useRef(0);
+  const [previewScheme, setPreviewScheme] = usePreviewScheme();
 
   const dirty = settings !== null && snapshotOf(name, settings, mode, code) !== savedSnapshot;
   const ctasComplete = settings?.content.ctas.every(isCompleteCta) ?? true;
@@ -573,6 +575,10 @@ export function DesignEditorPage() {
                   </div>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Email apps in dark mode show a dark version worked out from these colours, with Text as the
+                background and Background as the text. Switch the preview to Dark to check it.
+              </p>
               <SettingRow
                 label="Show the date range and counts"
                 description={`"Sep 21 – 28, 2026 · 36 new" and a count for each type, under the title.`}
@@ -807,6 +813,9 @@ export function DesignEditorPage() {
               ))}
             </Select>
             {previewing ? <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Updating preview" /> : null}
+            <div className="ml-auto">
+              <PreviewSchemeToggle scheme={previewScheme} onChange={setPreviewScheme} />
+            </div>
           </div>
           {previewError ? (
             <p role="alert" className="text-sm text-destructive">
@@ -814,12 +823,7 @@ export function DesignEditorPage() {
             </p>
           ) : null}
           {previewHtml !== null ? (
-            <iframe
-              title="Design preview"
-              srcDoc={previewHtml}
-              sandbox="allow-popups allow-popups-to-escape-sandbox"
-              className="h-[75dvh] w-full rounded-md border border-border bg-white"
-            />
+            <EmailPreviewFrame title="Design preview" html={previewHtml} scheme={previewScheme} className="h-[75dvh]" />
           ) : (
             <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
               Building preview...
