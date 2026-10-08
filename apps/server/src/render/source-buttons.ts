@@ -24,7 +24,7 @@ const SERVICES: Record<string, { verb: string; service: string }> = {
   jellyfin: { verb: "Watch on", service: "Jellyfin" },
   emby: { verb: "Watch on", service: "Emby" },
   booklore: { verb: "Read on", service: "BookLore" },
-  bookorbit: { verb: "Read on", service: "BookOrbit" },
+  bookorbit: { verb: "Read on", service: "Book Orbit" },
   grimmory: { verb: "Read on", service: "Grimmory" },
   audiobookshelf: { verb: "Listen on", service: "Audiobookshelf" },
   romm: { verb: "Play on", service: "RomM" },
