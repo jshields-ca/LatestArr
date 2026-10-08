@@ -324,6 +324,21 @@ describe("renderDefaultNewsletterHtml", () => {
       expect(footerIndex).toBeLessThan(generatedByIndex);
     });
 
+    // #289: HTML ran the lines of a multi-line intro together.
+    it("keeps the line breaks and paragraphs of the intro and footer note, still escaped", async () => {
+      const html = await renderDefaultNewsletterHtml({
+        newsletterName: "Weekly Digest",
+        items: [item()],
+        generatedAt: new Date("2026-01-20T12:00:00Z"),
+        introText: "Hi all,\r\nNew this week:\n\n\n<b>Movies</b> & shows",
+        footerNote: "Thanks!\nThe admin",
+      });
+
+      expect(html).toContain("Hi all,<br>New this week:<br><br>&lt;b&gt;Movies&lt;/b&gt; &amp; shows");
+      expect(html).toContain("Thanks!<br>The admin");
+      expect(html).not.toContain("<b>Movies</b>");
+    });
+
     it("renders each CTA as a button linking to its URL", async () => {
       const html = await renderDefaultNewsletterHtml({
         newsletterName: "Weekly Digest",
