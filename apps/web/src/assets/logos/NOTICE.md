@@ -1,6 +1,6 @@
 # Third-party service logos
 
-The SVGs in this folder are the brand marks of the self-hosted services
+The images in this folder are the brand marks of the self-hosted services
 LatestArr connects to as sources. They're bundled locally (rather than
 hotlinked) so the Sources page keeps working offline and doesn't leak
 browsing signals to a third-party host.
@@ -12,7 +12,7 @@ browsing signals to a third-party host.
 | `jellyfin.svg` | [Jellyfin](https://jellyfin.org/) | [selfh.st/icons](https://selfh.st/icons) ([svg/jellyfin.svg](https://github.com/selfhst/icons/blob/main/svg/jellyfin.svg)) |
 | `emby.svg` | [Emby](https://emby.media/) | [selfh.st/icons](https://selfh.st/icons) ([svg/emby.svg](https://github.com/selfhst/icons/blob/main/svg/emby.svg)) |
 | `booklore.svg` | [BookLore](https://github.com/booklore-app/booklore) | [selfh.st/icons](https://selfh.st/icons) ([svg/booklore.svg](https://github.com/selfhst/icons/blob/main/svg/booklore.svg)) |
-| `bookorbit.svg` | [BookOrbit](https://github.com/bookorbit-app/bookorbit) | [selfh.st/icons](https://selfh.st/icons) ([svg/bookorbit.svg](https://github.com/selfhst/icons/blob/main/svg/bookorbit.svg)) |
+| `bookorbit.webp` | [BookOrbit](https://bookorbit.app/) | [selfh.st/icons](https://selfh.st/icons) ([webp/bookorbit.webp](https://github.com/selfhst/icons/blob/main/webp/bookorbit.webp)), the new logo from October 2026, which is published only as a raster image |
 | `grimmory.svg` | [Grimmory](https://github.com/Grimmory/grimmory) | [selfh.st/icons](https://selfh.st/icons) ([svg/grimmory.svg](https://github.com/selfhst/icons/blob/main/svg/grimmory.svg)) |
 | `audiobookshelf.svg` | [Audiobookshelf](https://www.audiobookshelf.org/) | [selfh.st/icons](https://selfh.st/icons) ([svg/audiobookshelf.svg](https://github.com/selfhst/icons/blob/main/svg/audiobookshelf.svg)) |
 | `romm.svg` | [RomM](https://romm.app/) | [selfh.st/icons](https://selfh.st/icons) ([svg/romm.svg](https://github.com/selfhst/icons/blob/main/svg/romm.svg)) |
