@@ -1,10 +1,18 @@
 import { getAdapter } from "@latestarr/adapter-core";
-import { type Db, newsletters, sourceConnections, templates } from "@latestarr/db";
+import { type Db, designImages, newsletters, sourceConnections, templates } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  cleanImage,
+  MAX_UPLOAD_BYTES,
+  pruneUnusedDesignImages,
+  resolveLogo,
+  UnsupportedImageError,
+} from "../../pipeline/design-logo.js";
+import {
   describeSendFailure,
+  inlineAttachments,
   NewsletterNotFoundError,
   previewNewsletter,
 } from "../../pipeline/run-newsletter.js";
@@ -45,6 +53,13 @@ const updateTemplateSchema = z.object({
   settings: designSettingsSchema.optional(),
   compiledMjml: mjmlSchema.optional(),
 });
+
+// An uploaded image, as base64. Its size is checked once decoded.
+const uploadImageSchema = z.object({
+  data: z.string().min(1).max(Math.ceil(MAX_UPLOAD_BYTES / 3) * 4 + 4),
+});
+// Room for the base64 image plus the JSON around it.
+const UPLOAD_BODY_LIMIT = Math.ceil(MAX_UPLOAD_BYTES / 3) * 4 + 1024;
 
 function codeErrorReply(check: CodeCheck) {
   const [first] = check.errors;
@@ -94,12 +109,14 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         const sources = await db
           .select({ kind: sourceConnections.kind, name: sourceConnections.name, publicUrl: sourceConnections.publicUrl })
           .from(sourceConnections);
+        const logo = await resolveLogo(db, settings, { fetchUrls: false, log: request.log });
         const html = await renderDesignSample(
           settings,
           mjml,
           sources.map((source) => ({ ...source, kinds: getAdapter(source.kind)?.capabilities.supportsMediaKinds ?? [] })),
+          logo.logo,
         );
-        return reply.send({ subject: "Sample newsletter", html, items: [], warnings });
+        return reply.send({ subject: "Sample newsletter", html: inlineAttachments(html, logo.attachments), items: [], warnings });
       }
       try {
         const preview = await previewNewsletter(db, newsletterId, { log: request.log, design: { settings, mjml } });
@@ -110,6 +127,44 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         }
         return reply.code(502).send({ error: describeSendFailure(err) });
       }
+    });
+
+    // A logo for a design (#302). The image is checked and cleaned up
+    // (cleanImage) before it's stored; the design then refers to it by id.
+    scope.post("/templates/images", { bodyLimit: UPLOAD_BODY_LIMIT }, async (request, reply) => {
+      const body = parseBody(uploadImageSchema, request.body, reply);
+      if (!body) return reply;
+      const bytes = Buffer.from(body.data, "base64");
+      if (bytes.length === 0) return reply.code(400).send({ error: "The image is empty" });
+      if (bytes.length > MAX_UPLOAD_BYTES) {
+        return reply.code(413).send({ error: "Images can be up to 1 MB. Try a smaller or more compressed version." });
+      }
+      let image;
+      try {
+        image = await cleanImage(bytes);
+      } catch (err) {
+        if (err instanceof UnsupportedImageError) return reply.code(422).send({ error: err.message });
+        throw err;
+      }
+      const [row] = await db
+        .insert(designImages)
+        .values({ ...image, createdBy: request.sessionUser?.id ?? null })
+        .returning({ id: designImages.id, contentType: designImages.contentType, width: designImages.width, height: designImages.height });
+      request.log.info({ imageId: row!.id, bytes: image.content.length }, "Uploaded a design image");
+      await pruneUnusedDesignImages(db);
+      return reply.code(201).send({ image: row });
+    });
+
+    // Images never change (a new upload gets a new id), so browsers can
+    // keep them.
+    scope.get<{ Params: IdParams }>("/templates/images/:id", async (request, reply) => {
+      const [image] = await db.select().from(designImages).where(eq(designImages.id, request.params.id));
+      if (!image) return reply.code(404).send({ error: "Not found" });
+      return reply
+        .type(image.contentType)
+        .header("cache-control", "private, max-age=31536000, immutable")
+        .header("content-disposition", "inline")
+        .send(image.content);
     });
 
     scope.get("/templates", async (_request, reply) => {
@@ -151,6 +206,7 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         return reply.code(404).send({ error: "Not found" });
       }
       request.log.info({ templateId: template.id, fields: changedFields(body) }, `Saved template "${template.name}"`);
+      if (settings !== undefined) await pruneUnusedDesignImages(db);
       return reply.send({ template });
     });
 
@@ -192,6 +248,7 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
         return { deleted, switched };
       });
       if (deleted) {
+        await pruneUnusedDesignImages(db);
         request.log.info(
           { templateId: deleted.id, switchedToDefault: switched.map((n) => n.name) },
           `Deleted design "${deleted.name}"${switched.length > 0 ? `; ${switched.length} newsletter(s) now use Default` : ""}`,

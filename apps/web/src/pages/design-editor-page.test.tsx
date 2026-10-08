@@ -53,9 +53,11 @@ const codeDesign = { ...design, id: "c1", name: "Hand made", mode: "code", compi
 
 let previewBodies: { settings: typeof DEFAULT_DESIGN_SETTINGS; newsletterId?: string; mjml?: string }[];
 let previewResponse: () => ReturnType<typeof jsonResponse>;
+let uploads: string[];
 
 beforeEach(() => {
   previewBodies = [];
+  uploads = [];
   previewResponse = () => jsonResponse(200, { subject: "Sample", html: "<p>Preview body</p>", items: [], warnings: [] });
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockImplementation((url: string, init?: RequestInit) => {
@@ -73,6 +75,12 @@ beforeEach(() => {
       return Promise.resolve(jsonResponse(200, { template: design }));
     }
     if (url === "/api/newsletters") return Promise.resolve(jsonResponse(200, { newsletters: [newsletter] }));
+    if (url === "/api/templates/images" && init?.method === "POST") {
+      uploads.push(JSON.parse(init.body as string).data);
+      return Promise.resolve(
+        jsonResponse(201, { image: { id: `img${uploads.length}`, contentType: "image/png", width: 300, height: 80 } }),
+      );
+    }
     if (url === "/api/templates/preview") {
       previewBodies.push(JSON.parse(init!.body as string));
       return Promise.resolve(previewResponse());
@@ -282,6 +290,72 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     expect(screen.queryByLabelText("Where they go")).not.toBeInTheDocument();
     await waitFor(() => expect(previewBodies.at(-1)?.settings.content.sourceButtons.enabled).toBe(false));
   }, 60000);
+
+  // #302: a logo, uploaded (with a dark mode version) or from a URL.
+  it("uploads a logo and its dark mode version, and links it", async () => {
+    // Without applyAccept, so the SVG reaches the editor's own check.
+    const user = userEvent.setup({ applyAccept: false });
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    selectOption(screen.getByLabelText("Logo"), "Upload an image");
+    expect(screen.getByRole("alert")).toHaveTextContent("Upload a logo image, or choose No logo.");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    // Refused before uploading, with the reason.
+    await user.upload(screen.getByLabelText("Logo image"), new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" }));
+    expect(await screen.findByText(/SVG images aren't supported/)).toBeInTheDocument();
+    expect(uploads).toEqual([]);
+
+    await user.upload(screen.getByLabelText("Logo image"), new File(["png-bytes"], "logo.png", { type: "image/png" }));
+    await user.upload(
+      screen.getByLabelText("Dark mode version (optional)"),
+      new File(["dark-bytes"], "dark.png", { type: "image/png" }),
+    );
+    expect(uploads).toEqual([btoa("png-bytes"), btoa("dark-bytes")]);
+    expect(await screen.findAllByRole("button", { name: "Replace" })).toHaveLength(2);
+
+    await user.type(screen.getByLabelText("Link to (optional)"), "https://plex.example.com");
+    selectOption(screen.getByLabelText("Placement"), "Replace the name");
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.logo).toMatchObject({
+        source: "upload",
+        imageId: "img1",
+        darkImageId: "img2",
+        link: "https://plex.example.com",
+        placement: "replace",
+      }),
+    );
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Remove dark mode version (optional)" }));
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.logo.darkImageId).toBeNull());
+  });
+
+  it("uses a logo from an image URL, holding back Save until it's a full address", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    selectOption(screen.getByLabelText("Logo"), "Image URL");
+    await user.type(screen.getByLabelText("Image URL"), "example.com/logo.png");
+    expect(screen.getByRole("alert")).toHaveTextContent("Image URLs need to start with http:// or https://.");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    // Left out of the preview until it's valid.
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.logo.source).toBe("none"));
+
+    await user.clear(screen.getByLabelText("Image URL"));
+    await user.type(screen.getByLabelText("Image URL"), "https://example.com/logo.png");
+    await user.click(screen.getByRole("radio", { name: /Link to it/ }));
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.logo).toMatchObject({
+        source: "url",
+        url: "https://example.com/logo.png",
+        urlMode: "link",
+      }),
+    );
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
 
   it("has no accessibility violations", async () => {
     const { container } = renderEditor();

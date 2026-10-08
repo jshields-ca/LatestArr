@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Loader2, Plus, Save, X } from "lucide-react";
 
 import { DesignCodeReference } from "@/components/design-code-reference";
+import { DesignLogoFields } from "@/components/design-logo-fields";
 import { EmailPreviewFrame, PreviewSchemeToggle, usePreviewScheme } from "@/components/email-preview-frame";
 import { useHasRole } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ import {
   type DesignSettings,
   type DesignSourceButtonPlacement,
   isCompleteCta,
+  logoProblem,
   moveSection,
   orderedSections,
   MAX_DESIGN_CTAS,
@@ -388,6 +390,7 @@ export function DesignEditorPage() {
 
   const dirty = settings !== null && snapshotOf(name, settings, mode, code) !== savedSnapshot;
   const ctasComplete = settings?.content.ctas.every(isCompleteCta) ?? true;
+  const logoReady = settings ? logoProblem(settings.logo) === null : true;
 
   function load(template: Template) {
     const loaded = withDesignDefaults(template.settings);
@@ -417,10 +420,11 @@ export function DesignEditorPage() {
     const request = ++previewRequest.current;
     const timer = setTimeout(() => {
       setPreviewing(true);
-      // A half-typed button would fail validation; preview the rest.
+      // A half-typed button or logo URL would fail validation; preview the rest.
       const previewable = {
         ...settings,
         content: { ...settings.content, ctas: settings.content.ctas.filter(isCompleteCta) },
+        logo: logoProblem(settings.logo) ? { ...settings.logo, source: "none" as const } : settings.logo,
       };
       const source = previewSource === SAMPLE ? undefined : previewSource;
       previewDesign(previewable, source, mode === "code" ? code : undefined)
@@ -526,6 +530,16 @@ export function DesignEditorPage() {
       </div>
     );
   }
+
+  const logoSection = (
+    <Section title="Logo" defaultOpen={settings.logo.source !== "none"}>
+      <DesignLogoFields
+        logo={settings.logo}
+        showLayout={mode === "design"}
+        onChange={(logo) => update((c) => ({ ...c, logo }))}
+      />
+    </Section>
+  );
 
   const textAndButtons = (
     <Section title="Text and buttons" defaultOpen>
@@ -657,7 +671,7 @@ export function DesignEditorPage() {
                 Edit as code
               </Button>
             ) : null}
-            <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim() || !ctasComplete}>
+            <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim() || !ctasComplete || !logoReady}>
               {saving ? <Loader2 className="animate-spin" /> : <Save />}
               Save
             </Button>
@@ -721,6 +735,8 @@ export function DesignEditorPage() {
                 </p>
               )}
             </div>
+
+            {logoSection}
 
             {textAndButtons}
 
@@ -786,6 +802,8 @@ export function DesignEditorPage() {
                 }
               />
             </Section>
+
+            {logoSection}
 
             {textAndButtons}
 

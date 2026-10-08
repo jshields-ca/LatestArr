@@ -1,8 +1,9 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, runMigrations, sourceConnections, type Db } from "@latestarr/db";
+import { createDb, designImages, runMigrations, sourceConnections, type Db } from "@latestarr/db";
 import type { FastifyInstance } from "fastify";
+import sharp from "sharp";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../app.js";
 
@@ -377,5 +378,68 @@ describe("code designs", () => {
     expect((await preview(template.compiledMjml)).json().html).toContain("prefers-color-scheme: dark");
     const withoutMarker = template.compiledMjml.replace(/<!-- latestarr:dark-mode[^>]*-->/, "");
     expect((await preview(withoutMarker)).json().html).not.toContain("prefers-color-scheme");
+  });
+});
+
+describe("design images", () => {
+  async function upload(bytes: Buffer) {
+    return app.inject(authed({ method: "POST", url: "/api/templates/images", payload: { data: bytes.toString("base64") } }));
+  }
+  const png = () =>
+    sharp({ create: { width: 64, height: 32, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0.5 } } }).png().toBuffer();
+
+  it("stores an uploaded logo and serves it back", async () => {
+    const response = await upload(await png());
+    expect(response.statusCode).toBe(201);
+    const { image } = response.json();
+    expect(image).toMatchObject({ contentType: "image/png", width: 64, height: 32 });
+
+    const served = await app.inject(authed({ method: "GET", url: `/api/templates/images/${image.id}` }));
+    expect(served.statusCode).toBe(200);
+    expect(served.headers["content-type"]).toBe("image/png");
+    expect(served.headers["cache-control"]).toContain("immutable");
+    expect((await sharp(served.rawPayload).metadata()).width).toBe(64);
+  });
+
+  it("refuses SVG and files that aren't images", async () => {
+    const svg = await upload(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'));
+    expect(svg.statusCode).toBe(422);
+    expect(svg.json().error).toMatch(/SVG/);
+    expect((await upload(Buffer.from("hello"))).statusCode).toBe(422);
+  });
+
+  it("refuses an image over 1 MB", async () => {
+    const response = await upload(Buffer.alloc(1024 * 1024 + 1, 1));
+    expect(response.statusCode).toBe(413);
+    expect(response.json().error).toMatch(/up to 1 MB/);
+  });
+
+  it("shows the logo in the design preview, inline", async () => {
+    const { image } = (await upload(await png())).json();
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/templates/preview",
+        payload: { settings: { logo: { source: "upload", imageId: image.id, link: "https://plex.example.com" } } },
+      }),
+    );
+    expect(response.statusCode).toBe(200);
+    expect(response.json().html).toMatch(/<a href="https:\/\/plex\.example\.com"[^>]*><img class="latestarr-logo" src="data:image\/png;base64,/);
+  });
+
+  it("removes a deleted design's old logo", async () => {
+    const { image } = (await upload(await png())).json();
+    const { template } = (
+      await app.inject(
+        authed({ method: "POST", url: "/api/templates", payload: { name: "Logo", settings: { logo: { source: "upload", imageId: image.id } } } }),
+      )
+    ).json();
+    await db.update(designImages).set({ createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) });
+
+    await app.inject(authed({ method: "PATCH", url: `/api/templates/${template.id}`, payload: { name: "Renamed" } }));
+    expect(await db.select({ id: designImages.id }).from(designImages)).toHaveLength(1);
+
+    await app.inject(authed({ method: "DELETE", url: `/api/templates/${template.id}` }));
+    expect(await db.select({ id: designImages.id }).from(designImages)).toHaveLength(0);
   });
 });

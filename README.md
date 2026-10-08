@@ -23,7 +23,7 @@
 ## Features
 
 - **Many sources, one newsletter.** Plex, Tautulli, Jellyfin, Emby, BookLore-family book libraries, Audiobookshelf, and RomM. Mix them in one newsletter or give each its own, and import your server's users as recipients.
-- **Design without code, or with it.** Pick fonts, colours, layout (cards, compact list, or grid), and what each item shows, with a live preview. Group items by type, fold a show's new episodes into one row, and add an intro, a footer note, and buttons. Switch to **code mode** (MJML) for full control.
+- **Design without code, or with it.** Pick fonts, colours, layout (cards, compact list, or grid), and what each item shows, and add your logo (with a dark mode version), with a live preview. Group items by type, fold a show's new episodes into one row, and add an intro, a footer note, and buttons. Switch to **code mode** (MJML) for full control.
 - **Where to watch.** Each item links to your server, and **Watch on Plex**-style buttons point people to the right place.
 - **Your schedule.** As many newsletters as you like, each with its own schedule, timezone, lookback window, sources, and recipient groups. Missed sends catch up, and a send with nothing new can be skipped.
 - **Check before it goes out.** Preview the next issue with real items, and send yourself a test.

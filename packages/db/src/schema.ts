@@ -166,6 +166,22 @@ export const templates = sqliteTable("templates", {
   ...timestamps,
 });
 
+// Images uploaded for designs (a logo, #302), referenced by id from a
+// template's settings. Stored already cleaned up (re-encoded, metadata
+// removed), and embedded in each email as an inline attachment. An image
+// no design uses any more is removed (see pruneUnusedDesignImages).
+export const designImages = sqliteTable("design_images", {
+  id: id(),
+  contentType: text("content_type").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
+  content: blob("content", { mode: "buffer" }).notNull(),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export const smtpProfiles = sqliteTable("smtp_profiles", {
   id: id(),
   name: text("name").notNull(),

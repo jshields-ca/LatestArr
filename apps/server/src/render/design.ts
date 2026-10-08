@@ -11,6 +11,11 @@ export const DESIGN_KINDS = ["movie", "tv_episode", "tv_season", "book", "audiob
 export type DesignKind = (typeof DESIGN_KINDS)[number];
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Colours must be 6-digit hex values like #c31d4c");
+const httpUrl = z.url({ protocol: /^https?$/ }).max(2000);
+
+// A logo's width in the email, in px. The card's content is about 550 px wide.
+export const LOGO_MIN_WIDTH = 40;
+export const LOGO_MAX_WIDTH = 550;
 
 // Every field has a default, so a design saved by an older version (or a
 // partial one) still parses, and new options can be added later without a
@@ -38,6 +43,27 @@ export const designSettingsSchema = z.object({
       shape: z.enum(["square", "rounded", "pill"]).default("rounded"),
       style: z.enum(["filled", "outline"]).default("filled"),
       size: z.enum(["regular", "small"]).default("regular"),
+    })
+    .prefault({}),
+  // A logo at the top (#302): an uploaded image (design_images, embedded in
+  // each email) or an image URL, either embedded when sending or linked.
+  // A second image can stand in for it in dark mode.
+  logo: z
+    .object({
+      source: z.enum(["none", "upload", "url"]).default("none"),
+      imageId: z.string().min(1).max(64).nullable().default(null),
+      darkImageId: z.string().min(1).max(64).nullable().default(null),
+      url: httpUrl.nullable().default(null),
+      darkUrl: httpUrl.nullable().default(null),
+      urlMode: z.enum(["embed", "link"]).default("embed"),
+      link: httpUrl.nullable().default(null),
+      // Above the newsletter's name, or in its place (the name becomes the
+      // image's alt text, for when images are off).
+      placement: z.enum(["above", "replace"]).default("above"),
+      align: z.enum(["left", "center", "right"]).default("left"),
+      maxWidth: z.number().int().min(LOGO_MIN_WIDTH).max(LOGO_MAX_WIDTH).default(180),
+      // Empty uses the newsletter's name.
+      alt: z.string().trim().max(120).default(""),
     })
     .prefault({}),
   showLookbackLine: z.boolean().default(true),
@@ -196,6 +222,16 @@ function isLight(hex: string): boolean {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
 }
 
+/** A design with a dark background, which dark mode leaves as it is. */
+export function isDarkDesign(settings: DesignSettings): boolean {
+  return !isLight(settings.colors.background);
+}
+
+// A logo with a dark-mode version (#302) shows that one instead in dark
+// mode. mjml-template.ts's logo markup uses these classes.
+const logoSwapCss = (prefix: string) =>
+  `${prefix}.latestarr-logo-light { display:none !important; } ${prefix}.latestarr-logo-dark { display:inline-block !important; }`;
+
 // The design's colours for dark mode, derived from its light ones.
 function darkPaletteFor(p: Palette): Palette {
   const background = mix(p.text, "#000000", 0.35);
@@ -227,7 +263,7 @@ function darkPaletteFor(p: Palette): Palette {
 // This declares support and swaps each of the design's inline colours for
 // its dark counterpart, matched by value, so no element needs its own
 // class. A design that is already dark is left as it is.
-function darkModeHead(p: Palette): string {
+function darkModeHead(p: Palette, withDarkLogo = false): string {
   const declare = `<mj-raw><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></mj-raw>`;
   if (!isLight(p.background)) return `
     ${declare}`;
@@ -276,9 +312,9 @@ function darkModeHead(p: Palette): string {
     <mj-style>
       :root { color-scheme: light dark; supported-color-schemes: light dark; }
       @media (prefers-color-scheme: dark) {
-      ${css(false)}
+      ${css(false)}${withDarkLogo ? `\n      ${logoSwapCss("")}` : ""}
       }
-      ${css(true)}
+      ${css(true)}${withDarkLogo ? `\n      ${logoSwapCss("[data-ogsc] ")}` : ""}
     </mj-style>`;
 }
 
@@ -603,7 +639,14 @@ export const DARK_MODE_MARKER = "<!-- latestarr:dark-mode (dark-mode colours for
 const DARK_MODE_MARKER_PATTERN = /<!--\s*latestarr:dark-mode\b[^>]*-->/;
 
 export function expandDarkModeMarker(mjml: string, settings: DesignSettings): string {
-  return mjml.replace(DARK_MODE_MARKER_PATTERN, () => darkModeHead(paletteFor(settings)).trim());
+  return mjml.replace(DARK_MODE_MARKER_PATTERN, () => darkModeHead(paletteFor(settings), hasDarkLogo(settings)).trim());
+}
+
+// Whether the logo options name a dark-mode image (it may still fail to
+// load, in which case the swap rules match nothing).
+function hasDarkLogo(settings: DesignSettings): boolean {
+  const { logo } = settings;
+  return (logo.source === "upload" && Boolean(logo.darkImageId)) || (logo.source === "url" && Boolean(logo.darkUrl));
 }
 
 export function buildDesignMjml(settings: DesignSettings, options: { darkModeMarker?: boolean } = {}): string {
@@ -611,7 +654,7 @@ export function buildDesignMjml(settings: DesignSettings, options: { darkModeMar
   const font = EMAIL_FONTS[settings.font].stack;
   const css = sanitizeCss(settings.customCss).trim();
   const customCss = css ? `\n    <mj-style inline="inline">${css}</mj-style>` : "";
-  const darkMode = options.darkModeMarker ? `\n    ${DARK_MODE_MARKER}` : darkModeHead(p);
+  const darkMode = options.darkModeMarker ? `\n    ${DARK_MODE_MARKER}` : darkModeHead(p, hasDarkLogo(settings));
   const head = `\n  <mj-head>${darkMode}${customCss}\n  </mj-head>`;
 
   // Without a lookback window (a code path only tests use) there's no date
@@ -654,8 +697,25 @@ ${button(p, font, "secondary", settings.buttons)}
       </mj-column>
     </mj-section>
     {{/if}}`;
-  const title = `
-        <mj-text font-family="${font}" font-size="26px" line-height="1.25" font-weight="700" color="${p.text}">{{newsletterName}}</mj-text>${summary}`;
+  const name = `
+        <mj-text font-family="${font}" font-size="26px" line-height="1.25" font-weight="700" color="${p.text}">{{newsletterName}}</mj-text>`;
+  // {{logo}} is empty when the logo couldn't be loaded, so the name shows
+  // even when the logo is meant to replace it.
+  const { logo } = settings;
+  const logoText = `
+        <mj-text align="${logo.align}" padding-bottom="${logo.placement === "replace" ? "10px" : "4px"}">{{logo}}</mj-text>`;
+  const heading =
+    logo.source === "none"
+      ? name
+      : logo.placement === "replace"
+        ? `
+        {{#if logo}}${logoText}
+        {{else}}${name}
+        {{/if}}`
+        : `
+        {{#if logo}}${logoText}
+        {{/if}}${name}`;
+  const title = `${heading}${summary}`;
   const intro = `
         <mj-text font-family="${font}" font-size="15px" line-height="1.5" color="${p.text}" padding-top="8px" align="${settings.content.introAlign}">{{introText}}</mj-text>`;
   // Buttons above the intro sit between the heading and the intro, so the
