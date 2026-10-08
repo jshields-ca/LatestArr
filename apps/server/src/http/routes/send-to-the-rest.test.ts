@@ -319,3 +319,27 @@ describe("Send to the rest", () => {
     expect(response.statusCode).toBe(404);
   });
 });
+
+describe("a design's logo", () => {
+  it("is embedded in the email, and kept for Send to the rest", async () => {
+    const { newsletterId } = await setUp("a@example.com", "b@example.com");
+    const { default: sharp } = await import("sharp");
+    const logo = await sharp({ create: { width: 80, height: 20, channels: 3, background: "#123456" } }).png().toBuffer();
+    const { image } = (await post("/api/templates/images", { data: logo.toString("base64") })).json();
+    const { template } = (
+      await post("/api/templates", { name: "Branded", settings: { logo: { source: "upload", imageId: image.id } } })
+    ).json();
+    await app.inject(authed({ method: "PATCH", url: `/api/newsletters/${newsletterId}`, payload: { templateId: template.id } }));
+
+    const runId = await partialSend(newsletterId, 2, 1);
+    const firstEmail = mockSendMail.mock.calls[0]![0];
+    expect(firstEmail.html).toContain('src="cid:logo@latestarr"');
+    expect(firstEmail.attachments.map((a: { cid: string }) => a.cid)).toEqual(["logo@latestarr", "poster-0@latestarr"]);
+
+    mockSendMail.mockClear();
+    mockSendMail.mockResolvedValue({ messageId: "msg-rest" });
+    await post(`/api/newsletters/${newsletterId}/send-runs/${runId}/send-to-rest`);
+    const restEmail = mockSendMail.mock.calls[0]![0];
+    expect(restEmail.attachments.map((a: { cid: string }) => a.cid)).toContain("logo@latestarr");
+  });
+});

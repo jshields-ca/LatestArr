@@ -40,6 +40,7 @@ import {
   parseDesignSettings,
 } from "../render/design.js";
 import { logger as defaultLogger, type Logger } from "../logger.js";
+import { resolveLogo } from "./design-logo.js";
 import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
 
@@ -302,6 +303,9 @@ async function renderNewsletterContent(
   generatedAt: Date,
   log: Logger,
   designOverride?: DesignOverride,
+  // A preview links to a logo's image URL rather than fetching it (see
+  // resolveLogo); a send embeds it.
+  { forPreview = false }: { forPreview?: boolean } = {},
 ): Promise<RenderedNewsletter> {
   const since = new Date(Date.now() - newsletter.lookbackDays * 24 * 60 * 60 * 1000);
   const linkedSources = await resolveLinkedSources(db, newsletter, log);
@@ -328,6 +332,7 @@ async function renderNewsletterContent(
     // the lookback window, so it has to look further back than that.
     needsFallback ? fetchRecentItemsFromSources(linkedSources, new Date(0), log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
   ]);
+  const logo = await resolveLogo(db, settings, { fetchUrls: !forPreview, log });
   const popularPlaceholders = preparePosterPlaceholders(popular.items);
   const fallbackPlaceholders = preparePosterPlaceholders(fallback.items);
 
@@ -340,6 +345,7 @@ async function renderNewsletterContent(
     sourceButtons: buildNewsletterSourceButtons(linkedSources),
     generatedAt,
     lookbackDays: newsletter.lookbackDays,
+    logo: logo.logo,
     ...designContentVariables(settings),
   });
 
@@ -350,7 +356,12 @@ async function renderNewsletterContent(
   ]);
   const allSourceByItem = new Map([...sourceByItem, ...popular.sourceByItem, ...fallback.sourceByItem]);
   const resolved = await resolvePosterPlaceholders(html, allPlaceholders, (item) => allSourceByItem.get(item));
-  return { html: resolved.html, text: htmlToPlainText(resolved.html), attachments: resolved.attachments, items };
+  return {
+    html: resolved.html,
+    text: htmlToPlainText(resolved.html),
+    attachments: [...logo.attachments, ...resolved.attachments],
+    items,
+  };
 }
 
 // The images a send embeds, kept so "Send to the rest" can send the same
@@ -483,7 +494,7 @@ function subjectFor(newsletter: Newsletter): string {
 
 // A browser can't resolve cid: references, so the preview swaps each
 // embedded image for an inline data URI of the same bytes.
-function inlineAttachments(html: string, attachments: EmailAttachment[]): string {
+export function inlineAttachments(html: string, attachments: EmailAttachment[]): string {
   let result = html;
   for (const attachment of attachments) {
     result = result
@@ -509,7 +520,9 @@ export async function previewNewsletter(
   const log = (options.log ?? defaultLogger).child({ newsletterId });
   const newsletter = await loadNewsletter(db, newsletterId);
   try {
-    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log, options.design);
+    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log, options.design, {
+      forPreview: true,
+    });
     return {
       subject: subjectFor(newsletter),
       html: inlineAttachments(html, attachments),

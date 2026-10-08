@@ -46,6 +46,7 @@ describe("migrations", () => {
     expect(tableNames).toEqual(
       [
         "audit_events",
+        "design_images",
         "newsletter_recipient_groups",
         "newsletter_sources",
         "newsletters",

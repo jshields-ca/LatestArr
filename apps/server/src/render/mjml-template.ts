@@ -50,8 +50,26 @@ interface RenderableItem {
   isFallback?: boolean;
 }
 
+/** A design's logo (#302), as pipeline/design-logo.ts resolves it. */
+export interface LogoContext {
+  /** An http(s) URL, a cid: reference, or (in a preview) a data: URI. */
+  src: string;
+  /** Shown instead in dark mode, where the email client supports it. */
+  darkSrc?: string;
+  /** Widths it's shown at, in px. */
+  width: number;
+  darkWidth?: number;
+  /** Clicking the logo opens this (http or https). */
+  href?: string;
+  /** Defaults to the newsletter's name. */
+  alt?: string;
+}
+
 export interface MjmlRenderContext {
   newsletterName: string;
+  /** The design's logo. Bound as {{logo}}: the image (linked, if it has a
+   * link), or nothing when there's no logo. */
+  logo?: LogoContext;
   /** The "latest added" pool, used by a Media List block with sort="added". */
   items: NewItem[];
   /** The "most watched" pool, used by a Media List block with sort="mostWatched".
@@ -425,12 +443,35 @@ function formatPeriod(end: Date, days: number): string {
   return `${month(start)} ${start.getDate()} – ${endPart}, ${end.getFullYear()}`;
 }
 
+// The logo's markup. Every value is escaped; src and href are already
+// limited to http(s), cid: and data: by the settings schema and the
+// pipeline. width:100% with a max-width lets it shrink on narrow screens,
+// and the width attribute sizes it in Outlook. The dark-mode image is
+// hidden (and kept from Outlook entirely) until design.ts's dark-mode
+// styles swap the two.
+function logoMarkup(logo: LogoContext | undefined, newsletterName: string): Handlebars.SafeString | undefined {
+  if (!logo) return undefined;
+  const e = Handlebars.escapeExpression;
+  const alt = e(logo.alt || newsletterName);
+  const img = (src: string, width: number, className: string, hidden: boolean) =>
+    `<img class="${className}" src="${e(src)}" width="${width}" alt="${alt}" style="${hidden ? "display:none;" : "display:inline-block;"}width:100%;max-width:${width}px;height:auto;border:0;outline:none;text-decoration:none;vertical-align:middle;" />`;
+  const images = logo.darkSrc
+    ? img(logo.src, logo.width, "latestarr-logo-light", false) +
+      `<!--[if !mso]><!-->${img(logo.darkSrc, logo.darkWidth ?? logo.width, "latestarr-logo-dark", true)}<!--<![endif]-->`
+    : img(logo.src, logo.width, "latestarr-logo", false);
+  const linked = logo.href
+    ? `<a href="${e(logo.href)}" target="_blank" rel="noopener" style="text-decoration:none;">${images}</a>`
+    : images;
+  return new Handlebars.SafeString(linked);
+}
+
 export async function renderMjmlTemplate(
   mjmlSource: string,
   context: MjmlRenderContext,
 ): Promise<string> {
   const substitutedMjml = Handlebars.compile(mjmlSource)({
     newsletterName: context.newsletterName,
+    logo: logoMarkup(context.logo, context.newsletterName),
     items: context.items.map(toRenderable),
     popularItems: (context.popularItems ?? []).map(toRenderable),
     fallbackItems: (context.fallbackItems ?? []).map(toRenderable),

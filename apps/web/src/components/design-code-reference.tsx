@@ -45,6 +45,11 @@ export function DesignCodeReference() {
         <Entry code="{{generatedAtFormatted}}">The send date, e.g. September 27, 2026.</Entry>
         <Entry code="{{periodFormatted}} {{itemCount}}">The date range covered, e.g. Sep 21 – 28, 2026, and how many items are new.</Entry>
         <Entry code="{{#each kindCounts}}{{this}}{{/each}}">A count per type, largest first, e.g. 23 episodes, 9 movies.</Entry>
+        <Entry code="{{logo}}">
+          The logo from Logo above (linked, and with its dark mode version), for inside an{" "}
+          <code className="font-mono">mj-text</code>; empty without one, so{" "}
+          <code className="font-mono">{"{{#if logo}}"}</code> works.
+        </Entry>
         <Entry code="{{introText}} {{footerNote}}">From Text and buttons above, with their Markdown formatting as HTML; empty when not set.</Entry>
         <Entry code="{{#each ctas}}{{label}} {{url}}{{/each}}">The buttons from Text and buttons.</Entry>
         <Entry code="{{#each sourceButtons}}{{label}} {{url}}{{/each}}">

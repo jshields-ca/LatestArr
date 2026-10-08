@@ -1,6 +1,6 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import { buildDesignMjml, DESIGN_KINDS, type DesignSettings, designContentVariables, expandDarkModeMarker } from "./design.js";
-import { renderMjmlTemplate } from "./mjml-template.js";
+import { type LogoContext, renderMjmlTemplate } from "./mjml-template.js";
 import { buildSourceButtons, type SourceButton, type SourceButtonInput } from "./source-buttons.js";
 
 // Made-up content for previewing a design that isn't attached to a
@@ -103,11 +103,13 @@ export function sampleSourceButtons(sources: SourceButtonInput[]): SourceButton[
 
 // Renders a design with sample items: its options, or `mjml` (a code-mode
 // design) with the design's text and buttons. `sources` are the connected
-// sources, for the buttons that link to them.
+// sources, for the buttons that link to them, and `logo` the design's
+// logo as pipeline/design-logo.ts resolves it.
 export async function renderDesignSample(
   settings: DesignSettings,
   mjml?: string,
   sources: SourceButtonInput[] = [],
+  logo?: LogoContext,
 ): Promise<string> {
   const now = new Date();
   const items = sampleItems(now);
@@ -122,6 +124,7 @@ export async function renderDesignSample(
     sourceButtons: sampleSourceButtons(sources),
     generatedAt: now,
     lookbackDays: 7,
+    logo,
     ...designContentVariables(settings),
   });
 }

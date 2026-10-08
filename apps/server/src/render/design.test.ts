@@ -392,6 +392,68 @@ describe("buildDesignMjml", () => {
   });
 });
 
+describe("logo", () => {
+  const logo = { src: "cid:logo@latestarr", width: 120 };
+  const uploaded = { source: "upload", imageId: "image-1" };
+
+  it("adds nothing to a design without one", () => {
+    expect(buildDesignMjml(DEFAULT_DESIGN_SETTINGS)).not.toContain("{{logo}}");
+  });
+
+  it("shows the logo above the name, linked, at its width", async () => {
+    const html = await render(design({ logo: { ...uploaded, align: "center" } }), {
+      logo: { ...logo, href: "https://plex.example.com/?a=1&b=2" },
+    });
+    expect(html).toContain(
+      '<a href="https://plex.example.com/?a&#x3D;1&amp;b&#x3D;2" target="_blank" rel="noopener" style="text-decoration:none;"><img class="latestarr-logo" src="cid:logo@latestarr" width="120" alt="Weekly Digest"',
+    );
+    expect(html).toContain("max-width:120px;height:auto;");
+    expect(html).toMatch(/text-align:center;[^>]*><a href="https:\/\/plex/);
+    expect(html.indexOf("latestarr-logo")).toBeLessThan(html.indexOf(">Weekly Digest</div>"));
+    expect(html).toContain(">Weekly Digest</div>");
+  });
+
+  it("can replace the name, which shows again when the logo couldn't be loaded", async () => {
+    const settings = design({ logo: { ...uploaded, placement: "replace" } });
+    const html = await render(settings, { logo: { ...logo, alt: "Our <server>" } });
+    expect(html).toContain('alt="Our &lt;server&gt;"');
+    expect(html).not.toContain(">Weekly Digest</div>");
+
+    const without = await render(settings);
+    expect(without).not.toContain("latestarr-logo");
+    expect(without).toContain(">Weekly Digest</div>");
+  });
+
+  it("swaps in the dark-mode version in dark mode, kept from Outlook", async () => {
+    const settings = design({ logo: { ...uploaded, darkImageId: "image-2" } });
+    expect(buildDesignMjml(DEFAULT_DESIGN_SETTINGS)).not.toContain("latestarr-logo-dark");
+    const html = await render(settings, { logo: { ...logo, darkSrc: "cid:logo-dark@latestarr", darkWidth: 90 } });
+    expect(html).toContain('class="latestarr-logo-light" src="cid:logo@latestarr"');
+    expect(html).toContain(
+      '<!--[if !mso]><!--><img class="latestarr-logo-dark" src="cid:logo-dark@latestarr" width="90" alt="Weekly Digest" style="display:none;',
+    );
+    expect(html).toMatch(/@media \(prefers-color-scheme: dark\) \{[^}]*[\s\S]*\.latestarr-logo-light \{ display:none !important; \}/);
+    expect(html).toContain("[data-ogsc] .latestarr-logo-dark { display:inline-block !important; }");
+  });
+
+  it("is available to code designs as {{logo}}", async () => {
+    const html = await renderMjmlTemplate("<mj-section><mj-column><mj-text>{{logo}}</mj-text></mj-column></mj-section>", {
+      newsletterName: "Weekly Digest",
+      items: [],
+      generatedAt,
+      logo: { ...logo, src: 'https://example.com/a".png' },
+    });
+    expect(html).toContain('src="https://example.com/a&quot;.png"');
+  });
+
+  it("only accepts http(s) links and image URLs", () => {
+    for (const field of ["url", "darkUrl", "link"]) {
+      expect(designSettingsSchema.safeParse({ logo: { [field]: "javascript:alert(1)" } }).success).toBe(false);
+    }
+    expect(designSettingsSchema.safeParse({ logo: { maxWidth: 1000 } }).success).toBe(false);
+  });
+});
+
 describe("renderDesignSample", () => {
   it("renders a design with made-up content and inline poster images", async () => {
     const html = await renderDesignSample(design({ sections: { groupByType: true } }));

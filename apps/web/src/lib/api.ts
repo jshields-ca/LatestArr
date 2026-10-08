@@ -672,6 +672,33 @@ export function previewDesign(
   });
 }
 
+export interface DesignImage {
+  id: string;
+  contentType: string;
+  width: number;
+  height: number;
+}
+
+/** The largest image file the server accepts for a logo. */
+export const MAX_DESIGN_IMAGE_BYTES = 1024 * 1024;
+
+// Uploads a logo image (#302). The server checks and cleans it up.
+export async function uploadDesignImage(file: Blob): Promise<{ image: DesignImage }> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return apiFetch<{ image: DesignImage }>("/templates/images", {
+    method: "POST",
+    body: JSON.stringify({ data: btoa(binary) }),
+  });
+}
+
+export function designImageUrl(id: string): string {
+  return `/api/templates/images/${encodeURIComponent(id)}`;
+}
+
 export function convertDesignToCode(id: string): Promise<{ template: Template }> {
   return apiFetch<{ template: Template }>(`/templates/${id}/convert-to-code`, { method: "POST" });
 }
