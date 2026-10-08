@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Plus, Search, Upload,
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ import {
   type RecipientImportResult,
 } from "@/lib/api";
 import { parseRecipientImportText } from "@/lib/recipient-import";
+import { compareText, matchesSearch } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 // The edit panel and the Groups section both show group membership. The
@@ -354,7 +356,9 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load groups."));
   }, [recipientId]);
 
-  const availableToAdd = (allGroups ?? []).filter((g) => !memberGroups?.some((m) => m.id === g.id));
+  const availableToAdd = (allGroups ?? [])
+    .filter((g) => !memberGroups?.some((m) => m.id === g.id))
+    .sort((a, b) => compareText(a.name, b.name));
 
   async function handleAdd() {
     if (!selectedId) return;
@@ -700,9 +704,7 @@ function RecipientTableRow({
 const RECIPIENTS_PAGE_SIZE = 25;
 
 function matchesRecipientQuery(recipient: Recipient, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return recipient.email.toLowerCase().includes(q) || (recipient.displayName ?? "").toLowerCase().includes(q);
+  return matchesSearch(query, recipient.displayName, recipient.email);
 }
 
 type RecipientSortKey = "name" | "email" | "status";
@@ -710,9 +712,9 @@ type RecipientSortKey = "name" | "email" | "status";
 function recipientSortValue(recipient: Recipient, key: RecipientSortKey): string | number {
   switch (key) {
     case "name":
-      return (recipient.displayName || recipient.email).toLowerCase();
+      return recipient.displayName || recipient.email;
     case "email":
-      return recipient.email.toLowerCase();
+      return recipient.email;
     case "status":
       return recipient.isActive ? 1 : 0;
   }
@@ -785,9 +787,8 @@ function RecipientsSection({
     return [...filtered].sort((a, b) => {
       const av = recipientSortValue(a, sortKey);
       const bv = recipientSortValue(b, sortKey);
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      return 0;
+      if (typeof av === "string" && typeof bv === "string") return compareText(av, bv) * dir;
+      return (Number(av) - Number(bv)) * dir;
     });
   }, [filtered, sortKey, sortDir]);
 
@@ -1119,8 +1120,6 @@ function EditGroupDialog({
 function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipients: Recipient[] }) {
   const [members, setMembers] = useState<Recipient[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState("");
-  const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const { membershipVersion } = useContext(GroupSyncContext);
 
@@ -1140,25 +1139,33 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
     };
   }, [groupId, membershipVersion]);
 
-  const availableToAdd = allRecipients.filter(
-    (r) => !members?.some((m) => m.id === r.id),
+  // Everyone not already in the group, by name (#287). Inactive people can
+  // still be added, and say so.
+  const pickerOptions = useMemo(
+    () =>
+      allRecipients
+        .filter((r) => !members?.some((m) => m.id === r.id))
+        .sort((a, b) => compareText(a.displayName || a.email, b.displayName || b.email))
+        .map((r) => ({
+          value: r.id,
+          label: r.displayName || r.email,
+          detail: [r.displayName ? r.email : null, r.isActive ? null : "inactive"].filter(Boolean).join(" · ") || undefined,
+        })),
+    [allRecipients, members],
   );
 
-  async function handleAdd() {
-    if (!selectedId) return;
-    setAdding(true);
+  async function handleAdd(recipientId: string) {
+    const added = allRecipients.find((r) => r.id === recipientId);
     try {
-      await addGroupMember(groupId, selectedId);
-      const added = allRecipients.find((r) => r.id === selectedId);
-      if (added) setMembers((prev) => [...(prev ?? []), added]);
-      setSelectedId("");
-      toast({ variant: "success", title: "Member added to group" });
+      await addGroupMember(groupId, recipientId);
+      if (added) setMembers((prev) => (prev?.some((m) => m.id === added.id) ? prev : [...(prev ?? []), added]));
+      toast({ variant: "success", title: "Member added to group", description: added?.displayName || added?.email });
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Failed to add member.";
-      setLoadError(message);
-      toast({ variant: "destructive", title: "Failed to add member", description: message });
-    } finally {
-      setAdding(false);
+      toast({
+        variant: "destructive",
+        title: "Failed to add member",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
     }
   }
 
@@ -1221,26 +1228,15 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
         </ul>
       )}
 
-      {availableToAdd.length > 0 ? (
-        <div className="flex items-center gap-2">
-          <Select
-            aria-label="Add a recipient to this group"
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-            className="max-w-xs"
-          >
-            <option value="">Select a recipient...</option>
-            {availableToAdd.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.displayName || r.email}
-              </option>
-            ))}
-          </Select>
-          <Button size="sm" variant="outline" onClick={() => void handleAdd()} disabled={!selectedId || adding}>
-            {adding ? <Loader2 className="animate-spin" /> : null}
-            Add
-          </Button>
-        </div>
+      {pickerOptions.length > 0 ? (
+        <Combobox
+          aria-label="Add a recipient to this group"
+          placeholder="Add someone: type a name or email..."
+          options={pickerOptions}
+          onSelect={(recipientId) => void handleAdd(recipientId)}
+          emptyText="Nobody matches."
+          className="max-w-sm"
+        />
       ) : null}
     </div>
   );
