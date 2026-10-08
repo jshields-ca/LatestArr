@@ -1,5 +1,114 @@
 # @latestarr/db
 
+## 0.12.0
+
+### Minor Changes
+
+- [#277](https://github.com/jshields-ca/LatestArr/pull/277) [`31615b2`](https://github.com/jshields-ca/LatestArr/commit/31615b2d20e5c5fc3c1e0a1dd315ca2ba8bade4b) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Automatic backups. LatestArr now backs up its database every day at 03:00 and keeps the last seven, with no downtime. It also backs up before every upgrade. The new **Backups** page (admins only) changes the schedule and what's kept, and can **Back up now**, download, or delete a backup. Point `BACKUP_PATH` at another disk or a NAS so a failed disk can't take both the database and its backups. To restore one, run `docker exec -it latestarr node dist/cli.js restore <file>` and restart.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#263](https://github.com/jshields-ca/LatestArr/issues/263).
+  - **Snapshots** use SQLite's online backup API (`better-sqlite3`'s `backup()`), never a raw file copy.
+    - Each snapshot is switched out of WAL mode and must pass `PRAGMA integrity_check` before it's kept.
+    - It's packed into one ZIP with `manifest.json` (version, migration count, item counts, and an `ENCRYPTION_KEY` fingerprint, never the key) and a README.
+    - The file is written under a temporary name and renamed, so a crash never leaves a half-written backup.
+    - The ZIP writer and reader are small and in-house (`backups/zip.ts`), using Node's `zlib` deflate and `crc32`, so there's no new dependency.
+  - **Names:** `latestarr-backup-<UTC time>-v<version>-<scheduled|manual|pre-upgrade>.zip`. The folder itself is the list of backups, so it stays right after a restore or a manual copy. Download and delete only accept names matching this pattern, so no other path can be reached.
+  - **Retention:** keep the newest _N_ (default 7), or calendar rules (the newest of each of the last _D_ days, _W_ weeks, and _M_ months).
+    - The newest backup is always kept, and so are the 3 newest pre-upgrade backups.
+    - Pruning only runs after a backup succeeds.
+  - **Schedule:** on by default, daily at 03:00 in the server's time zone (`TZ`), with the same schedule picker as newsletters.
+  - **Pre-upgrade backup:** taken at startup, before migrations, whenever the version that last ran the database (now saved as `appVersion`) differs from this one. Databases from before 0.12 are labelled "earlier".
+  - **Failures** are logged, shown on the Backups page, and sent as a failure alert (new **A backup fails** option, on by default, at most one an hour).
+  - **Restore** uses the recovery CLI:
+    - `check-backup <file>` reports the version, contents, integrity, and whether the key matches.
+    - `restore <file>` stages a checked database (`restore-pending.db`), and the next start swaps it in, keeping the old one as `latestarr.db.before-restore-<time>`. `restore --cancel` undoes the staging.
+    - It refuses a backup made with another key (unless `--ignore-key-mismatch`) or by a newer version.
+    - At startup, LatestArr warns if `ENCRYPTION_KEY` can't decrypt the saved credentials.
+  - **Routes:** `GET`/`POST /backups`, `PUT /backups/settings`, `GET /backups/:filename/download`, `DELETE /backups/:filename`, all admin only.
+    - Downloads are `no-store` and logged at warn level.
+    - The page warns when backups share the database's disk (same device id).
+  - `docker/entrypoint.sh` gives the `node` user a separate `BACKUP_PATH` mount. Backup files are written `0600`.
+  - Docs: a new "Backups" section with "Restoring a backup" in `docs/self-hosting.md`, plus `BACKUP_PATH` in `.env.example`.
+
+  </details>
+
+- [#315](https://github.com/jshields-ca/LatestArr/pull/315) [`9253e16`](https://github.com/jshields-ca/LatestArr/commit/9253e16484b59d1cf9dbf305ec399812d94018b0) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Add your logo to the top of a design, under **Logo** in the design editor.
+
+  - **Upload** a PNG, JPEG or GIF (up to 1 MB). It's included in each email, so it shows even where email apps block images from the web. Or use an **image URL**, either copied into each email (the default) or linked.
+  - **Link it** to your server's site, Overseerr, or your Plex or Jellyfin app.
+  - Put it **above the newsletter's name or in place of it**, aligned left, centre or right, at the width you choose. It shrinks to fit on phones.
+  - Add a **dark mode version** for logos with dark lettering, which would otherwise disappear on dark backgrounds. Switch the preview to Dark to check it.
+  - Code designs can place it themselves with `{{logo}}`.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#302](https://github.com/jshields-ca/LatestArr/issues/302).
+  - **Storage:**
+    - New `design_images` table (migration `0011_design_images`) for uploads, referenced by id from a design's `settings.logo`. Backups include it, since they copy the whole database.
+    - Uploads no design uses are removed after 24 hours (`pruneUnusedDesignImages`, run on upload and when a design is saved or deleted).
+  - **Uploads:** `POST /api/templates/images` (editors and admins) and `GET /api/templates/images/:id` (signed in, cached as immutable).
+    - `cleanImage` checks the contents, not the file name, and accepts PNG, JPEG and GIF only. SVG is refused with its own message.
+    - It re-encodes the image, which drops metadata, turns photos the right way up, and scales anything over 1100 px wide down.
+  - **Settings:** `logo: { source, imageId, darkImageId, url, darkUrl, urlMode, link, placement, align, maxWidth, alt }`. URLs are http(s) only and `maxWidth` runs from 40 to 550 px. Without a logo, the default design's output is unchanged (snapshot test).
+  - **Rendering:**
+    - `resolveLogo` embeds uploads as `cid:` attachments.
+    - When sending, it fetches image URLs with the same timeout and size cap as posters and an image content type only. If that fails, the email links to the URL instead and the send carries on.
+    - Previews never fetch URLs (anyone signed in can preview), so the server never requests an address on a viewer's behalf.
+    - The logo's attachments are kept with the send, so "Send to the rest" includes it.
+  - **Dark mode:** the dark image is hidden and kept from Outlook with a conditional comment. It's swapped in by `prefers-color-scheme` and `[data-ogsc]` rules, which are added only when a dark image is set. A dark design always shows its dark image.
+  - **Web:** `DesignLogoFields` in `components/design-logo-fields.tsx`. An incomplete logo holds back Save and is left out of the preview.
+
+  </details>
+
+- [#276](https://github.com/jshields-ca/LatestArr/pull/276) [`e071447`](https://github.com/jshields-ca/LatestArr/commit/e0714475552f1f690bcaf8b267b4b7ae0a0a1c11) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** A way back in when you forget your password. Choose a **System email** profile on the SMTP Profiles page, and the sign-in page gets a **Forgot password?** link that emails you a one-time reset link. Without email, there's a recovery command for whoever runs the server: `docker exec -it latestarr node dist/cli.js reset-password --email you@example.com` asks you for a new password. Another admin can still reset your password from the Users page.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#264](https://github.com/jshields-ca/LatestArr/issues/264).
+  - **Reset links:** `POST /auth/password-reset/request` and `/confirm`.
+    - Tokens are 32 random bytes, stored as SHA-256 hashes in the new `password_reset_tokens` table. They work once, for 30 minutes.
+    - A new link cancels older ones, and an account gets at most one email every 2 minutes. Requests are rate limited (5 per 15 minutes per IP).
+    - The answer is the same whether or not the account exists, and the email is sent after replying, so timing doesn't reveal it either. SSO-only and deactivated accounts never get a link.
+    - Using a link sets the password, signs the account out everywhere, and cancels other links. So does any other password change.
+  - **Links are built from `WEB_ORIGIN`, never the request's Host header.** When the address in use doesn't match `WEB_ORIGIN` (say, a proxy in front of an install still set to localhost), email resets stay off rather than sending a broken link, and the SMTP Profiles page explains why.
+  - The token travels in the URL fragment (`/reset-password#token=…`), which browsers never send to a server, so it can't reach access logs. The page removes it from the address bar.
+  - **System email:** `GET`/`PUT /settings/system-mail` (admin only), stored in `settings`. Deleting the chosen profile turns it off. `/auth/providers` now says whether resets are available.
+  - **Recovery command** (`dist/cli.js`):
+    - `reset-password --email` asks for the new password twice at a hidden prompt (or reads one line with `--password-stdin`), signs the account out everywhere, and reactivates it if needed. The password is never printed, passed as an argument, or read from the environment.
+    - `list-admins` lists the admins.
+    - When run as root (the default for `docker exec`), it switches to the data folder's owner first, so SQLite never leaves root-owned files the server can't write.
+    - Its actions are written to a new `audit_events` table, which the Logs page merges in.
+  - CI's Docker smoke test now runs both commands as root, signs in with a password piped to `--password-stdin`, checks it refuses without a terminal, and checks no root-owned files are left in `/app/data`.
+  - Docs: a "Locked out?" section in `docs/self-hosting.md`, and `WEB_ORIGIN`'s role in reset links.
+
+  </details>
+
+- [#309](https://github.com/jshields-ca/LatestArr/pull/309) [`64196a9`](https://github.com/jshields-ca/LatestArr/commit/64196a9e6e8fe286cafd45a9a3b631f55de2ab60) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** **Send to the rest** finishes a newsletter that only reached some of its recipients, without sending anyone a duplicate. Use it when LatestArr stopped partway, the mail server turned some people away, or a rate limit cut a send off. Open the send's **Details** in the newsletter's **History** and choose **Send to the rest**. It sends the same email, with the same items, subject and images, to only the people who didn't get it, including anyone whose delivery failed. A confirmation shows who it will go to, and their results are added to the same send. It works on the newsletter's latest send, within its lookback window, and is for editors and admins.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#283](https://github.com/jshields-ca/LatestArr/issues/283).
+  - **Migration `0010_send_to_the_rest`:**
+    - `send_runs.subject`, set with `rendered_html`;
+    - `send_runs.rest_sent_at`;
+    - a new `send_run_attachments` table holding a send's embedded images (cid, filename, type, bytes). A newsletter's earlier sends' images are deleted when its next send renders, so storage stays at one send per newsletter.
+  - **New `pipeline/send-to-the-rest.ts`:**
+    - `planSendToTheRest()` checks that the send is `partial_failure` or `failed` and has its stored subject, HTML and every referenced image.
+    - It also checks that it's the newsletter's latest send (no later send, by insertion order, reached anyone) and that it started within `lookbackDays`.
+    - It returns the newsletter's active recipients not recorded as `sent`.
+    - `sendToTheRest()` claims the run by setting it to `running` in one conditional `UPDATE`, which shares Send now's "already running" lock and stops two requests from both sending. It then sends, replaces each recipient's earlier result, and sets the final status, `finishedAt` and `restSentAt`, in a `finally` block.
+    - If LatestArr stops partway, the startup clean-up from [#280](https://github.com/jshields-ca/LatestArr/issues/280) closes the send as usual.
+  - **API:**
+    - `GET /newsletters/:id/send-runs/:runId/rest` (editor) returns the plan, or why the send can't be finished.
+    - `POST /newsletters/:id/send-runs/:runId/send-to-rest` (editor) answers 409 when the send can't be finished or another send is running.
+    - The History list adds `canSendToRest` and `restSentAt`, and breaks ties on start time by insertion order.
+  - **Web:** a `SendToRestDialog` in the send's details, and "Sent to the rest" with its time in History.
+  - **Docs:** `self-hosting.md` covers finishing a partly sent newsletter. The interrupted-send message and alert now point to **Send to the rest**.
+
+  </details>
+
 ## 0.11.2
 
 No changes in this release.
