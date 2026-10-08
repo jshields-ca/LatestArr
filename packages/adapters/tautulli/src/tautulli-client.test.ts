@@ -171,7 +171,7 @@ describe("getHomeStats", () => {
         response: {
           result: "success",
           message: null,
-          data: [{ stat_id: "top_movies", rows: [] }],
+          data: { stat_id: "top_movies", rows: [] },
         },
       }),
     );
@@ -186,7 +186,29 @@ describe("getHomeStats", () => {
     expect(calledUrl.searchParams.get("stats_count")).toBe("10");
   });
 
-  it("returns the rows for the matching stat_id out of the response array", async () => {
+  // What Tautulli actually sends when stat_id is given: the one block as an
+  // object, not an array (#284).
+  it("returns the rows of the single stat block Tautulli returns for a stat_id", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            stat_id: "top_movies",
+            stat_type: "total_plays",
+            stat_title: "Most Watched Movies",
+            rows: [{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }],
+          },
+        },
+      }),
+    );
+
+    const rows = await getHomeStats("http://tautulli.local:8181", "key123", "top_movies", 7, 10);
+    expect(rows).toEqual([{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }]);
+  });
+
+  it("returns the rows for the matching stat_id out of a response array", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -209,13 +231,26 @@ describe("getHomeStats", () => {
     ]);
   });
 
-  it("returns an empty array when the stat_id isn't present in the response", async () => {
+  it("returns an empty array when Tautulli has no stats to report", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({ response: { result: "success", message: null, data: [] } }),
     );
 
     const rows = await getHomeStats("http://tautulli.local:8181", "key123", "top_movies", 7, 10);
     expect(rows).toEqual([]);
+  });
+
+  it.each([
+    ["no data", null],
+    ["a different stat", { stat_id: "top_tv", rows: [] }],
+    ["rows that aren't a list", { stat_id: "top_movies", rows: {} }],
+    ["a string", "oops"],
+  ])("throws a clear error for an unexpected response (%s)", async (_label, data) => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ response: { result: "success", message: null, data } }));
+
+    await expect(getHomeStats("http://tautulli.local:8181", "key123", "top_movies", 7, 10)).rejects.toThrow(
+      'Tautulli returned an unexpected response for its "top_movies" stats',
+    );
   });
 });
 

@@ -477,27 +477,25 @@ describe("fetchPopularItems", () => {
           response: {
             result: "success",
             message: null,
-            data: [
-              {
-                stat_id: "top_movies",
-                rows: [
-                  {
-                    rating_key: "1",
-                    title: "A Movie",
-                    media_type: "movie",
-                    total_plays: 12,
-                    users_watched: 3,
-                    last_play: "1700000000",
-                  },
-                ],
-              },
-            ],
+            data: {
+              stat_id: "top_movies",
+              rows: [
+                {
+                  rating_key: "1",
+                  title: "A Movie",
+                  media_type: "movie",
+                  total_plays: 12,
+                  users_watched: 3,
+                  last_play: "1700000000",
+                },
+              ],
+            },
           },
         }),
       )
       .mockResolvedValueOnce(
         jsonResponse({
-          response: { result: "success", message: null, data: [{ stat_id: "top_tv", rows: [] }] },
+          response: { result: "success", message: null, data: { stat_id: "top_tv", rows: [] } },
         }),
       );
 
@@ -520,14 +518,12 @@ describe("fetchPopularItems", () => {
         response: {
           result: "success",
           message: null,
-          data: [
-            {
-              stat_id: "top_tv",
-              rows: [
-                { rating_key: "2", title: "A Show", media_type: "episode", total_plays: 7 },
-              ],
-            },
-          ],
+          data: {
+            stat_id: "top_tv",
+            rows: [
+              { rating_key: "2", title: "A Show", media_type: "episode", total_plays: 7 },
+            ],
+          },
         },
       }),
     );
@@ -572,12 +568,10 @@ describe("fetchPopularItems", () => {
         response: {
           result: "success",
           message: null,
-          data: [
-            {
-              stat_id: "top_movies",
-              rows: [{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }],
-            },
-          ],
+          data: {
+            stat_id: "top_movies",
+            rows: [{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }],
+          },
         },
       }),
     );
@@ -597,12 +591,10 @@ describe("fetchPopularItems", () => {
         response: {
           result: "success",
           message: null,
-          data: [
-            {
-              stat_id: "top_movies",
-              rows: [{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }],
-            },
-          ],
+          data: {
+            stat_id: "top_movies",
+            rows: [{ rating_key: "1", title: "A Movie", media_type: "movie", total_plays: 12 }],
+          },
         },
       }),
     );

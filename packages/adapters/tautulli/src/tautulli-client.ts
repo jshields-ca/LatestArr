@@ -140,9 +140,10 @@ export async function getUsers(baseUrl: string, apiKey: string): Promise<Tautull
 /**
  * Wraps Tautulli's get_home_stats command for a single stat_id (e.g.
  * "top_movies", "top_tv" — ranked by play count over time_range days).
- * The API returns an array of stat blocks even when stat_id narrows the
- * request to one; we pick the matching block defensively rather than
- * assuming array[0].
+ * With a stat_id, Tautulli returns that one stat block as an object, or an
+ * empty array when there's nothing to report (`if stat_id and home_stats:
+ * return home_stats[0]` in its datafactory). Both are handled, and an
+ * array is still searched by stat_id in case that ever changes (#284).
  */
 export async function getHomeStats(
   baseUrl: string,
@@ -151,13 +152,18 @@ export async function getHomeStats(
   timeRangeDays: number,
   count: number,
 ): Promise<TautulliHomeStatRow[]> {
-  const data = await callTautulli<TautulliHomeStat[]>(baseUrl, apiKey, "get_home_stats", {
+  const data = await callTautulli<TautulliHomeStat | TautulliHomeStat[] | null>(baseUrl, apiKey, "get_home_stats", {
     stat_id: statId,
     time_range: String(timeRangeDays),
     stats_type: "plays",
     stats_count: String(count),
   });
-  return data.find((stat) => stat.stat_id === statId)?.rows ?? [];
+  const block = Array.isArray(data) ? data.find((stat) => stat?.stat_id === statId) : data;
+  if (block === undefined) return [];
+  if (block === null || typeof block !== "object" || block.stat_id !== statId || !Array.isArray(block.rows)) {
+    throw new Error(`Tautulli returned an unexpected response for its "${statId}" stats`);
+  }
+  return block.rows;
 }
 
 // Tautulli's own pms_image_proxy command fetches an image from the

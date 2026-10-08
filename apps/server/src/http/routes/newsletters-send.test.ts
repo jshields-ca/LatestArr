@@ -592,17 +592,16 @@ describe("POST /newsletters/:id/send-now", () => {
         response: {
           result: "success",
           message: null,
-          data: [
-            {
-              stat_id: "top_movies",
-              rows: [{ rating_key: "9", title: "Most Watched Movie", media_type: "movie", total_plays: 42 }],
-            },
-          ],
+          // Tautulli returns a single block, not an array, for one stat_id (#284).
+          data: {
+            stat_id: "top_movies",
+            rows: [{ rating_key: "9", title: "Most Watched Movie", media_type: "movie", total_plays: 42 }],
+          },
         },
       }),
     );
     mockFetch.mockResolvedValueOnce(
-      jsonResponse({ response: { result: "success", message: null, data: [{ stat_id: "top_tv", rows: [] }] } }),
+      jsonResponse({ response: { result: "success", message: null, data: { stat_id: "top_tv", rows: [] } } }),
     );
     mockSendMail.mockResolvedValueOnce({ messageId: "msg-1" });
 
