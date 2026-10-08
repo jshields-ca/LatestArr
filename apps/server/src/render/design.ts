@@ -349,6 +349,29 @@ function button(p: Palette, font: string, style: "primary" | "secondary"): strin
         >{{label}}</mj-button>`;
 }
 
+// "Nothing new this time" and a "Browse movies" button in the design's own
+// style (#292). Sections that already end with "Watch on Plex"-style source
+// buttons skip it, since those go to the same library.
+function libraryLinkWhenEmpty(
+  section: { browse: string },
+  contentType: string,
+  perSection: boolean,
+  p: Palette,
+  font: string,
+): string {
+  const link = [
+    `        {{#libraryLinkFor contentType="${contentType}" label="Browse ${section.browse}"}}`,
+    button(p, font, "secondary"),
+    `        {{/libraryLinkFor}}`,
+  ].join("\n");
+  return [
+    `        {{#ifAnyItems contentType="${contentType}"}}{{else}}`,
+    emptyMessage(p, font),
+    perSection ? `        {{#sourceButtonsFor contentType="${contentType}"}}{{else}}\n${link}\n        {{/sourceButtonsFor}}` : link,
+    `        {{/ifAnyItems}}`,
+  ].join("\n");
+}
+
 function emptyMessage(p: Palette, font: string): string {
   return `        <mj-text font-family="${font}" font-size="14px" color="${p.muted}">Nothing new this time.</mj-text>`;
 }
@@ -427,7 +450,6 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
       `contentType="${contentType}"`,
       limit ? `count="${limit}"` : "",
       groupEpisodes ? `groupEpisodes="true"` : "",
-      empty === "link" ? `emptyFallback="link" fallbackWrap="none" fallbackLinkLabel="Browse ${section.browse}"` : "",
       empty === "random" ? `emptyFallback="random" fallbackCount="${limit ?? 5}"` : "",
     ]
       .filter(Boolean)
@@ -441,6 +463,7 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
       `        ${wrapSectionItems(settings, `{{#mediaList ${hash}}}\n${card}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,
       empty === "message" ? `        {{#ifAnyItems contentType="${contentType}"}}{{else}}\n${emptyMessage(p, font)}\n        {{/ifAnyItems}}` : "",
+      empty === "link" ? libraryLinkWhenEmpty(section, contentType, perSection, p, font) : "",
       perSection
         ? `        {{#sourceButtonsFor contentType="${contentType}"}}\n${button(p, font, "secondary")}\n        {{/sourceButtonsFor}}`
         : "",

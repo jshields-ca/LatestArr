@@ -194,6 +194,36 @@ describe("buildDesignMjml", () => {
       expect(html).toContain("Browse games");
     });
 
+    // #292: it was a bare link in a fixed colour, not one of the design's buttons.
+    it("shows the library link as a button in the design's own accent, under a short message", async () => {
+      const html = await render(
+        design({ colors: { accent: "#1a7f5a" }, sections: { groupByType: true, empty: "link" } }),
+        { sourceLinksByContentType: links },
+      );
+      const games = html.slice(html.indexOf(">Games<"));
+      expect(games).toContain("Nothing new this time.");
+      expect(games.indexOf("Nothing new this time.")).toBeLessThan(games.indexOf("Browse games"));
+      expect(games).toMatch(/<a\s+href="https:\/\/games\.example"[^>]*color:#1a7f5a/);
+      expect(games).toContain("border:1px solid #1a7f5a");
+      expect(html).not.toContain("#c31d4c");
+      expect(html).not.toContain("&rarr;");
+    });
+
+    it("leaves out the library button when the section already has its source buttons", async () => {
+      const html = await render(
+        design({
+          sections: { groupByType: true, empty: "link" },
+          content: { sourceButtons: { enabled: true, placement: "sections" } },
+        }),
+        {
+          sourceLinksByContentType: links,
+          sourceButtons: [{ label: "Play on RomM", url: "https://games.example", kinds: ["game"] }],
+        },
+      );
+      expect(html).toContain("Play on RomM");
+      expect(html).not.toContain("Browse games");
+    });
+
     it("fills an empty section with library picks, marked as such", async () => {
       const oldGame = item({ kind: "game", title: "An Old Game" });
       const html = await render(design({ sections: { groupByType: true, empty: "random" } }), {
