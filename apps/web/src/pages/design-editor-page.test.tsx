@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -220,6 +220,31 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
       ctaPlacement: "afterIntro",
       sourceButtons: { enabled: true, placement: "end" },
     });
+  });
+
+  // #293: colours that otherwise follow the accent, button styles, and a
+  // warning for hard-to-read colour pairs.
+  it("sets and resets an advanced colour, styles buttons, and warns about low contrast", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+    expect(screen.getAllByText("Follows the accent")).toHaveLength(5);
+
+    fireEvent.input(screen.getByLabelText("Button colour"), { target: { value: "#ffff00" } });
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.colors.buttonBackground).toBe("#ffff00"));
+    expect(screen.getByRole("status")).toHaveTextContent("Button text on the button colour");
+
+    selectOption(screen.getByLabelText("Shape"), "Pill");
+    selectOption(screen.getByLabelText("Style"), "Outlined");
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.buttons).toEqual({ shape: "pill", style: "outline", size: "regular" }),
+    );
+    // Outlined, the yellow is checked against the background instead.
+    expect(screen.getByRole("status")).toHaveTextContent("Outlined buttons on the background");
+
+    await user.click(screen.getByRole("button", { name: "Button colour: use the accent" }));
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.colors.buttonBackground).toBeNull());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
   // #290: each note has its own alignment, and says what formatting works.

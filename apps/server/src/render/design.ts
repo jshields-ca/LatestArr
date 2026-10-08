@@ -23,6 +23,21 @@ export const designSettingsSchema = z.object({
       background: hexColor.default("#ffffff"),
       text: hexColor.default("#241521"),
       muted: hexColor.default("#7c5a68"),
+      // Advanced (#293): null follows the accent, as every design did before.
+      labelText: hexColor.nullable().default(null),
+      labelBackground: hexColor.nullable().default(null),
+      buttonBackground: hexColor.nullable().default(null),
+      buttonText: hexColor.nullable().default(null),
+      link: hexColor.nullable().default(null),
+    })
+    .prefault({}),
+  // The design's own buttons (#293). "Where to watch" source buttons and
+  // the library link always use the outlined style, at this shape and size.
+  buttons: z
+    .object({
+      shape: z.enum(["square", "rounded", "pill"]).default("rounded"),
+      style: z.enum(["filled", "outline"]).default("filled"),
+      size: z.enum(["regular", "small"]).default("regular"),
     })
     .prefault({}),
   showLookbackLine: z.boolean().default(true),
@@ -100,7 +115,12 @@ export function parseDesignSettings(value: unknown): DesignSettings {
 // template) reads.
 export function designContentVariables(settings: DesignSettings) {
   const { intro, footerNote, ctas } = settings.content;
-  return { introText: intro || undefined, footerNote: footerNote || undefined, ctas, noteLinkColor: settings.colors.accent };
+  return {
+    introText: intro || undefined,
+    footerNote: footerNote || undefined,
+    ctas,
+    noteLinkColor: settings.colors.link ?? settings.colors.accent,
+  };
 }
 
 // The original palette's hand-tuned tint, border, and "subtle" shades. A
@@ -119,6 +139,14 @@ interface Palette {
   /** Behind the email's card. */
   page: string;
   accent: string;
+  /** Type badges ("Movie", "3 new episodes"). */
+  labelText: string;
+  labelBackground: string;
+  labelBorder: string;
+  buttonBackground: string;
+  buttonText: string;
+  /** Links in the intro and footer note. */
+  link: string;
   /** Keeps a badge visible when a client drops its background. */
   badgeBorder: string;
   accentTint: string;
@@ -139,16 +167,27 @@ function paletteFor(settings: DesignSettings): Palette {
   ].map((colour) => colour.toLowerCase()) as [string, string, string, string];
   const defaults = DEFAULT_DESIGN_SETTINGS.colors;
   const neutralDefault = muted === defaults.muted && background === defaults.background;
+  const accentTint =
+    accent === defaults.accent && background === defaults.background ? DEFAULT_ACCENT_TINT : mix(accent, background, 0.85);
+  const badgeBorder = mix(accent, background, 0.6);
+  const own = (colour: string | null) => colour?.toLowerCase();
+  const labelText = own(settings.colors.labelText) ?? accent;
   return {
     page: mix(background, accent, 0.045),
     accent,
-    badgeBorder: mix(accent, background, 0.6),
+    badgeBorder,
     background,
     text,
     muted,
-    accentTint: accent === defaults.accent && background === defaults.background ? DEFAULT_ACCENT_TINT : mix(accent, background, 0.85),
+    accentTint,
     subtle: neutralDefault ? DEFAULT_SUBTLE : mix(muted, background, 0.3),
     border: neutralDefault ? DEFAULT_BORDER : mix(muted, background, 0.8),
+    labelText,
+    labelBackground: own(settings.colors.labelBackground) ?? accentTint,
+    labelBorder: settings.colors.labelText ? mix(labelText, background, 0.6) : badgeBorder,
+    buttonBackground: own(settings.colors.buttonBackground) ?? accent,
+    buttonText: own(settings.colors.buttonText) ?? "#ffffff",
+    link: own(settings.colors.link) ?? accent,
   };
 }
 
@@ -171,6 +210,13 @@ function darkPaletteFor(p: Palette): Palette {
     muted: mix(p.muted, "#ffffff", 0.45),
     subtle: mix(p.subtle, "#ffffff", 0.3),
     border: mix(text, background, 0.85),
+    labelText: mix(p.labelText, "#ffffff", 0.35),
+    labelBackground: mix(p.labelBackground, background, 0.75),
+    labelBorder: mix(mix(p.labelText, "#ffffff", 0.35), background, 0.5),
+    // Buttons keep their colours in dark mode, as they always have.
+    buttonBackground: p.buttonBackground,
+    buttonText: p.buttonText,
+    link: mix(p.link, "#ffffff", 0.35),
   };
 }
 
@@ -207,6 +253,17 @@ function darkModeHead(p: Palette): string {
     [[`[style*="solid ${p.border}"]`], `border-color:${d.border} !important;`, false],
     [[`[style*="solid ${p.badgeBorder}"]`], `border-color:${d.badgeBorder} !important;`, false],
   ];
+  // Advanced colours (#293) that differ from the ones above get their own
+  // dark versions; the defaults are already covered.
+  const covered = new Set([p.accent, p.text, p.muted, p.subtle]);
+  if (!covered.has(p.labelText)) rules.push([[`[style*="color:${p.labelText}"]`], `color:${d.labelText} !important;`, false]);
+  if (!covered.has(p.link) && p.link !== p.labelText) rules.push([[`[style*="color:${p.link}"]`], `color:${d.link} !important;`, false]);
+  if (p.labelBackground !== p.accentTint) {
+    rules.push([[`[style*="background:${p.labelBackground}"]`], `background:${d.labelBackground} !important;`, true]);
+  }
+  if (p.labelBorder !== p.badgeBorder) {
+    rules.push([[`[style*="solid ${p.labelBorder}"]`], `border-color:${d.labelBorder} !important;`, false]);
+  }
   const css = (outlook: boolean) =>
     rules
       .map(([selectors, declaration, isBackground]) => {
@@ -246,7 +303,7 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
     ? `{{#if isFallback}}<div style="font-size:12px;color:${p.subtle};margin-top:3px;">From the library</div>{{/if}}`
     : "";
   const pill = (text: string, extra = "") =>
-    `<span style="display:inline-block;font-size:11px;font-weight:600;color:${p.accent};background:${p.accentTint};border:1px solid ${p.badgeBorder};border-radius:999px;padding:1px 8px;${extra}">${text}</span>`;
+    `<span style="display:inline-block;font-size:11px;font-weight:600;color:${p.labelText};background:${p.labelBackground};border:1px solid ${p.labelBorder};border-radius:999px;padding:1px 8px;${extra}">${text}</span>`;
   // A grouped series says how many episodes it stands for instead of its type.
   const badge = show.badge
     ? `{{#if episodeCount}} ${pill("{{episodeCount}} new episodes", "vertical-align:middle;")}{{else}}{{#if contentLabel}} ${pill("{{contentLabel}}", "vertical-align:middle;")}{{/if}}{{/if}}`
@@ -332,21 +389,36 @@ function heading(text: string, p: Palette, font: string): string {
   return `        <mj-text font-family="${font}" font-size="12px" font-weight="700" letter-spacing="1px" text-transform="uppercase" color="${p.accent}" padding-bottom="2px">${text}</mj-text>`;
 }
 
-// A button for the current {label, url}: filled in the accent for the
-// design's own buttons, outlined for "Watch on Plex"-style source buttons.
-function button(p: Palette, font: string, style: "primary" | "secondary"): string {
-  const colors =
-    style === "primary"
-      ? `background-color="${p.accent}"\n          color="#ffffff"`
-      : `background-color="${p.background}"\n          color="${p.accent}"\n          border="1px solid ${p.accent}"`;
+type ButtonLook = DesignSettings["buttons"];
+
+const BUTTON_RADIUS: Record<ButtonLook["shape"], string> = { square: "0px", rounded: "8px", pill: "999px" };
+// [vertical, horizontal] padding and font size; an outlined button loses a
+// pixel each way to its border, so both kinds come out the same size.
+const BUTTON_SIZE: Record<ButtonLook["size"], { padding: [number, number]; fontSize: string }> = {
+  regular: { padding: [10, 20], fontSize: "14px" },
+  small: { padding: [7, 14], fontSize: "13px" },
+};
+
+// A button for the current {label, url}. The design's own buttons are
+// filled in the button colour, or outlined if the design says so; "Watch on
+// Plex"-style source buttons are always outlined. Both follow the design's
+// button shape and size (#293). mj-button draws them as tables, so they
+// keep their shape in Outlook too.
+function button(p: Palette, font: string, kind: "primary" | "secondary", look: ButtonLook): string {
+  const outlined = kind === "secondary" || look.style === "outline";
+  const colors = outlined
+    ? `background-color="${p.background}"\n          color="${p.buttonBackground}"\n          border="1px solid ${p.buttonBackground}"`
+    : `background-color="${p.buttonBackground}"\n          color="${p.buttonText}"`;
+  const { padding, fontSize } = BUTTON_SIZE[look.size];
+  const [vertical, horizontal] = outlined ? [padding[0] - 1, padding[1] - 1] : padding;
   return `        <mj-button
           href="{{url}}"
           ${colors}
           font-family="${font}"
-          font-size="14px"
+          font-size="${fontSize}"
           font-weight="600"
-          border-radius="8px"
-          inner-padding="${style === "primary" ? "10px 20px" : "9px 19px"}"
+          border-radius="${BUTTON_RADIUS[look.shape]}"
+          inner-padding="${vertical}px ${horizontal}px"
           align="left"
           padding-top="0"
           padding-bottom="8px"
@@ -362,10 +434,11 @@ function libraryLinkWhenEmpty(
   perSection: boolean,
   p: Palette,
   font: string,
+  buttons: ButtonLook,
 ): string {
   const link = [
     `        {{#libraryLinkFor contentType="${contentType}" label="Browse ${section.browse}"}}`,
-    button(p, font, "secondary"),
+    button(p, font, "secondary", buttons),
     `        {{/libraryLinkFor}}`,
   ].join("\n");
   return [
@@ -467,9 +540,9 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
       `        ${wrapSectionItems(settings, `{{#mediaList ${hash}}}\n${card}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,
       empty === "message" ? `        {{#ifAnyItems contentType="${contentType}"}}{{else}}\n${emptyMessage(p, font)}\n        {{/ifAnyItems}}` : "",
-      empty === "link" ? libraryLinkWhenEmpty(section, contentType, perSection, p, font) : "",
+      empty === "link" ? libraryLinkWhenEmpty(section, contentType, perSection, p, font, settings.buttons) : "",
       perSection
-        ? `        {{#sourceButtonsFor contentType="${contentType}"}}\n${button(p, font, "secondary")}\n        {{/sourceButtonsFor}}`
+        ? `        {{#sourceButtonsFor contentType="${contentType}"}}\n${button(p, font, "secondary", settings.buttons)}\n        {{/sourceButtonsFor}}`
         : "",
       `      </mj-column>`,
       `    </mj-section>`,
@@ -560,7 +633,7 @@ export function buildDesignMjml(settings: DesignSettings, options: { darkModeMar
     <mj-section padding="0 0 8px">
       <mj-column>
         {{#each ctas}}
-${button(p, font, "primary")}
+${button(p, font, "primary", settings.buttons)}
         {{/each}}
       </mj-column>
     </mj-section>
@@ -576,7 +649,7 @@ ${button(p, font, "primary")}
     <mj-section padding="4px 0 8px">
       <mj-column>
         {{#each sourceButtons}}
-${button(p, font, "secondary")}
+${button(p, font, "secondary", settings.buttons)}
         {{/each}}
       </mj-column>
     </mj-section>

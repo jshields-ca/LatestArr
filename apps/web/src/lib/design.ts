@@ -17,6 +17,12 @@ export type DesignCtaPlacement = "beforeIntro" | "afterIntro" | "end";
 export type DesignSourceButtonPlacement = "top" | "sections" | "end";
 export type DesignTextAlign = "left" | "center" | "right";
 
+export interface DesignButtons {
+  shape: "square" | "rounded" | "pill";
+  style: "filled" | "outline";
+  size: "regular" | "small";
+}
+
 export interface DesignContent {
   // Markdown: bold, italic, links, and lists.
   intro: string;
@@ -31,7 +37,19 @@ export interface DesignContent {
 
 export interface DesignSettings {
   font: string;
-  colors: { accent: string; background: string; text: string; muted: string };
+  colors: {
+    accent: string;
+    background: string;
+    text: string;
+    muted: string;
+    // Advanced: null follows the accent.
+    labelText: string | null;
+    labelBackground: string | null;
+    buttonBackground: string | null;
+    buttonText: string | null;
+    link: string | null;
+  };
+  buttons: DesignButtons;
   showLookbackLine: boolean;
   layout: DesignLayout;
   show: { poster: boolean; badge: boolean; subtitle: boolean; details: boolean; overview: boolean; dates: boolean };
@@ -49,7 +67,18 @@ export interface DesignSettings {
 
 export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   font: "ubuntu",
-  colors: { accent: "#c31d4c", background: "#ffffff", text: "#241521", muted: "#7c5a68" },
+  colors: {
+    accent: "#c31d4c",
+    background: "#ffffff",
+    text: "#241521",
+    muted: "#7c5a68",
+    labelText: null,
+    labelBackground: null,
+    buttonBackground: null,
+    buttonText: null,
+    link: null,
+  },
+  buttons: { shape: "rounded", style: "filled", size: "regular" },
   showLookbackLine: true,
   layout: "cards",
   show: { poster: true, badge: true, subtitle: true, details: true, overview: true, dates: true },
@@ -81,6 +110,7 @@ export function withDesignDefaults(settings: Partial<DesignSettings> | null | un
     ...DEFAULT_DESIGN_SETTINGS,
     ...value,
     colors: { ...DEFAULT_DESIGN_SETTINGS.colors, ...value.colors },
+    buttons: { ...DEFAULT_DESIGN_SETTINGS.buttons, ...value.buttons },
     show: { ...DEFAULT_DESIGN_SETTINGS.show, ...value.show },
     sections: {
       ...DEFAULT_DESIGN_SETTINGS.sections,

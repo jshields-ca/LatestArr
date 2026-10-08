@@ -260,6 +260,55 @@ describe("buildDesignMjml", () => {
     expect(html).toMatch(/text-align:right;[^"]*"\s*>Thanks!</);
   });
 
+  // #293: label, button and link colours of their own, and button styles.
+  describe("advanced colours and button styles", () => {
+    const ctas = [{ label: "Requests", url: "https://requests.example" }];
+
+    it("follows the accent until set, so existing designs don't change", () => {
+      expect(DEFAULT_DESIGN_SETTINGS.colors).toMatchObject({
+        labelText: null,
+        labelBackground: null,
+        buttonBackground: null,
+        buttonText: null,
+        link: null,
+      });
+      expect(DEFAULT_DESIGN_SETTINGS.buttons).toEqual({ shape: "rounded", style: "filled", size: "regular" });
+    });
+
+    it("colours type labels, with dark-mode versions", async () => {
+      const html = await render(
+        design({ colors: { labelText: "#0B5394", labelBackground: "#DCEBFA" }, sections: { groupByType: false } }),
+        { items: [book] },
+      );
+      expect(html).toContain("color:#0b5394;background:#dcebfa;");
+      expect(html).toMatch(/\[style\*="color:#0b5394"\] \{ color:#[0-9a-f]{6} !important; \}/);
+      expect(html).toMatch(/\[style\*="background:#dcebfa"\] \{ background:#[0-9a-f]{6} !important; \}/);
+    });
+
+    it("fills the design's buttons with the button colours", async () => {
+      const settings = design({ colors: { buttonBackground: "#222222", buttonText: "#FFD700" }, content: { ctas } });
+      const html = await render(settings, designContentVariables(settings));
+      expect(html).toMatch(/background:#222222;color:#ffd700;/);
+    });
+
+    it("draws buttons square, as pills, outlined, or small", async () => {
+      const square = design({ content: { ctas }, buttons: { shape: "square" } });
+      expect(await render(square, designContentVariables(square))).toMatch(/border-radius:0px;[^>]*>\s*Requests/);
+
+      const pill = design({ content: { ctas }, buttons: { shape: "pill", style: "outline", size: "small" } });
+      const html = await render(pill, designContentVariables(pill));
+      expect(html).toMatch(/border:1px solid #c31d4c;border-radius:999px/);
+      expect(html).toMatch(/font-size:13px;[^"]*padding:6px 13px;/);
+    });
+
+    it("colours links in the notes with the link colour", async () => {
+      const settings = design({ colors: { link: "#0B5394" }, content: { intro: "[Requests](https://requests.example)" } });
+      const html = await render(settings, designContentVariables(settings));
+      expect(html).toContain('href="https://requests.example" style="color:#0b5394;');
+      expect(html).toMatch(/\[style\*="color:#0b5394"\] \{ color:#[0-9a-f]{6} !important; \}/);
+    });
+  });
+
   it("keeps notes left-aligned by default", () => {
     expect(DEFAULT_DESIGN_SETTINGS.content).toMatchObject({ introAlign: "left", footerAlign: "left" });
   });

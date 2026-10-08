@@ -26,7 +26,9 @@ import {
   type Newsletter,
   type Template,
 } from "@/lib/api";
+import { type AdvancedColour, contrastWarnings, effectiveColour, MIN_CONTRAST } from "@/lib/colour";
 import {
+  type DesignButtons,
   type DesignCta,
   type DesignCtaPlacement,
   type DesignTextAlign,
@@ -55,7 +57,7 @@ const LAYOUTS: { value: DesignLayout; label: string; description: string }[] = [
   { value: "grid", label: "Grid", description: "Posters side by side" },
 ];
 
-const COLORS: { key: keyof DesignSettings["colors"]; label: string }[] = [
+const COLORS: { key: "accent" | "background" | "text" | "muted"; label: string }[] = [
   { key: "accent", label: "Accent" },
   { key: "background", label: "Background" },
   { key: "text", label: "Text" },
@@ -161,6 +163,129 @@ function Section({ title, defaultOpen = false, children }: { title: string; defa
       </summary>
       <div className="flex flex-col gap-3 border-t border-border px-4 py-3">{children}</div>
     </details>
+  );
+}
+
+const ADVANCED_COLOURS: { key: AdvancedColour; label: string }[] = [
+  { key: "labelText", label: "Label text" },
+  { key: "labelBackground", label: "Label background" },
+  { key: "buttonBackground", label: "Button colour" },
+  { key: "buttonText", label: "Button text" },
+  { key: "link", label: "Links" },
+];
+
+// Colours that otherwise follow the accent (#293). Each shows what it is
+// now, and "Use accent" puts it back to following the accent.
+function AdvancedColours({
+  colors,
+  onChange,
+}: {
+  colors: DesignSettings["colors"];
+  onChange: (key: AdvancedColour, value: string | null) => void;
+}) {
+  const custom = ADVANCED_COLOURS.filter(({ key }) => colors[key]).length;
+  return (
+    <details className="rounded-md border border-border px-3 py-2" open={custom > 0}>
+      <summary className="cursor-pointer text-sm font-medium">
+        More colours{custom > 0 ? ` (${custom} set)` : ""}
+      </summary>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Type labels, buttons, and links in the intro and footer note use the accent unless you choose otherwise.
+      </p>
+      <ul className="mt-3 flex flex-col gap-2">
+        {ADVANCED_COLOURS.map(({ key, label }) => {
+          const own = colors[key];
+          return (
+            <li key={key} className="flex items-center gap-2">
+              <input
+                id={`design-color-${key}`}
+                type="color"
+                value={effectiveColour(colors, key)}
+                onChange={(e) => onChange(key, e.target.value)}
+                className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
+              />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <Label htmlFor={`design-color-${key}`}>{label}</Label>
+                <span className="font-mono text-xs text-muted-foreground">{own ?? "Follows the accent"}</span>
+              </div>
+              {own ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => onChange(key, null)} aria-label={`${label}: use the accent`}>
+                  Use accent
+                </Button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
+const BUTTON_SHAPES: { value: DesignButtons["shape"]; label: string }[] = [
+  { value: "rounded", label: "Rounded" },
+  { value: "square", label: "Square" },
+  { value: "pill", label: "Pill" },
+];
+const BUTTON_FILLS: { value: DesignButtons["style"]; label: string }[] = [
+  { value: "filled", label: "Filled" },
+  { value: "outline", label: "Outlined" },
+];
+const BUTTON_SIZES: { value: DesignButtons["size"]; label: string }[] = [
+  { value: "regular", label: "Regular" },
+  { value: "small", label: "Small" },
+];
+
+// How the design's buttons look; "Where to watch" buttons share the shape
+// and size, and are always outlined.
+function ButtonStyle({ buttons, onChange }: { buttons: DesignButtons; onChange: (buttons: DesignButtons) => void }) {
+  const field = <K extends keyof DesignButtons>(
+    key: K,
+    label: string,
+    options: { value: DesignButtons[K]; label: string }[],
+  ) => (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={`design-button-${key}`}>{label}</Label>
+      <Select
+        id={`design-button-${key}`}
+        value={buttons[key]}
+        onChange={(e) => onChange({ ...buttons, [key]: e.target.value as DesignButtons[K] })}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-sm font-medium">Buttons</legend>
+      <div className="grid grid-cols-3 gap-2">
+        {field("shape", "Shape", BUTTON_SHAPES)}
+        {field("style", "Style", BUTTON_FILLS)}
+        {field("size", "Size", BUTTON_SIZES)}
+      </div>
+    </fieldset>
+  );
+}
+
+// Warns about colour pairs whose text would be hard to read (below WCAG
+// AA), without blocking anything: it's the designer's call.
+function ContrastNotes({ settings }: { settings: DesignSettings }) {
+  const warnings = contrastWarnings(settings);
+  if (warnings.length === 0) return null;
+  return (
+    <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+      <p className="font-medium">Some text may be hard to read:</p>
+      <ul className="mt-1 list-disc pl-4">
+        {warnings.map((warning) => (
+          <li key={warning.label}>
+            {warning.label} ({warning.ratio.toFixed(1)}:1; aim for at least {MIN_CONTRAST}:1)
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -641,6 +766,12 @@ export function DesignEditorPage() {
                 Email apps in dark mode show a dark version worked out from these colours, with Text as the
                 background and Background as the text. Switch the preview to Dark to check it.
               </p>
+              <AdvancedColours
+                colors={settings.colors}
+                onChange={(key, value) => update((c) => ({ ...c, colors: { ...c.colors, [key]: value } }))}
+              />
+              <ButtonStyle buttons={settings.buttons} onChange={(buttons) => update((c) => ({ ...c, buttons }))} />
+              <ContrastNotes settings={settings} />
               <SettingRow
                 label="Show the date range and counts"
                 description={`"Sep 21 – 28, 2026 · 36 new" and a count for each type, under the title.`}
