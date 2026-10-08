@@ -9,7 +9,7 @@ import {
   sendRuns,
   sourceConnections,
 } from "@latestarr/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { designSettingsSchema } from "../../render/design.js";
@@ -22,6 +22,12 @@ import {
   SendAlreadyRunningError,
   sendTestNewsletter,
 } from "../../pipeline/run-newsletter.js";
+import {
+  planSendToTheRest,
+  SendRunNotFoundError,
+  sendToTheRest,
+  SendToRestUnavailableError,
+} from "../../pipeline/send-to-the-rest.js";
 import type { SchedulerHandle } from "../../scheduler/engine.js";
 import { refreshScheduler } from "../../scheduler/engine.js";
 import { isUniqueConstraintError } from "../db-errors.js";
@@ -444,11 +450,20 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
           recipientCount: sendRuns.recipientCount,
           error: sendRuns.error,
           itemsSnapshot: sendRuns.itemsSnapshot,
+          restSentAt: sendRuns.restSentAt,
         })
         .from(sendRuns)
         .where(eq(sendRuns.newsletterId, request.params.id))
-        .orderBy(desc(sendRuns.startedAt));
-      return reply.send({ sendRuns: rows });
+        .orderBy(desc(sendRuns.startedAt), sql`rowid desc`);
+      // Only the newest partly sent or failed send can be finished (see
+      // send-to-the-rest.ts), so that's the only one worth checking.
+      const candidate = rows.find((row) => row.status === "partial_failure" || row.status === "failed");
+      const restAvailable = candidate
+        ? (await planSendToTheRest(db, request.params.id, candidate.id)).available
+        : false;
+      return reply.send({
+        sendRuns: rows.map((row) => ({ ...row, canSendToRest: restAvailable && row.id === candidate?.id })),
+      });
     });
 
     scope.get<{ Params: SendRunParams }>(
@@ -476,6 +491,32 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         return reply.send({ recipients: rows });
       },
     );
+
+    // Who "Send to the rest" would send to, for its confirmation, or why
+    // this send can't be finished.
+    // Lists recipients' email addresses, so it's for editors and admins.
+    scope.get<{ Params: SendRunParams }>("/newsletters/:id/send-runs/:runId/rest", { config: { minRole: "editor" } }, async (request, reply) => {
+      try {
+        return reply.send(await planSendToTheRest(db, request.params.id, request.params.runId));
+      } catch (err) {
+        if (err instanceof SendRunNotFoundError) return reply.code(404).send({ error: err.message });
+        throw err;
+      }
+    });
+
+    scope.post<{ Params: SendRunParams }>("/newsletters/:id/send-runs/:runId/send-to-rest", async (request, reply) => {
+      try {
+        const result = await sendToTheRest(db, request.params.id, request.params.runId, request.log);
+        return reply.send(result);
+      } catch (err) {
+        if (err instanceof SendRunNotFoundError) return reply.code(404).send({ error: err.message });
+        if (err instanceof SendToRestUnavailableError) return reply.code(409).send({ error: err.message });
+        if (err instanceof SendAlreadyRunningError) return reply.code(409).send({ error: err.message });
+        if (err instanceof NewsletterMisconfiguredError) return reply.code(400).send({ error: err.message });
+        request.log.error({ err, sendRunId: request.params.runId }, `Send to the rest failed: ${describeSendFailure(err)}`);
+        return reply.code(502).send({ error: describeSendFailure(err) });
+      }
+    });
 
     // Plain text/html, not JSON — this is meant to be opened directly (a
     // link target, not fetched and parsed), the same copy that was

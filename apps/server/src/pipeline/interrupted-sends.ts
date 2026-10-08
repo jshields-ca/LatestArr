@@ -12,7 +12,8 @@ import { sendFailureAlert } from "../notifications/alerts.js";
 // Nothing is resent: everyone recorded as sent got it, and resending would
 // give them a duplicate. Catch-up treats the interrupted send as this
 // period's send (it has a start time), so it isn't sent again either. The
-// admin is told who got it, and decides about the rest.
+// admin is told who got it, and can finish it with Send to the rest
+// (send-to-the-rest.ts).
 
 export async function closeInterruptedSends(db: Db, log: Logger): Promise<number> {
   const stuck = await db
@@ -32,8 +33,8 @@ export async function closeInterruptedSends(db: Db, log: Logger): Promise<number
     const reason =
       `LatestArr stopped during this send, after reaching ${reached}. ` +
       (sent > 0
-        ? "They're listed in its history. The rest didn't get it, and it won't be resent automatically, to avoid duplicates."
-        : "Nobody got it, and it won't be resent automatically. Use Send now to send it.");
+        ? "They're listed in its history. It won't be resent automatically; use Send to the rest in its history to reach the others without duplicates."
+        : "Nobody got it, and it won't be resent automatically. Use Send to the rest in its history, or Send now.");
     const status = sent > 0 ? "partial_failure" : "failed";
 
     await db

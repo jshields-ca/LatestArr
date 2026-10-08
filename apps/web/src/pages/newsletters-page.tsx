@@ -1174,7 +1174,7 @@ function NewsletterCard({
             </TabsContent>
 
             <TabsContent value="history">
-              <SendRunHistoryList runs={sendRuns} error={sendRunsError} />
+              <SendRunHistoryList runs={sendRuns} error={sendRunsError} onRunsChanged={refreshSendRuns} />
             </TabsContent>
           </Tabs>
         </div>

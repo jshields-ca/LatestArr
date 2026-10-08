@@ -159,7 +159,14 @@ The page keeps the most recent 500 entries in memory, so it starts empty after a
 
 The **Notifications** page can alert you when a scheduled newsletter fails to send or only reaches some of its recipients: by email through one of your SMTP profiles, and/or through a webhook (Discord, Slack, ntfy, Apprise, or generic JSON). Manual **Send now** results don't alert, since you see those yourself, and alerts for the same newsletter are limited to one per hour. Use **Send test alert** to check a destination before saving. If the problem is your mail server, an email alert can't get through either, so a webhook is the more reliable choice.
 
-**If LatestArr stops during a send** (a crash, a restart, an upgrade), it closes that send the next time it starts. The newsletter's **History** shows who got it before the stop, the send is marked partly sent (or failed, if nobody got it), and you're alerted. It isn't resent automatically, and missed-send catch-up counts it as that period's send, so nobody who already got it receives a duplicate. To reach the rest, use **Send now**, which goes to everyone, or wait for the next scheduled send.
+**If LatestArr stops during a send** (a crash, a restart, an upgrade), it closes that send the next time it starts. The newsletter's **History** shows who got it before the stop, the send is marked partly sent (or failed, if nobody got it), and you're alerted. It isn't resent automatically, and missed-send catch-up counts it as that period's send, so nobody who already got it receives a duplicate. To reach the rest, use **Send to the rest** (below).
+
+**Finishing a partly sent newsletter.** When a send only reached some people (LatestArr stopped partway, the mail server turned some away, or a rate limit cut it off), open its **Details** in the newsletter's **History** and choose **Send to the rest**. It sends the same email, with the same items, subject, and images, to only the people who didn't get it. It also retries anyone whose delivery failed, for example after you fix an SMTP setting. It skips anyone you've deactivated since, and includes anyone added to the newsletter's groups since. A confirmation shows how many people it will go to, and who. Their results are added to the same send, which becomes a success once everyone has it. A few things to know:
+
+- **Who can use it:** editors and admins. It's logged with who used it.
+- **Which sends:** only the newsletter's latest send, and only within its lookback window. After a newer issue has gone out, or once the news is older than the window, use **Send now** instead.
+- **The one possible duplicate:** if LatestArr stopped mid-send, the person it was sending to at that moment may have got the email without it being recorded, so they could get it twice.
+- **Storage:** LatestArr keeps the latest send's images for each newsletter, so it can send the same email again. Earlier sends' images are removed when the next one goes out.
 
 ## Backups
 

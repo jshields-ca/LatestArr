@@ -490,6 +490,24 @@ export interface SendRun {
   recipientCount: number;
   error: string | null;
   itemsSnapshot: { title: string; kind: string }[] | null;
+  /** When "Send to the rest" was last used on it. */
+  restSentAt?: string | null;
+  /** Whether "Send to the rest" can finish it now (newsletter history only). */
+  canSendToRest?: boolean;
+}
+
+export type SendToRestPlan =
+  | {
+      available: true;
+      alreadySent: number;
+      recipients: { id: string; email: string; displayName: string | null; previous: "failed" | "not_sent" }[];
+    }
+  | { available: false; reason: string };
+
+export interface SendToRestResult {
+  status: "success" | "partial_failure" | "failed";
+  sent: number;
+  failed: number;
 }
 
 export interface SendRunRecipientResult {
@@ -596,6 +614,16 @@ export function listSendRunRecipients(
 // Not JSON — the endpoint returns the sent HTML itself
 // (Content-Type: text/html), meant to be opened directly rather than
 // fetched through apiFetch's JSON parsing.
+export function getSendToRestPlan(newsletterId: string, sendRunId: string): Promise<SendToRestPlan> {
+  return apiFetch<SendToRestPlan>(`/newsletters/${newsletterId}/send-runs/${sendRunId}/rest`);
+}
+
+export function sendToTheRest(newsletterId: string, sendRunId: string): Promise<SendToRestResult> {
+  return apiFetch<SendToRestResult>(`/newsletters/${newsletterId}/send-runs/${sendRunId}/send-to-rest`, {
+    method: "POST",
+  });
+}
+
 export function sendRunHtmlUrl(newsletterId: string, sendRunId: string): string {
   return `/api/newsletters/${newsletterId}/send-runs/${sendRunId}/html`;
 }

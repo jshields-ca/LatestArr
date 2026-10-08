@@ -103,6 +103,8 @@ const ROLE_NEEDED: Record<string, Role> = {
   "POST /api/newsletters/:id/send-now": "editor",
   "POST /api/newsletters/:id/send-test": "editor",
   "GET /api/newsletters/:id/send-runs/:runId/recipients": "editor",
+  "GET /api/newsletters/:id/send-runs/:runId/rest": "editor",
+  "POST /api/newsletters/:id/send-runs/:runId/send-to-rest": "editor",
   "POST /api/templates": "editor",
   "PATCH /api/templates/:id": "editor",
   "DELETE /api/templates/:id": "editor",

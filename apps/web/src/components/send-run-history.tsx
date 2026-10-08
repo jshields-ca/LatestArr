@@ -1,15 +1,28 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronDown, Clock, ExternalLink, Loader2, TriangleAlert, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock, ExternalLink, Loader2, Send, TriangleAlert, XCircle } from "lucide-react";
 
 import { useHasRole } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/use-toast";
+import {
   ApiError,
+  getSendToRestPlan,
   listSendRunRecipients,
   sendRunHtmlUrl,
+  sendToTheRest,
   type SendRun,
   type SendRunRecipientResult,
+  type SendToRestPlan,
 } from "@/lib/api";
 import { sendRunBadgeLabel, sendRunBadgeVariant } from "@/lib/send-run";
 import { cn } from "@/lib/utils";
@@ -68,12 +81,129 @@ function recipientStatusVariant(
   }
 }
 
+// "Send to the rest" (#283): sends this send's email to the people it
+// didn't reach. The dialog loads who that is when it opens, so the count
+// is current, and says plainly why when it can't be done.
+function SendToRestDialog({ run, onSent }: { run: SendRun; onSent: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [plan, setPlan] = useState<SendToRestPlan | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  function handleOpenChange(next: boolean) {
+    if (sending) return;
+    setOpen(next);
+    if (!next) return;
+    setPlan(null);
+    setError(null);
+    getSendToRestPlan(run.newsletterId, run.id)
+      .then(setPlan)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Couldn't check who still needs it."));
+  }
+
+  async function handleSend() {
+    setSending(true);
+    setError(null);
+    try {
+      const result = await sendToTheRest(run.newsletterId, run.id);
+      setOpen(false);
+      toast(
+        result.failed === 0
+          ? { variant: "success", title: `Sent to ${result.sent} more ${result.sent === 1 ? "person" : "people"}` }
+          : {
+              variant: "destructive",
+              title: `Sent to ${result.sent}, but ${result.failed} still didn't get it`,
+              description: "Their errors are in the send's details.",
+            },
+      );
+      onSent();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't send it. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const count = plan?.available ? plan.recipients.length : 0;
+  const people = `${count} ${count === 1 ? "person" : "people"}`;
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="w-fit">
+          <Send />
+          Send to the rest
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send to the rest</DialogTitle>
+          <DialogDescription>
+            Sends this same email, with the same items and subject, to the people who didn&apos;t get it. Nobody
+            who already got it is sent it again.
+          </DialogDescription>
+        </DialogHeader>
+
+        {plan === null && !error ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Checking who still needs it...
+          </div>
+        ) : null}
+
+        {plan && !plan.available ? <p className="text-sm">{plan.reason}</p> : null}
+
+        {plan?.available ? (
+          <div className="flex flex-col gap-3 text-sm">
+            <p>
+              It will go to <strong>{people}</strong>. {plan.alreadySent} already got it.
+            </p>
+            <details className="rounded-md border border-border px-3 py-2">
+              <summary className="cursor-pointer text-muted-foreground">Show who</summary>
+              <ul className="mt-2 flex max-h-48 flex-col gap-1 overflow-y-auto">
+                {plan.recipients.map((recipient) => (
+                  <li key={recipient.id} className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="truncate">{recipient.displayName || recipient.email}</span>
+                    <Badge variant="neutral">{recipient.previous === "failed" ? "failed before" : "not sent yet"}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </details>
+            <p className="text-muted-foreground">
+              If LatestArr stopped partway through this send, the person it was sending to at that moment may
+              already have it without it being recorded, and would get it twice.
+            </p>
+          </div>
+        ) : null}
+
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={sending}>
+            {plan?.available ? "Cancel" : "Close"}
+          </Button>
+          {plan?.available ? (
+            <Button type="button" onClick={() => void handleSend()} disabled={sending}>
+              {sending ? <Loader2 className="animate-spin" /> : <Send />}
+              Send to {people}
+            </Button>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Fetches per-recipient results lazily, only once expanded — the list view
 // above already shows aggregate counts, so this detail (who exactly, what
 // was included, a link to the actual rendered copy) is only worth the
 // extra request when someone asks to see it.
-function SendRunDetails({ run }: { run: SendRun }) {
-  // Recipients' email addresses are for editors and admins.
+function SendRunDetails({ run, onRunsChanged }: { run: SendRun; onRunsChanged?: () => void }) {
+  // Recipients' email addresses, and sending, are for editors and admins.
   const showRecipients = useHasRole("editor");
   const [recipients, setRecipients] = useState<SendRunRecipientResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +264,10 @@ function SendRunDetails({ run }: { run: SendRun }) {
         </div>
       ) : null}
 
+      {run.canSendToRest && showRecipients && onRunsChanged ? (
+        <SendToRestDialog run={run} onSent={onRunsChanged} />
+      ) : null}
+
       <a
         href={sendRunHtmlUrl(run.newsletterId, run.id)}
         target="_blank"
@@ -154,10 +288,13 @@ export function SendRunHistoryList({
   runs,
   error,
   limit = 10,
+  onRunsChanged,
 }: {
   runs: RunWithOptionalNewsletterName[] | null;
   error: string | null;
   limit?: number;
+  /** Reloads the runs; when given, a partly sent run offers "Send to the rest". */
+  onRunsChanged?: () => void;
 }) {
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
 
@@ -226,6 +363,11 @@ export function SendRunHistoryList({
                     {run.error}
                   </span>
                 ) : null}
+                {run.restSentAt ? (
+                  <span className="text-sm text-muted-foreground">
+                    Sent to the rest {new Date(run.restSentAt).toLocaleString()}
+                  </span>
+                ) : null}
               </div>
               {hasDetail ? (
                 <Button
@@ -240,7 +382,7 @@ export function SendRunHistoryList({
                 </Button>
               ) : null}
             </div>
-            {expanded ? <SendRunDetails run={run} /> : null}
+            {expanded ? <SendRunDetails run={run} onRunsChanged={onRunsChanged} /> : null}
           </li>
         );
       })}
