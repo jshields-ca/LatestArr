@@ -304,10 +304,7 @@ Handlebars.registerHelper("mediaList", function mediaList(
   }
 
   if (selected.length === 0 && emptyFallback === "link") {
-    const href = contentType
-      ?.split(",")
-      .map((kind) => this.sourceLinksByContentType?.[kind])
-      .find(Boolean);
+    const href = libraryLink(this.sourceLinksByContentType, contentType);
     if (!href) return "";
     const label = Handlebars.escapeExpression(fallbackLinkLabel || "Browse the library");
     // Wrapped in its own <mj-raw> unless told otherwise: this string
@@ -322,6 +319,28 @@ Handlebars.registerHelper("mediaList", function mediaList(
   }
 
   return selected.map((item) => options.fn(item)).join("");
+});
+
+// The first linked source's library address for any of these content
+// types (a comma list).
+function libraryLink(links: Record<string, string> | undefined, contentType: string | undefined): string | undefined {
+  return contentType
+    ?.split(",")
+    .map((kind) => links?.[kind.trim()])
+    .find(Boolean);
+}
+
+// A "Browse movies" link for a section with nothing new, rendered with
+// {label, url} so a design can show it as one of its own buttons (#292).
+// The else block runs when no linked source provides these content types.
+// {{#libraryLinkFor contentType="movie" label="Browse movies"}}...{{/libraryLinkFor}}
+Handlebars.registerHelper("libraryLinkFor", function libraryLinkFor(
+  this: { sourceLinksByContentType?: Record<string, string> },
+  options: Handlebars.HelperOptions,
+) {
+  const { contentType, label } = options.hash as { contentType?: string; label?: string };
+  const url = libraryLink(this.sourceLinksByContentType, contentType);
+  return url ? options.fn({ label: label || "Browse the library", url }) : options.inverse(this);
 });
 
 // Lets a heading above a {{#mediaList}} disappear along with its (empty)
