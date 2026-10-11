@@ -73,9 +73,22 @@ jobs:
       - name: Check this release has highlights
         run: node scripts/build-release-notes.mjs --check-highlights "$(node -p "require('./package.json').version")"
 
+  # The image is published for amd64 and arm64 (#318), so both are built
+  # natively and smoke-tested; the native modules (better-sqlite3, sharp,
+  # argon2) load at startup, so a missing arm64 binary fails the health
+  # check. The amd64 job keeps the plain "Docker build" name, which the
+  # main branch ruleset requires.
   docker-build:
-    name: Docker build
-    runs-on: ubuntu-latest
+    name: ${{ matrix.arch == 'amd64' && 'Docker build' || format('Docker build ({0})', matrix.arch) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -91,8 +104,8 @@ jobs:
           push: false
           load: true
           tags: latestarr:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=ci-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=ci-${{ matrix.arch }}
 
       - name: Smoke test the built image
         run: |
