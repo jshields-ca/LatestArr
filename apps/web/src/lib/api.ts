@@ -325,6 +325,9 @@ export interface RecipientImportPlan {
   update: { id: string; email: string; displayName: string; previousName: string | null }[];
   unchanged: { email: string }[];
   skipped: RecipientImportSkip[];
+  /** Each group the file names, whether it's new, and how many people
+   * the import adds to it. */
+  groups: { name: string; isNew: boolean; adding: number }[];
 }
 
 export interface RecipientImportResult {
@@ -332,9 +335,11 @@ export interface RecipientImportResult {
   updated: Recipient[];
   unchanged: { email: string }[];
   skipped: RecipientImportSkip[];
+  createdGroups: RecipientGroup[];
+  membershipsAdded: number;
 }
 
-type ImportRows = { email: string; displayName?: string }[];
+type ImportRows = { email: string; displayName?: string; groups?: string[] }[];
 
 export function previewRecipientImport(rows: ImportRows): Promise<{ plan: RecipientImportPlan }> {
   return apiFetch<{ plan: RecipientImportPlan }>("/recipients/import", {

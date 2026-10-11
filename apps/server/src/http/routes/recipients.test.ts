@@ -149,6 +149,40 @@ describe("POST /recipients/import", () => {
     expect(after.json().recipients.map((r: { displayName: string }) => r.displayName).sort()).toEqual(["Ann Smith", "Bo", "Cy"]);
   });
 
+  // #288 part 2: a Group column joins groups, creating missing ones.
+  it("adds people to groups by name, creating missing groups and never removing anyone", async () => {
+    const family = (await app.inject(authed({ method: "POST", url: "/api/recipient-groups", payload: { name: "Family" } }))).json().group;
+    const kept = (await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "ann@example.com" } }))).json().recipient;
+    const other = (await app.inject(authed({ method: "POST", url: "/api/recipient-groups", payload: { name: "Other" } }))).json().group;
+    await app.inject(authed({ method: "POST", url: `/api/recipient-groups/${family.id}/members`, payload: { recipientId: kept.id } }));
+    await app.inject(authed({ method: "POST", url: `/api/recipient-groups/${other.id}/members`, payload: { recipientId: kept.id } }));
+    const rows = [
+      { email: "ann@example.com", groups: [" family "] },
+      { email: "bo@example.com", groups: ["FAMILY", "Book club"] },
+      { email: "cy@example.com", groups: ["book club"] },
+    ];
+
+    const preview = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows, dryRun: true } }));
+    expect(preview.json().plan.groups).toEqual([
+      { name: "Family", isNew: false, adding: 1 },
+      { name: "Book club", isNew: true, adding: 2 },
+    ]);
+    // Ann is already in Family, so nothing changes for her.
+    expect(preview.json().plan.unchanged).toEqual([{ email: "ann@example.com" }]);
+
+    const applied = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows } }));
+    expect(applied.json()).toMatchObject({ membershipsAdded: 3, createdGroups: [{ name: "Book club" }] });
+
+    const groups = (await app.inject(authed({ method: "GET", url: "/api/recipient-groups" }))).json().groups;
+    expect(groups.map((g: { name: string }) => g.name).sort()).toEqual(["Book club", "Family", "Other"]);
+    const members = async (id: string) =>
+      (await app.inject(authed({ method: "GET", url: `/api/recipient-groups/${id}` }))).json().members.map((m: { email: string }) => m.email).sort();
+    expect(await members(family.id)).toEqual(["ann@example.com", "bo@example.com"]);
+    expect(await members(other.id)).toEqual(["ann@example.com"]);
+    const bookClub = groups.find((g: { name: string }) => g.name === "Book club");
+    expect(await members(bookClub.id)).toEqual(["bo@example.com", "cy@example.com"]);
+  });
+
   it("rejects an empty rows array", async () => {
     const response = await app.inject(
       authed({ method: "POST", url: "/api/recipients/import", payload: { rows: [] } }),

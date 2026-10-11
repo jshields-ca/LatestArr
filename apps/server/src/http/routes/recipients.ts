@@ -31,6 +31,8 @@ const bulkImportSchema = z.object({
       z.object({
         email: z.string().trim().min(1),
         displayName: z.string().trim().min(1).optional(),
+        // Group names to add this person to (#288).
+        groups: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
       }),
     )
     .min(1)
@@ -75,13 +77,23 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         return reply.send({ plan: planRecipientImport(db, body.rows) });
       }
 
-      const { plan, created, updated } = applyRecipientImport(db, body.rows);
+      const { plan, created, updated, createdGroups, membershipsAdded } = applyRecipientImport(db, body.rows);
       request.log.info(
-        { created: created.length, updated: updated.length, unchanged: plan.unchanged.length, skipped: plan.skipped.length },
-        `Imported recipients: ${created.length} added, ${updated.length} renamed` +
+        {
+          created: created.length,
+          updated: updated.length,
+          unchanged: plan.unchanged.length,
+          skipped: plan.skipped.length,
+          groupsCreated: createdGroups.length,
+          membershipsAdded,
+        },
+        `Imported recipients: ${created.length} added, ${updated.length} renamed, ${membershipsAdded} added to groups` +
+          (createdGroups.length ? ` (${createdGroups.length} new)` : "") +
           (plan.skipped.length ? `, ${plan.skipped.length} skipped` : ""),
       );
-      return reply.code(201).send({ created, updated, unchanged: plan.unchanged, skipped: plan.skipped });
+      return reply
+        .code(201)
+        .send({ created, updated, unchanged: plan.unchanged, skipped: plan.skipped, createdGroups, membershipsAdded });
     });
 
     scope.get("/recipients", async (_request, reply) => {

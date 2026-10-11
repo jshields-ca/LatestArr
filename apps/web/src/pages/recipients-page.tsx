@@ -588,6 +588,8 @@ function RecipientsSection({
   loadError: string | null;
   onRecipientsChange: (updater: (prev: Recipient[]) => Recipient[]) => void;
 }) {
+  // An import can create groups and add people to them.
+  const groupSync = useContext(GroupSyncContext);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<RecipientSortKey>("name");
@@ -628,12 +630,14 @@ function RecipientsSection({
         {recipients ? (
           <div className="flex items-center gap-2">
             <ImportRecipientsDialog
-              onImported={(created, updated) =>
+              onImported={({ created, updated, createdGroups, membershipsAdded }) => {
                 onRecipientsChange((prev) => [
                   ...prev.map((recipient) => updated.find((row) => row.id === recipient.id) ?? recipient),
                   ...created,
-                ])
-              }
+                ]);
+                createdGroups.forEach(groupSync.groupCreated);
+                if (membershipsAdded > 0) groupSync.membershipChanged();
+              }}
             />
             <AddRecipientDialog onCreated={(r) => onRecipientsChange((prev) => [...prev, r])} />
           </div>
