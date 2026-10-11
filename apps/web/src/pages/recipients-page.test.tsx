@@ -230,10 +230,15 @@ describe("RecipientsPage", () => {
     await user.type(within(dialog).getByLabelText("Email"), "alice2@example.com");
     await user.clear(within(dialog).getByLabelText("Name (optional)"));
     await user.type(within(dialog).getByLabelText("Name (optional)"), "Alice Two");
-    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    // Groups save as they change; the details wait for Save details (#295).
+    expect(within(dialog).getByText("Changes to groups save straight away.")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save details" }));
 
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await screen.findByText("Alice Two")).toBeInTheDocument();
+    // The dialog stays open for the groups, with nothing left to save.
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Save details" })).toBeDisabled());
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
     const patchCall = fetchMock.mock.calls.find(
       ([, init]) => init?.method === "PATCH",

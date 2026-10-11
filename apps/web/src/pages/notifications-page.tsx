@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveActions } from "@/components/ui/save-actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { SettingRow } from "@/components/ui/setting-row";
@@ -24,6 +25,7 @@ import {
   type SmtpProfile,
   type WebhookFormat,
 } from "@/lib/api";
+import { saveShortcutRef, useSavedSnapshot, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const WEBHOOK_FORMATS: { value: WebhookFormat; label: string; placeholder: string }[] = [
   { value: "discord", label: "Discord", placeholder: "https://discord.com/api/webhooks/..." },
@@ -90,6 +92,11 @@ export function NotificationsPage() {
     };
   }
 
+  // Seeded suggestions (your email, the only SMTP profile) count as part
+  // of the starting point, so opening the page doesn't show unsaved changes.
+  const { dirty, markSaved } = useSavedSnapshot(currentInput(), saved !== null);
+  useUnsavedChanges(dirty);
+
   async function handleSave(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
@@ -97,6 +104,7 @@ export function NotificationsPage() {
     try {
       const { settings } = await saveNotificationSettings(currentInput());
       applySaved(settings);
+      markSaved();
       toast({ variant: "success", title: "Alert settings saved" });
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Couldn't save alert settings.");
@@ -142,7 +150,7 @@ export function NotificationsPage() {
       ) : null}
 
       {saved ? (
-        <form className="flex max-w-2xl flex-col gap-4" onSubmit={handleSave} noValidate>
+        <form ref={saveShortcutRef} className="flex max-w-2xl flex-col gap-4" onSubmit={handleSave} noValidate>
           <Card>
             <CardHeader>
               <CardTitle>When to alert</CardTitle>
@@ -292,11 +300,7 @@ export function NotificationsPage() {
             </ul>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 className="animate-spin" /> : null}
-              Save
-            </Button>
+          <SaveActions dirty={dirty} saving={saving} label="Save" align="start">
             <Button
               type="button"
               variant="outline"
@@ -306,7 +310,7 @@ export function NotificationsPage() {
               {testing ? <Loader2 className="animate-spin" /> : <BellRing />}
               Send test alert
             </Button>
-          </div>
+          </SaveActions>
         </form>
       ) : null}
     </div>

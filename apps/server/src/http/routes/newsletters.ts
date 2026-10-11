@@ -49,12 +49,15 @@ const sendTestSchema = z.object({
   to: z.email("A valid email address is required"),
 });
 
+// Shown as is in the web app, so it says what to do (#295).
+const LOOKBACK_MESSAGE = "Lookback must be a whole number of days, 1 or more.";
+
 const createNewsletterSchema = z.object({
   name: z.string().trim().min(1, "name and scheduleCron are required"),
   scheduleCron: z.string().trim().min(1, "name and scheduleCron are required"),
   timezone: z.string().trim().min(1).optional(),
   subjectTemplate: z.string().optional(),
-  lookbackDays: z.number().int().positive().optional(),
+  lookbackDays: z.number(LOOKBACK_MESSAGE).int(LOOKBACK_MESSAGE).min(1, LOOKBACK_MESSAGE).optional(),
   skipWhenEmpty: z.boolean().optional(),
   smtpProfileId: z.string().min(1).optional(),
   templateId: z.string().min(1).optional(),
@@ -66,7 +69,7 @@ const updateNewsletterSchema = z.object({
   scheduleCron: z.string().trim().min(1).optional(),
   timezone: z.string().trim().min(1).optional(),
   subjectTemplate: z.string().optional(),
-  lookbackDays: z.number().int().positive().optional(),
+  lookbackDays: z.number(LOOKBACK_MESSAGE).int(LOOKBACK_MESSAGE).min(1, LOOKBACK_MESSAGE).optional(),
   skipWhenEmpty: z.boolean().optional(),
   isEnabled: z.boolean().optional(),
   smtpProfileId: z.string().min(1).nullable().optional(),

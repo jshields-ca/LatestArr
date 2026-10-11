@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveActions } from "@/components/ui/save-actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +37,7 @@ import {
   type SmtpProfile,
   type SystemMailSettings,
 } from "@/lib/api";
+import { guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 // Port 465 is "implicit TLS" (the socket is wrapped in TLS before any SMTP
 // conversation happens); 587 and 25 are STARTTLS (a plain connection that
@@ -353,8 +355,18 @@ function EditSmtpProfileDialog({
     }
   }
 
+  const dirty = name !== profile.name ||
+    host !== profile.host ||
+    port !== String(profile.port) ||
+    secure !== profile.secure ||
+    username !== "" ||
+    password !== "" ||
+    defaultFromName !== profile.defaultFromName ||
+    defaultFromEmail !== profile.defaultFromEmail;
+  useUnsavedChanges(open && dirty);
+
   return (
-    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+    <Dialog open={open} onOpenChange={guardClose(dirty, openWithCurrentValues)}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" aria-label={`Edit ${profile.name}`}>
           <Pencil />
@@ -365,7 +377,7 @@ function EditSmtpProfileDialog({
           <DialogTitle>Edit SMTP profile</DialogTitle>
           <DialogDescription>Used to send newsletters and test emails.</DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} ref={saveShortcutRef} noValidate>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="edit-smtp-name">Name</Label>
             <Input
@@ -497,10 +509,7 @@ function EditSmtpProfileDialog({
           ) : null}
 
           <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              Save changes
-            </Button>
+            <SaveActions dirty={dirty} saving={submitting} />
           </DialogFooter>
         </form>
       </DialogContent>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveActions } from "@/components/ui/save-actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { SettingRow } from "@/components/ui/setting-row";
@@ -32,6 +33,7 @@ import {
   type SimpleSchedule,
   simpleScheduleToCron,
 } from "@/lib/schedule";
+import { saveShortcutRef, useSavedSnapshot, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const RESTORE_DOCS_URL = "https://github.com/jshields-ca/LatestArr/blob/main/docs/self-hosting.md#restoring-a-backup";
 
@@ -102,22 +104,29 @@ function SettingsCard({ overview, onSaved }: { overview: BackupOverview; onSaved
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
+  function currentSettings() {
     const retention: BackupRetention =
       mode === "count"
         ? { mode, keep: Number(keep) }
         : { mode, daily: Number(daily), weekly: Number(weekly), monthly: Number(monthly) };
+    return {
+      enabled,
+      scheduleCron: scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron,
+      timezone,
+      retention,
+    };
+  }
+  const { dirty, markSaved } = useSavedSnapshot(currentSettings());
+  useUnsavedChanges(dirty);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError(null);
     setSaving(true);
     try {
-      const next = await saveBackupSettings({
-        enabled,
-        scheduleCron: scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron,
-        timezone,
-        retention,
-      });
+      const next = await saveBackupSettings(currentSettings());
       onSaved(next);
+      markSaved();
       toast({ variant: "success", title: "Backup settings saved" });
     } catch (err) {
       setError(errorMessage(err, "Couldn't save the backup settings."));
@@ -152,7 +161,7 @@ function SettingsCard({ overview, onSaved }: { overview: BackupOverview; onSaved
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <form ref={saveShortcutRef} className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
           <SettingRow
             label="Back up on a schedule"
             htmlFor="backups-enabled"
@@ -200,12 +209,7 @@ function SettingsCard({ overview, onSaved }: { overview: BackupOverview; onSaved
               {error}
             </p>
           ) : null}
-          <div>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 className="animate-spin" /> : null}
-              Save
-            </Button>
-          </div>
+          <SaveActions dirty={dirty} saving={saving} label="Save" align="start" />
         </form>
       </CardContent>
     </Card>
