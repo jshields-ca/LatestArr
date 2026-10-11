@@ -33,6 +33,7 @@ import { refreshScheduler } from "../../scheduler/engine.js";
 import { isUniqueConstraintError } from "../db-errors.js";
 import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
+import { MAX_SUBJECT_LENGTH, SUBJECT_VARIABLES, unknownSubjectVariables } from "../../render/subject.js";
 import { parseBody } from "../validate.js";
 
 const senderIdentitySchema = z.object({
@@ -49,6 +50,21 @@ const sendTestSchema = z.object({
   to: z.email("A valid email address is required"),
 });
 
+// {variables} are filled in on each send (#267); a typo is refused here
+// rather than reaching an inbox as "{dat}".
+const subjectSchema = z
+  .string()
+  .max(MAX_SUBJECT_LENGTH, `Keep the subject under ${MAX_SUBJECT_LENGTH} characters`)
+  .superRefine((value, ctx) => {
+    const unknown = unknownSubjectVariables(value);
+    if (unknown.length > 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: `${unknown.map((name) => `{${name}}`).join(", ")} ${unknown.length === 1 ? "isn't a variable" : "aren't variables"}. Use ${SUBJECT_VARIABLES.map((name) => `{${name}}`).join(", ")}.`,
+      });
+    }
+  });
+
 // Shown as is in the web app, so it says what to do (#295).
 const LOOKBACK_MESSAGE = "Lookback must be a whole number of days, 1 or more.";
 
@@ -56,7 +72,7 @@ const createNewsletterSchema = z.object({
   name: z.string().trim().min(1, "name and scheduleCron are required"),
   scheduleCron: z.string().trim().min(1, "name and scheduleCron are required"),
   timezone: z.string().trim().min(1).optional(),
-  subjectTemplate: z.string().optional(),
+  subjectTemplate: subjectSchema.optional(),
   lookbackDays: z.number(LOOKBACK_MESSAGE).int(LOOKBACK_MESSAGE).min(1, LOOKBACK_MESSAGE).optional(),
   skipWhenEmpty: z.boolean().optional(),
   smtpProfileId: z.string().min(1).optional(),
@@ -68,7 +84,7 @@ const updateNewsletterSchema = z.object({
   name: z.string().trim().min(1).optional(),
   scheduleCron: z.string().trim().min(1).optional(),
   timezone: z.string().trim().min(1).optional(),
-  subjectTemplate: z.string().optional(),
+  subjectTemplate: subjectSchema.optional(),
   lookbackDays: z.number(LOOKBACK_MESSAGE).int(LOOKBACK_MESSAGE).min(1, LOOKBACK_MESSAGE).optional(),
   skipWhenEmpty: z.boolean().optional(),
   isEnabled: z.boolean().optional(),

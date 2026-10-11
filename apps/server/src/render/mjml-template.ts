@@ -1,5 +1,6 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import Handlebars from "handlebars";
+import { formatDate, formatPeriod } from "./dates.js";
 import { renderNote } from "./notes.js";
 import mjml2html from "mjml";
 import type { SourceButton } from "./source-buttons.js";
@@ -88,6 +89,9 @@ export interface MjmlRenderContext {
    * than one linked source resolves to whichever was resolved first. */
   sourceLinksByContentType?: Record<string, string>;
   generatedAt: Date;
+  /** The newsletter's timezone, for the send date and the date range
+   * (the subject uses the same, see subject.ts). The server's otherwise. */
+  timeZone?: string;
   /** The newsletter's configured lookback-window length, for the default
    * template's "Here's what's new in the last N days" intro line
    * (design.ts). Bound as {{lookbackDays}} for code designs too. */
@@ -108,10 +112,6 @@ export interface MjmlRenderContext {
    * URL (source-buttons.ts). Bound as {{#each sourceButtons}}, or
    * {{#sourceButtonsFor contentType="movie"}} for one section's. */
   sourceButtons?: SourceButton[];
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
 // Shared by runtimeMinutes (movies/TV) and durationSeconds (audiobooks,
@@ -423,24 +423,12 @@ const KIND_COUNT_LABELS: Record<NewItem["kind"], [string, string]> = {
 };
 
 // "23 episodes", "9 movies", ... largest first.
-function kindCounts(items: NewItem[]): string[] {
+export function kindCounts(items: NewItem[]): string[] {
   const counts = new Map<NewItem["kind"], number>();
   for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([kind, n]) => `${n} ${KIND_COUNT_LABELS[kind][n === 1 ? 0 : 1]}`);
-}
-
-// "Sep 21 – 28, 2026", "Aug 30 – Sep 5, 2026", or across years in full.
-function formatPeriod(end: Date, days: number): string {
-  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-  const month = (d: Date) => d.toLocaleDateString("en-US", { month: "short" });
-  if (start.getFullYear() !== end.getFullYear()) {
-    const full = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return `${full(start)} – ${full(end)}`;
-  }
-  const endPart = start.getMonth() === end.getMonth() ? `${end.getDate()}` : `${month(end)} ${end.getDate()}`;
-  return `${month(start)} ${start.getDate()} – ${endPart}, ${end.getFullYear()}`;
 }
 
 // The logo's markup. Every value is escaped; src and href are already
@@ -477,9 +465,11 @@ export async function renderMjmlTemplate(
     fallbackItems: (context.fallbackItems ?? []).map(toRenderable),
     sourceLinksByContentType: context.sourceLinksByContentType ?? {},
     hasLinkedSources: Object.keys(context.sourceLinksByContentType ?? {}).length > 0,
-    generatedAtFormatted: formatDate(context.generatedAt),
+    generatedAtFormatted: formatDate(context.generatedAt, context.timeZone),
     lookbackDays: context.lookbackDays,
-    periodFormatted: context.lookbackDays ? formatPeriod(context.generatedAt, context.lookbackDays) : undefined,
+    periodFormatted: context.lookbackDays
+      ? formatPeriod(context.generatedAt, context.lookbackDays, context.timeZone)
+      : undefined,
     itemCount: context.items.length,
     kindCounts: kindCounts(context.items),
     introText: renderNote(context.introText, context.noteLinkColor),
