@@ -57,12 +57,24 @@ Visit `http://localhost:3000` (or wherever you've exposed it). The first thing y
 After creating the admin account and logging in, the dashboard shows a setup checklist:
 
 1. **Connect a source** — point LatestArr at a running Tautulli, Plex, Jellyfin, Emby, BookLore-family app, Audiobookshelf, or RomM instance and its API credentials. Use the **Test connection** button before saving; it calls the source's own API immediately rather than waiting for the first scheduled fetch to discover a bad URL or key.
-2. **Add recipients and a group** — recipients are added individually (email + display name), then grouped, since a newsletter targets one or more groups rather than individual recipients directly.
+2. **Add recipients and a group** — add people one at a time, import your source's users, or paste or upload a CSV or Excel (`.xlsx`) file. Put them in a group, since a newsletter targets one or more groups rather than individual recipients directly. See [Importing recipients](#importing-recipients).
 3. **Configure an SMTP profile** — see [Deliverability](deliverability.md) for what to put in `defaultFromEmail`/`defaultFromName` and why. Use **Send test email** before wiring it to a real newsletter.
 4. **(Optional) Make a design** — under Designs, duplicate the built-in Default and change its colours, layout, and details, and add your logo, an intro, footer note, or buttons, with a live preview. **Edit as code** switches a design to hand-written MJML if you want full control. Skip this and a newsletter uses Default; you can always come back and design one later.
-5. **Create a newsletter** — pick a schedule (cron expression + timezone), lookback window, the source(s) and recipient group(s) to use, and optionally the design from step 4. **Send now** on the newsletter's detail page sends immediately without waiting for the schedule, useful for checking the result before trusting the automated send.
+5. **Create a newsletter** — pick a schedule (cron expression + timezone), lookback window, the source(s) and recipient group(s) to use, and optionally the design from step 4 and a subject (see [Subject variables](#subject-variables)). **Preview** shows the next issue and can **Send test** to one address; **Send now** sends to everyone immediately without waiting for the schedule.
 
 None of this is a separate wizard — it's the same admin screens you'd use afterward for day-to-day management, just presented in a sensible first-run order.
+
+### Importing recipients
+
+On the **Recipients** page, **Import** takes a pasted list, a CSV, or an Excel file (`.xlsx`, first sheet; old `.xls` isn't supported). A heading row is read by column, in any order, ignoring case: `Email` (required), `Name` (or `Full name`), and `Groups`, with several groups in one cell separated by `;`. Other columns are ignored. Without headings, one person per line works: `jane@example.com`, `jane@example.com, Jane`, or `Jane <jane@example.com>`. **Download a template** gives you a starting file.
+
+**Review** shows what the import will do before anything is saved: new people, name changes for people already on the list, groups to create and join, and skipped rows with the reason. Groups are matched by name, missing ones are created, and an import never takes anyone out of a group. Up to 1,000 rows at a time.
+
+**Undo last import** appears next to Import for 24 hours, or until your next import. It removes the people and groups the import added, takes people back out of the groups it added them to, and puts back names it changed. Anything changed since is kept, and Undo says what.
+
+### Subject variables
+
+A newsletter's subject can include variables, filled in on each send in the newsletter's timezone: `{newsletter}`, `{date}` (September 29, 2026), `{shortDate}` (Sep 29), `{period}` (Sep 22 – 29, 2026), `{month}`, `{year}`, `{count}` (new items), and `{counts}` (8 movies, 4 episodes). For example, `{count} new from {period}`. **Insert a variable** in the form adds one, and a line under the field previews the next subject. A misspelled variable is refused when you save. A blank subject uses the newsletter's name.
 
 ## Running behind a reverse proxy
 

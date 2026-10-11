@@ -22,12 +22,13 @@
 
 ## Features
 
-- **Many sources, one newsletter.** Plex, Tautulli, Jellyfin, Emby, BookLore-family book libraries, Audiobookshelf, and RomM. Mix them in one newsletter or give each its own, and import your server's users as recipients.
+- **Many sources, one newsletter.** Plex, Tautulli, Jellyfin, Emby, BookLore-family book libraries, Audiobookshelf, and RomM. Mix them in one newsletter or give each its own.
+- **Recipients without retyping.** Import your server's users, or paste or upload a CSV or Excel file, groups included. You see what will change before anything is saved, and can undo the last import.
 - **Design without code, or with it.** Pick fonts, colours, layout (cards, compact list, or grid), and what each item shows, and add your logo (with a dark mode version), with a live preview. Group items by type, fold a show's new episodes into one row, and add an intro, a footer note, and buttons. Switch to **code mode** (MJML) for full control.
 - **Where to watch.** Each item links to your server, and **Watch on Plex**-style buttons point people to the right place.
-- **Your schedule.** As many newsletters as you like, each with its own schedule, timezone, lookback window, sources, and recipient groups. Missed sends catch up, and a send with nothing new can be skipped.
+- **Your schedule.** As many newsletters as you like, each with its own schedule, timezone, lookback window, sources, and recipient groups. Subjects can fill in the date, period, and counts, like "{count} new from {period}". Missed sends catch up, and a send with nothing new can be skipped.
 - **Check before it goes out.** Preview the next issue with real items, and send yourself a test.
-- **Know when it fails.** Alerts by email, Discord, Slack, ntfy, Apprise, or JSON webhook, and a Logs page that shows what happened.
+- **Know when it fails, and finish the job.** Alerts by email, Discord, Slack, ntfy, Apprise, or JSON webhook, and a Logs page that shows what happened. If a send only reached some people, **Send to the rest** finishes it without duplicates.
 - **Good delivery habits.** Sends through your own mail server or provider, one message per recipient, with posters embedded and a plain-text version. Dark-mode aware.
 - **Backed up for you.** Daily checked backups with retention, one before every upgrade, and a recovery command to restore one or get back in if you're locked out.
 - **Built to be exposed.** Local accounts or SSO (OIDC), admin, editor, and viewer roles, encrypted credentials, rate limiting, CSRF protection, and a strict CSP. Runs as a non-root container.
@@ -55,7 +56,7 @@ Each source has a setup guide in the [docs](https://www.latestarr.app/docs/sourc
 
 ## Quick start
 
-You'll need Docker with Compose, at least one supported source the container can reach, and an SMTP server or provider to send from. Everything runs in one container, with no separate database to set up.
+You'll need Docker with Compose (on x86-64 or 64-bit ARM, such as Apple Silicon or a Raspberry Pi 4 or 5), at least one supported source the container can reach, and an SMTP server or provider to send from. Everything runs in one container, with no separate database to set up.
 
 ```bash
 # Get docker-compose.yml and .env.example from this repository, then:

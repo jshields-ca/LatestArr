@@ -31,7 +31,7 @@ body:
     id: version
     attributes:
       label: LatestArr version / commit
-      placeholder: e.g. v0.1.0 or commit SHA
+      placeholder: e.g. v0.12.0 (shown in the web UI's header), dev, or a commit SHA
     validations:
       required: true
 
