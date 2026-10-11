@@ -54,6 +54,7 @@ describe("migrations", () => {
         "password_reset_tokens",
         "recipient_group_members",
         "recipient_groups",
+        "recipient_imports",
         "recipients",
         "send_run_attachments",
         "send_run_recipient_results",

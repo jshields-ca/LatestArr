@@ -1,5 +1,13 @@
-import { type Db, recipientGroupMembers, recipientGroups, recipients } from "@latestarr/db";
-import { eq } from "drizzle-orm";
+import {
+  type Db,
+  newsletterRecipientGroups,
+  recipientGroupMembers,
+  recipientGroups,
+  recipientImports,
+  recipients,
+  sendRunRecipientResults,
+} from "@latestarr/db";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 // Importing recipients in two steps (#288): a plan of what an import would
@@ -136,8 +144,20 @@ export function planRecipientImport(db: Db | Tx, rows: ImportRow[]): ImportPlan 
   return plan(db, rows).plan;
 }
 
-/** Applies an import in one transaction, planning it again first. */
-export function applyRecipientImport(db: Db, rows: ImportRow[]) {
+/** What an import changed, kept so Undo can reverse exactly that. */
+export interface ImportChanges {
+  created: { id: string; email: string; displayName: string | null }[];
+  renamed: { id: string; from: string | null; to: string }[];
+  joined: { recipientId: string; groupId: string }[];
+  createdGroups: { id: string; name: string }[];
+}
+
+/**
+ * Applies an import in one transaction, planning it again first, and
+ * records what it changed as the latest import (replacing the one before,
+ * which can then no longer be undone).
+ */
+export function applyRecipientImport(db: Db, rows: ImportRow[], createdBy: string | null = null) {
   return db.transaction((tx) => {
     const { plan: result, groupIds, joins } = plan(tx, rows);
 
@@ -169,6 +189,144 @@ export function applyRecipientImport(db: Db, rows: ImportRow[]) {
     const memberships = joins.map(([email, gkey]) => ({ recipientId: idByEmail.get(email)!, groupId: groupIds.get(gkey)! }));
     if (memberships.length > 0) tx.insert(recipientGroupMembers).values(memberships).onConflictDoNothing().run();
 
-    return { plan: result, created, updated, createdGroups, membershipsAdded: memberships.length };
+    const changes: ImportChanges = {
+      created: created.map(({ id, email, displayName }) => ({ id, email, displayName })),
+      renamed: result.update.map((row) => ({ id: row.id, from: row.previousName, to: row.displayName })),
+      joined: memberships,
+      createdGroups: createdGroups.map(({ id, name }) => ({ id, name })),
+    };
+    tx.delete(recipientImports).run();
+    const record = tx
+      .insert(recipientImports)
+      .values({ createdBy, changes: changes as unknown as Record<string, unknown> })
+      .returning()
+      .get()!;
+
+    return { plan: result, created, updated, createdGroups, membershipsAdded: memberships.length, importId: record.id };
+  });
+}
+
+// Undo is offered for the latest import, for this long.
+export const UNDO_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export interface LatestImport {
+  id: string;
+  createdAt: Date;
+  undoneAt: Date | null;
+  counts: { created: number; renamed: number; joined: number; createdGroups: number };
+  canUndo: boolean;
+}
+
+export function latestImport(db: Db, now = new Date()): LatestImport | null {
+  const row = db.select().from(recipientImports).orderBy(desc(recipientImports.createdAt)).limit(1).get();
+  if (!row) return null;
+  const changes = row.changes as unknown as ImportChanges;
+  return {
+    id: row.id,
+    createdAt: row.createdAt,
+    undoneAt: row.undoneAt,
+    counts: {
+      created: changes.created.length,
+      renamed: changes.renamed.length,
+      joined: changes.joined.length,
+      createdGroups: changes.createdGroups.length,
+    },
+    canUndo: !row.undoneAt && now.getTime() - row.createdAt.getTime() < UNDO_WINDOW_MS,
+  };
+}
+
+export class ImportNotUndoableError extends Error {}
+
+export interface UndoResult {
+  undone: { removed: number; renamed: number; leftGroups: number; removedGroups: number };
+  /** Changes left alone because something changed since, and why. */
+  skipped: { item: string; reason: string }[];
+}
+
+/**
+ * Reverses the latest import (#288): removes the group memberships it
+ * added, the recipients it created, and the groups it created, and puts
+ * back the names it changed. Anything changed since is left alone and
+ * listed, rather than overwritten: a recipient who was edited, deactivated
+ * or has since been sent a newsletter (removing them would lose that
+ * history), a name changed again, or a group that was renamed, given a
+ * description, used by a newsletter or given other members.
+ */
+export function undoRecipientImport(db: Db, importId: string, now = new Date()): UndoResult {
+  return db.transaction((tx) => {
+    const row = tx.select().from(recipientImports).where(eq(recipientImports.id, importId)).get();
+    const latest = tx.select({ id: recipientImports.id }).from(recipientImports).orderBy(desc(recipientImports.createdAt)).limit(1).get();
+    if (!row || latest?.id !== row.id || row.undoneAt || now.getTime() - row.createdAt.getTime() >= UNDO_WINDOW_MS) {
+      throw new ImportNotUndoableError("Only the latest import can be undone, once, within 24 hours of it.");
+    }
+    const changes = row.changes as unknown as ImportChanges;
+    const result: UndoResult = { undone: { removed: 0, renamed: 0, leftGroups: 0, removedGroups: 0 }, skipped: [] };
+
+    for (const join of changes.joined) {
+      const removed = tx
+        .delete(recipientGroupMembers)
+        .where(and(eq(recipientGroupMembers.recipientId, join.recipientId), eq(recipientGroupMembers.groupId, join.groupId)))
+        .returning()
+        .all();
+      result.undone.leftGroups += removed.length;
+    }
+
+    for (const created of changes.created) {
+      const current = tx.select().from(recipients).where(eq(recipients.id, created.id)).get();
+      if (!current) continue;
+      if (current.email !== created.email || current.displayName !== created.displayName || !current.isActive) {
+        result.skipped.push({ item: current.email, reason: "Changed since the import, so kept" });
+        continue;
+      }
+      const sent = tx
+        .select({ id: sendRunRecipientResults.id })
+        .from(sendRunRecipientResults)
+        .where(eq(sendRunRecipientResults.recipientId, created.id))
+        .limit(1)
+        .get();
+      if (sent) {
+        result.skipped.push({ item: current.email, reason: "Has been sent a newsletter since, so kept" });
+        continue;
+      }
+      tx.delete(recipients).where(eq(recipients.id, created.id)).run();
+      result.undone.removed += 1;
+    }
+
+    for (const rename of changes.renamed) {
+      const current = tx.select().from(recipients).where(eq(recipients.id, rename.id)).get();
+      if (!current) continue;
+      if (current.displayName !== rename.to) {
+        result.skipped.push({ item: current.email, reason: "Renamed again since, so the new name was kept" });
+        continue;
+      }
+      tx.update(recipients).set({ displayName: rename.from }).where(eq(recipients.id, rename.id)).run();
+      result.undone.renamed += 1;
+    }
+
+    for (const group of changes.createdGroups) {
+      const current = tx.select().from(recipientGroups).where(eq(recipientGroups.id, group.id)).get();
+      if (!current) continue;
+      const hasMembers = tx
+        .select({ id: recipientGroupMembers.recipientId })
+        .from(recipientGroupMembers)
+        .where(eq(recipientGroupMembers.groupId, group.id))
+        .limit(1)
+        .get();
+      const usedByNewsletter = tx
+        .select({ id: newsletterRecipientGroups.groupId })
+        .from(newsletterRecipientGroups)
+        .where(eq(newsletterRecipientGroups.groupId, group.id))
+        .limit(1)
+        .get();
+      if (current.name !== group.name || current.description || hasMembers || usedByNewsletter) {
+        result.skipped.push({ item: `Group "${current.name}"`, reason: "Changed or in use since, so kept" });
+        continue;
+      }
+      tx.delete(recipientGroups).where(eq(recipientGroups.id, group.id)).run();
+      result.undone.removedGroups += 1;
+    }
+
+    tx.update(recipientImports).set({ undoneAt: now }).where(eq(recipientImports.id, row.id)).run();
+    return result;
   });
 }

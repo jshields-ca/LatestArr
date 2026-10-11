@@ -151,6 +151,19 @@ export const recipientGroupMembers = sqliteTable(
   }),
 );
 
+// What the latest recipient import changed (#288), so Undo can reverse
+// exactly that: see apps/server/src/http/routes/recipient-import.ts. Only
+// the latest is kept; an import replaces the one before.
+export const recipientImports = sqliteTable("recipient_imports", {
+  id: id(),
+  createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  changes: text("changes", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  undoneAt: integer("undone_at", { mode: "timestamp" }),
+});
+
 export const templates = sqliteTable("templates", {
   id: id(),
   name: text("name").notNull(),

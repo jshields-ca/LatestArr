@@ -22,7 +22,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
-import { ImportRecipientsDialog } from "@/components/import-recipients-dialog";
+import { ImportRecipientsDialog, UndoLastImport } from "@/components/import-recipients-dialog";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
   ApiError,
@@ -54,12 +54,15 @@ interface GroupSync {
   membershipVersion: number;
   groupCreated: (group: RecipientGroup) => void;
   membershipChanged: () => void;
+  /** Loads recipients and groups again, e.g. after an import is undone. */
+  reload: () => void;
 }
 
 const GroupSyncContext = createContext<GroupSync>({
   membershipVersion: 0,
   groupCreated: () => {},
   membershipChanged: () => {},
+  reload: () => {},
 });
 
 function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) => void }) {
@@ -590,6 +593,8 @@ function RecipientsSection({
 }) {
   // An import can create groups and add people to them.
   const groupSync = useContext(GroupSyncContext);
+  // Bumped after an import, so Undo last import looks again.
+  const [importVersion, setImportVersion] = useState(0);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<RecipientSortKey>("name");
@@ -637,8 +642,10 @@ function RecipientsSection({
                 ]);
                 createdGroups.forEach(groupSync.groupCreated);
                 if (membershipsAdded > 0) groupSync.membershipChanged();
+                setImportVersion((v) => v + 1);
               }}
             />
+            <UndoLastImport refreshKey={importVersion} onUndone={groupSync.reload} />
             <AddRecipientDialog onCreated={(r) => onRecipientsChange((prev) => [...prev, r])} />
           </div>
         ) : null}
@@ -1197,6 +1204,8 @@ export function RecipientsPage() {
   const [groupsLoadError, setGroupsLoadError] = useState<string | null>(null);
   const [membershipVersion, setMembershipVersion] = useState(0);
 
+  const [loadVersion, setLoadVersion] = useState(0);
+
   useEffect(() => {
     listRecipients()
       .then(({ recipients: loaded }) => setRecipients(loaded))
@@ -1204,7 +1213,7 @@ export function RecipientsPage() {
     listGroups()
       .then(({ groups: loaded }) => setGroups(loaded))
       .catch((err) => setGroupsLoadError(err instanceof ApiError ? err.message : "Failed to load groups."));
-  }, []);
+  }, [loadVersion]);
 
   const groupSync = useMemo<GroupSync>(
     () => ({
@@ -1212,6 +1221,10 @@ export function RecipientsPage() {
       groupCreated: (group) =>
         setGroups((prev) => (prev && !prev.some((g) => g.id === group.id) ? [...prev, group] : prev)),
       membershipChanged: () => setMembershipVersion((v) => v + 1),
+      reload: () => {
+        setLoadVersion((v) => v + 1);
+        setMembershipVersion((v) => v + 1);
+      },
     }),
     [membershipVersion],
   );

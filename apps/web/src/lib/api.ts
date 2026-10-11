@@ -337,6 +337,31 @@ export interface RecipientImportResult {
   skipped: RecipientImportSkip[];
   createdGroups: RecipientGroup[];
   membershipsAdded: number;
+  /** For Undo: see getLatestImport. */
+  importId: string;
+}
+
+/** The latest import, and whether it can still be undone (#288). */
+export interface RecipientImportSummary {
+  id: string;
+  createdAt: string;
+  undoneAt: string | null;
+  counts: { created: number; renamed: number; joined: number; createdGroups: number };
+  canUndo: boolean;
+}
+
+export interface UndoImportResult {
+  undone: { removed: number; renamed: number; leftGroups: number; removedGroups: number };
+  /** Left alone because they changed since the import. */
+  skipped: { item: string; reason: string }[];
+}
+
+export function getLatestImport(): Promise<{ import: RecipientImportSummary | null }> {
+  return apiFetch<{ import: RecipientImportSummary | null }>("/recipients/imports/latest");
+}
+
+export function undoImport(id: string): Promise<UndoImportResult> {
+  return apiFetch<UndoImportResult>(`/recipients/imports/${encodeURIComponent(id)}/undo`, { method: "POST" });
 }
 
 type ImportRows = { email: string; displayName?: string; groups?: string[] }[];

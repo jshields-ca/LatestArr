@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
-import { ArrowLeft, Download, Loader2, Upload } from "lucide-react";
+import { ArrowLeft, Download, Loader2, Undo2, Upload } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/use-toast";
 import {
   ApiError,
+  getLatestImport,
   importRecipients,
   previewRecipientImport,
+  type RecipientImportSummary,
+  undoImport,
   type RecipientImportPlan,
   type RecipientImportResult,
 } from "@/lib/api";
 import { EMAIL_HEADERS, GROUP_HEADERS, NAME_HEADERS, parseRecipientImportText } from "@/lib/recipient-import";
+import { isSpreadsheet, readSpreadsheetAsText, SpreadsheetError } from "@/lib/spreadsheet";
 import { guardClose } from "@/lib/unsaved-changes";
 
 // Shown this many rows per part of the review, with the rest behind "Show all".
@@ -51,7 +55,8 @@ function FormatHelp() {
       <summary className="cursor-pointer font-medium">File format</summary>
       <div className="mt-2 flex flex-col gap-2 text-xs text-muted-foreground">
         <p>
-          A CSV with a heading row works best: an <strong>email</strong> column (required), and optionally a{" "}
+          Upload a CSV or an Excel file (.xlsx, first sheet only), or paste cells from a spreadsheet. A heading row works
+          best: an <strong>email</strong> column (required), and optionally a{" "}
           <strong>name</strong> and a <strong>groups</strong> column. Other columns are ignored. Headings are matched
           ignoring case: {EMAIL_HEADERS.join(", ")} for the email, {NAME_HEADERS.join(", ")} for the name, and{" "}
           {GROUP_HEADERS.join(" or ")} for groups.
@@ -218,7 +223,19 @@ export function ImportRecipientsDialog({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setRawText(await file.text());
+    setError(null);
+    if (!isSpreadsheet(file)) {
+      setRawText(await file.text());
+      return;
+    }
+    setBusy(true);
+    try {
+      setRawText(await readSpreadsheetAsText(file));
+    } catch (err) {
+      setError(err instanceof SpreadsheetError ? err.message : "That spreadsheet couldn't be read.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleReview() {
@@ -298,6 +315,9 @@ export function ImportRecipientsDialog({
               ) : null}
               .
             </p>
+            <p className="text-sm text-muted-foreground">
+              Changed your mind? <strong>Undo last import</strong>, next to Import, reverses it for the next 24 hours.
+            </p>
             <DialogFooter>
               <Button type="button" onClick={() => setOpen(false)}>
                 Done
@@ -330,13 +350,13 @@ export function ImportRecipientsDialog({
                 <Label htmlFor="recipient-import-text">Paste recipients</Label>
                 <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={busy}>
                   <Upload className="size-3.5" />
-                  Upload CSV
+                  Upload CSV or Excel
                 </Button>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  aria-label="Upload a CSV of recipients"
-                  accept=".csv,text/csv,text/plain"
+                  aria-label="Upload a CSV or Excel file of recipients"
+                  accept=".csv,.xlsx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   className="hidden"
                   onChange={(e) => void handleFileChange(e)}
                 />
@@ -379,5 +399,75 @@ export function ImportRecipientsDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function describeCounts(counts: RecipientImportSummary["counts"]): string {
+  return [
+    counts.created > 0 ? `removes the ${plural(counts.created, "person", "people")} it added` : "",
+    counts.renamed > 0 ? `puts back ${plural(counts.renamed, "name")} it changed` : "",
+    counts.joined > 0 ? `removes the ${plural(counts.joined, "group membership")} it added` : "",
+    counts.createdGroups > 0 ? `deletes the ${plural(counts.createdGroups, "group")} it created` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+// Undoes the latest import (#288), offered until the next import or for 24
+// hours. Anything changed since is kept, and the result says so.
+// `refreshKey` changes after an import, to look again.
+export function UndoLastImport({ refreshKey, onUndone }: { refreshKey: number; onUndone: () => void }) {
+  const [latest, setLatest] = useState<RecipientImportSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getLatestImport()
+      .then(({ import: summary }) => setLatest(summary))
+      .catch(() => setLatest(null));
+  }, [refreshKey]);
+
+  if (!latest?.canUndo) return null;
+
+  async function handleUndo() {
+    if (!latest) return;
+    const when = new Date(latest.createdAt).toLocaleString();
+    if (!window.confirm(`Undo the import from ${when}? This ${describeCounts(latest.counts)}. Anything changed since is kept.`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const { undone, skipped } = await undoImport(latest.id);
+      const done = [
+        undone.removed > 0 ? `Removed ${plural(undone.removed, "person", "people")}.` : "",
+        undone.renamed > 0 ? `Put back ${plural(undone.renamed, "name")}.` : "",
+        undone.leftGroups > 0 ? `Removed ${plural(undone.leftGroups, "group membership")}.` : "",
+        undone.removedGroups > 0 ? `Deleted ${plural(undone.removedGroups, "group")}.` : "",
+        skipped.length > 0 ? `Kept ${skipped.map((item) => item.item).join(", ")}: changed since the import.` : "",
+      ].filter(Boolean);
+      toast({ variant: "success", title: "Import undone", description: done.join(" ") || undefined });
+      setLatest(null);
+      onUndone();
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't undo the import",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={() => void handleUndo()}
+      disabled={busy}
+      title={`Imported ${new Date(latest.createdAt).toLocaleString()}`}
+    >
+      {busy ? <Loader2 className="animate-spin" /> : <Undo2 />}
+      Undo last import
+    </Button>
   );
 }

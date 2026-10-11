@@ -662,6 +662,51 @@ describe("RecipientsPage", () => {
     expect(screen.getByText("Book club")).toBeInTheDocument();
   });
 
+  // #288 part 3: the latest import can be undone for a day.
+  it("undoes the last import from the page, then reloads the lists", async () => {
+    const user = userEvent.setup();
+    let undone = false;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/recipients" && (!init || init.method === undefined)) {
+        const people = [{ id: "r1", email: "kept@example.com", displayName: "Kept", isActive: true }];
+        if (!undone) people.push({ id: "r2", email: "added@example.com", displayName: "Added", isActive: true });
+        return Promise.resolve(jsonResponse(200, { recipients: people }));
+      }
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients/imports/latest") {
+        return Promise.resolve(
+          jsonResponse(200, {
+            import: {
+              id: "imp1",
+              createdAt: "2026-10-11T10:00:00.000Z",
+              undoneAt: null,
+              counts: { created: 1, renamed: 0, joined: 0, createdGroups: 0 },
+              canUndo: !undone,
+            },
+          }),
+        );
+      }
+      if (url === "/api/recipients/imports/imp1/undo" && init?.method === "POST") {
+        undone = true;
+        return Promise.resolve(
+          jsonResponse(200, { undone: { removed: 1, renamed: 0, leftGroups: 0, removedGroups: 0 }, skipped: [] }),
+        );
+      }
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<RecipientsPage />);
+    await screen.findByText("Added");
+    await user.click(await screen.findByRole("button", { name: "Undo last import" }));
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("removes the 1 person it added"));
+    await waitFor(() => expect(screen.queryByText("Added")).not.toBeInTheDocument());
+    expect(screen.getByText("Kept")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Undo last import" })).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
   it("has no accessibility violations with the import-recipients dialog open", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {
