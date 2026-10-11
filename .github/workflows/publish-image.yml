@@ -131,5 +131,8 @@ jobs:
         run: |
           first=$(printf '%s\n' "$TAGS" | sed -n '/./{p;q;}')
           docker buildx imagetools inspect "$first"
-          docker buildx imagetools inspect "$first" --format '{{json .Manifest}}' | grep -q '"architecture":"arm64"'
-          docker buildx imagetools inspect "$first" --format '{{json .Manifest}}' | grep -q '"architecture":"amd64"'
+          raw=$(docker buildx imagetools inspect "$first" --raw)
+          for arch in amd64 arm64; do
+            echo "$raw" | jq -e --arg arch "$arch" '.manifests[] | select(.platform.os == "linux" and .platform.architecture == $arch)' > /dev/null \
+              || { echo "$first has no linux/$arch image"; exit 1; }
+          done
