@@ -20,16 +20,15 @@ import {
   ApiError,
   importRecipients,
   previewRecipientImport,
-  type Recipient,
   type RecipientImportPlan,
   type RecipientImportResult,
 } from "@/lib/api";
-import { EMAIL_HEADERS, NAME_HEADERS, parseRecipientImportText } from "@/lib/recipient-import";
+import { EMAIL_HEADERS, GROUP_HEADERS, NAME_HEADERS, parseRecipientImportText } from "@/lib/recipient-import";
 import { guardClose } from "@/lib/unsaved-changes";
 
 // Shown this many rows per part of the review, with the rest behind "Show all".
 const PREVIEW_ROWS = 5;
-const TEMPLATE_CSV = "email,name\r\njane@example.com,Jane Smith\r\njohn@example.com,\r\n";
+const TEMPLATE_CSV = "email,name,groups\r\njane@example.com,Jane Smith,Family;Book club\r\njohn@example.com,,Family\r\n";
 
 function plural(count: number, one: string, many = `${one}s`) {
   return `${count} ${count === 1 ? one : many}`;
@@ -52,9 +51,15 @@ function FormatHelp() {
       <summary className="cursor-pointer font-medium">File format</summary>
       <div className="mt-2 flex flex-col gap-2 text-xs text-muted-foreground">
         <p>
-          A CSV with a heading row works best: an <strong>email</strong> column (required) and a <strong>name</strong>{" "}
-          column (optional). Other columns are ignored. Headings are matched ignoring case:{" "}
-          {EMAIL_HEADERS.join(", ")} for the email, and {NAME_HEADERS.join(", ")} for the name.
+          A CSV with a heading row works best: an <strong>email</strong> column (required), and optionally a{" "}
+          <strong>name</strong> and a <strong>groups</strong> column. Other columns are ignored. Headings are matched
+          ignoring case: {EMAIL_HEADERS.join(", ")} for the email, {NAME_HEADERS.join(", ")} for the name, and{" "}
+          {GROUP_HEADERS.join(" or ")} for groups.
+        </p>
+        <p>
+          Put several groups in one cell separated by <code>;</code> (in a file separated by semicolons, use commas).
+          Groups are matched by name, ignoring case; missing ones are created. An import only adds people to groups,
+          never removes them.
         </p>
         <p>
           Without headings, paste one person per line: <code>jane@example.com</code>, <code>jane@example.com, Jane</code>,
@@ -111,12 +116,14 @@ function PlanSection<T>({
 
 function Review({ plan, unreadable }: { plan: RecipientImportPlan; unreadable: string[] }) {
   const skipped = [...plan.skipped, ...unreadable.map((line) => ({ email: line, reason: "Couldn't read this line" }))];
+  const joining = plan.groups.reduce((total, group) => total + group.adding, 0);
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm">
         {plural(plan.create.length, "new recipient")}, {plural(plan.update.length, "name change")},{" "}
         {plural(plan.unchanged.length, "already on the list", "already on the list")}
         {skipped.length > 0 ? `, ${plural(skipped.length, "row")} skipped` : ""}.
+        {joining > 0 ? ` Adds ${plural(joining, "group membership", "group memberships")}.` : ""}
       </p>
       <PlanSection
         title="New"
@@ -137,6 +144,25 @@ function Review({ plan, unreadable }: { plan: RecipientImportPlan; unreadable: s
             <span className="truncate text-muted-foreground">
               {row.previousName ? `${row.previousName} → ` : ""}
               {row.displayName}
+            </span>
+          </>
+        )}
+      />
+      <PlanSection
+        title="Groups"
+        rows={plan.groups}
+        render={(group) => (
+          <>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate">{group.name}</span>
+              {group.isNew ? (
+                <Badge variant="neutral" className="shrink-0">
+                  New group
+                </Badge>
+              ) : null}
+            </span>
+            <span className="shrink-0 text-muted-foreground">
+              {group.adding === 0 ? "Everyone's already in it" : `Adding ${plural(group.adding, "person", "people")}`}
             </span>
           </>
         )}
@@ -166,7 +192,7 @@ type Step = { name: "edit" } | { name: "review"; plan: RecipientImportPlan } | {
 export function ImportRecipientsDialog({
   onImported,
 }: {
-  onImported: (created: Recipient[], updated: Recipient[]) => void;
+  onImported: (result: RecipientImportResult) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [rawText, setRawText] = useState("");
@@ -214,11 +240,15 @@ export function ImportRecipientsDialog({
     try {
       const result = await importRecipients(parsed.rows);
       setStep({ name: "done", result });
-      onImported(result.created, result.updated);
+      onImported(result);
+      const details = [
+        result.updated.length > 0 ? `Updated ${plural(result.updated.length, "name")}.` : "",
+        result.membershipsAdded > 0 ? `Added ${plural(result.membershipsAdded, "group membership")}.` : "",
+      ].filter(Boolean);
       toast({
         variant: "success",
         title: `Added ${plural(result.created.length, "recipient")}`,
-        description: result.updated.length > 0 ? `Updated ${plural(result.updated.length, "name")}.` : undefined,
+        description: details.length > 0 ? details.join(" ") : undefined,
       });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -227,7 +257,10 @@ export function ImportRecipientsDialog({
     }
   }
 
-  const changes = step.name === "review" ? step.plan.create.length + step.plan.update.length : 0;
+  const changes =
+    step.name === "review"
+      ? step.plan.create.length + step.plan.update.length + step.plan.groups.reduce((total, group) => total + group.adding, 0)
+      : 0;
 
   return (
     <Dialog open={open} onOpenChange={guardClose(unsaved, openChange)}>
@@ -253,6 +286,11 @@ export function ImportRecipientsDialog({
           <div className="flex flex-col gap-3">
             <p className="text-sm">
               Added <strong>{step.result.created.length}</strong>, updated <strong>{step.result.updated.length}</strong>
+              {step.result.membershipsAdded > 0 ? (
+                <>
+                  , <strong>{step.result.membershipsAdded}</strong> added to groups
+                </>
+              ) : null}
               {step.result.skipped.length > 0 ? (
                 <>
                   , skipped <strong>{step.result.skipped.length}</strong>

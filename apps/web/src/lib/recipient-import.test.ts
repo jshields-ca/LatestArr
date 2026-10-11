@@ -86,3 +86,19 @@ describe("splitCells", () => {
     expect(splitCells('a, "b, c";d\t"say ""hi"""')).toEqual(["a", "b, c", "d", 'say "hi"']);
   });
 });
+
+describe("parseRecipientImportText with a Group column (#288)", () => {
+  it("reads several groups per person, separated by semicolons", () => {
+    const result = parseRecipientImportText("email,name,groups\na@example.com,Ann,Family;Book club\nb@example.com,,\nc@example.com,Cy, Friends | Family ");
+    expect(result.rows).toEqual([
+      { email: "a@example.com", displayName: "Ann", groups: ["Family", "Book club"] },
+      { email: "b@example.com" },
+      { email: "c@example.com", displayName: "Cy", groups: ["Friends", "Family"] },
+    ]);
+  });
+
+  it("uses commas between groups in a file separated by semicolons", () => {
+    const result = parseRecipientImportText("Email;Group\na@example.com;Family, Friends");
+    expect(result.rows).toEqual([{ email: "a@example.com", groups: ["Family", "Friends"] }]);
+  });
+});

@@ -603,6 +603,7 @@ describe("RecipientsPage", () => {
                 update: [{ id: "r1", email: "old@example.com", displayName: "Renamed", previousName: "Old" }],
                 unchanged: [],
                 skipped: [{ email: "bad", reason: "Invalid email address" }],
+                groups: [{ name: "Book club", isNew: true, adding: 1 }],
               },
             }),
           );
@@ -613,6 +614,8 @@ describe("RecipientsPage", () => {
             updated: [{ ...existing, displayName: "Renamed" }],
             unchanged: [],
             skipped: [{ email: "bad", reason: "Invalid email address" }],
+            createdGroups: [{ id: "g9", name: "Book club", description: null }],
+            membershipsAdded: 1,
           }),
         );
       }
@@ -627,7 +630,7 @@ describe("RecipientsPage", () => {
     expect(within(dialog).getByText("File format")).toBeInTheDocument();
 
     fireEvent.change(within(dialog).getByLabelText("Paste recipients"), {
-      target: { value: "email,name\nnew@example.com,New Person\nold@example.com,Renamed\nbad,x\nnot a row at all" },
+      target: { value: "email,name,groups\nnew@example.com,New Person,Book club\nold@example.com,Renamed,\nbad,x,\nnot a row at all" },
     });
     expect(within(dialog).getByText(/2 rows found, 2 lines couldn't be read/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Review" }));
@@ -636,24 +639,27 @@ describe("RecipientsPage", () => {
     expect(await within(dialog).findByText(/1 new recipient, 1 name change/)).toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "Name changes" })).toHaveTextContent("Old → Renamed");
     expect(within(dialog).getByRole("region", { name: "Skipped" })).toHaveTextContent("Couldn't read this line");
+    expect(within(dialog).getByRole("region", { name: "Groups" })).toHaveTextContent(/Book clubNew groupAdding 1 person/);
     const calls = () => fetchMock.mock.calls.filter(([url]) => url === "/api/recipients/import");
     expect(calls()).toHaveLength(1);
     expect(JSON.parse(calls()[0]![1].body as string)).toEqual({
       rows: [
-        { email: "new@example.com", displayName: "New Person" },
+        { email: "new@example.com", displayName: "New Person", groups: ["Book club"] },
         { email: "old@example.com", displayName: "Renamed" },
       ],
       dryRun: true,
     });
 
-    await user.click(within(dialog).getByRole("button", { name: "Import 2 changes" }));
-    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1, updated\s*1, skipped\s*1/));
+    await user.click(within(dialog).getByRole("button", { name: "Import 3 changes" }));
+    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1, updated\s*1, 1 added to groups, skipped\s*1/));
     expect(JSON.parse(calls()[1]![1].body as string)).not.toHaveProperty("dryRun");
 
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await screen.findByText("New Person")).toBeInTheDocument();
     expect(screen.getByText("Renamed")).toBeInTheDocument();
+    // The new group appears under Groups without a reload.
+    expect(screen.getByText("Book club")).toBeInTheDocument();
   });
 
   it("has no accessibility violations with the import-recipients dialog open", async () => {
