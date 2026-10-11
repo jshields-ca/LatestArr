@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -585,18 +585,33 @@ describe("RecipientsPage", () => {
     expect(await axe(document.body)).toHaveNoViolations();
   });
 
-  it("imports recipients pasted as text, reporting created and skipped rows", async () => {
+  // #288: nothing changes until the review is confirmed.
+  it("reviews an import before applying it, then adds and renames recipients", async () => {
     const user = userEvent.setup();
+    const existing = { id: "r1", email: "old@example.com", displayName: "Old", isActive: true };
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       if (url === "/api/recipients" && (!init || init.method === undefined))
-        return Promise.resolve(jsonResponse(200, { recipients: [] }));
+        return Promise.resolve(jsonResponse(200, { recipients: [existing] }));
       if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
       if (url === "/api/recipients/import" && init?.method === "POST") {
+        const body = JSON.parse(init.body as string);
+        if (body.dryRun) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              plan: {
+                create: [{ email: "new@example.com", displayName: "New Person" }],
+                update: [{ id: "r1", email: "old@example.com", displayName: "Renamed", previousName: "Old" }],
+                unchanged: [],
+                skipped: [{ email: "bad", reason: "Invalid email address" }],
+              },
+            }),
+          );
+        }
         return Promise.resolve(
           jsonResponse(201, {
-            created: [
-              { id: "r2", email: "new@example.com", displayName: "New Person", isActive: true },
-            ],
+            created: [{ id: "r2", email: "new@example.com", displayName: "New Person", isActive: true }],
+            updated: [{ ...existing, displayName: "Renamed" }],
+            unchanged: [],
             skipped: [{ email: "bad", reason: "Invalid email address" }],
           }),
         );
@@ -605,34 +620,40 @@ describe("RecipientsPage", () => {
     });
 
     render(<RecipientsPage />);
-    await screen.findByText("No recipients yet");
+    await screen.findByText("Old");
 
     await user.click(screen.getByRole("button", { name: "Import" }));
     const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("File format")).toBeInTheDocument();
 
-    await user.type(
-      within(dialog).getByLabelText("Paste recipients"),
-      "new@example.com, New Person",
-    );
-    expect(await within(dialog).findByText(/1 recipient ready to import/)).toBeInTheDocument();
-
-    await user.click(within(dialog).getByRole("button", { name: /Import 1 recipient/ }));
-
-    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1\s*recipient.*skipped\s*1/));
-    expect(within(dialog).getByText("bad")).toBeInTheDocument();
-    expect(within(dialog).getByText("Invalid email address")).toBeInTheDocument();
-
-    const importCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipients/import") as [
-      string,
-      RequestInit,
-    ];
-    expect(JSON.parse(importCall[1].body as string)).toEqual({
-      rows: [{ email: "new@example.com", displayName: "New Person" }],
+    fireEvent.change(within(dialog).getByLabelText("Paste recipients"), {
+      target: { value: "email,name\nnew@example.com,New Person\nold@example.com,Renamed\nbad,x\nnot a row at all" },
     });
+    expect(within(dialog).getByText(/2 rows found, 2 lines couldn't be read/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Review" }));
+
+    // The review: nothing imported yet.
+    expect(await within(dialog).findByText(/1 new recipient, 1 name change/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("region", { name: "Name changes" })).toHaveTextContent("Old → Renamed");
+    expect(within(dialog).getByRole("region", { name: "Skipped" })).toHaveTextContent("Couldn't read this line");
+    const calls = () => fetchMock.mock.calls.filter(([url]) => url === "/api/recipients/import");
+    expect(calls()).toHaveLength(1);
+    expect(JSON.parse(calls()[0]![1].body as string)).toEqual({
+      rows: [
+        { email: "new@example.com", displayName: "New Person" },
+        { email: "old@example.com", displayName: "Renamed" },
+      ],
+      dryRun: true,
+    });
+
+    await user.click(within(dialog).getByRole("button", { name: "Import 2 changes" }));
+    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1, updated\s*1, skipped\s*1/));
+    expect(JSON.parse(calls()[1]![1].body as string)).not.toHaveProperty("dryRun");
 
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await screen.findByText("New Person")).toBeInTheDocument();
+    expect(screen.getByText("Renamed")).toBeInTheDocument();
   });
 
   it("has no accessibility violations with the import-recipients dialog open", async () => {

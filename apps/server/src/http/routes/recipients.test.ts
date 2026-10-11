@@ -110,12 +110,43 @@ describe("POST /recipients/import", () => {
     expect(body.created.map((r) => r.email).sort()).toEqual(["new1@example.com", "new2@example.com"]);
     expect(body.skipped).toEqual([
       { email: "not-an-email", reason: "Invalid email address" },
-      { email: "existing@example.com", reason: "Already exists" },
       { email: "New1@Example.com", reason: "Duplicate in this import" },
     ]);
+    // Already there with nothing to change (#288).
+    expect(response.json().unchanged).toEqual([{ email: "existing@example.com" }]);
 
     const listResponse = await app.inject(authed({ method: "GET", url: "/api/recipients" }));
     expect(listResponse.json().recipients).toHaveLength(3);
+  });
+
+  // #288: preview first, then apply; names of existing recipients update.
+  it("previews an import without changing anything, then applies it", async () => {
+    await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "Ann@example.com", displayName: "Ann" } }));
+    await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "bo@example.com", displayName: "Bo" } }));
+    const rows = [
+      { email: "ann@example.com", displayName: "Ann Smith" },
+      { email: "bo@example.com" },
+      { email: "cy@example.com", displayName: "Cy" },
+      { email: "nope" },
+    ];
+
+    const preview = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows, dryRun: true } }));
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json().plan).toMatchObject({
+      create: [{ email: "cy@example.com", displayName: "Cy" }],
+      update: [{ email: "Ann@example.com", displayName: "Ann Smith", previousName: "Ann" }],
+      unchanged: [{ email: "bo@example.com" }],
+      skipped: [{ email: "nope", reason: "Invalid email address" }],
+    });
+    const before = await app.inject(authed({ method: "GET", url: "/api/recipients" }));
+    expect(before.json().recipients).toHaveLength(2);
+
+    const applied = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows } }));
+    expect(applied.statusCode).toBe(201);
+    expect(applied.json().created.map((r: { email: string }) => r.email)).toEqual(["cy@example.com"]);
+    expect(applied.json().updated.map((r: { displayName: string }) => r.displayName)).toEqual(["Ann Smith"]);
+    const after = await app.inject(authed({ method: "GET", url: "/api/recipients" }));
+    expect(after.json().recipients.map((r: { displayName: string }) => r.displayName).sort()).toEqual(["Ann Smith", "Bo", "Cy"]);
   });
 
   it("rejects an empty rows array", async () => {

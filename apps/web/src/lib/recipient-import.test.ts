@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRecipientImportText } from "./recipient-import";
+import { parseRecipientImportText, splitCells } from "./recipient-import";
 
 describe("parseRecipientImportText", () => {
   it("parses one bare email per line", () => {
@@ -54,5 +54,35 @@ describe("parseRecipientImportText", () => {
     const result = parseRecipientImportText("");
     expect(result.rows).toEqual([]);
     expect(result.unparsedLines).toEqual([]);
+  });
+});
+
+// #288: spreadsheet exports, with a heading row and other columns.
+describe("parseRecipientImportText with a heading row", () => {
+  it("reads columns by their headings, in any order, ignoring the rest", () => {
+    const result = parseRecipientImportText(
+      "﻿Full Name,Phone,E-mail Address\n\"Smith, Jane\",555,jane@example.com\nBob,,bob@example.com\nNo email,1,\n",
+    );
+    expect(result.rows).toEqual([
+      { email: "jane@example.com", displayName: "Smith, Jane" },
+      { email: "bob@example.com", displayName: "Bob" },
+    ]);
+    expect(result.unparsedLines).toEqual(["No email,1,"]);
+  });
+
+  it("reads a tab-separated paste from a spreadsheet", () => {
+    const result = parseRecipientImportText("Email\tName\na@example.com\tAlice");
+    expect(result.rows).toEqual([{ email: "a@example.com", displayName: "Alice" }]);
+  });
+
+  it("keeps a quoted name with a comma whole without a heading row too", () => {
+    const result = parseRecipientImportText('"Smith, Jane",jane@example.com');
+    expect(result.rows).toEqual([{ email: "jane@example.com", displayName: "Smith, Jane" }]);
+  });
+});
+
+describe("splitCells", () => {
+  it("splits on commas, semicolons and tabs, honouring quotes", () => {
+    expect(splitCells('a, "b, c";d\t"say ""hi"""')).toEqual(["a", "b, c", "d", 'say "hi"']);
   });
 });
