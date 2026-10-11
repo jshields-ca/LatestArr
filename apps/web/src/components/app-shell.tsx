@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { BookOpen, Bug, Globe, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
+import { BookOpen, Bug, Globe, Heart, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
@@ -35,6 +35,7 @@ const LICENSE_URL = "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE"
 const SITE_URL = "https://www.latestarr.app";
 const DOCS_URL = "https://www.latestarr.app/docs";
 const DISCUSSIONS_URL = "https://github.com/jshields-ca/LatestArr/discussions";
+const SPONSOR_URL = "https://github.com/sponsors/jshields-ca";
 const MAINTAINER_URL = "https://www.jeremyshields.ca";
 
 // -m-1.5 p-1.5 grows the tap target to 28px without moving the icon.
@@ -78,6 +79,16 @@ function StarPopoverContent() {
           Star on GitHub
         </a>
       </Button>
+      {/* A quiet second option for anyone who opened this to support the
+          project (#266); never shown unprompted. */}
+      <a
+        href={SPONSOR_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        You can also sponsor development
+      </a>
     </div>
   );
 }
@@ -165,6 +176,8 @@ function AppFooter() {
     { href: SITE_URL, icon: Globe, label: "LatestArr.app" },
     { href: DOCS_URL, icon: BookOpen, label: "Docs" },
     { href: DISCUSSIONS_URL, icon: MessagesSquare, label: "Discussions" },
+    // A link, never a prompt (#266).
+    { href: SPONSOR_URL, icon: Heart, label: "Sponsor" },
     { href: `${REPO_URL}/issues`, icon: Bug, label: "Report an issue" },
     { href: LICENSE_URL, icon: Scale, label: "GPLv3 license" },
   ];

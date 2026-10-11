@@ -73,6 +73,11 @@ describe("AppShell", () => {
     expect(await screen.findByText(/Enjoying LatestArr/)).toBeInTheDocument();
     const starLink = screen.getByRole("link", { name: /Star on GitHub/ });
     expect(starLink).toHaveAttribute("href", "https://github.com/jshields-ca/LatestArr");
+    // #266: a quiet sponsor line, only here and in the footer.
+    expect(screen.getByRole("link", { name: "You can also sponsor development" })).toHaveAttribute(
+      "href",
+      "https://github.com/sponsors/jshields-ca",
+    );
   });
 
   it("shows the project's links in the page footer without needing a click", async () => {
@@ -87,6 +92,9 @@ describe("AppShell", () => {
       "href",
       "https://github.com/jshields-ca/LatestArr/discussions",
     );
+    const sponsor = footer.getByRole("link", { name: /Sponsor/ });
+    expect(sponsor).toHaveAttribute("href", "https://github.com/sponsors/jshields-ca");
+    expect(sponsor).toHaveAttribute("target", "_blank");
     expect(footer.getByRole("link", { name: /Report an issue/ })).toHaveAttribute(
       "href",
       "https://github.com/jshields-ca/LatestArr/issues",
