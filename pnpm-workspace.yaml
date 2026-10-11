@@ -2,3 +2,9 @@ packages:
   - "apps/*"
   - "packages/*"
   - "packages/adapters/*"
+
+# turbo starts several `pnpm run` at once, and pnpm's check that
+# node_modules is up to date reads a state file another run may be writing
+# ("Unexpected end of JSON input", seen in the Docker build). CI and the
+# image always install from the frozen lockfile first, so it isn't needed.
+verifyDepsBeforeRun: false
