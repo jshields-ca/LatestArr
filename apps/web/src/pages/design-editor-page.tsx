@@ -45,6 +45,7 @@ import {
   withDesignDefaults,
 } from "@/lib/design";
 import { EMAIL_FONT_OPTIONS } from "@/lib/email-fonts";
+import { useSaveShortcut, useUnsavedChanges } from "@/lib/unsaved-changes";
 import { cn } from "@/lib/utils";
 
 // CodeMirror is only needed for code designs, so it loads on demand.
@@ -447,12 +448,9 @@ export function DesignEditorPage() {
     return () => clearTimeout(timer);
   }, [settings, previewSource, mode, code]);
 
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  useUnsavedChanges(dirty);
+  const canSave = canEdit && dirty && !saving && Boolean(name.trim()) && ctasComplete && logoReady;
+  useSaveShortcut(() => void handleSave(), canSave);
 
   function update(change: (current: DesignSettings) => DesignSettings) {
     setSettings((current) => (current ? change(current) : current));
@@ -671,7 +669,7 @@ export function DesignEditorPage() {
                 Edit as code
               </Button>
             ) : null}
-            <Button onClick={() => void handleSave()} disabled={saving || !dirty || !name.trim() || !ctasComplete || !logoReady}>
+            <Button onClick={() => void handleSave()} disabled={!canSave}>
               {saving ? <Loader2 className="animate-spin" /> : <Save />}
               Save
             </Button>

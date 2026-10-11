@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveActions } from "@/components/ui/save-actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
@@ -65,6 +66,7 @@ import {
   simpleScheduleToCron,
   type SimpleSchedule,
 } from "@/lib/schedule";
+import { confirmDiscard, saveShortcutRef, useSavedSnapshot, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 function AddNewsletterDialog({
   smtpProfiles,
@@ -109,6 +111,11 @@ function AddNewsletterDialog({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    const lookbackError = lookbackProblem(lookbackDays);
+    if (lookbackError) {
+      setError(lookbackError);
+      return;
+    }
     setSubmitting(true);
     try {
       const scheduleCron = scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron;
@@ -475,6 +482,13 @@ function LinkedGroups({
   );
 }
 
+// The lookback has to be a whole number of days, at least one.
+function lookbackProblem(value: string): string | null {
+  const days = Number(value);
+  if (value.trim() === "" || !Number.isInteger(days) || days < 1) return "Enter a whole number of days, 1 or more.";
+  return null;
+}
+
 type SaveState = { status: "idle" | "saving" | "saved" } | { status: "error"; message: string };
 
 // Every field in the Content panel saves on its own and reports it the same
@@ -616,22 +630,30 @@ function NewsletterDetailsForm({
 
   const idPrefix = `newsletter-${newsletter.id}`;
 
+  function currentInput() {
+    return {
+      name,
+      scheduleCron: scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron,
+      timezone,
+      lookbackDays: Number(lookbackDays),
+      subjectTemplate: subjectTemplate || undefined,
+      smtpProfileId: smtpProfileId || null,
+      skipWhenEmpty,
+    };
+  }
+  const { dirty, markSaved } = useSavedSnapshot(currentInput());
+  useUnsavedChanges(dirty);
+  const lookbackError = lookbackProblem(lookbackDays);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    if (lookbackError) return;
     setSubmitting(true);
     try {
-      const scheduleCron = scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron;
-      const { newsletter: updated } = await updateNewsletter(newsletter.id, {
-        name,
-        scheduleCron,
-        timezone,
-        lookbackDays: Number(lookbackDays),
-        subjectTemplate: subjectTemplate || undefined,
-        smtpProfileId: smtpProfileId || null,
-        skipWhenEmpty,
-      });
+      const { newsletter: updated } = await updateNewsletter(newsletter.id, currentInput());
       onSaved(updated);
+      markSaved();
       toast({ variant: "success", title: "Newsletter updated" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -641,7 +663,7 @@ function NewsletterDetailsForm({
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+    <form ref={saveShortcutRef} className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${idPrefix}-name`}>Name</Label>
         <Input
@@ -681,11 +703,19 @@ function NewsletterDetailsForm({
                 id={`${idPrefix}-lookback`}
                 type="number"
                 min={1}
+                step={1}
                 required
                 value={lookbackDays}
                 onChange={(e) => setLookbackDays(e.target.value)}
                 disabled={submitting}
+                aria-invalid={lookbackError ? true : undefined}
+                aria-describedby={lookbackError ? `${idPrefix}-lookback-error` : undefined}
               />
+              {lookbackError ? (
+                <p id={`${idPrefix}-lookback-error`} className="text-xs text-destructive">
+                  {lookbackError}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${idPrefix}-smtp`}>SMTP profile</Label>
@@ -740,12 +770,7 @@ function NewsletterDetailsForm({
         </p>
       ) : null}
 
-      <div>
-        <Button type="submit" disabled={submitting}>
-          {submitting ? <Loader2 className="animate-spin" /> : null}
-          Save changes
-        </Button>
-      </div>
+      <SaveActions dirty={dirty} saving={submitting} disabled={lookbackError !== null} align="start" />
     </form>
   );
 }
@@ -1031,7 +1056,7 @@ function NewsletterCard({
           <span className="text-xs text-muted-foreground">{newsletter.lookbackDays}-day lookback</span>
         </span>
       }
-      expand={{ expanded, onToggle: () => setExpanded((e) => !e) }}
+      expand={{ expanded, onToggle: () => (expanded && !confirmDiscard() ? undefined : setExpanded((e) => !e)) }}
       actions={
         <>
           {/* Folded into the header row instead of a standalone full-width

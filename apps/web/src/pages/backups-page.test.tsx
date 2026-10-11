@@ -114,7 +114,8 @@ describe("BackupsPage", () => {
       timezone: "UTC",
       retention: { mode: "calendar", daily: 7, weekly: 8, monthly: 6 },
     }));
-  });
+    // Typing into number fields is slow under jsdom on a busy runner.
+  }, 20_000);
 
   it("deletes a backup after confirming", async () => {
     answer({

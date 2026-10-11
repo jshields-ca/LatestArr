@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { BookOpen, Bug, Globe, Loader2, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
+import { BookOpen, Bug, Globe, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveActions } from "@/components/ui/save-actions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { ApiError, getVersion, updateCurrentUser } from "@/lib/api";
 import { navItems } from "@/lib/nav-items";
 import { hasRole, ROLE_LABELS } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { confirmDiscard, guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const REPO_URL = "https://github.com/jshields-ca/LatestArr";
 const LICENSE_URL = "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE";
@@ -247,8 +249,11 @@ function EditProfileDialog() {
     }
   }
 
+  const dirty = displayName !== (user?.displayName ?? "") || currentPassword !== "" || newPassword !== "";
+  useUnsavedChanges(open && dirty);
+
   return (
-    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+    <Dialog open={open} onOpenChange={guardClose(dirty, openWithCurrentValues)}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" aria-label="Edit profile" title="Edit profile">
           <Pencil />
@@ -259,7 +264,7 @@ function EditProfileDialog() {
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>Update your display name or change your password.</DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} ref={saveShortcutRef} noValidate>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="profile-display-name">Display name</Label>
             <Input
@@ -298,10 +303,7 @@ function EditProfileDialog() {
           ) : null}
 
           <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              Save changes
-            </Button>
+            <SaveActions dirty={dirty} saving={submitting} />
           </DialogFooter>
         </form>
       </DialogContent>
@@ -364,7 +366,13 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           key={to}
           to={to}
           end={to === "/"}
-          onClick={onNavigate}
+          onClick={(event) => {
+            if (!confirmDiscard()) {
+              event.preventDefault();
+              return;
+            }
+            onNavigate?.();
+          }}
           className={({ isActive }) =>
             cn(
               "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200",

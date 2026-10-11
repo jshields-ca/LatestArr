@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SaveActions } from "@/components/ui/save-actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -45,6 +46,7 @@ import {
 import { parseRecipientImportText } from "@/lib/recipient-import";
 import { compareText, matchesSearch } from "@/lib/text";
 import { cn } from "@/lib/utils";
+import { guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 // The edit panel and the Groups section both show group membership. The
 // panel reports its changes here so the section updates without a page
@@ -332,10 +334,9 @@ function ImportRecipientsDialog({ onImported }: { onImported: (recipients: Recip
 // (add-via-dropdown, remove-via-chip), plus an inline "create a new group"
 // shortcut — so adding someone to a (possibly brand-new) group doesn't
 // require leaving the Edit dialog to visit the Groups section separately.
-// Every button here needs an explicit type="button": this renders inside
-// EditRecipientDialog's <form>, whose submit already does something else
-// (save email/name), and a native <button> with no type defaults to
-// type="submit" inside a form.
+// Each change here saves straight away (#295), unlike the name and email
+// above it, which wait for Save details. Buttons keep an explicit
+// type="button" in case this ends up inside a form again.
 function RecipientGroupsField({ recipientId }: { recipientId: string }) {
   const [allGroups, setAllGroups] = useState<RecipientGroup[] | null>(null);
   const [memberGroups, setMemberGroups] = useState<RecipientGroup[] | null>(null);
@@ -443,7 +444,10 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Label>Groups</Label>
+      <div className="flex flex-col gap-0.5">
+        <Label>Groups</Label>
+        <p className="text-xs text-muted-foreground">Changes to groups save straight away.</p>
+      </div>
       {memberGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">Not in any groups yet.</p>
       ) : (
@@ -550,7 +554,6 @@ function EditRecipientDialog({
         displayName: displayName || undefined,
       });
       onSaved(updated);
-      setOpen(false);
       toast({ variant: "success", title: "Recipient updated" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
@@ -559,8 +562,13 @@ function EditRecipientDialog({
     }
   }
 
+  // Name and email are saved with Save details; groups save as they change.
+  const dirty = email !== recipient.email || displayName !== (recipient.displayName ?? "");
+  useUnsavedChanges(open && dirty);
+  const changeOpen = guardClose(dirty, openWithCurrentValues);
+
   return (
-    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+    <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" aria-label={`Edit ${recipient.email}`}>
           <Pencil />
@@ -571,7 +579,7 @@ function EditRecipientDialog({
           <DialogTitle>Edit recipient</DialogTitle>
           <DialogDescription>Update their details and manage which groups they belong to.</DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} ref={saveShortcutRef} noValidate>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="edit-recipient-email">Email</Label>
             <Input
@@ -593,21 +601,24 @@ function EditRecipientDialog({
             />
           </div>
 
-          <RecipientGroupsField recipientId={recipient.id} />
-
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>
           ) : null}
 
-          <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              Save changes
-            </Button>
-          </DialogFooter>
+          <SaveActions dirty={dirty} saving={submitting} label="Save details" />
         </form>
+
+        <div className="border-t border-border pt-4">
+          <RecipientGroupsField recipientId={recipient.id} />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => changeOpen(false)}>
+            Done
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1066,8 +1077,11 @@ function EditGroupDialog({
     }
   }
 
+  const dirty = name !== group.name || description !== (group.description ?? "");
+  useUnsavedChanges(open && dirty);
+
   return (
-    <Dialog open={open} onOpenChange={openWithCurrentValues}>
+    <Dialog open={open} onOpenChange={guardClose(dirty, openWithCurrentValues)}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" aria-label={`Edit ${group.name}`}>
           <Pencil />
@@ -1078,7 +1092,7 @@ function EditGroupDialog({
           <DialogTitle>Edit group</DialogTitle>
           <DialogDescription>Update this group's name or description.</DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} ref={saveShortcutRef} noValidate>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="edit-group-name">Name</Label>
             <Input
@@ -1106,10 +1120,7 @@ function EditGroupDialog({
           ) : null}
 
           <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              Save changes
-            </Button>
+            <SaveActions dirty={dirty} saving={submitting} />
           </DialogFooter>
         </form>
       </DialogContent>

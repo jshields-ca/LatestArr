@@ -100,6 +100,20 @@ describe("POST /newsletters", () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it("says plainly what's wrong with a lookback under a day or not whole", async () => {
+    for (const lookbackDays of [0, 1.5]) {
+      const response = await app.inject(
+        authed({
+          method: "POST",
+          url: "/api/newsletters",
+          payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1", lookbackDays },
+        }),
+      );
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toBe("Lookback must be a whole number of days, 1 or more.");
+    }
+  });
+
   it("creates a newsletter with defaults applied", async () => {
     const response = await app.inject(
       authed({

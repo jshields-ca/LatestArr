@@ -825,9 +825,12 @@ describe("NewslettersPage", () => {
       fetchMock.mockResolvedValueOnce(
         jsonResponse(200, { newsletter: { ...weeklyDigest, scheduleCron: "30 10 * * *" } }),
       );
+      // Enabled only once something has changed (#295), and disabled again once saved.
+      expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
       const saveButton = screen.getByRole("button", { name: "Save changes" });
       await user.click(saveButton);
-      await waitFor(() => expect(saveButton).not.toBeDisabled());
+      await waitFor(() => expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument());
+      expect(saveButton).toBeDisabled();
 
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(init.method).toBe("PATCH");
@@ -860,9 +863,12 @@ describe("NewslettersPage", () => {
       await user.click(toggle);
 
       fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, skipWhenEmpty: true } }));
+      // Enabled only once something has changed (#295), and disabled again once saved.
+      expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
       const saveButton = screen.getByRole("button", { name: "Save changes" });
       await user.click(saveButton);
-      await waitFor(() => expect(saveButton).not.toBeDisabled());
+      await waitFor(() => expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument());
+      expect(saveButton).toBeDisabled();
 
       const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
       expect(JSON.parse(init.body as string)).toMatchObject({ skipWhenEmpty: true });
