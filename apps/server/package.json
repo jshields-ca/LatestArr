@@ -25,7 +25,7 @@
     "@latestarr/adapter-tautulli": "workspace:*",
     "@latestarr/crypto": "workspace:*",
     "@latestarr/db": "workspace:*",
-    "@node-rs/argon2": "^2.0.0",
+    "@node-rs/argon2": "^2.2.2",
     "croner": "^10.0.1",
     "drizzle-orm": "^0.45.3",
     "fastify": "^5.12.5",
@@ -33,9 +33,9 @@
     "html-to-text": "^10.0.1",
     "markdown-it": "^15.0.2",
     "mjml": "^5.4.1",
-    "nodemailer": "^10.0.12",
+    "nodemailer": "^10.0.15",
     "openid-client": "^6.1.0",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "sharp": "^0.35.5",
     "zod": "^4.6.5"
   },
@@ -43,11 +43,11 @@
     "@latestarr/config": "workspace:*",
     "@types/html-to-text": "^9.0.4",
     "@types/mjml": "^5.0.0",
-    "@types/node": "^24.19.0",
+    "@types/node": "^24.19.1",
     "@types/nodemailer": "^8.0.2",
-    "eslint": "^10.10.0",
+    "eslint": "^10.12.0",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.3"
   }
 }
