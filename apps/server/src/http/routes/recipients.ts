@@ -3,7 +3,13 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
-import { applyRecipientImport, planRecipientImport } from "./recipient-import.js";
+import {
+  applyRecipientImport,
+  ImportNotUndoableError,
+  latestImport,
+  planRecipientImport,
+  undoRecipientImport,
+} from "./recipient-import.js";
 import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
@@ -77,7 +83,11 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         return reply.send({ plan: planRecipientImport(db, body.rows) });
       }
 
-      const { plan, created, updated, createdGroups, membershipsAdded } = applyRecipientImport(db, body.rows);
+      const { plan, created, updated, createdGroups, membershipsAdded, importId } = applyRecipientImport(
+        db,
+        body.rows,
+        request.sessionUser?.id ?? null,
+      );
       request.log.info(
         {
           created: created.length,
@@ -93,7 +103,28 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
       );
       return reply
         .code(201)
-        .send({ created, updated, unchanged: plan.unchanged, skipped: plan.skipped, createdGroups, membershipsAdded });
+        .send({ created, updated, unchanged: plan.unchanged, skipped: plan.skipped, createdGroups, membershipsAdded, importId });
+    });
+
+    // The latest import, and whether it can still be undone (#288).
+    scope.get("/recipients/imports/latest", async (_request, reply) => {
+      return reply.send({ import: latestImport(db) });
+    });
+
+    scope.post<{ Params: IdParams }>("/recipients/imports/:id/undo", async (request, reply) => {
+      try {
+        const result = undoRecipientImport(db, request.params.id);
+        request.log.info(
+          { importId: request.params.id, ...result.undone, skipped: result.skipped.length },
+          `Undid the last recipient import: ${result.undone.removed} removed, ${result.undone.renamed} renamed back, ` +
+            `${result.undone.leftGroups} group memberships and ${result.undone.removedGroups} groups removed` +
+            (result.skipped.length ? ` (${result.skipped.length} kept because they changed since)` : ""),
+        );
+        return reply.send(result);
+      } catch (err) {
+        if (err instanceof ImportNotUndoableError) return reply.code(409).send({ error: err.message });
+        throw err;
+      }
     });
 
     scope.get("/recipients", async (_request, reply) => {

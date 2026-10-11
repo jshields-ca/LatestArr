@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, runMigrations, type Db } from "@latestarr/db";
+import { createDb, recipientImports, runMigrations, type Db } from "@latestarr/db";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../app.js";
@@ -181,6 +181,59 @@ describe("POST /recipients/import", () => {
     expect(await members(other.id)).toEqual(["ann@example.com"]);
     const bookClub = groups.find((g: { name: string }) => g.name === "Book club");
     expect(await members(bookClub.id)).toEqual(["bo@example.com", "cy@example.com"]);
+  });
+
+  // #288 part 3: Undo reverses exactly what the latest import did.
+  it("undoes the latest import, keeping anything changed since", async () => {
+    const post = (url: string, payload: unknown) => app.inject(authed({ method: "POST", url, payload }));
+    const kept = (await post("/api/recipients", { email: "kept@example.com", displayName: "Kept" })).json().recipient;
+    const renamed = (await post("/api/recipients", { email: "ren@example.com", displayName: "Old name" })).json().recipient;
+
+    const imported = await post("/api/recipients/import", {
+      rows: [
+        { email: "new1@example.com", groups: ["Club"] },
+        { email: "new2@example.com" },
+        { email: "ren@example.com", displayName: "New name", groups: ["Club"] },
+        { email: "kept@example.com", groups: ["Club"] },
+      ],
+    });
+    const { importId, created } = imported.json();
+    const latest = (await app.inject(authed({ method: "GET", url: "/api/recipients/imports/latest" }))).json().import;
+    expect(latest).toMatchObject({ id: importId, canUndo: true, counts: { created: 2, renamed: 1, joined: 3, createdGroups: 1 } });
+
+    // Edited since: new2 is kept rather than removed.
+    const new2 = created.find((r: { email: string }) => r.email === "new2@example.com");
+    await app.inject(authed({ method: "PATCH", url: `/api/recipients/${new2.id}`, payload: { displayName: "Someone" } }));
+
+    const undo = await post(`/api/recipients/imports/${importId}/undo`, {});
+    expect(undo.statusCode).toBe(200);
+    expect(undo.json()).toEqual({
+      undone: { removed: 1, renamed: 1, leftGroups: 3, removedGroups: 1 },
+      skipped: [{ item: "new2@example.com", reason: "Changed since the import, so kept" }],
+    });
+
+    const list = (await app.inject(authed({ method: "GET", url: "/api/recipients" }))).json().recipients;
+    expect(list.map((r: { email: string }) => r.email).sort()).toEqual(["kept@example.com", "new2@example.com", "ren@example.com"]);
+    expect(list.find((r: { id: string }) => r.id === renamed.id).displayName).toBe("Old name");
+    expect(list.find((r: { id: string }) => r.id === kept.id).displayName).toBe("Kept");
+    expect((await app.inject(authed({ method: "GET", url: "/api/recipient-groups" }))).json().groups).toEqual([]);
+
+    // Once only.
+    expect((await post(`/api/recipients/imports/${importId}/undo`, {})).statusCode).toBe(409);
+    const after = (await app.inject(authed({ method: "GET", url: "/api/recipients/imports/latest" }))).json().import;
+    expect(after.canUndo).toBe(false);
+  });
+
+  it("only offers Undo for the latest import, within a day", async () => {
+    const post = (url: string, payload: unknown) => app.inject(authed({ method: "POST", url, payload }));
+    const first = (await post("/api/recipients/import", { rows: [{ email: "a@example.com" }] })).json().importId;
+    const second = (await post("/api/recipients/import", { rows: [{ email: "b@example.com" }] })).json().importId;
+    expect((await post(`/api/recipients/imports/${first}/undo`, {})).statusCode).toBe(409);
+
+    await db.update(recipientImports).set({ createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000) });
+    const latest = (await app.inject(authed({ method: "GET", url: "/api/recipients/imports/latest" }))).json().import;
+    expect(latest).toMatchObject({ id: second, canUndo: false });
+    expect((await post(`/api/recipients/imports/${second}/undo`, {})).statusCode).toBe(409);
   });
 
   it("rejects an empty rows array", async () => {
