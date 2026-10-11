@@ -312,14 +312,38 @@ export function deleteRecipient(id: string): Promise<void> {
   return apiFetch<void>(`/recipients/${id}`, { method: "DELETE" });
 }
 
-export interface RecipientImportResult {
-  created: Recipient[];
-  skipped: { email: string; displayName?: string; reason: string }[];
+export interface RecipientImportSkip {
+  email: string;
+  displayName?: string;
+  reason: string;
 }
 
-export function importRecipients(
-  rows: { email: string; displayName?: string }[],
-): Promise<RecipientImportResult> {
+/** What an import would do (#288), from a dry run. */
+export interface RecipientImportPlan {
+  create: { email: string; displayName?: string }[];
+  /** Existing recipients whose name the file changes. */
+  update: { id: string; email: string; displayName: string; previousName: string | null }[];
+  unchanged: { email: string }[];
+  skipped: RecipientImportSkip[];
+}
+
+export interface RecipientImportResult {
+  created: Recipient[];
+  updated: Recipient[];
+  unchanged: { email: string }[];
+  skipped: RecipientImportSkip[];
+}
+
+type ImportRows = { email: string; displayName?: string }[];
+
+export function previewRecipientImport(rows: ImportRows): Promise<{ plan: RecipientImportPlan }> {
+  return apiFetch<{ plan: RecipientImportPlan }>("/recipients/import", {
+    method: "POST",
+    body: JSON.stringify({ rows, dryRun: true }),
+  });
+}
+
+export function importRecipients(rows: ImportRows): Promise<RecipientImportResult> {
   return apiFetch<RecipientImportResult>("/recipients/import", {
     method: "POST",
     body: JSON.stringify({ rows }),

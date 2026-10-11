@@ -31,12 +31,60 @@ function stripQuotes(value: string): string {
   return value.trim().replace(/^["']|["']$/g, "").trim();
 }
 
-function isLikelyHeaderRow(line: string): boolean {
-  const normalized = line.toLowerCase().replace(/["']/g, "").trim();
-  return (
-    /^(email|e-mail)\s*[,;]\s*(name|display ?name)$/.test(normalized) ||
-    /^(name|display ?name)\s*[,;]\s*(email|e-mail)$/.test(normalized)
-  );
+// Splits one line into cells on commas, semicolons or tabs (a paste from a
+// spreadsheet), keeping a quoted cell whole: "Smith, Jane" is one name.
+// "" inside quotes is a literal quote.
+export function splitCells(line: string): string[] {
+  const cells: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]!;
+    if (quoted) {
+      if (char === '"' && line[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+    } else if (char === '"' && cell.trim() === "") {
+      quoted = true;
+      cell = "";
+    } else if (char === "," || char === ";" || char === "\t") {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+// The column headings an import understands (#288), ignoring case, spaces,
+// dashes and underscores. Other columns are ignored.
+export const EMAIL_HEADERS = ["Email", "E-mail", "Email address"];
+export const NAME_HEADERS = ["Name", "Full name", "Display name"];
+const normalizeHeader = (value: string) => value.toLowerCase().replace(/[\s_-]+/g, "");
+const EMAIL_KEYS = new Set([...EMAIL_HEADERS, "Mail"].map(normalizeHeader));
+const NAME_KEYS = new Set(NAME_HEADERS.map(normalizeHeader));
+
+interface HeaderColumns {
+  email: number;
+  name: number | null;
+}
+
+// A first line naming an email column (and maybe a name column) is a
+// heading row, and the lines after it are read by those columns.
+function headerColumns(line: string): HeaderColumns | null {
+  const keys = splitCells(line).map((cell) => normalizeHeader(stripQuotes(cell)));
+  if (keys.some((key) => key.includes("@"))) return null;
+  const email = keys.findIndex((key) => EMAIL_KEYS.has(key));
+  if (email < 0) return null;
+  const name = keys.findIndex((key) => NAME_KEYS.has(key));
+  return { email, name: name < 0 ? null : name };
 }
 
 function parseLine(trimmed: string): ParsedRecipientRow[] | null {
@@ -48,8 +96,7 @@ function parseLine(trimmed: string): ParsedRecipientRow[] | null {
     return [{ email, displayName }];
   }
 
-  const parts = trimmed
-    .split(/[,;]/)
+  const parts = splitCells(trimmed)
     .map((part) => stripQuotes(part))
     .filter(Boolean);
 
@@ -79,11 +126,26 @@ export function parseRecipientImportText(text: string): ParseRecipientImportResu
   const rows: ParsedRecipientRow[] = [];
   const unparsedLines: string[] = [];
 
-  const lines = text.split(/\r?\n/);
+  // A spreadsheet's CSV export can start with a byte-order mark.
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
+  const firstLine = lines.findIndex((line) => line.trim());
+  const columns = firstLine >= 0 ? headerColumns(lines[firstLine]!) : null;
+
   lines.forEach((rawLine, index) => {
     const trimmed = rawLine.trim();
     if (!trimmed) return;
-    if (index === 0 && isLikelyHeaderRow(trimmed)) return;
+    if (columns) {
+      if (index === firstLine) return;
+      const cells = splitCells(trimmed);
+      const email = stripQuotes(cells[columns.email] ?? "");
+      if (!looksLikeEmail(email)) {
+        unparsedLines.push(trimmed);
+        return;
+      }
+      const displayName = columns.name === null ? "" : stripQuotes(cells[columns.name] ?? "");
+      rows.push(displayName ? { email, displayName } : { email });
+      return;
+    }
 
     const parsed = parseLine(trimmed);
     if (parsed === null) {

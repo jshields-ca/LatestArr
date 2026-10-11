@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
+import { applyRecipientImport, planRecipientImport } from "./recipient-import.js";
 import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { parseBody } from "../validate.js";
@@ -34,6 +35,7 @@ const bulkImportSchema = z.object({
     )
     .min(1)
     .max(1000),
+  dryRun: z.boolean().optional(),
 });
 
 interface IdParams {
@@ -61,52 +63,25 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
       }
     });
 
-    // Processes rows one at a time (rather than a single multi-row insert)
-    // so one bad or duplicate row doesn't fail the whole import — the point
-    // of a bulk-import endpoint is tolerating a messy paste/CSV, not
-    // requiring it to be perfectly clean up front.
+    // A messy paste or CSV is fine: bad and duplicate rows are skipped with
+    // a reason rather than failing the import (recipient-import.ts). With
+    // dryRun, says what the import would do without changing anything
+    // (#288); the web app shows that before the user confirms.
     scope.post("/recipients/import", async (request, reply) => {
       const body = parseBody(bulkImportSchema, request.body, reply);
       if (!body) return reply;
 
-      const created: (typeof recipients.$inferSelect)[] = [];
-      const skipped: { email: string; displayName?: string; reason: string }[] = [];
-      const seenEmails = new Set<string>();
-
-      for (const row of body.rows) {
-        const emailResult = z.email().safeParse(row.email);
-        if (!emailResult.success) {
-          skipped.push({ email: row.email, displayName: row.displayName, reason: "Invalid email address" });
-          continue;
-        }
-        const normalizedEmail = emailResult.data.toLowerCase();
-        if (seenEmails.has(normalizedEmail)) {
-          skipped.push({ email: row.email, displayName: row.displayName, reason: "Duplicate in this import" });
-          continue;
-        }
-        seenEmails.add(normalizedEmail);
-
-        try {
-          const [recipient] = await db
-            .insert(recipients)
-            .values({ email: emailResult.data, displayName: row.displayName })
-            .returning();
-          created.push(recipient!);
-        } catch (err) {
-          if (isUniqueConstraintError(err)) {
-            skipped.push({ email: row.email, displayName: row.displayName, reason: "Already exists" });
-          } else {
-            throw err;
-          }
-        }
+      if (body.dryRun) {
+        return reply.send({ plan: planRecipientImport(db, body.rows) });
       }
 
+      const { plan, created, updated } = applyRecipientImport(db, body.rows);
       request.log.info(
-        { created: created.length, skipped: skipped.length },
-        `Imported ${created.length} recipient${created.length === 1 ? "" : "s"}` +
-          (skipped.length ? ` (${skipped.length} skipped)` : ""),
+        { created: created.length, updated: updated.length, unchanged: plan.unchanged.length, skipped: plan.skipped.length },
+        `Imported recipients: ${created.length} added, ${updated.length} renamed` +
+          (plan.skipped.length ? `, ${plan.skipped.length} skipped` : ""),
       );
-      return reply.code(201).send({ created, skipped });
+      return reply.code(201).send({ created, updated, unchanged: plan.unchanged, skipped: plan.skipped });
     });
 
     scope.get("/recipients", async (_request, reply) => {
