@@ -114,6 +114,19 @@ describe("POST /newsletters", () => {
     }
   });
 
+  // #267: a typo in a subject variable is refused, not sent.
+  it("refuses a subject with a variable that doesn't exist", async () => {
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/newsletters",
+        payload: { name: "Weekly Digest", scheduleCron: "0 9 * * 1", subjectTemplate: "The latest from {dat}" },
+      }),
+    );
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toMatch(/^{dat} isn't a variable. Use {newsletter}, {date}/);
+  });
+
   it("creates a newsletter with defaults applied", async () => {
     const response = await app.inject(
       authed({

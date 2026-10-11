@@ -9,6 +9,7 @@ import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { ListRow } from "@/components/list-row";
 import { SendRunHistoryList } from "@/components/send-run-history";
 import { SourceLogo } from "@/components/source-logo";
+import { SubjectField } from "@/components/subject-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,7 @@ import {
   simpleScheduleToCron,
   type SimpleSchedule,
 } from "@/lib/schedule";
+import { subjectProblem } from "@/lib/subject";
 import { confirmDiscard, saveShortcutRef, useSavedSnapshot, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 function AddNewsletterDialog({
@@ -114,6 +116,11 @@ function AddNewsletterDialog({
     const lookbackError = lookbackProblem(lookbackDays);
     if (lookbackError) {
       setError(lookbackError);
+      return;
+    }
+    const subjectError = subjectProblem(subjectTemplate);
+    if (subjectError) {
+      setError(subjectError);
       return;
     }
     setSubmitting(true);
@@ -232,16 +239,15 @@ function AddNewsletterDialog({
               </Select>
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="newsletter-subject">Subject template (optional)</Label>
-            <Input
-              id="newsletter-subject"
-              placeholder="What's new this week"
-              value={subjectTemplate}
-              onChange={(e) => setSubjectTemplate(e.target.value)}
-              disabled={submitting}
-            />
-          </div>
+          <SubjectField
+            id="newsletter-subject"
+            value={subjectTemplate}
+            onChange={setSubjectTemplate}
+            disabled={submitting}
+            newsletterName={name}
+            timeZone={timezone}
+            lookbackDays={Number(lookbackDays)}
+          />
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
@@ -636,7 +642,7 @@ function NewsletterDetailsForm({
       scheduleCron: scheduleMode === "simple" ? simpleScheduleToCron(simpleSchedule) : advancedCron,
       timezone,
       lookbackDays: Number(lookbackDays),
-      subjectTemplate: subjectTemplate || undefined,
+      subjectTemplate,
       smtpProfileId: smtpProfileId || null,
       skipWhenEmpty,
     };
@@ -644,11 +650,12 @@ function NewsletterDetailsForm({
   const { dirty, markSaved } = useSavedSnapshot(currentInput());
   useUnsavedChanges(dirty);
   const lookbackError = lookbackProblem(lookbackDays);
+  const subjectError = subjectProblem(subjectTemplate);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
-    if (lookbackError) return;
+    if (lookbackError || subjectError) return;
     setSubmitting(true);
     try {
       const { newsletter: updated } = await updateNewsletter(newsletter.id, currentInput());
@@ -734,16 +741,15 @@ function NewsletterDetailsForm({
               </Select>
             </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${idPrefix}-subject`}>Subject template (optional)</Label>
-            <Input
-              id={`${idPrefix}-subject`}
-              placeholder="What's new this week"
-              value={subjectTemplate}
-              onChange={(e) => setSubjectTemplate(e.target.value)}
-              disabled={submitting}
-            />
-          </div>
+          <SubjectField
+            id={`${idPrefix}-subject`}
+            value={subjectTemplate}
+            onChange={setSubjectTemplate}
+            disabled={submitting}
+            newsletterName={name}
+            timeZone={timezone}
+            lookbackDays={Number(lookbackDays)}
+          />
           <div className="flex items-start gap-3">
             <Switch
               id={`${idPrefix}-skip-empty`}
@@ -770,7 +776,7 @@ function NewsletterDetailsForm({
         </p>
       ) : null}
 
-      <SaveActions dirty={dirty} saving={submitting} disabled={lookbackError !== null} align="start" />
+      <SaveActions dirty={dirty} saving={submitting} disabled={lookbackError !== null || subjectError !== null} align="start" />
     </form>
   );
 }

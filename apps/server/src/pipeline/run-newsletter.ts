@@ -40,6 +40,7 @@ import {
   parseDesignSettings,
 } from "../render/design.js";
 import { logger as defaultLogger, type Logger } from "../logger.js";
+import { renderSubject } from "../render/subject.js";
 import { resolveLogo } from "./design-logo.js";
 import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -344,6 +345,7 @@ async function renderNewsletterContent(
     sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
     sourceButtons: buildNewsletterSourceButtons(linkedSources),
     generatedAt,
+    timeZone: newsletter.timezone,
     lookbackDays: newsletter.lookbackDays,
     logo: logo.logo,
     ...designContentVariables(settings),
@@ -488,8 +490,15 @@ export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender
   return { credentials: smtpCredentialsFor(smtpProfile), from: `${fromName} <${fromEmail}>` };
 }
 
-function subjectFor(newsletter: Newsletter): string {
-  return newsletter.subjectTemplate || newsletter.name;
+// The subject for this issue, with its {variables} filled in (#267).
+function subjectFor(newsletter: Newsletter, items: NewItem[], generatedAt: Date): string {
+  return renderSubject(newsletter.subjectTemplate, {
+    newsletterName: newsletter.name,
+    generatedAt,
+    lookbackDays: newsletter.lookbackDays,
+    timeZone: newsletter.timezone,
+    items,
+  });
 }
 
 // A browser can't resolve cid: references, so the preview swaps each
@@ -520,11 +529,12 @@ export async function previewNewsletter(
   const log = (options.log ?? defaultLogger).child({ newsletterId });
   const newsletter = await loadNewsletter(db, newsletterId);
   try {
-    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log, options.design, {
+    const generatedAt = new Date();
+    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, generatedAt, log, options.design, {
       forPreview: true,
     });
     return {
-      subject: subjectFor(newsletter),
+      subject: subjectFor(newsletter, items, generatedAt),
       html: inlineAttachments(html, attachments),
       items: items.map((item) => ({ title: item.title, kind: item.kind })),
     };
@@ -546,11 +556,12 @@ export async function sendTestNewsletter(
   const newsletter = await loadNewsletter(db, newsletterId);
   const sender = await loadSender(db, newsletter);
   try {
-    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
+    const generatedAt = new Date();
+    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, generatedAt, log);
     const result = await sendEmail(sender.credentials, {
       from: sender.from,
       to,
-      subject: `[Test] ${subjectFor(newsletter)}`,
+      subject: `[Test] ${subjectFor(newsletter, items, generatedAt)}`,
       html,
       text,
       attachments,
@@ -593,8 +604,9 @@ async function executeRun(
   log.info(`Sending newsletter "${newsletter.name}"`);
 
   try {
-    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, new Date(), log);
-    const subject = subjectFor(newsletter);
+    const generatedAt = new Date();
+    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, generatedAt, log);
+    const subject = subjectFor(newsletter, items, generatedAt);
 
     // "Nothing new" means nothing added in the lookback window; a custom
     // template's empty-section fallback content doesn't count. Send now

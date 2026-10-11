@@ -320,6 +320,19 @@ describe("Send to the rest", () => {
   });
 });
 
+describe("subject variables (#267)", () => {
+  it("fills them in when sending, and records the subject as sent", async () => {
+    const { newsletterId } = await setUp("a@example.com");
+    await app.inject(
+      authed({ method: "PATCH", url: `/api/newsletters/${newsletterId}`, payload: { subjectTemplate: "{count} new in {newsletter}: {counts}" } }),
+    );
+    const runId = await partialSend(newsletterId, 1, 1);
+    expect(mockSendMail.mock.calls[0]![0].subject).toBe("1 new in Weekly Digest: 1 movie");
+    const [run] = await db.select().from(sendRuns).where(eq(sendRuns.id, runId));
+    expect(run!.subject).toBe("1 new in Weekly Digest: 1 movie");
+  });
+});
+
 describe("a design's logo", () => {
   it("is embedded in the email, and kept for Send to the rest", async () => {
     const { newsletterId } = await setUp("a@example.com", "b@example.com");
