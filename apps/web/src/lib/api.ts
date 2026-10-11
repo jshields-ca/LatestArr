@@ -58,6 +58,10 @@ export interface AuthUser {
   /** Signed in with a temporary password an admin set; a new one must be
    * chosen before using the app. */
   mustChangePassword?: boolean;
+  /** An SSO account is linked, so SSO signs in to this one (#317). */
+  ssoLinked?: boolean;
+  /** There's a password to sign in with, without SSO. */
+  hasPassword?: boolean;
 }
 
 export interface ManagedUser {
@@ -145,6 +149,16 @@ export function getVersion(): Promise<{ version: string }> {
 
 export function getCurrentUser(): Promise<{ user: AuthUser }> {
   return apiFetch<{ user: AuthUser }>("/auth/me");
+}
+
+// Starts linking SSO to the signed-in account: the browser then goes to
+// `url`, the identity provider, and comes back with ?sso=linked.
+export function startSsoLink(): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>("/auth/oidc/link", { method: "POST" });
+}
+
+export function unlinkSso(): Promise<void> {
+  return apiFetch<void>("/auth/me/sso", { method: "DELETE" });
 }
 
 export function updateCurrentUser(input: {

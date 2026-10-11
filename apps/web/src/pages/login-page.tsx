@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ApiError, getAuthProviders } from "@/lib/api";
 import { RECOVERY_DOCS_URL } from "@/lib/links";
+import { ssoMessage, takeSsoOutcome } from "@/lib/sso";
 
 interface LocationState {
   from?: { pathname: string };
@@ -31,6 +32,11 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Why an SSO sign-in came back here, if it did (#317).
+  const [ssoError] = useState(() => {
+    const outcome = takeSsoOutcome();
+    return outcome ? ssoMessage(outcome) : null;
+  });
 
   useEffect(() => {
     getAuthProviders()
@@ -79,6 +85,11 @@ export function LoginPage() {
           <CardDescription>Sign in to manage your newsletters.</CardDescription>
         </CardHeader>
         <CardContent>
+          {ssoError ? (
+            <p role="alert" className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+              {ssoError}
+            </p>
+          ) : null}
           <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Email</Label>

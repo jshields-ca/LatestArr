@@ -19,6 +19,7 @@ import {
   SESSION_COOKIE,
 } from "../../auth/session.js";
 import { parseBody } from "../validate.js";
+import { hasOidcIdentity } from "../../auth/oidc-user.js";
 
 export const MIN_PASSWORD_LENGTH = 12;
 
@@ -262,7 +263,11 @@ export function registerAuthRoutes(
       return reply.code(401).send({ error: "Not authenticated" });
     }
 
-    return reply.send({ user: sanitizeUser(user) });
+    // For the profile's SSO section (#317): whether SSO is linked, and
+    // whether there's a password to fall back on if it's unlinked.
+    return reply.send({
+      user: { ...sanitizeUser(user), ssoLinked: await hasOidcIdentity(db, user.id), hasPassword: Boolean(user.passwordHash) },
+    });
   });
 
   app.patch("/auth/me", async (request, reply) => {

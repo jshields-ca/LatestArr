@@ -24,6 +24,7 @@ vi.mock("openid-client", () => ({
 }));
 
 const { buildApp } = await import("../../app.js");
+const { createSession } = await import("../../auth/session.js");
 
 let dir: string;
 let db: Db;
@@ -69,9 +70,31 @@ function extractCookie(
   return undefined;
 }
 
+// Requests arrive on the address in OIDC_REDIRECT_URI unless a test says otherwise.
+const HOST = { host: "app.example.com" };
+const FLOW = "test-state.test-nonce.test-code-verifier";
+
+function callback(cookies: Record<string, string>) {
+  return app.inject({
+    method: "GET",
+    url: "/api/auth/oidc/callback?code=abc&state=test-state",
+    headers: HOST,
+    cookies,
+  });
+}
+
+async function signedInUser(overrides: { passwordHash?: string | null } = {}) {
+  const [user] = await db
+    .insert(users)
+    .values({ email: "existing@example.com", displayName: "Existing", passwordHash: "hash", ...overrides })
+    .returning();
+  const session = await createSession(db, user!.id);
+  return { user: user!, cookie: session.token };
+}
+
 describe("GET /auth/oidc/login", () => {
   it("redirects to the IdP with PKCE + state + nonce, and sets the flow cookie", async () => {
-    const response = await app.inject({ method: "GET", url: "/api/auth/oidc/login" });
+    const response = await app.inject({ method: "GET", url: "/api/auth/oidc/login", headers: HOST });
 
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe("https://idp.example.com/authorize?state=test-state");
@@ -89,28 +112,32 @@ describe("GET /auth/oidc/login", () => {
     );
 
     const flowCookie = extractCookie(response, "latestarr_oidc_flow");
-    expect(flowCookie).toBe("test-state.test-nonce.test-code-verifier");
+    expect(flowCookie).toBe(FLOW);
+  });
+
+  // #317: started on the LAN IP, the flow cookie would be set there while
+  // the provider sends the browser back to the public address.
+  it("moves a sign-in started on another address to the callback's address first", async () => {
+    const response = await app.inject({ method: "GET", url: "/api/auth/oidc/login", headers: { host: "10.0.1.21:3000" } });
+
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("https://app.example.com/auth/oidc/login");
+    expect(extractCookie(response, "latestarr_oidc_flow")).toBeUndefined();
+    expect(mockBuildAuthorizationUrl).not.toHaveBeenCalled();
   });
 });
 
 describe("GET /auth/oidc/callback", () => {
-  it("rejects a callback with no flow cookie", async () => {
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/auth/oidc/callback?code=abc&state=test-state",
-    });
-    expect(response.statusCode).toBe(400);
+  it("sends a callback with no sign-in in progress back to the login page to say so", async () => {
+    const response = await callback({});
+    expect(response.statusCode).toBe(302);
+    expect(response.headers.location).toBe("/login?sso=expired");
   });
 
-  it("rejects when the token exchange fails", async () => {
+  it("says when the token exchange fails", async () => {
     mockAuthorizationCodeGrant.mockRejectedValueOnce(new Error("invalid_grant"));
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/auth/oidc/callback?code=abc&state=test-state",
-      cookies: { latestarr_oidc_flow: "test-state.test-nonce.test-code-verifier" },
-    });
-    expect(response.statusCode).toBe(400);
+    const response = await callback({ latestarr_oidc_flow: FLOW });
+    expect(response.headers.location).toBe("/login?sso=failed");
   });
 
   it("logs in and bootstraps the first admin on a fresh instance", async () => {
@@ -118,11 +145,7 @@ describe("GET /auth/oidc/callback", () => {
       claims: () => ({ sub: "user-1", email: "person@example.com", name: "Person" }),
     });
 
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/auth/oidc/callback?code=abc&state=test-state",
-      cookies: { latestarr_oidc_flow: "test-state.test-nonce.test-code-verifier" },
-    });
+    const response = await callback({ latestarr_oidc_flow: FLOW });
 
     expect(response.statusCode).toBe(302);
     expect(response.headers.location).toBe("/");
@@ -147,19 +170,121 @@ describe("GET /auth/oidc/callback", () => {
     expect(link?.subject).toBe("user-1");
   });
 
-  it("rejects an unlinked identity once a local user already exists", async () => {
+  it("refuses an unlinked identity once a local user already exists, saying why", async () => {
     await db.insert(users).values({ email: "existing@example.com", displayName: "Existing" });
 
     mockAuthorizationCodeGrant.mockResolvedValueOnce({
-      claims: () => ({ sub: "some-other-user", email: "other@example.com" }),
+      claims: () => ({ sub: "some-other-user", email: "other@example.com", email_verified: true }),
     });
+    const noAccount = await callback({ latestarr_oidc_flow: FLOW });
+    expect(noAccount.headers.location).toBe("/login?sso=not-linked");
+    expect(extractCookie(noAccount, "latestarr_session")).toBeUndefined();
 
-    const response = await app.inject({
-      method: "GET",
-      url: "/api/auth/oidc/callback?code=abc&state=test-state",
-      cookies: { latestarr_oidc_flow: "test-state.test-nonce.test-code-verifier" },
+    // Same email as the account, but the provider doesn't vouch for it.
+    mockAuthorizationCodeGrant.mockResolvedValueOnce({
+      claims: () => ({ sub: "some-other-user", email: "existing@example.com", email_verified: false }),
     });
+    const unverified = await callback({ latestarr_oidc_flow: FLOW });
+    expect(unverified.headers.location).toBe("/login?sso=unverified-email");
+  });
 
-    expect(response.statusCode).toBe(403);
+  it("goes back to WEB_ORIGIN when it's set", async () => {
+    process.env.WEB_ORIGIN = "https://app.example.com/";
+    try {
+      const response = await callback({});
+      expect(response.headers.location).toBe("https://app.example.com/login?sso=expired");
+    } finally {
+      delete process.env.WEB_ORIGIN;
+    }
+  });
+});
+
+describe("linking SSO to a signed-in account (#317)", () => {
+  it("links the identity the user signs in with, even when the provider doesn't verify the email", async () => {
+    const { user, cookie } = await signedInUser();
+
+    const start = await app.inject({
+      method: "POST",
+      url: "/api/auth/oidc/link",
+      headers: { ...HOST, origin: "https://app.example.com" },
+      cookies: { latestarr_session: cookie },
+    });
+    expect(start.statusCode).toBe(200);
+    expect(start.json()).toEqual({ url: "https://idp.example.com/authorize?state=test-state" });
+    const flow = extractCookie(start, "latestarr_oidc_flow");
+    expect(flow).toBe(`${FLOW}.link.${user.id}`);
+
+    mockAuthorizationCodeGrant.mockResolvedValueOnce({
+      claims: () => ({ sub: "idp-user", email: "someone-else@example.com", email_verified: false }),
+    });
+    const done = await callback({ latestarr_oidc_flow: flow!, latestarr_session: cookie });
+    expect(done.headers.location).toBe("/?sso=linked");
+    const [link] = await db.select().from(oidcIdentities);
+    expect(link).toMatchObject({ userId: user.id, subject: "idp-user" });
+
+    // From now on, signing in with SSO finds this account.
+    mockAuthorizationCodeGrant.mockResolvedValueOnce({ claims: () => ({ sub: "idp-user" }) });
+    const signIn = await callback({ latestarr_oidc_flow: FLOW });
+    expect(signIn.headers.location).toBe("/");
+    expect(extractCookie(signIn, "latestarr_session")).toBeTruthy();
+
+    const me = await app.inject({ method: "GET", url: "/api/auth/me", cookies: { latestarr_session: cookie } });
+    expect(me.json().user).toMatchObject({ ssoLinked: true, hasPassword: true });
+  });
+
+  it("won't link an identity that belongs to another account", async () => {
+    const [other] = await db.insert(users).values({ email: "other@example.com", displayName: "Other" }).returning();
+    await db.insert(oidcIdentities).values({ userId: other!.id, issuer: "https://idp.example.com", subject: "idp-user" });
+    const { user, cookie } = await signedInUser();
+
+    mockAuthorizationCodeGrant.mockResolvedValueOnce({ claims: () => ({ sub: "idp-user" }) });
+    const done = await callback({ latestarr_oidc_flow: `${FLOW}.link.${user.id}`, latestarr_session: cookie });
+    expect(done.headers.location).toBe("/?sso=link-taken");
+  });
+
+  it("needs the session that started linking", async () => {
+    const { user } = await signedInUser();
+    mockAuthorizationCodeGrant.mockResolvedValueOnce({ claims: () => ({ sub: "idp-user" }) });
+    const done = await callback({ latestarr_oidc_flow: `${FLOW}.link.${user.id}` });
+    expect(done.headers.location).toBe("/login?sso=expired");
+    expect(await db.select().from(oidcIdentities)).toEqual([]);
+  });
+
+  it("asks to link from the callback's address, and only when signed in", async () => {
+    const { cookie } = await signedInUser();
+    const elsewhere = await app.inject({
+      method: "POST",
+      url: "/api/auth/oidc/link",
+      headers: { host: "10.0.1.21:3000", origin: "http://10.0.1.21:3000" },
+      cookies: { latestarr_session: cookie },
+    });
+    expect(elsewhere.statusCode).toBe(409);
+    expect(elsewhere.json().error).toContain("https://app.example.com");
+
+    const anonymous = await app.inject({ method: "POST", url: "/api/auth/oidc/link", headers: { ...HOST, origin: "https://app.example.com" } });
+    expect(anonymous.statusCode).toBe(401);
+  });
+
+  it("unlinks, but not from an account with no password to fall back on", async () => {
+    const { user, cookie } = await signedInUser();
+    await db.insert(oidcIdentities).values({ userId: user.id, issuer: "https://idp.example.com", subject: "idp-user" });
+    const unlink = await app.inject({
+      method: "DELETE",
+      url: "/api/auth/me/sso",
+      headers: { ...HOST, origin: "https://app.example.com" },
+      cookies: { latestarr_session: cookie },
+    });
+    expect(unlink.statusCode).toBe(204);
+    expect(await db.select().from(oidcIdentities)).toEqual([]);
+
+    await db.update(users).set({ passwordHash: null });
+    await db.insert(oidcIdentities).values({ userId: user.id, issuer: "https://idp.example.com", subject: "idp-user" });
+    const refused = await app.inject({
+      method: "DELETE",
+      url: "/api/auth/me/sso",
+      headers: { ...HOST, origin: "https://app.example.com" },
+      cookies: { latestarr_session: cookie },
+    });
+    expect(refused.statusCode).toBe(409);
   });
 });

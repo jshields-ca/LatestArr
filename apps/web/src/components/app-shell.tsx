@@ -22,8 +22,10 @@ import { SaveActions } from "@/components/ui/save-actions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ApiError, getVersion, updateCurrentUser } from "@/lib/api";
+import { toast } from "@/components/ui/use-toast";
+import { ApiError, getAuthProviders, getVersion, startSsoLink, unlinkSso, updateCurrentUser } from "@/lib/api";
 import { navItems } from "@/lib/nav-items";
+import { ssoMessage, takeSsoOutcome } from "@/lib/sso";
 import { hasRole, ROLE_LABELS } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { confirmDiscard, guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -215,14 +217,47 @@ function EditProfileDialog() {
   const [newPassword, setNewPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ssoAvailable, setSsoAvailable] = useState(false);
+  const [ssoBusy, setSsoBusy] = useState(false);
 
   function openWithCurrentValues(next: boolean) {
     setOpen(next);
     if (next) {
+      getAuthProviders()
+        .then((providers) => setSsoAvailable(providers.oidc))
+        .catch(() => setSsoAvailable(false));
       setDisplayName(user?.displayName ?? "");
       setCurrentPassword("");
       setNewPassword("");
       setError(null);
+    }
+  }
+
+  // Linking goes to the identity provider and back (#317).
+  async function handleLinkSso() {
+    setSsoBusy(true);
+    setError(null);
+    try {
+      const { url } = await startSsoLink();
+      window.location.assign(url);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't start linking SSO.");
+      setSsoBusy(false);
+    }
+  }
+
+  async function handleUnlinkSso() {
+    if (!window.confirm("Unlink SSO? You'll sign in with your password until you link it again.")) return;
+    setSsoBusy(true);
+    setError(null);
+    try {
+      await unlinkSso();
+      await refresh();
+      toast({ variant: "success", title: "SSO unlinked" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't unlink SSO.");
+    } finally {
+      setSsoBusy(false);
     }
   }
 
@@ -306,6 +341,37 @@ function EditProfileDialog() {
             <SaveActions dirty={dirty} saving={submitting} />
           </DialogFooter>
         </form>
+
+        {ssoAvailable ? (
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">Single sign-on</span>
+              <p className="text-xs text-muted-foreground">
+                {user?.ssoLinked
+                  ? "Linked: you can sign in with SSO."
+                  : "Link your SSO account to sign in with it. You'll sign in at your identity provider and come back here."}
+              </p>
+            </div>
+            <div>
+              {user?.ssoLinked ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleUnlinkSso()}
+                  disabled={ssoBusy || !user.hasPassword}
+                  title={user.hasPassword ? undefined : "This account signs in only with SSO"}
+                >
+                  Unlink SSO
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" size="sm" onClick={() => void handleLinkSso()} disabled={ssoBusy}>
+                  Link SSO
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -406,6 +472,17 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Back from linking SSO in the profile (#317).
+  useEffect(() => {
+    const outcome = takeSsoOutcome();
+    if (!outcome) return;
+    toast({
+      variant: outcome === "linked" ? "success" : "destructive",
+      title: outcome === "linked" ? "SSO linked" : "SSO not linked",
+      description: ssoMessage(outcome),
+    });
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

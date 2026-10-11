@@ -49,6 +49,14 @@ function renderLoginPage(providers: { local: boolean; oidc: boolean; needsSetup:
 }
 
 describe("LoginPage", () => {
+  // #317: the server sends a failed SSO sign-in back here with the reason.
+  it("explains why an SSO sign-in came back without signing in", async () => {
+    window.history.pushState({}, "", "/login?sso=not-linked");
+    renderLoginPage({ local: true, oidc: true, needsSetup: false });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your SSO account isn't linked to a LatestArr account.");
+    expect(window.location.search).toBe("");
+  });
+
   it("shows an error message when login fails", async () => {
     const user = userEvent.setup();
     renderLoginPage({ local: true, oidc: false, needsSetup: false });

@@ -113,6 +113,12 @@ Local username/password login stays available alongside OIDC once it's configure
 
 SSO never creates accounts by itself after the first one. To let someone in with SSO, add them on the **Users** page with the email address their provider uses, and leave the password blank. The first time they sign in with SSO, LatestArr links their SSO identity to that account, as long as the provider marks the email as verified (`email_verified`).
 
+**Already have an account?** Sign in with your password, open your profile (the pencil by your name) and choose **Link SSO**. You sign in at your provider and come back linked. This works even when the provider doesn't mark emails as verified, which some do by default, and whatever email address the provider has for you. **Unlink SSO** is there too, for accounts that also have a password.
+
+**Signing in from another address.** Your provider always sends you back to `OIDC_REDIRECT_URI`. If you open LatestArr on another address, such as its LAN IP, **Continue with SSO** first moves you to the `OIDC_REDIRECT_URI` address, so the sign-in can finish there. You're signed in on that address, not the one you started on.
+
+If an SSO sign-in comes back without signing you in, the sign-in page says why, and LatestArr's logs give the detail, for example that the provider didn't mark the email verified, or that no account has that email.
+
 ## Users
 
 Everyone who can sign in is listed under **Users**, with their role. Only admins can open the page.
