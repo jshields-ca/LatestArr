@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "./auth-provider";
 import { ThemeProvider } from "./theme-provider";
 import { AppShell } from "./app-shell";
+import { Toaster } from "./ui/toaster";
 
 const fetchMock = vi.fn();
 
@@ -163,6 +164,33 @@ describe("AppShell", () => {
     expect(
       await within(dialog).findByText("Enter both your current password and a new password to change it."),
     ).toBeInTheDocument();
+  });
+
+  // #317: link SSO to the signed-in account from the profile.
+  it("links SSO from the profile when SSO is set up", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await screen.findByText("Admin");
+    const routes = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/auth/providers") return Promise.resolve(jsonResponse(200, { local: true, oidc: true, needsSetup: false }));
+      // Not a URL jsdom can go to: the assign that follows only logs.
+      if (url === "/api/auth/oidc/link" && init?.method === "POST") return Promise.resolve(jsonResponse(409, { error: "Open LatestArr at https://app.example.com to link SSO." }));
+      return routes(url, init);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Edit profile" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(await within(dialog).findByRole("button", { name: "Link SSO" }));
+    expect(await within(dialog).findByText("Open LatestArr at https://app.example.com to link SSO.")).toBeInTheDocument();
+  });
+
+  it("says when linking SSO came back with a problem", async () => {
+    window.history.pushState({}, "", "/?sso=link-taken");
+    renderShell();
+    render(<Toaster />);
+    expect(await screen.findByText("That SSO account is already linked to another LatestArr account.")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
   });
 
   it("has no accessibility violations", async () => {

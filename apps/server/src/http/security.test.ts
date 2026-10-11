@@ -72,6 +72,9 @@ const PUBLIC = new Set([
   "POST /api/auth/logout",
   "GET /api/auth/oidc/login",
   "GET /api/auth/oidc/callback",
+  // Also registered only with OIDC configured, so not in this app:
+  // POST /api/auth/oidc/link and DELETE /api/auth/me/sso need a session,
+  // which oidc.test.ts checks.
 ]);
 
 // The role each signed-in route needs (see auth/roles.ts). A new route
