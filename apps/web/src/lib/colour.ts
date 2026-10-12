@@ -58,23 +58,27 @@ export function effectiveColour(colors: DesignSettings["colors"], key: AdvancedC
 export interface ContrastWarning {
   label: string;
   ratio: number;
+  // Shown with the button options rather than the colours.
+  buttons: boolean;
 }
 
 /** Colour pairs in the design whose text would be hard to read. */
 export function contrastWarnings(settings: DesignSettings): ContrastWarning[] {
   const { colors } = settings;
-  const pairs: [string, string, string][] = [
+  const pairs: [string, string, string, boolean?][] = [
     ["Text on the background", colors.text, colors.background],
     ["Secondary text on the background", colors.muted, colors.background],
     ["Label text on the label background", effectiveColour(colors, "labelText"), effectiveColour(colors, "labelBackground")],
     ["Links on the background", effectiveColour(colors, "link"), colors.background],
   ];
-  if (settings.buttons.style === "filled") {
-    pairs.push(["Button text on the button colour", effectiveColour(colors, "buttonText"), effectiveColour(colors, "buttonBackground")]);
-  } else {
-    pairs.push(["Outlined buttons on the background", effectiveColour(colors, "buttonBackground"), colors.background]);
+  const styles = [settings.buttons.style, settings.buttons.sourceStyle];
+  if (styles.includes("filled")) {
+    pairs.push(["Button text on the button colour", effectiveColour(colors, "buttonText"), effectiveColour(colors, "buttonBackground"), true]);
+  }
+  if (styles.includes("outline")) {
+    pairs.push(["Outlined buttons on the background", effectiveColour(colors, "buttonBackground"), colors.background, true]);
   }
   return pairs
-    .map(([label, fg, bg]) => ({ label, ratio: contrastRatio(fg, bg) }))
+    .map(([label, fg, bg, buttons = false]) => ({ label, ratio: contrastRatio(fg, bg), buttons }))
     .filter((pair) => pair.ratio < MIN_CONTRAST);
 }

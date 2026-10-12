@@ -30,6 +30,7 @@ import {
 import { type AdvancedColour, contrastWarnings, effectiveColour, MIN_CONTRAST } from "@/lib/colour";
 import {
   type DesignButtons,
+  type DesignContent,
   type DesignCta,
   type DesignCtaPlacement,
   type DesignTextAlign,
@@ -157,70 +158,139 @@ const SOURCE_BUTTON_PLACEMENTS: { value: DesignSourceButtonPlacement; label: str
   { value: "top", label: "Near the top" },
 ];
 
-function Section({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
+// A collapsible group of options. `summary` says what's set, so a design
+// can be reviewed at a glance without opening every section.
+const LOGO_SUMMARY: Record<DesignSettings["logo"]["source"], string> = {
+  none: "None",
+  upload: "Uploaded image",
+  url: "Image URL",
+};
+
+// "Intro, Footer note", or "None" when nothing's set.
+function listOrNone(parts: (string | false | 0)[]): string {
+  const set = parts.filter(Boolean);
+  return set.length > 0 ? set.join(", ") : "None";
+}
+
+function fontLabel(font: string): string {
+  return EMAIL_FONT_OPTIONS.find((option) => option.value === font)?.label ?? font;
+}
+
+function sectionsSummary(sections: DesignSettings["sections"]): string {
+  return [
+    sections.groupByType ? "Grouped by type" : "One list",
+    sections.limit ? `up to ${sections.limit}` : "",
+    sections.mostWatched.enabled ? "Most watched" : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function Section({
+  title,
+  summary,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  summary?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
   return (
     <details open={defaultOpen} className="group rounded-lg border border-border bg-card">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
-        {title}
-        <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
+        <span className="shrink-0 font-semibold">{title}</span>
+        {summary ? <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">{summary}</span> : <span className="flex-1" />}
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
       </summary>
       <div className="flex flex-col gap-3 border-t border-border px-4 py-3">{children}</div>
     </details>
   );
 }
 
-const ADVANCED_COLOURS: { key: AdvancedColour; label: string }[] = [
+// A labelled group inside a section, e.g. "Where to watch" under Buttons.
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <fieldset className="flex flex-col gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0">
+      <legend className="float-left mb-1 w-full text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </legend>
+      {children}
+    </fieldset>
+  );
+}
+
+// A colour picker with its name and value.
+function ColourField({ id, label, value, note, onChange }: { id: string; label: string; value: string; note?: string; onChange: (value: string) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        id={id}
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
+      />
+      <div className="flex min-w-0 flex-col">
+        <Label htmlFor={id}>{label}</Label>
+        <span className="font-mono text-xs text-muted-foreground">{note ?? value}</span>
+      </div>
+    </div>
+  );
+}
+
+const TEXT_COLOURS: { key: AdvancedColour; label: string }[] = [
   { key: "labelText", label: "Label text" },
   { key: "labelBackground", label: "Label background" },
+  { key: "link", label: "Links" },
+];
+const BUTTON_COLOURS: { key: AdvancedColour; label: string }[] = [
   { key: "buttonBackground", label: "Button colour" },
   { key: "buttonText", label: "Button text" },
-  { key: "link", label: "Links" },
 ];
 
 // Colours that otherwise follow the accent (#293). Each shows what it is
 // now, and "Use accent" puts it back to following the accent.
-function AdvancedColours({
+function AccentColours({
+  colours,
   colors,
   onChange,
 }: {
+  colours: { key: AdvancedColour; label: string }[];
   colors: DesignSettings["colors"];
   onChange: (key: AdvancedColour, value: string | null) => void;
 }) {
-  const custom = ADVANCED_COLOURS.filter(({ key }) => colors[key]).length;
   return (
-    <details className="rounded-md border border-border px-3 py-2" open={custom > 0}>
-      <summary className="cursor-pointer text-sm font-medium">
-        More colours{custom > 0 ? ` (${custom} set)` : ""}
-      </summary>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Type labels, buttons, and links in the intro and footer note use the accent unless you choose otherwise.
-      </p>
-      <ul className="mt-3 flex flex-col gap-2">
-        {ADVANCED_COLOURS.map(({ key, label }) => {
-          const own = colors[key];
-          return (
-            <li key={key} className="flex items-center gap-2">
-              <input
-                id={`design-color-${key}`}
-                type="color"
-                value={effectiveColour(colors, key)}
-                onChange={(e) => onChange(key, e.target.value)}
-                className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
-              />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <Label htmlFor={`design-color-${key}`}>{label}</Label>
-                <span className="font-mono text-xs text-muted-foreground">{own ?? "Follows the accent"}</span>
-              </div>
-              {own ? (
-                <Button type="button" variant="ghost" size="sm" onClick={() => onChange(key, null)} aria-label={`${label}: use the accent`}>
-                  Use accent
-                </Button>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </details>
+    <ul className="grid grid-cols-2 gap-3">
+      {colours.map(({ key, label }) => {
+        const own = colors[key];
+        return (
+          <li key={key} className="flex items-center gap-1">
+            <ColourField
+              id={`design-color-${key}`}
+              label={label}
+              value={effectiveColour(colors, key)}
+              note={own ?? (key === "buttonText" ? "White" : "Follows the accent")}
+              onChange={(value) => onChange(key, value)}
+            />
+            {own ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="ml-auto size-7"
+                onClick={() => onChange(key, null)}
+                aria-label={`${label}: use the ${key === "buttonText" ? "default" : "accent"}`}
+                title="Reset"
+              >
+                <X />
+              </Button>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -238,21 +308,26 @@ const BUTTON_SIZES: { value: DesignButtons["size"]; label: string }[] = [
   { value: "small", label: "Small" },
 ];
 
-// How the design's buttons look; "Where to watch" buttons share the shape
-// and size, and are always outlined.
-function ButtonStyle({ buttons, onChange }: { buttons: DesignButtons; onChange: (buttons: DesignButtons) => void }) {
-  const field = <K extends keyof DesignButtons>(
-    key: K,
-    label: string,
-    options: { value: DesignButtons[K]; label: string }[],
-  ) => (
+function ChoiceField<T extends string>({
+  id,
+  label,
+  name,
+  value,
+  options,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  // The full name, when the label only makes sense next to its heading.
+  name?: string;
+  value: T;
+  options: readonly { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={`design-button-${key}`}>{label}</Label>
-      <Select
-        id={`design-button-${key}`}
-        value={buttons[key]}
-        onChange={(e) => onChange({ ...buttons, [key]: e.target.value as DesignButtons[K] })}
-      >
+      <Label htmlFor={id}>{label}</Label>
+      <Select id={id} aria-label={name} value={value} onChange={(e) => onChange(e.target.value as T)}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -261,22 +336,12 @@ function ButtonStyle({ buttons, onChange }: { buttons: DesignButtons; onChange: 
       </Select>
     </div>
   );
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="mb-1 text-sm font-medium">Buttons</legend>
-      <div className="grid grid-cols-3 gap-2">
-        {field("shape", "Shape", BUTTON_SHAPES)}
-        {field("style", "Style", BUTTON_FILLS)}
-        {field("size", "Size", BUTTON_SIZES)}
-      </div>
-    </fieldset>
-  );
 }
 
 // Warns about colour pairs whose text would be hard to read (below WCAG
 // AA), without blocking anything: it's the designer's call.
-function ContrastNotes({ settings }: { settings: DesignSettings }) {
-  const warnings = contrastWarnings(settings);
+function ContrastNotes({ settings, buttons }: { settings: DesignSettings; buttons: boolean }) {
+  const warnings = contrastWarnings(settings).filter((warning) => warning.buttons === buttons);
   if (warnings.length === 0) return null;
   return (
     <div role="status" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
@@ -297,9 +362,8 @@ function ContrastNotes({ settings }: { settings: DesignSettings }) {
 function CtaRows({ ctas, onChange }: { ctas: DesignCta[]; onChange: (ctas: DesignCta[]) => void }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium">Buttons</span>
       {ctas.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No buttons yet, e.g. a link to your Plex app.</p>
+        <p className="text-sm text-muted-foreground">Up to {MAX_DESIGN_CTAS} links of your own, e.g. to your Plex app or a request page.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {ctas.map((cta, index) => {
@@ -529,112 +593,145 @@ export function DesignEditorPage() {
     );
   }
 
+  const isDesign = mode === "design";
+  const customTextColours = TEXT_COLOURS.filter(({ key }) => settings.colors[key]).length;
+  const shownDetails = DETAILS.filter(({ key }) => settings.show[key]).length;
+  const setAccentColour = (key: AdvancedColour, value: string | null) =>
+    update((c) => ({ ...c, colors: { ...c.colors, [key]: value } }));
+  const content = settings.content;
+  const setContent = (change: Partial<DesignContent>) => update((c) => ({ ...c, content: { ...c.content, ...change } }));
+  const ownButtons = content.ctas.filter(isCompleteCta).length;
+  const sourceButtonPlacement =
+    content.sourceButtons.placement === "sections" && !settings.sections.groupByType ? "end" : content.sourceButtons.placement;
+
   const logoSection = (
-    <Section title="Logo" defaultOpen={settings.logo.source !== "none"}>
+    <Section title="Logo" summary={LOGO_SUMMARY[settings.logo.source]} defaultOpen={settings.logo.source !== "none"}>
       <DesignLogoFields
         logo={settings.logo}
-        showLayout={mode === "design"}
+        showLayout={isDesign}
         onChange={(logo) => update((c) => ({ ...c, logo }))}
       />
     </Section>
   );
 
-  const textAndButtons = (
-    <Section title="Text and buttons" defaultOpen>
+  const textSection = (
+    <Section title="Text" summary={listOrNone([content.intro.trim() && "Intro", content.footerNote.trim() && "Footer note"])} defaultOpen>
       <NoteField
         id="design-intro"
         label="Intro (optional)"
         placeholder="A note above the items, e.g. a quick update."
-        value={settings.content.intro}
-        align={settings.content.introAlign}
-        showAlign={mode === "design"}
-        onChange={(intro) => update((c) => ({ ...c, content: { ...c.content, intro } }))}
-        onAlignChange={(introAlign) => update((c) => ({ ...c, content: { ...c.content, introAlign } }))}
+        value={content.intro}
+        align={content.introAlign}
+        showAlign={isDesign}
+        onChange={(intro) => setContent({ intro })}
+        onAlignChange={(introAlign) => setContent({ introAlign })}
       />
-      <CtaRows
-        ctas={settings.content.ctas}
-        onChange={(ctas) => update((c) => ({ ...c, content: { ...c.content, ctas } }))}
-      />
-      {mode === "design" && settings.content.ctas.length > 0 ? (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="design-cta-placement">Where your buttons go</Label>
-          <Select
-            id="design-cta-placement"
-            value={settings.content.ctaPlacement}
-            onChange={(e) =>
-              update((c) => ({ ...c, content: { ...c.content, ctaPlacement: e.target.value as DesignCtaPlacement } }))
-            }
-          >
-            {CTA_PLACEMENTS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-      ) : null}
-      {mode === "design" ? (
-        <>
-          <SettingRow
-            label="Where to watch buttons"
-            description="A button for each linked source with a public URL, like Watch on Plex or Play on RomM."
-            htmlFor="design-source-buttons"
-            className="py-1"
-            control={
-              <Switch
-                id="design-source-buttons"
-                checked={settings.content.sourceButtons.enabled}
-                onCheckedChange={(checked) =>
-                  update((c) => ({
-                    ...c,
-                    content: { ...c.content, sourceButtons: { ...c.content.sourceButtons, enabled: checked } },
-                  }))
-                }
-              />
-            }
-          />
-          {settings.content.sourceButtons.enabled ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="design-source-button-placement">Where they go</Label>
-              <Select
-                id="design-source-button-placement"
-                value={
-                  settings.content.sourceButtons.placement === "sections" && !settings.sections.groupByType
-                    ? "end"
-                    : settings.content.sourceButtons.placement
-                }
-                onChange={(e) =>
-                  update((c) => ({
-                    ...c,
-                    content: {
-                      ...c.content,
-                      sourceButtons: { ...c.content.sourceButtons, placement: e.target.value as DesignSourceButtonPlacement },
-                    },
-                  }))
-                }
-              >
-                {SOURCE_BUTTON_PLACEMENTS.filter((option) => settings.sections.groupByType || option.value !== "sections").map(
-                  (option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ),
-                )}
-              </Select>
-            </div>
-          ) : null}
-        </>
-      ) : null}
       <NoteField
         id="design-footer"
         label="Footer note (optional)"
         placeholder="A note near the bottom, above the LatestArr credit line."
-        value={settings.content.footerNote}
-        align={settings.content.footerAlign}
-        showAlign={mode === "design"}
-        onChange={(footerNote) => update((c) => ({ ...c, content: { ...c.content, footerNote } }))}
-        onAlignChange={(footerAlign) => update((c) => ({ ...c, content: { ...c.content, footerAlign } }))}
+        value={content.footerNote}
+        align={content.footerAlign}
+        showAlign={isDesign}
+        onChange={(footerNote) => setContent({ footerNote })}
+        onAlignChange={(footerAlign) => setContent({ footerAlign })}
       />
+    </Section>
+  );
+
+  const buttonsSection = (
+    <Section
+      title="Buttons"
+      summary={listOrNone([
+        ownButtons > 0 && `${ownButtons} of your own`,
+        isDesign && content.sourceButtons.enabled && "Where to watch",
+      ])}
+    >
+      <Group title="Your buttons">
+        <CtaRows ctas={content.ctas} onChange={(ctas) => setContent({ ctas })} />
+        {isDesign && content.ctas.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3">
+            <ChoiceField
+              id="design-cta-placement"
+              label="Where they go"
+              name="Where your buttons go"
+              value={content.ctaPlacement}
+              options={CTA_PLACEMENTS}
+              onChange={(ctaPlacement) => setContent({ ctaPlacement })}
+            />
+            <ChoiceField
+              id="design-button-style"
+              label="Style"
+              name="Your buttons style"
+              value={settings.buttons.style}
+              options={BUTTON_FILLS}
+              onChange={(style) => update((c) => ({ ...c, buttons: { ...c.buttons, style } }))}
+            />
+          </div>
+        ) : null}
+      </Group>
+      {isDesign ? (
+        <>
+          <Group title="Where to watch">
+            <SettingRow
+              label="Where to watch buttons"
+              description="A button for each linked source with a public URL, like Watch on Plex or Play on RomM."
+              htmlFor="design-source-buttons"
+              className="py-1"
+              control={
+                <Switch
+                  id="design-source-buttons"
+                  checked={content.sourceButtons.enabled}
+                  onCheckedChange={(enabled) => setContent({ sourceButtons: { ...content.sourceButtons, enabled } })}
+                />
+              }
+            />
+            {content.sourceButtons.enabled ? (
+              <div className="grid grid-cols-2 gap-3">
+                <ChoiceField
+                  id="design-source-button-placement"
+                  label="Where they go"
+                  name="Where the Where to watch buttons go"
+                  value={sourceButtonPlacement}
+                  options={SOURCE_BUTTON_PLACEMENTS.filter((option) => settings.sections.groupByType || option.value !== "sections")}
+                  onChange={(placement) => setContent({ sourceButtons: { ...content.sourceButtons, placement } })}
+                />
+                <ChoiceField
+                  id="design-button-sourceStyle"
+                  label="Style"
+                  name="Where to watch buttons style"
+                  value={settings.buttons.sourceStyle}
+                  options={BUTTON_FILLS}
+                  onChange={(sourceStyle) => update((c) => ({ ...c, buttons: { ...c.buttons, sourceStyle } }))}
+                />
+              </div>
+            ) : null}
+          </Group>
+          <Group title="Look of all buttons">
+            <div className="grid grid-cols-2 gap-3">
+              <ChoiceField
+                id="design-button-shape"
+                label="Shape"
+                value={settings.buttons.shape}
+                options={BUTTON_SHAPES}
+                onChange={(shape) => update((c) => ({ ...c, buttons: { ...c.buttons, shape } }))}
+              />
+              <ChoiceField
+                id="design-button-size"
+                label="Size"
+                value={settings.buttons.size}
+                options={BUTTON_SIZES}
+                onChange={(size) => update((c) => ({ ...c, buttons: { ...c.buttons, size } }))}
+              />
+            </div>
+            <AccentColours colours={BUTTON_COLOURS} colors={settings.colors} onChange={setAccentColour} />
+            <p className="text-xs text-muted-foreground">
+              Filled buttons use both colours. Outlined buttons use Button colour for their text and border.
+            </p>
+            <ContrastNotes settings={settings} buttons />
+          </Group>
+        </>
+      ) : null}
     </Section>
   );
 
@@ -736,7 +833,9 @@ export function DesignEditorPage() {
 
             {logoSection}
 
-            {textAndButtons}
+            {textSection}
+
+            {buttonsSection}
 
             <Section title="Variables and helpers">
               <DesignCodeReference />
@@ -744,68 +843,44 @@ export function DesignEditorPage() {
           </fieldset>
         ) : (
           <fieldset disabled={!canEdit} className="flex min-w-0 flex-col gap-3">
-            <Section title="Branding" defaultOpen>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="design-font">Font</Label>
-                <Select
-                  id="design-font"
-                  value={settings.font}
-                  onChange={(e) => update((c) => ({ ...c, font: e.target.value }))}
-                >
-                  {EMAIL_FONT_OPTIONS.map((font) => (
-                    <option key={font.value} value={font.value}>
-                      {font.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+            <Section title="Colours and font" summary={fontLabel(settings.font)} defaultOpen>
               <div className="grid grid-cols-2 gap-3">
                 {COLORS.map(({ key, label }) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <input
-                      id={`design-color-${key}`}
-                      type="color"
-                      value={settings.colors[key]}
-                      onChange={(e) => update((c) => ({ ...c, colors: { ...c.colors, [key]: e.target.value } }))}
-                      className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
-                    />
-                    <div className="flex min-w-0 flex-col">
-                      <Label htmlFor={`design-color-${key}`}>{label}</Label>
-                      <span className="font-mono text-xs text-muted-foreground">{settings.colors[key]}</span>
-                    </div>
-                  </div>
+                  <ColourField
+                    key={key}
+                    id={`design-color-${key}`}
+                    label={label}
+                    value={settings.colors[key]}
+                    onChange={(value) => update((c) => ({ ...c, colors: { ...c.colors, [key]: value } }))}
+                  />
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
                 Email apps in dark mode show a dark version worked out from these colours, with Text as the
                 background and Background as the text. Switch the preview to Dark to check it.
               </p>
-              <AdvancedColours
-                colors={settings.colors}
-                onChange={(key, value) => update((c) => ({ ...c, colors: { ...c.colors, [key]: value } }))}
-              />
-              <ButtonStyle buttons={settings.buttons} onChange={(buttons) => update((c) => ({ ...c, buttons }))} />
-              <ContrastNotes settings={settings} />
-              <SettingRow
-                label="Show the date range and counts"
-                description={`"Sep 21 – 28, 2026 · 36 new" and a count for each type, under the title.`}
-                htmlFor="design-lookback"
-                className="py-1"
-                control={
-                  <Switch
-                    id="design-lookback"
-                    checked={settings.showLookbackLine}
-                    onCheckedChange={(checked) => update((c) => ({ ...c, showLookbackLine: checked }))}
-                  />
-                }
+              <details className="rounded-md border border-border px-3 py-2" open={customTextColours > 0}>
+                <summary className="cursor-pointer text-sm font-medium">
+                  More colours{customTextColours > 0 ? ` (${customTextColours} set)` : ""}
+                </summary>
+                <p className="mb-3 mt-2 text-xs text-muted-foreground">
+                  Type labels (Movie, Ebook, ...) and links in the intro and footer note use the accent unless you choose otherwise.
+                </p>
+                <AccentColours colours={TEXT_COLOURS} colors={settings.colors} onChange={setAccentColour} />
+              </details>
+              <ContrastNotes settings={settings} buttons={false} />
+              <ChoiceField
+                id="design-font"
+                label="Font"
+                value={settings.font}
+                options={EMAIL_FONT_OPTIONS}
+                onChange={(font) => update((c) => ({ ...c, font }))}
               />
             </Section>
 
             {logoSection}
 
-            {textAndButtons}
-
-            <Section title="Layout" defaultOpen>
+            <Section title="Layout" summary={LAYOUTS.find((layout) => layout.value === settings.layout)?.label} defaultOpen>
               <fieldset className="flex flex-col gap-2">
                 <legend className="sr-only">Item layout</legend>
                 {LAYOUTS.map((layout) => (
@@ -829,9 +904,26 @@ export function DesignEditorPage() {
                   </label>
                 ))}
               </fieldset>
+              <SettingRow
+                label="Show the date range and counts"
+                description={`"Sep 21 – 28, 2026 · 36 new" and a count for each type, under the title.`}
+                htmlFor="design-lookback"
+                className="py-1"
+                control={
+                  <Switch
+                    id="design-lookback"
+                    checked={settings.showLookbackLine}
+                    onCheckedChange={(checked) => update((c) => ({ ...c, showLookbackLine: checked }))}
+                  />
+                }
+              />
             </Section>
 
-            <Section title="Item details">
+            {textSection}
+
+            {buttonsSection}
+
+            <Section title="Item details" summary={`${shownDetails} of ${DETAILS.length} shown`}>
               {DETAILS.map(({ key, label }) => (
                 <SettingRow
                   key={key}
@@ -849,7 +941,7 @@ export function DesignEditorPage() {
               ))}
             </Section>
 
-            <Section title="Sections">
+            <Section title="Sections" summary={sectionsSummary(settings.sections)}>
               <SettingRow
                 label="Group a show's new episodes"
                 description="Several new episodes of one show share a row, listed under its title."
@@ -987,7 +1079,7 @@ export function DesignEditorPage() {
               ) : null}
             </Section>
 
-            <Section title="Custom CSS">
+            <Section title="Custom CSS" summary={settings.customCss.trim() ? "Added" : "None"}>
               <Label htmlFor="design-css">CSS applied to the email</Label>
               <Textarea
                 id="design-css"
