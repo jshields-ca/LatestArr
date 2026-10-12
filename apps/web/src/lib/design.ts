@@ -19,7 +19,9 @@ export type DesignTextAlign = "left" | "center" | "right";
 
 export interface DesignButtons {
   shape: "square" | "rounded" | "pill";
+  // The design's own buttons, and "Where to watch" buttons.
   style: "filled" | "outline";
+  sourceStyle: "filled" | "outline";
   size: "regular" | "small";
 }
 
@@ -99,7 +101,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     buttonText: null,
     link: null,
   },
-  buttons: { shape: "rounded", style: "filled", size: "regular" },
+  buttons: { shape: "rounded", style: "filled", sourceStyle: "outline", size: "regular" },
   logo: {
     source: "none",
     imageId: null,

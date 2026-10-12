@@ -236,24 +236,33 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     const user = userEvent.setup();
     renderEditor();
     await screen.findByTitle("Design preview");
-    expect(screen.getAllByText("Follows the accent")).toHaveLength(5);
+    expect(screen.getAllByText("Follows the accent")).toHaveLength(4);
 
     fireEvent.input(screen.getByLabelText("Button colour"), { target: { value: "#ffff00" } });
     await waitFor(() => expect(previewBodies.at(-1)?.settings.colors.buttonBackground).toBe("#ffff00"));
     expect(screen.getByRole("status")).toHaveTextContent("Button text on the button colour");
 
     selectOption(screen.getByLabelText("Shape"), "Pill");
-    selectOption(screen.getByLabelText("Style"), "Outlined");
+    // Your buttons' style is offered once there's a button.
+    expect(screen.queryByLabelText("Your buttons style")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    selectOption(screen.getByLabelText("Your buttons style"), "Outlined");
     await waitFor(() =>
-      expect(previewBodies.at(-1)?.settings.buttons).toEqual({ shape: "pill", style: "outline", size: "regular" }),
+      expect(previewBodies.at(-1)?.settings.buttons).toEqual({ shape: "pill", style: "outline", sourceStyle: "outline", size: "regular" }),
     );
     // Outlined, the yellow is checked against the background instead.
+    expect(screen.getByRole("status")).not.toHaveTextContent("Button text on the button colour");
     expect(screen.getByRole("status")).toHaveTextContent("Outlined buttons on the background");
+
+    // Filled Where to watch buttons bring the button text check back.
+    selectOption(screen.getByLabelText("Where to watch buttons style"), "Filled");
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.buttons.sourceStyle).toBe("filled"));
+    expect(screen.getByRole("status")).toHaveTextContent("Button text on the button colour");
 
     await user.click(screen.getByRole("button", { name: "Button colour: use the accent" }));
     await waitFor(() => expect(previewBodies.at(-1)?.settings.colors.buttonBackground).toBeNull());
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-  });
+  }, 30000);
 
   // #290: each note has its own alignment, and says what formatting works.
   it("sets the intro and footer note alignment, and explains the formatting", async () => {
@@ -283,11 +292,11 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     selectOption(screen.getByLabelText("Where your buttons go"), "Above the intro");
     await waitFor(() => expect(previewBodies.at(-1)?.settings.content.ctaPlacement).toBe("beforeIntro"));
 
-    selectOption(screen.getByLabelText("Where they go"), /Under each section/);
+    selectOption(screen.getByLabelText("Where the Where to watch buttons go"), /Under each section/);
     await waitFor(() => expect(previewBodies.at(-1)?.settings.content.sourceButtons.placement).toBe("sections"));
 
     await user.click(screen.getByRole("switch", { name: "Where to watch buttons" }));
-    expect(screen.queryByLabelText("Where they go")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Where the Where to watch buttons go")).not.toBeInTheDocument();
     await waitFor(() => expect(previewBodies.at(-1)?.settings.content.sourceButtons.enabled).toBe(false));
   }, 60000);
 
@@ -381,7 +390,7 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
       expect(await screen.findByText("Line 1 (warning): Attribute bogus is illegal")).toBeInTheDocument();
       expect(editor).toHaveAttribute("data-issue-lines", "1");
       // Options that only apply to options designs aren't offered.
-      expect(screen.queryByText("Branding")).not.toBeInTheDocument();
+      expect(screen.queryByText("Colours and font")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Edit as code" })).not.toBeInTheDocument();
 
       await user.type(editor, " ");
@@ -417,7 +426,7 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
       await user.click(screen.getByRole("button", { name: "Edit as code" }));
       expect(confirm).toHaveBeenCalled();
       expect(await screen.findByLabelText("Email markup (MJML)")).toHaveValue(CODE);
-      expect(screen.queryByText("Branding")).not.toBeInTheDocument();
+      expect(screen.queryByText("Colours and font")).not.toBeInTheDocument();
       expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
       confirm.mockRestore();
     });

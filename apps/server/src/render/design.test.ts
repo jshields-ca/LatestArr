@@ -272,7 +272,7 @@ describe("buildDesignMjml", () => {
         buttonText: null,
         link: null,
       });
-      expect(DEFAULT_DESIGN_SETTINGS.buttons).toEqual({ shape: "rounded", style: "filled", size: "regular" });
+      expect(DEFAULT_DESIGN_SETTINGS.buttons).toEqual({ shape: "rounded", style: "filled", sourceStyle: "outline", size: "regular" });
     });
 
     it("colours type labels, with dark-mode versions", async () => {
@@ -356,6 +356,21 @@ describe("buildDesignMjml", () => {
       expect(ascending(order(top, "Request something", "Watch on Plex", "A Movie"))).toBe(true);
       const off = await render(design({ content: { sourceButtons: { enabled: false } } }), context);
       expect(off).not.toContain("Watch on Plex");
+    });
+
+    it("outlines source buttons by default, and fills them if the design says so", async () => {
+      const colors = { buttonBackground: "#222222", buttonText: "#FFD700" };
+      // The Watch on Plex button's markup, from its table to its label.
+      const watchOnPlex = (html: string) => {
+        const link = html.indexOf('href="https://plex.example"');
+        return html.slice(html.lastIndexOf("<table", link), html.indexOf("Watch on Plex", link));
+      };
+      const outlined = watchOnPlex(await render(design({ colors }), context));
+      expect(outlined).toContain("border:1px solid #222222");
+      expect(outlined).not.toContain("background:#222222");
+      const filled = watchOnPlex(await render(design({ colors, buttons: { sourceStyle: "filled" } }), context));
+      expect(filled).toMatch(/background:#222222;color:#ffd700;/);
+      expect(filled).not.toContain("border:1px solid");
     });
 
     it("renders no button markup when there are none", async () => {
