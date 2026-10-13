@@ -85,7 +85,7 @@ describe("roles in the web app", () => {
       .getAllByRole("link")
       .map((link) => link.textContent);
     expect(links).toEqual(["Dashboard", "Sources", "Newsletters", "Designs"]);
-    expect(screen.getAllByText("Viewer access").length).toBeGreaterThan(0);
+    expect(screen.getAllByTitle("You have viewer access").length).toBeGreaterThan(0);
   });
 
   it("adds Recipients for editors, and everything for admins", async () => {
