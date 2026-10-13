@@ -614,7 +614,7 @@ describe("NewslettersPage", () => {
     await user.click(screen.getByRole("tab", { name: "History" }));
 
     expect(await screen.findByText("Sent (empty)")).toBeInTheDocument();
-    expect(screen.queryByText("success")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sent")).not.toBeInTheDocument();
   });
 
   it("shows a real send's included items and per-recipient results when Details is opened", async () => {
@@ -659,7 +659,7 @@ describe("NewslettersPage", () => {
     await screen.findByText("Weekly digest");
     await user.click(screen.getByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
     await user.click(screen.getByRole("tab", { name: "History" }));
-    await screen.findByText("success");
+    await screen.findByText("Sent");
 
     await user.click(screen.getByRole("button", { name: "Show send details" }));
 

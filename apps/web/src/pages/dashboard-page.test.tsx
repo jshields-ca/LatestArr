@@ -152,7 +152,7 @@ describe("DashboardPage", () => {
 
     // Recent send detail: which newsletter, item/recipient counts, outcome.
     expect(await screen.findByText("Weekly digest")).toBeInTheDocument();
-    expect(screen.getByText("success")).toBeInTheDocument();
+    expect(screen.getByText("Sent")).toBeInTheDocument();
     expect(screen.getByText(/4 items/)).toBeInTheDocument();
     expect(screen.getByText(/2 recipients/)).toBeInTheDocument();
   });

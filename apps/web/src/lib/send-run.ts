@@ -4,7 +4,7 @@ type BadgeVariant = "neutral" | "success" | "destructive" | "warning";
 
 const STATUS_VARIANT: Record<SendRun["status"], BadgeVariant> = {
   success: "success",
-  partial_failure: "destructive",
+  partial_failure: "warning",
   failed: "destructive",
   pending: "neutral",
   running: "neutral",
@@ -17,6 +17,16 @@ const STATUS_VARIANT: Record<SendRun["status"], BadgeVariant> = {
 // breaking other logic/tests that depend on its current semantics. So the
 // distinction between a real send and an empty one lives here, on the
 // frontend, purely for display.
+// What each status reads as. The raw values ("partial_failure") are for code.
+const STATUS_LABEL: Record<SendRun["status"], string> = {
+  success: "Sent",
+  partial_failure: "Partly sent",
+  failed: "Failed",
+  pending: "Waiting",
+  running: "Sending",
+  skipped: "Skipped (nothing new)",
+};
+
 export function isEmptySendRun(run: SendRun): boolean {
   return run.status === "success" && (run.itemCountIncluded === 0 || run.recipientCount === 0);
 }
@@ -28,6 +38,5 @@ export function sendRunBadgeVariant(run: SendRun): BadgeVariant {
 
 export function sendRunBadgeLabel(run: SendRun): string {
   if (isEmptySendRun(run)) return "Sent (empty)";
-  if (run.status === "skipped") return "Skipped (nothing new)";
-  return run.status;
+  return STATUS_LABEL[run.status];
 }

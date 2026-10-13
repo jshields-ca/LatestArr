@@ -1,8 +1,20 @@
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
-import { CheckCircle2, DatabaseBackup, Download, Loader2, TriangleAlert, XCircle } from "lucide-react";
+import type { FormEvent, ReactNode } from "react";
+import {
+  CalendarClock,
+  Check,
+  CheckCircle2,
+  Copy,
+  DatabaseBackup,
+  Download,
+  FolderOpen,
+  KeyRound,
+  Loader2,
+  TriangleAlert,
+  XCircle,
+} from "lucide-react";
 
-import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
+import { ConfirmDeleteButton } from "@/components/list-row";
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +32,7 @@ import {
   type BackupFile,
   type BackupOverview,
   type BackupRetention,
+  type BackupSettings,
   type BackupTrigger,
   backupDownloadUrl,
   createBackupNow,
@@ -29,6 +42,7 @@ import {
 } from "@/lib/api";
 import {
   DEFAULT_SIMPLE_SCHEDULE,
+  formatScheduleForDisplay,
   parseCronToSimpleSchedule,
   type SimpleSchedule,
   simpleScheduleToCron,
@@ -36,6 +50,7 @@ import {
 import { saveShortcutRef, useSavedSnapshot, useUnsavedChanges } from "@/lib/unsaved-changes";
 
 const RESTORE_DOCS_URL = "https://github.com/jshields-ca/LatestArr/blob/main/docs/self-hosting.md#restoring-a-backup";
+const BACKUP_PATH_DOCS_URL = "https://github.com/jshields-ca/LatestArr/blob/main/docs/self-hosting.md#backups";
 
 const TRIGGER_LABELS: Record<BackupTrigger, string> = {
   scheduled: "Scheduled",
@@ -56,30 +71,159 @@ function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
+function retentionSummary(retention: BackupRetention): string {
+  return retention.mode === "count"
+    ? `keeps the latest ${retention.keep}`
+    : `keeps ${retention.daily} daily, ${retention.weekly} weekly, and ${retention.monthly} monthly`;
+}
+
+// "Daily at 3:00 AM (UTC), keeps the latest 7", for the settings card's header.
+function settingsSummary(settings: BackupSettings): string {
+  const schedule = settings.enabled ? formatScheduleForDisplay(settings.scheduleCron, settings.timezone) : "Scheduled backups are off";
+  return `${schedule}, ${retentionSummary(settings.retention)}.`;
+}
+
+// One fact in the status card: an icon, a label, and its value.
+function Fact({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <dt className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+        {icon}
+        {label}
+      </dt>
+      <dd className="min-w-0 pl-6 text-sm">{children}</dd>
+    </div>
+  );
+}
+
+// "Am I protected?" at a glance. The last backup comes from the files
+// actually in the backup folder, so it always agrees with the list below,
+// unless the most recent attempt failed, which is shown instead.
 function StatusCard({ overview }: { overview: BackupOverview }) {
-  const { lastRun, nextRun, settings } = overview;
+  const { lastRun, nextRun, settings, location, backups } = overview;
+  const newest = backups[0];
+  const failed = lastRun && !lastRun.ok && (!newest || lastRun.at > newest.createdAt) ? lastRun : null;
+  const totalBytes = backups.reduce((sum, backup) => sum + backup.sizeBytes, 0);
+
   return (
     <Card>
-      <CardContent className="flex flex-col gap-2 pt-6 text-sm">
-        <div className="flex items-start gap-2">
-          {lastRun === null ? (
-            <DatabaseBackup className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          ) : lastRun.ok ? (
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-          ) : (
-            <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
-          )}
-          <p>
-            {lastRun === null
-              ? "No backups yet."
-              : lastRun.ok
-                ? `Last backup ${formatWhen(lastRun.at)} (${TRIGGER_LABELS[lastRun.trigger].toLowerCase()}).`
-                : `The last backup failed, ${formatWhen(lastRun.at)}: ${lastRun.error ?? "unknown error"}`}
-          </p>
+      <CardContent className="flex flex-col gap-4 pt-6">
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <Fact
+            icon={
+              failed ? (
+                <XCircle className="text-destructive" aria-hidden="true" />
+              ) : newest ? (
+                <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+              ) : (
+                <DatabaseBackup aria-hidden="true" />
+              )
+            }
+            label="Last backup"
+          >
+            {failed ? (
+              <span className="text-destructive">
+                The last backup failed, {formatWhen(failed.at)}: {failed.error ?? "unknown error"}
+              </span>
+            ) : newest ? (
+              <>
+                {formatWhen(newest.createdAt)}{" "}
+                <span className="text-muted-foreground">({TRIGGER_LABELS[newest.trigger].toLowerCase()})</span>
+              </>
+            ) : (
+              "No backups yet."
+            )}
+          </Fact>
+          <Fact icon={<CalendarClock aria-hidden="true" />} label="Next backup">
+            {settings.enabled && nextRun ? formatWhen(nextRun) : <span className="text-muted-foreground">Scheduled backups are off.</span>}
+          </Fact>
+          <Fact icon={<FolderOpen aria-hidden="true" />} label="Saved to">
+            <code className="break-all font-mono text-xs">{location.path}</code>
+          </Fact>
+          <Fact icon={<DatabaseBackup aria-hidden="true" />} label="Stored">
+            {backups.length === 0
+              ? "None"
+              : `${backups.length} ${backups.length === 1 ? "backup" : "backups"}, ${formatSize(totalBytes)}`}
+          </Fact>
+        </dl>
+        {location.sameDiskAsDatabase ? (
+          <div role="note" className="flex gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
+            <p>
+              <span className="font-medium">On the same disk as the database,</span> so a failed disk would take both.
+              Set <code className="font-mono text-xs">BACKUP_PATH</code> to another disk, a NAS, or a folder your own
+              backup tool copies off this machine.{" "}
+              <a href={BACKUP_PATH_DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                How to set it
+              </a>
+              .
+            </p>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BackupRow({ backup, onDeleted }: { backup: BackupFile; onDeleted: (filename: string) => void }) {
+  const when = formatWhen(backup.createdAt);
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 first:pt-0 last:pb-0">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-medium">{when}</p>
+          <Badge variant={backup.trigger === "pre-upgrade" ? "accent" : "neutral"}>{TRIGGER_LABELS[backup.trigger]}</Badge>
         </div>
-        <p className="pl-6 text-muted-foreground">
-          {settings.enabled && nextRun ? `Next scheduled backup: ${formatWhen(nextRun)}.` : "Scheduled backups are off."}
+        <p className="text-sm text-muted-foreground">
+          {backup.version === "earlier" ? "From before 0.12" : `LatestArr ${backup.version}`} · {formatSize(backup.sizeBytes)}
         </p>
+      </div>
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="sm" asChild>
+          <a href={backupDownloadUrl(backup.filename)} download aria-label={`Download the backup from ${when}`}>
+            <Download />
+            Download
+          </a>
+        </Button>
+        <ConfirmDeleteButton
+          label={`Delete the backup from ${when}`}
+          onConfirm={() =>
+            deleteBackup(backup.filename)
+              .then(() => {
+                onDeleted(backup.filename);
+                toast({ variant: "success", title: "Backup deleted" });
+              })
+              .catch((err) => {
+                toast({ variant: "destructive", title: "Couldn't delete the backup", description: errorMessage(err, "") || undefined });
+                throw err;
+              })
+          }
+        />
+      </div>
+    </li>
+  );
+}
+
+function BackupsCard({ backups, onDeleted }: { backups: BackupFile[]; onDeleted: (filename: string) => void }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle id="backups-list-heading">Saved backups</CardTitle>
+        <CardDescription>Newest first. Each one is a single .zip file you can download.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {backups.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border px-4 py-8 text-center">
+            <DatabaseBackup className="size-6 text-muted-foreground" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">None yet. Back up now, or wait for the schedule.</p>
+          </div>
+        ) : (
+          <ul aria-labelledby="backups-list-heading" className="flex flex-col divide-y divide-border">
+            {backups.map((backup) => (
+              <BackupRow key={backup.filename} backup={backup} onDeleted={onDeleted} />
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   );
@@ -155,13 +299,10 @@ function SettingsCard({ overview, onSaved }: { overview: BackupOverview; onSaved
     <Card>
       <CardHeader>
         <CardTitle>Schedule and retention</CardTitle>
-        <CardDescription>
-          Old backups are only removed after a new one succeeds, and the newest is always kept. The last three
-          made before an upgrade are kept regardless.
-        </CardDescription>
+        <CardDescription>{settingsSummary(saved)}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form ref={saveShortcutRef} className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <form ref={saveShortcutRef} className="flex max-w-xl flex-col gap-5" onSubmit={handleSubmit} noValidate>
           <SettingRow
             label="Back up on a schedule"
             htmlFor="backups-enabled"
@@ -182,28 +323,36 @@ function SettingsCard({ overview, onSaved }: { overview: BackupOverview; onSaved
               disabled={saving}
             />
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="backups-retention">Which backups to keep</Label>
-            <Select
-              id="backups-retention"
-              className="w-72"
-              value={mode}
-              disabled={saving}
-              onChange={(e) => setMode(e.target.value === "calendar" ? "calendar" : "count")}
-            >
-              <option value="count">The most recent ones</option>
-              <option value="calendar">Daily, weekly, and monthly ones</option>
-            </Select>
-          </div>
-          {mode === "count" ? (
-            numberField("backups-keep", "How many", keep, setKeep, 365)
-          ) : (
-            <div className="flex flex-wrap gap-4">
-              {numberField("backups-daily", "Days", daily, setDaily, 90)}
-              {numberField("backups-weekly", "Weeks", weekly, setWeekly, 52)}
-              {numberField("backups-monthly", "Months", monthly, setMonthly, 120)}
+          <fieldset className="flex flex-col gap-3 border-t border-border pt-4">
+            <legend className="sr-only">Retention</legend>
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="backups-retention">Which backups to keep</Label>
+                <Select
+                  id="backups-retention"
+                  className="w-64"
+                  value={mode}
+                  disabled={saving}
+                  onChange={(e) => setMode(e.target.value === "calendar" ? "calendar" : "count")}
+                >
+                  <option value="count">The most recent ones</option>
+                  <option value="calendar">Daily, weekly, and monthly ones</option>
+                </Select>
+              </div>
+              {mode === "count" ? numberField("backups-keep", "How many", keep, setKeep, 365) : null}
             </div>
-          )}
+            {mode === "calendar" ? (
+              <div className="flex flex-wrap gap-4">
+                {numberField("backups-daily", "Days", daily, setDaily, 90)}
+                {numberField("backups-weekly", "Weeks", weekly, setWeekly, 52)}
+                {numberField("backups-monthly", "Months", monthly, setMonthly, 120)}
+              </div>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Old backups are only removed after a new one succeeds, and the newest is always kept. The last three made
+              before an upgrade are kept regardless.
+            </p>
+          </fieldset>
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -216,50 +365,76 @@ function SettingsCard({ overview, onSaved }: { overview: BackupOverview; onSaved
   );
 }
 
-function BackupRow({ backup, onDeleted }: { backup: BackupFile; onDeleted: (filename: string) => void }) {
+// A shell command with a copy button.
+function Command({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ variant: "destructive", title: "Couldn't copy", description: "Select the command and copy it instead." });
+    }
+  }
   return (
-    <ListRow
-      leading={
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-          <DatabaseBackup className="size-4" aria-hidden="true" />
-        </span>
-      }
-      primary={
-        <>
-          <p className="truncate font-medium">{formatWhen(backup.createdAt)}</p>
-          <Badge variant={backup.trigger === "pre-upgrade" ? "accent" : "neutral"}>{TRIGGER_LABELS[backup.trigger]}</Badge>
-        </>
-      }
-      secondary={
-        <p className="truncate text-sm text-muted-foreground">
-          {backup.version === "earlier" ? "From before 0.12" : `LatestArr ${backup.version}`} · {formatSize(backup.sizeBytes)}
+    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 py-1 pl-3 pr-1">
+      <code className="min-w-0 flex-1 break-all py-1 font-mono text-xs">{command}</code>
+      <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => void copy()} aria-label={`Copy: ${command}`}>
+        {copied ? <Check /> : <Copy />}
+      </Button>
+    </div>
+  );
+}
+
+function RestoreCard({ newest }: { newest: BackupFile | undefined }) {
+  const file = newest?.filename ?? "<file>";
+  const steps = [
+    { title: "Check it (optional)", command: `docker exec -it latestarr node dist/cli.js check-backup ${file}` },
+    { title: "Stage the restore", command: `docker exec -it latestarr node dist/cli.js restore ${file}` },
+    { title: "Restart to swap it in", command: "docker restart latestarr" },
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Restoring a backup</CardTitle>
+        <CardDescription>
+          Run these on the server. {newest ? "They use your newest backup; swap in another file's name from the list. " : ""}
+          If your container has a different name, use that instead of latestarr.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <ol className="flex flex-col gap-3">
+          {steps.map((step, index) => (
+            <li key={step.title} className="flex gap-3">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                {index + 1}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <p className="text-sm font-medium">{step.title}</p>
+                <Command command={step.command} />
+              </div>
+            </li>
+          ))}
+        </ol>
+        <p className="text-sm text-muted-foreground">
+          Your current database is kept beside it, renamed <code className="font-mono text-xs">latestarr.db.before-restore-&lt;time&gt;</code>,
+          in case you change your mind.{" "}
+          <a href={RESTORE_DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+            Full restore guide
+          </a>
+          .
         </p>
-      }
-      actions={
-        <>
-          <Button variant="outline" size="sm" asChild>
-            <a href={backupDownloadUrl(backup.filename)} download aria-label={`Download the backup from ${formatWhen(backup.createdAt)}`}>
-              <Download />
-              Download
-            </a>
-          </Button>
-          <ConfirmDeleteButton
-            label={`Delete the backup from ${formatWhen(backup.createdAt)}`}
-            onConfirm={() =>
-              deleteBackup(backup.filename)
-                .then(() => {
-                  onDeleted(backup.filename);
-                  toast({ variant: "success", title: "Backup deleted" });
-                })
-                .catch((err) => {
-                  toast({ variant: "destructive", title: "Couldn't delete the backup", description: errorMessage(err, "") || undefined });
-                  throw err;
-                })
-            }
-          />
-        </>
-      }
-    />
+        <div className="flex gap-3 rounded-md bg-muted/50 px-3 py-2.5 text-sm">
+          <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <p className="text-muted-foreground">
+            <span className="font-medium text-foreground">Keep ENCRYPTION_KEY safe, separately.</span> Backups don&apos;t
+            include it, so without it a restored backup&apos;s source and SMTP passwords can&apos;t be read. Backups hold
+            every recipient&apos;s email address and your send history, so keep them as private as the server.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -293,7 +468,7 @@ export function BackupsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Backups"
-        description="Copies of LatestArr's database: sources, designs, newsletters, recipients, users, and send history. Made while LatestArr keeps running, and checked after each one."
+        description="Checked copies of everything LatestArr keeps, made while it runs."
         actions={
           overview ? (
             <Button onClick={() => void backUpNow()} disabled={backingUp}>
@@ -320,64 +495,14 @@ export function BackupsPage() {
       {overview ? (
         <>
           <StatusCard overview={overview} />
-
-          {overview.location.sameDiskAsDatabase ? (
-            <div role="note" className="flex gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
-              <p>
-                Backups are saved on the same disk as the database ({overview.location.path}), so a failed disk would
-                take both. Set <code className="font-mono text-xs">BACKUP_PATH</code> to another disk, a NAS, or a
-                folder your own backup tool copies off this machine.
-              </p>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Saved to <code className="font-mono text-xs">{overview.location.path}</code>.
-            </p>
-          )}
-
+          <BackupsCard
+            backups={overview.backups}
+            onDeleted={(filename) =>
+              setOverview((prev) => prev && { ...prev, backups: prev.backups.filter((b) => b.filename !== filename) })
+            }
+          />
           <SettingsCard overview={overview} onSaved={setOverview} />
-
-          <section className="flex flex-col gap-3" aria-labelledby="backups-list-heading">
-            <h2 id="backups-list-heading" className="text-sm font-semibold">
-              Saved backups
-            </h2>
-            {overview.backups.length === 0 ? (
-              <p className="text-sm text-muted-foreground">None yet. Back up now, or wait for the schedule.</p>
-            ) : (
-              overview.backups.map((backup) => (
-                <BackupRow
-                  key={backup.filename}
-                  backup={backup}
-                  onDeleted={(filename) =>
-                    setOverview((prev) => prev && { ...prev, backups: prev.backups.filter((b) => b.filename !== filename) })
-                  }
-                />
-              ))
-            )}
-          </section>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Keep them safe, and restoring one</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 text-sm text-muted-foreground">
-              <p>
-                Backups hold every recipient&apos;s email address and your send history, so keep them as private as the
-                server. They don&apos;t include <code className="font-mono text-xs">ENCRYPTION_KEY</code>: keep a copy of it
-                somewhere safe, or a restored backup&apos;s source and SMTP passwords can&apos;t be read.
-              </p>
-              <p>
-                To restore one, run{" "}
-                <code className="font-mono text-xs">docker exec -it latestarr node dist/cli.js restore &lt;file&gt;</code>
-                , then restart LatestArr. The current database is kept, in case you change your mind.{" "}
-                <a href={RESTORE_DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-                  Step-by-step restore guide
-                </a>
-                .
-              </p>
-            </CardContent>
-          </Card>
+          <RestoreCard newest={overview.backups[0]} />
         </>
       ) : null}
     </div>

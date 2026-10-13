@@ -59,9 +59,13 @@ describe("BackupsPage", () => {
   it("lists backups with download links, and warns when they share the database's disk", async () => {
     answer({ "GET /api/backups": () => jsonResponse(200, overview()) });
     const { container } = render(<BackupsPage />);
-    expect(await screen.findByText(/Last backup/)).toBeInTheDocument();
-    expect(screen.getByText(/Next scheduled backup/)).toBeInTheDocument();
+    expect(await screen.findByText("Last backup")).toBeInTheDocument();
+    expect(screen.getByText("Next backup")).toBeInTheDocument();
+    expect(screen.getByText("/app/data/backups")).toBeInTheDocument();
+    expect(screen.getByText("2 backups, 3.4 MB")).toBeInTheDocument();
     expect(screen.getByRole("note")).toHaveTextContent("same disk as the database");
+    // The settings card says what's set without reading the form.
+    expect(screen.getByText("Daily at 3:00 AM (UTC), keeps the latest 7.")).toBeInTheDocument();
     expect(screen.getByText("Before upgrade")).toBeInTheDocument();
     expect(screen.getByText(/From before 0.12/)).toBeInTheDocument();
     expect(screen.getByText(/2.5 MB/)).toBeInTheDocument();
@@ -89,10 +93,29 @@ describe("BackupsPage", () => {
   it("shows a failed backup's reason", async () => {
     answer({
       "GET /api/backups": () =>
-        jsonResponse(200, overview({ lastRun: { at: "2026-09-29T03:00:00.000Z", ok: false, trigger: "scheduled", error: "ENOSPC: no space left on device" } })),
+        jsonResponse(200, overview({ lastRun: { at: "2026-09-30T03:00:00.000Z", ok: false, trigger: "scheduled", error: "ENOSPC: no space left on device" } })),
     });
     render(<BackupsPage />);
     expect(await screen.findByText(/The last backup failed.*no space left/)).toBeInTheDocument();
+  });
+
+  // The status comes from the files in the folder, so after BACKUP_PATH
+  // changes it doesn't claim a backup the list doesn't show.
+  it("bases the last backup on the backups in the folder", async () => {
+    answer({ "GET /api/backups": () => jsonResponse(200, overview({ backups: [] })) });
+    render(<BackupsPage />);
+    expect(await screen.findByText("No backups yet.")).toBeInTheDocument();
+    expect(screen.getByText(/None yet. Back up now/)).toBeInTheDocument();
+  });
+
+  it("copies the restore commands for the newest backup", async () => {
+    answer({ "GET /api/backups": () => jsonResponse(200, overview()) });
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    render(<BackupsPage />);
+    const command = `docker exec -it latestarr node dist/cli.js restore ${backup.filename}`;
+    await user.click(await screen.findByRole("button", { name: `Copy: ${command}` }));
+    expect(writeText).toHaveBeenCalledWith(command);
   });
 
   it("saves calendar retention", async () => {
@@ -102,7 +125,7 @@ describe("BackupsPage", () => {
     });
     const user = userEvent.setup();
     render(<BackupsPage />);
-    await screen.findByText(/Last backup/);
+    await screen.findByText("Last backup");
     selectOption(screen.getByLabelText("Which backups to keep"), "Daily, weekly, and monthly ones");
     const weeks = screen.getByLabelText("Weeks");
     await user.clear(weeks);
@@ -125,7 +148,7 @@ describe("BackupsPage", () => {
     const user = userEvent.setup();
     render(<BackupsPage />);
     await screen.findByText("Before upgrade");
-    const row = screen.getByText("Before upgrade").closest("div[class*='border']") as HTMLElement;
+    const row = screen.getByText("Before upgrade").closest("li") as HTMLElement;
     await user.click(within(row).getByRole("button", { name: /^Delete the backup/ }));
     await user.click(within(row).getByRole("button", { name: /Confirm|Delete/ }));
     await waitFor(() => expect(screen.queryByText("Before upgrade")).not.toBeInTheDocument());
