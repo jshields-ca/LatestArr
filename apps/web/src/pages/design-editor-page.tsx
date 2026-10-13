@@ -513,7 +513,7 @@ export function DesignEditorPage() {
     return () => clearTimeout(timer);
   }, [settings, previewSource, mode, code]);
 
-  useUnsavedChanges(dirty);
+  useUnsavedChanges(canEdit && dirty);
   const canSave = canEdit && dirty && !saving && Boolean(name.trim()) && ctasComplete && logoReady;
   useSaveShortcut(() => void handleSave(), canSave);
 
@@ -569,7 +569,7 @@ export function DesignEditorPage() {
   }
 
   async function handleBack() {
-    if (!(await confirmDiscard(dirty))) return;
+    if (!(await confirmDiscard(canEdit && dirty))) return;
     navigate("/designs");
   }
 

@@ -648,7 +648,9 @@ function NewsletterDetailsForm({
     };
   }
   const { dirty, markSaved } = useSavedSnapshot(currentInput());
-  useUnsavedChanges(dirty);
+  // Viewers can look but not save, so there's nothing to warn them about.
+  const canEdit = useHasRole("editor");
+  useUnsavedChanges(canEdit && dirty);
   const lookbackError = lookbackProblem(lookbackDays);
   const subjectError = subjectProblem(subjectTemplate);
 
