@@ -665,7 +665,8 @@ describe("NewslettersPage", () => {
 
     expect(await screen.findByText("Some Movie")).toBeInTheDocument();
     expect(await screen.findByText("Person")).toBeInTheDocument();
-    expect(screen.getByText("sent")).toBeInTheDocument();
+    // The run says Sent, and so does the one person in it.
+    expect(screen.getAllByText("Sent")).toHaveLength(2);
 
     const viewCopyLink = screen.getByRole("link", { name: "View a copy of this send" });
     expect(viewCopyLink).toHaveAttribute("href", "/api/newsletters/n1/send-runs/run1/html");

@@ -67,6 +67,14 @@ export function sendRunIconClass(variant: ReturnType<typeof sendRunBadgeVariant>
 // Per-recipient send result badge — separate from sendRunBadgeVariant
 // (which reads the whole SendRun) since these are the four
 // sendRunRecipientResults.status values, not the run-level status enum.
+// Each person's result in a send, as words, matching the send's own status.
+const RECIPIENT_STATUS_LABEL: Record<SendRunRecipientResult["status"], string> = {
+  sent: "Sent",
+  bounced: "Bounced",
+  failed: "Failed",
+  skipped_unsubscribed: "Unsubscribed",
+};
+
 function recipientStatusVariant(
   status: SendRunRecipientResult["status"],
 ): "success" | "destructive" | "neutral" {
@@ -256,7 +264,7 @@ function SendRunDetails({ run, onRunsChanged }: { run: SendRun; onRunsChanged?: 
                   className="flex flex-wrap items-center justify-between gap-2 text-sm"
                 >
                   <span className="truncate">{recipient.displayName || recipient.email}</span>
-                  <Badge variant={recipientStatusVariant(recipient.status)}>{recipient.status}</Badge>
+                  <Badge variant={recipientStatusVariant(recipient.status)}>{RECIPIENT_STATUS_LABEL[recipient.status]}</Badge>
                 </li>
               ))}
             </ul>
