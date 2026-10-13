@@ -245,12 +245,20 @@ function TestersNote({ label, issueUrl }: { label: string; issueUrl: string }) {
   );
 }
 
+function BaseUrlHint({ id }: { id: string }) {
+  return (
+    <p id={id} className="text-xs text-muted-foreground">
+      Where LatestArr connects to fetch what&apos;s new. It only has to work from LatestArr&apos;s server, so a
+      local address is fine.
+    </p>
+  );
+}
+
 function PublicUrlHint({ id }: { id: string }) {
   return (
     <p id={id} className="text-xs text-muted-foreground">
-      The address your recipients open, for item links and a Where to watch button (like Watch on Plex). Set it
-      when the Base URL only works on your own network, such as a Tailscale IP or Tautulli&apos;s address. Left
-      blank, item links use the Base URL and there&apos;s no Where to watch button.
+      Where your recipients go when they click an item or a Where to watch button (like Watch on Plex). Leave it
+      blank and item links use the Base URL, with no Where to watch button.
     </p>
   );
 }
@@ -386,7 +394,9 @@ function AddSourceDialog({
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               disabled={submitting}
+              aria-describedby="source-base-url-hint"
             />
+            <BaseUrlHint id="source-base-url-hint" />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="source-public-url">Public URL (optional)</Label>
@@ -542,7 +552,9 @@ function EditSourceDialog({
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               disabled={submitting}
+              aria-describedby={`edit-source-base-url-hint-${source.id}`}
             />
+            <BaseUrlHint id={`edit-source-base-url-hint-${source.id}`} />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`edit-source-public-url-${source.id}`}>Public URL (optional)</Label>
