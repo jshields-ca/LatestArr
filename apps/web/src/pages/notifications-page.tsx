@@ -150,7 +150,7 @@ export function NotificationsPage() {
       ) : null}
 
       {saved ? (
-        <form ref={saveShortcutRef} className="flex max-w-2xl flex-col gap-4" onSubmit={handleSave} noValidate>
+        <form ref={saveShortcutRef} className="flex flex-col gap-4" onSubmit={handleSave} noValidate>
           <Card>
             <CardHeader>
               <CardTitle>When to alert</CardTitle>
@@ -159,7 +159,7 @@ export function NotificationsPage() {
                 per newsletter, or for backups, per hour.
               </CardDescription>
             </CardHeader>
-            <CardContent className="divide-y divide-border py-0">
+            <CardContent className="max-w-2xl divide-y divide-border py-0">
               <SettingRow
                 label="A scheduled send fails"
                 description="Including a newsletter that can't send at all, e.g. its SMTP profile was deleted."
@@ -190,7 +190,7 @@ export function NotificationsPage() {
                 webhook too.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="flex max-w-2xl flex-col gap-3">
               <SettingRow
                 label="Email me"
                 htmlFor="alert-email-enabled"
@@ -237,7 +237,7 @@ export function NotificationsPage() {
                 JSON to your own endpoint.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="flex max-w-2xl flex-col gap-3">
               <SettingRow
                 label="Send to a webhook"
                 htmlFor="alert-webhook-enabled"
