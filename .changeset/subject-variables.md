@@ -10,7 +10,7 @@
 - **Preview and history:** **Preview** shows the real next subject, **Send test** uses it (with `[Test]`), and History records the subject as sent.
 - **Nothing new:** a subject built around `{count}` or `{counts}` becomes "<newsletter>: nothing new" instead of "0 new".
 - **Unchanged:** a blank subject still uses the newsletter's name, and existing subjects work exactly as before.
-- **Fixed:** clearing a newsletter's subject now saves. It used to keep the old one.
+- **Fixed:** Clearing a newsletter's subject now saves. It used to keep the old one.
 
 <details>
 <summary>Technical details</summary>

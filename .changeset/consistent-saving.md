@@ -9,7 +9,7 @@
   - the button is enabled only when something has changed, with **Unsaved changes** beside it;
   - **Ctrl+S** (or **Cmd+S**) saves;
   - you're asked before losing changes: on reload, closing the tab, following a sidebar link, closing the dialog, or collapsing the newsletter.
-- **Editing a recipient:** name and email save with **Save details**, and the dialog stays open. Groups save straight away, as they always did, and now say so. The dialog closes with **Done**.
+- **Editing a recipient:** name, email and groups all save together with **Save changes**, and **Cancel** asks before discarding. A new group typed there is created when you save, and a name that matches an existing group just adds them to it.
 - **Lookback:** an invalid lookback, such as 0 days, now says "Enter a whole number of days, 1 or more." It used to show a raw validation message.
 
 <details>

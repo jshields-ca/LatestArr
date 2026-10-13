@@ -2,7 +2,7 @@
 "@latestarr/web": patch
 ---
 
-**Improved:** A clearer Backups page, from release testing.
+**Improved:** A clearer Backups page.
 
 - **Status at a glance:** one card shows the last backup, the next one, where they're saved, and how many there are with their total size. A note in that card warns when they're on the same disk as the database, with a link to how to fix it.
 - **Always in agreement:** the last backup comes from the backups actually in the folder. After changing `BACKUP_PATH`, it no longer names a backup the list doesn't show.

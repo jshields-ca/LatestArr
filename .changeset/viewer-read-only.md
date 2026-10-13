@@ -2,11 +2,10 @@
 "@latestarr/web": patch
 ---
 
-**Fixed:** Viewers can no longer change dropdowns they can't save.
+**Improved:** Viewers get a fully read-only view, and everyone can see their role.
 
-- **Read-only means read-only:** on newsletters and designs, viewers could open dropdowns like Repeats, Timezone, Font, or a newsletter's Design, and change them, only to find they couldn't save. Those dropdowns are now disabled like the rest of a read-only form.
-- **No false warnings:** viewers are no longer asked about unsaved changes when leaving a page they can't edit.
-- **Your role, tidier:** editors and viewers see their role as a small badge beside their name in the header, instead of a cramped extra line.
+- **Read-only means read-only:** on newsletters and designs, every control is disabled for viewers, dropdowns included, and they're never asked about unsaved changes.
+- **Your role:** editors and viewers see a small **Editor** or **Viewer** badge beside their name in the header.
 
 <details>
 <summary>Technical details</summary>

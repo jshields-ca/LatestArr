@@ -3,10 +3,10 @@
 "@latestarr/web": minor
 ---
 
-**New:** More branding options for designs, under **Branding** in the design editor.
+**New:** More colour and button options for designs, under **Colours and font** and **Buttons** in the design editor.
 
-- **More colours:** choose your own colours for type labels (text and background), for buttons (colour and text), and for links in the intro and footer note. Each follows the accent until you set it, and **Use accent** puts it back, so existing designs, Default included, look exactly as before. Custom label and link colours get dark-mode versions too.
-- **Button style:** rounded, square or pill shape; filled or outlined; regular or small. "Where to watch" buttons share the shape and size.
+- **More colours:** choose your own colours for type labels (text and background) and for links in the intro and footer note, and under **Buttons**, the button colour and button text. Each follows the accent until you set it, and the × puts it back, so existing designs, Default included, look exactly as before. Custom label and link colours get dark-mode versions too.
+- **Button style:** rounded, square or pill shape, regular or small, for every button. Your own buttons and "Where to watch" buttons can each be filled or outlined.
 - **Contrast check:** the editor warns when a colour pair would be hard to read (below WCAG AA, 4.5:1). It doesn't stop you saving.
 
 <details>
