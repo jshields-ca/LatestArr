@@ -46,7 +46,8 @@ import {
   withDesignDefaults,
 } from "@/lib/design";
 import { EMAIL_FONT_OPTIONS } from "@/lib/email-fonts";
-import { useSaveShortcut, useUnsavedChanges } from "@/lib/unsaved-changes";
+import { confirmDiscard, useSaveShortcut, useUnsavedChanges } from "@/lib/unsaved-changes";
+import { confirmAction } from "@/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 // CodeMirror is only needed for code designs, so it loads on demand.
@@ -234,7 +235,7 @@ function ColourField({ id, label, value, note, onChange }: { id: string; label: 
       />
       <div className="flex min-w-0 flex-col">
         <Label htmlFor={id}>{label}</Label>
-        <span className="font-mono text-xs text-muted-foreground">{note ?? value}</span>
+        <span className={cn("text-xs text-muted-foreground", !note && "font-mono")}>{note ?? value}</span>
       </div>
     </div>
   );
@@ -262,7 +263,7 @@ function AccentColours({
   onChange: (key: AdvancedColour, value: string | null) => void;
 }) {
   return (
-    <ul className="grid grid-cols-2 gap-3">
+    <ul className="flex flex-col gap-2">
       {colours.map(({ key, label }) => {
         const own = colors[key];
         return (
@@ -271,7 +272,7 @@ function AccentColours({
               id={`design-color-${key}`}
               label={label}
               value={effectiveColour(colors, key)}
-              note={own ?? (key === "buttonText" ? "White" : "Follows the accent")}
+              note={own ? undefined : key === "buttonText" ? "White" : "Follows the accent"}
               onChange={(value) => onChange(key, value)}
             />
             {own ? (
@@ -548,9 +549,12 @@ export function DesignEditorPage() {
       toast({ variant: "destructive", title: "Save your changes first", description: "Then switch this design to code." });
       return;
     }
-    const confirmed = window.confirm(
-      "Edit this design as code from now on? You'll start from the markup its current options produce, and the options won't apply any more. To keep an options version, duplicate the design first.",
-    );
+    const confirmed = await confirmAction({
+      title: "Edit this design as code?",
+      description:
+        "You'll start from the markup its current options produce, and the options won't apply any more. To keep an options version, duplicate the design first.",
+      confirmLabel: "Edit as code",
+    });
     if (!confirmed) return;
     setConverting(true);
     try {
@@ -564,8 +568,8 @@ export function DesignEditorPage() {
     }
   }
 
-  function handleBack() {
-    if (dirty && !window.confirm("You have unsaved changes to this design. Leave without saving?")) return;
+  async function handleBack() {
+    if (!(await confirmDiscard(dirty))) return;
     navigate("/designs");
   }
 
@@ -740,7 +744,7 @@ export function DesignEditorPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" aria-label="Back to designs" onClick={handleBack}>
+        <Button variant="ghost" size="icon" aria-label="Back to designs" onClick={() => void handleBack()}>
           <ArrowLeft />
         </Button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">

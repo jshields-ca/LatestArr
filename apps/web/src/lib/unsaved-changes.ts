@@ -1,11 +1,24 @@
 import { useEffect, useId, useRef, useState } from "react";
 
+import { confirmAction } from "@/components/confirm-dialog";
+
 // How the app treats unsaved changes (#295). Forms with a Save button
 // register while they have changes, so leaving the page, following a link
 // in the sidebar, closing a dialog or collapsing a panel can ask first.
 // See CONTRIBUTING.md, "Saving".
 
 export const DISCARD_MESSAGE = "You have unsaved changes. Discard them?";
+
+/** Asks whether to discard unsaved changes, in the app's own dialog. */
+export function askToDiscard(): Promise<boolean> {
+  return confirmAction({
+    title: "Discard unsaved changes?",
+    description: "Your changes haven't been saved, and will be lost.",
+    confirmLabel: "Discard",
+    cancelLabel: "Keep editing",
+    destructive: true,
+  });
+}
 
 // Which mounted forms have unsaved changes. Module-level rather than a
 // context, so any component can check it without a provider.
@@ -16,8 +29,8 @@ export function hasUnsavedChanges(): boolean {
 }
 
 /** True when there's nothing unsaved, or the user agrees to discard it. */
-export function confirmDiscard(dirty = hasUnsavedChanges()): boolean {
-  return !dirty || window.confirm(DISCARD_MESSAGE);
+export async function confirmDiscard(dirty = hasUnsavedChanges()): Promise<boolean> {
+  return !dirty || askToDiscard();
 }
 
 /**
@@ -57,8 +70,13 @@ export function useSavedSnapshot(current: unknown, ready = true): { dirty: boole
 /** A dialog's onOpenChange that asks before closing with unsaved changes. */
 export function guardClose(dirty: boolean, onOpenChange: (open: boolean) => void): (open: boolean) => void {
   return (open) => {
-    if (!open && !confirmDiscard(dirty)) return;
-    onOpenChange(open);
+    if (open || !dirty) {
+      onOpenChange(open);
+      return;
+    }
+    void askToDiscard().then((discard) => {
+      if (discard) onOpenChange(false);
+    });
   };
 }
 

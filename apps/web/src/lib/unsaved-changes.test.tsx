@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ConfirmHost } from "@/components/confirm-dialog";
 import { SaveActions } from "@/components/ui/save-actions";
 import {
   confirmDiscard,
@@ -31,26 +33,40 @@ describe("useUnsavedChanges", () => {
 });
 
 describe("confirmDiscard and guardClose", () => {
-  it("only asks when there's something to lose", () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    expect(confirmDiscard(false)).toBe(true);
+  it("only asks when there's something to lose, in the app's own dialog", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm");
+    render(<ConfirmHost />);
+    await expect(confirmDiscard(false)).resolves.toBe(true);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+
+    const keep = confirmDiscard(true);
+    expect(await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep editing" }));
+    await expect(keep).resolves.toBe(false);
+
+    const discard = confirmDiscard(true);
+    await user.click(await screen.findByRole("button", { name: "Discard" }));
+    await expect(discard).resolves.toBe(true);
     expect(confirm).not.toHaveBeenCalled();
-    expect(confirmDiscard(true)).toBe(false);
-    expect(confirm).toHaveBeenCalledWith("You have unsaved changes. Discard them?");
   });
 
-  it("keeps a dialog open with unsaved changes unless discarding is confirmed", () => {
+  it("keeps a dialog open with unsaved changes unless discarding is confirmed", async () => {
+    const user = userEvent.setup();
+    render(<ConfirmHost />);
     const onOpenChange = vi.fn();
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     guardClose(true, onOpenChange)(false);
+    await user.click(await screen.findByRole("button", { name: "Keep editing" }));
     expect(onOpenChange).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     guardClose(true, onOpenChange)(false);
-    expect(onOpenChange).toHaveBeenCalledWith(false);
-    // Opening never asks.
+    await user.click(await screen.findByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    // Opening, or closing with nothing to lose, never asks.
     guardClose(true, onOpenChange)(true);
     expect(onOpenChange).toHaveBeenLastCalledWith(true);
+    guardClose(false, onOpenChange)(false);
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
   });
 });
 

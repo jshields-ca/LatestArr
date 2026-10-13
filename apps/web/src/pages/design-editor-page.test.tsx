@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -419,16 +420,16 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
 
     it("switches an options design to code after confirming", async () => {
       const user = userEvent.setup();
-      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
       renderEditor();
+      render(<ConfirmHost />);
       await screen.findByTitle("Design preview");
 
       await user.click(screen.getByRole("button", { name: "Edit as code" }));
-      expect(confirm).toHaveBeenCalled();
+      const dialog = await screen.findByRole("alertdialog", { name: "Edit this design as code?" });
+      await user.click(within(dialog).getByRole("button", { name: "Edit as code" }));
       expect(await screen.findByLabelText("Email markup (MJML)")).toHaveValue(CODE);
       expect(screen.queryByText("Colours and font")).not.toBeInTheDocument();
       expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
-      confirm.mockRestore();
     });
   });
 });
