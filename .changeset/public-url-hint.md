@@ -2,13 +2,13 @@
 "@latestarr/web": patch
 ---
 
-**Improved:** A clearer hint under **Public URL** when adding or editing a source.
+**Improved:** Clearer **Base URL** and **Public URL** fields when adding or editing a source.
 
-It said "the address above", which read as the Public URL field itself. It now names the **Base URL**, and says what a blank Public URL means: item links use the Base URL, and there's no Where to watch button.
+Each field now has its own short explanation. The **Base URL** is where LatestArr connects, so a local address is fine. The **Public URL** is where recipients go when they click. Before, one hint under Public URL tried to explain both, and called the Base URL "the address above".
 
 <details>
 <summary>Technical details</summary>
 
-`PublicUrlHint` in `pages/sources-page.tsx`, shared by the Add and Edit source dialogs.
+`BaseUrlHint` and `PublicUrlHint` in `pages/sources-page.tsx`, shared by the Add and Edit source dialogs, each linked to its input with `aria-describedby`.
 
 </details>
