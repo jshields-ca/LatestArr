@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { BookOpen, Bug, Globe, Heart, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -28,7 +28,8 @@ import { navItems } from "@/lib/nav-items";
 import { ssoMessage, takeSsoOutcome } from "@/lib/sso";
 import { hasRole, ROLE_LABELS } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { confirmDiscard, guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
+import { askToDiscard, guardClose, hasUnsavedChanges, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
+import { confirmAction } from "@/components/confirm-dialog";
 
 const REPO_URL = "https://github.com/jshields-ca/LatestArr";
 const LICENSE_URL = "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE";
@@ -260,7 +261,12 @@ function EditProfileDialog() {
   }
 
   async function handleUnlinkSso() {
-    if (!window.confirm("Unlink SSO? You'll sign in with your password until you link it again.")) return;
+    const confirmed = await confirmAction({
+      title: "Unlink SSO?",
+      description: "You'll sign in with your password until you link it again.",
+      confirmLabel: "Unlink",
+    });
+    if (!confirmed) return;
     setSsoBusy(true);
     setError(null);
     try {
@@ -401,17 +407,21 @@ function UserSummary() {
   return (
     <div className="flex min-w-0 items-center justify-between gap-2">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium" title={user?.displayName || undefined}>
-          {user?.displayName}
+        <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+          <span className="truncate" title={user?.displayName || undefined}>
+            {user?.displayName}
+          </span>
+          {/* Editors and viewers see their role, so missing pages and
+              buttons make sense. */}
+          {user && user.role !== "admin" ? (
+            <Badge variant="neutral" className="shrink-0 px-1.5 py-0 text-[0.6875rem]" title={`You have ${ROLE_LABELS[user.role].toLowerCase()} access`}>
+              {ROLE_LABELS[user.role]}
+            </Badge>
+          ) : null}
         </p>
         <p className="truncate text-xs text-muted-foreground" title={user?.email || undefined}>
           {user?.email}
         </p>
-        {/* Editors and viewers see their role, so missing pages and
-            buttons make sense. */}
-        {user && user.role !== "admin" ? (
-          <p className="text-xs text-muted-foreground">{ROLE_LABELS[user.role]} access</p>
-        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <EditProfileDialog />
@@ -436,6 +446,7 @@ function UserSummary() {
 // section this list by it.
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   // Pages someone can't use aren't listed (the server refuses them anyway).
   const items = navItems.filter((item) => hasRole(user?.role, item.minRole));
   return (
@@ -446,11 +457,17 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           to={to}
           end={to === "/"}
           onClick={(event) => {
-            if (!confirmDiscard()) {
-              event.preventDefault();
+            if (!hasUnsavedChanges()) {
+              onNavigate?.();
               return;
             }
-            onNavigate?.();
+            // Ask first, and follow the link only if they discard.
+            event.preventDefault();
+            void askToDiscard().then((discard) => {
+              if (!discard) return;
+              navigate(to);
+              onNavigate?.();
+            });
           }}
           className={({ isActive }) =>
             cn(

@@ -36,11 +36,27 @@ describe("colour helpers", () => {
     expect(warnings.map((warning) => warning.label)).toEqual([
       "Label text on the label background",
       "Button text on the button colour",
+      "Outlined buttons on the background",
     ]);
   });
 
   it("checks outlined buttons against the background instead", () => {
     const warnings = contrastWarnings(settings({ buttonBackground: "#ffff00" }, { style: "outline" }));
     expect(warnings.map((warning) => warning.label)).toEqual(["Outlined buttons on the background"]);
+  });
+
+  it("checks button text when only the where-to-watch buttons are filled", () => {
+    const warnings = contrastWarnings(
+      settings({ buttonBackground: "#ffff00" }, { style: "outline", sourceStyle: "filled" }),
+    );
+    expect(warnings.map((warning) => warning.label)).toEqual([
+      "Button text on the button colour",
+      "Outlined buttons on the background",
+    ]);
+  });
+
+  it("checks only button text when every button is filled", () => {
+    const warnings = contrastWarnings(settings({ buttonBackground: "#ffff00" }, { sourceStyle: "filled" }));
+    expect(warnings.map((warning) => warning.label)).toEqual(["Button text on the button colour"]);
   });
 });

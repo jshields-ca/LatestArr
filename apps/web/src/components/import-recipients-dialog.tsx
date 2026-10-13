@@ -29,6 +29,7 @@ import {
 import { EMAIL_HEADERS, GROUP_HEADERS, NAME_HEADERS, parseRecipientImportText } from "@/lib/recipient-import";
 import { isSpreadsheet, readSpreadsheetAsText, SpreadsheetError } from "@/lib/spreadsheet";
 import { guardClose } from "@/lib/unsaved-changes";
+import { confirmAction } from "@/components/confirm-dialog";
 
 // Shown this many rows per part of the review, with the rest behind "Show all".
 const PREVIEW_ROWS = 5;
@@ -300,24 +301,33 @@ export function ImportRecipientsDialog({
         </DialogHeader>
 
         {step.name === "done" ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm">
-              Added <strong>{step.result.created.length}</strong>, updated <strong>{step.result.updated.length}</strong>
-              {step.result.membershipsAdded > 0 ? (
-                <>
-                  , <strong>{step.result.membershipsAdded}</strong> added to groups
-                </>
-              ) : null}
-              {step.result.skipped.length > 0 ? (
-                <>
-                  , skipped <strong>{step.result.skipped.length}</strong>
-                </>
-              ) : null}
-              .
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Changed your mind? <strong>Undo last import</strong>, next to Import, reverses it for the next 24 hours.
-            </p>
+          <div className="flex flex-col gap-4">
+            <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {[
+                { label: "Added", value: step.result.created.length, show: true },
+                { label: "Updated", value: step.result.updated.length, show: true },
+                { label: "Group memberships", value: step.result.membershipsAdded, show: step.result.membershipsAdded > 0 },
+                { label: "Groups created", value: step.result.createdGroups.length, show: step.result.createdGroups.length > 0 },
+                { label: "Skipped", value: step.result.skipped.length, show: step.result.skipped.length > 0 },
+              ]
+                .filter((stat) => stat.show)
+                .map((stat) => (
+                  <div key={stat.label} className="flex flex-col rounded-md border border-border px-3 py-2">
+                    <dt className="text-xs text-muted-foreground">{stat.label}</dt>
+                    <dd className="text-xl font-semibold tabular-nums">{stat.value}</dd>
+                  </div>
+                ))}
+            </dl>
+            <div className="flex gap-3 rounded-md bg-muted/50 px-3 py-2.5 text-sm">
+              <Undo2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <div className="flex flex-col gap-0.5">
+                <p className="font-medium">Changed your mind?</p>
+                <p className="text-muted-foreground">
+                  <strong className="font-medium text-foreground">Undo last import</strong>, next to Import, reverses it
+                  for 24 hours, or until your next import.
+                </p>
+              </div>
+            </div>
             <DialogFooter>
               <Button type="button" onClick={() => setOpen(false)}>
                 Done
@@ -431,9 +441,13 @@ export function UndoLastImport({ refreshKey, onUndone }: { refreshKey: number; o
   async function handleUndo() {
     if (!latest) return;
     const when = new Date(latest.createdAt).toLocaleString();
-    if (!window.confirm(`Undo the import from ${when}? This ${describeCounts(latest.counts)}. Anything changed since is kept.`)) {
-      return;
-    }
+    const confirmed = await confirmAction({
+      title: "Undo the last import?",
+      description: `From ${when}. This ${describeCounts(latest.counts)}. Anything changed since is kept.`,
+      confirmLabel: "Undo import",
+      destructive: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     try {
       const { undone, skipped } = await undoImport(latest.id);

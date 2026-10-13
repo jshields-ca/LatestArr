@@ -59,13 +59,14 @@ If you're proposing support for a source that isn't in the README's supported-so
 
 Every screen follows one rule (#295), so people always know whether they need to press Save:
 
-- **Save straight away** for single, low-risk, easily reversed changes: a switch, a one-choice select, adding someone to a group. Confirm it quietly (an inline "Saved" or a toast).
+- **Save straight away** for single, low-risk, easily reversed changes outside a form: a switch, a one-choice select, adding someone to a group from the group's own card. Confirm it quietly (an inline "Saved" or a toast).
 - **Use a Save button** where fields belong together or a half-finished state would be wrong: connection details, schedules, the design editor, settings pages. Use `SaveActions` (`components/ui/save-actions.tsx`), which is enabled only when something changed and says "Unsaved changes", and the helpers in `lib/unsaved-changes.ts`:
   - `useSavedSnapshot` or your own comparison for `dirty`;
   - `useUnsavedChanges(dirty)` to warn before reloading, closing the tab or following a sidebar link;
-  - `guardClose` on a dialog's `onOpenChange`, and `confirmDiscard()` before collapsing a panel;
+  - `guardClose` on a dialog's `onOpenChange`, and `await confirmDiscard()` before collapsing a panel;
   - `ref={saveShortcutRef}` on the form for Ctrl/Cmd+S.
-- **Never both on the same thing.** A dialog whose changes save straight away gets **Done**, not **Save changes**. If one dialog has both kinds, separate them and say which is which (see the recipient dialog).
+- **Never both in one form.** Everything in a form or edit dialog waits for its Save, including lists like a recipient's groups. A dialog whose changes all save straight away gets **Done**, not **Save changes**.
+- **Ask in the app's own dialog,** never `window.confirm`: `confirmAction()` from `components/confirm-dialog.tsx` (resolves true or false), with a specific title, a confirm label that names the action ("Undo import", not "OK"), and `destructive` for anything that removes or discards.
 
 ## Pull requests
 

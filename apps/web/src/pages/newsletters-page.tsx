@@ -648,7 +648,9 @@ function NewsletterDetailsForm({
     };
   }
   const { dirty, markSaved } = useSavedSnapshot(currentInput());
-  useUnsavedChanges(dirty);
+  // Viewers can look but not save, so there's nothing to warn them about.
+  const canEdit = useHasRole("editor");
+  useUnsavedChanges(canEdit && dirty);
   const lookbackError = lookbackProblem(lookbackDays);
   const subjectError = subjectProblem(subjectTemplate);
 
@@ -1062,7 +1064,13 @@ function NewsletterCard({
           <span className="text-xs text-muted-foreground">{newsletter.lookbackDays}-day lookback</span>
         </span>
       }
-      expand={{ expanded, onToggle: () => (expanded && !confirmDiscard() ? undefined : setExpanded((e) => !e)) }}
+      expand={{
+        expanded,
+        onToggle: () => {
+          if (!expanded) setExpanded(true);
+          else void confirmDiscard().then((discard) => discard && setExpanded(false));
+        },
+      }}
       actions={
         <>
           {/* Folded into the header row instead of a standalone full-width

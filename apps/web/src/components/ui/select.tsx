@@ -197,9 +197,22 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     ref,
   ) => {
     const options = React.useMemo(() => parseOptionChildren(children), [children]);
+    // Radix opens on pointerdown, which a disabled <fieldset> around the
+    // trigger doesn't stop (a native <select> would be disabled by it). So
+    // read-only forms, like a viewer's, would let the value change. Opening
+    // is refused while the trigger is :disabled for any reason.
+    const trigger = React.useRef<HTMLButtonElement | null>(null);
+    const [open, setOpen] = React.useState(false);
+    const setRefs = (node: HTMLButtonElement | null) => {
+      trigger.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    };
 
     return (
       <SelectRoot
+        open={open}
+        onOpenChange={(next) => setOpen(next && !trigger.current?.matches(":disabled"))}
         value={value !== undefined ? toInternalValue(String(value)) : undefined}
         defaultValue={defaultValue !== undefined ? toInternalValue(String(defaultValue)) : undefined}
         onValueChange={(next) => onChange?.({ target: { value: toExternalValue(next) } })}
@@ -207,7 +220,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         name={name}
         required={required}
       >
-        <SelectTrigger id={id} ref={ref} className={className} aria-label={ariaLabel}>
+        <SelectTrigger id={id} ref={setRefs} className={className} aria-label={ariaLabel}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

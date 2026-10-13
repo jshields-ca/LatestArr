@@ -36,12 +36,14 @@ export const designSettingsSchema = z.object({
       link: hexColor.nullable().default(null),
     })
     .prefault({}),
-  // The design's own buttons (#293). "Where to watch" source buttons and
-  // the library link always use the outlined style, at this shape and size.
+  // Button shape and size (#293). `style` is for the design's own buttons;
+  // `sourceStyle` is for "Where to watch" source buttons and the library
+  // link, outlined by default as they always were before it existed.
   buttons: z
     .object({
       shape: z.enum(["square", "rounded", "pill"]).default("rounded"),
       style: z.enum(["filled", "outline"]).default("filled"),
+      sourceStyle: z.enum(["filled", "outline"]).default("outline"),
       size: z.enum(["regular", "small"]).default("regular"),
     })
     .prefault({}),
@@ -435,13 +437,13 @@ const BUTTON_SIZE: Record<ButtonLook["size"], { padding: [number, number]; fontS
   small: { padding: [7, 14], fontSize: "13px" },
 };
 
-// A button for the current {label, url}. The design's own buttons are
-// filled in the button colour, or outlined if the design says so; "Watch on
-// Plex"-style source buttons are always outlined. Both follow the design's
+// A button for the current {label, url}: filled in the button colour, or
+// outlined in it. The design's own buttons follow `style`; "Watch on
+// Plex"-style source buttons follow `sourceStyle`. Both follow the design's
 // button shape and size (#293). mj-button draws them as tables, so they
 // keep their shape in Outlook too.
 function button(p: Palette, font: string, kind: "primary" | "secondary", look: ButtonLook): string {
-  const outlined = kind === "secondary" || look.style === "outline";
+  const outlined = (kind === "primary" ? look.style : look.sourceStyle) === "outline";
   const colors = outlined
     ? `background-color="${p.background}"\n          color="${p.buttonBackground}"\n          border="1px solid ${p.buttonBackground}"`
     : `background-color="${p.buttonBackground}"\n          color="${p.buttonText}"`;
