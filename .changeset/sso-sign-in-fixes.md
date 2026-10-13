@@ -3,7 +3,7 @@
 "@latestarr/web": minor
 ---
 
-**Fixed:** Signing in with SSO from another address, such as the server's LAN IP, failed with "Missing or expired OIDC sign-in attempt". **New:** link SSO to an existing account from your profile.
+**Fixed:** Signing in with SSO from another address, such as the server's LAN IP, failed with "Missing or expired OIDC sign-in attempt". **New:** Link SSO to an existing account from your profile.
 
 - **Sign-in from another address** now works: **Continue with SSO** first moves you to the address in `OIDC_REDIRECT_URI`, where your identity provider sends you back.
 - **Link SSO** in your profile connects your SSO account to the account you're signed in to. It works even when your provider doesn't mark your email address as verified, which stopped automatic matching before. **Unlink SSO** is there too, for accounts that also have a password.

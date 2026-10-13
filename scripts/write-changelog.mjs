@@ -29,7 +29,8 @@ const changesetConfigPath = path.join(changesetDir, "config.json");
 const CATEGORY_ORDER = ["New", "Improved", "Fixed", "Other"];
 
 function parseChangeset(filePath) {
-  const raw = readFileSync(filePath, "utf8");
+  // Windows checkouts may have CRLF line endings.
+  const raw = readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
   const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) return null;
   const [, frontmatter, body] = match;
@@ -82,31 +83,55 @@ async function resolvePrLink(filePath, repo) {
 }
 
 // Splits a changeset body into one entry per category tag: its category,
-// its plain-language lede (visible at a glance, before any PR link), and
-// the rest (a <details> technical block, if present) — so the lede and
-// link sit together on one line ahead of the collapsed details. A body
-// with more than one tag ("**Fixed:** ... **New:** ...") becomes one
-// bullet under each heading instead of the second tag being buried in
-// the first one's bullet; the details block stays with the first.
+// its plain-language lede (the first paragraph, on one line with the PR
+// link), what follows it (bullets and paragraphs, kept as written), and a
+// <details> technical block if there is one. A body with more than one tag
+// ("**Fixed:** ... **New:** ...") becomes one entry under each heading
+// instead of the second tag being buried in the first; the details block
+// stays with the first.
 function splitChangeset(summary) {
-  const flat = summary.replace(/\n+/g, " ").trim();
-  const detailsIndex = flat.indexOf("<details>");
-  const ledePart = detailsIndex === -1 ? flat : flat.slice(0, detailsIndex).trim();
-  const rest = detailsIndex === -1 ? "" : ` ${flat.slice(detailsIndex)}`;
+  const text = summary.replace(/\r\n/g, "\n").trim();
+  const detailsIndex = text.indexOf("<details>");
+  const ledePart = (detailsIndex === -1 ? text : text.slice(0, detailsIndex)).trim();
+  const details = detailsIndex === -1 ? "" : text.slice(detailsIndex).trim();
   const tags = [...ledePart.matchAll(/\*\*(New|Improved|Fixed):\*\*\s*/g)];
-  if (tags.length === 0 || tags[0].index !== 0) {
-    return [{ category: "Other", lede: ledePart, rest }];
-  }
-  return tags.map((tag, i) => ({
-    category: tag[1],
-    lede: ledePart.slice(tag.index + tag[0].length, tags[i + 1]?.index).trim(),
-    rest: i === 0 ? rest : "",
-  }));
+  const parts =
+    tags.length === 0 || tags[0].index !== 0
+      ? [{ category: "Other", body: ledePart }]
+      : tags.map((tag, i) => ({
+          category: tag[1],
+          // A tag that opens a bullet ("- **Fixed:** ...") leaves that
+          // bullet's dash behind at the end of the previous part.
+          body: ledePart
+            .slice(tag.index + tag[0].length, tags[i + 1]?.index)
+            .replace(/\n[ \t]*-[ \t]*$/, "")
+            .trim(),
+        }));
+  return parts.map(({ category, body }, i) => {
+    const lines = body.split("\n");
+    // The lede runs until a blank line or the first bullet.
+    const end = lines.findIndex((line, n) => n > 0 && (line.trim() === "" || /^\s*[-*] /.test(line)));
+    const ledeLines = end === -1 ? lines : lines.slice(0, end);
+    return {
+      category,
+      lede: ledeLines.map((line) => line.trim()).join(" "),
+      more: end === -1 ? "" : lines.slice(end).join("\n").trim(),
+      details: i === 0 ? details : "",
+    };
+  });
 }
 
-function formatBullet({ lede, rest }, prLink) {
+// Indents a block so it belongs to the list item above it.
+function indent(block) {
+  return block
+    .split("\n")
+    .map((line) => (line.trim() ? `  ${line}` : ""))
+    .join("\n");
+}
+
+function formatBullet({ lede, more, details }, prLink) {
   const link = prLink ? ` ([#${prLink.number}](${prLink.url}))` : "";
-  return `- ${lede}${link}${rest}`;
+  return [`- ${lede}${link}`, more && indent(more), details && indent(details)].filter(Boolean).join("\n\n");
 }
 
 const files = readdirSync(changesetDir)
@@ -154,7 +179,7 @@ for (const entry of entries) {
 }
 
 const sections = CATEGORY_ORDER.filter((category) => byCategory.has(category))
-  .map((category) => `### ${category}\n\n${byCategory.get(category).join("\n")}`)
+  .map((category) => `### ${category}\n\n${byCategory.get(category).join("\n\n")}`)
   .join("\n\n");
 
 const newSection = `## [${newVersion}] - ${today}\n\n${sections}\n\n`;

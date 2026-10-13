@@ -52,7 +52,11 @@ function readChangelogSection(version) {
 }
 
 function stripTechnicalDetails(section) {
-  return section.replace(/[ \t]*<details>[\s\S]*?<\/details>/g, "").replace(/[ \t]+$/gm, "");
+  return section
+    .replace(/[ \t]*<details>[\s\S]*?<\/details>/g, "")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function git(args) {

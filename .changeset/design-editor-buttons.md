@@ -5,7 +5,7 @@
 
 **Improved:** The design editor is easier to work through, and button styles now reach every button.
 
-- **Where to watch buttons can be filled:** Watch on Plex and Browse movies buttons get their own **Style**. It defaults to Outlined, as they've always been, so existing designs look the same until you change it. Before, Style, Button colour fill, and Button text only affected buttons you added yourself, so a design without its own buttons showed no change.
+- **Where to watch buttons can be filled:** Watch on Plex and Browse movies buttons get their own **Style**. It defaults to Outlined, as they've always been, so existing designs look the same until you change it.
 - **One place for buttons:** a new **Buttons** section has your buttons (with where they go and their style), Where to watch buttons (on or off, where they go and their style), and the look of all buttons: shape, size, Button colour, and Button text.
 - **In the order of the email:** Colours and font, Logo, Layout, Text, Buttons, Item details, Sections, and Custom CSS. The date range and counts line moved to Layout, and the intro and footer note share a Text section.
 - **Easy to review:** each section's header says what's set, like "Cards", "Intro, Footer note", or "6 of 6 shown", so you can check a design without opening everything.
