@@ -286,7 +286,8 @@ async function makeBackup(
     saveLastRun(ctx.db, { at: now.toISOString(), ok: true, trigger, filename });
     log.info({ filename, sizeBytes: archive.length, trigger }, `Backed up the database to ${filename}`);
     return file;
-  } catch (err) {
+  } catch (caught) {
+    const err = explainFolderError(caught, ctx.backupDir);
     const message = err instanceof Error ? err.message : String(err);
     saveLastRun(ctx.db, { at: now.toISOString(), ok: false, trigger, error: message });
     await rm(partialPath, { force: true }).catch(() => undefined);
@@ -294,6 +295,21 @@ async function makeBackup(
   } finally {
     await rm(snapshotPath, { force: true }).catch(() => undefined);
   }
+}
+
+const FOLDER_ERRORS = new Set(["SQLITE_CANTOPEN", "EACCES", "EPERM", "EROFS", "ENOENT", "ENOTDIR", "EEXIST"]);
+
+// A folder LatestArr can't write to fails deep inside SQLite or the file
+// system ("unable to open database file", "EACCES"), which doesn't say
+// where or what to do. Name the folder instead, keeping the original as
+// the cause for the log.
+function explainFolderError(err: unknown, backupDir: string): unknown {
+  const code = (err as { code?: unknown } | null)?.code;
+  if (typeof code !== "string" || !FOLDER_ERRORS.has(code)) return err;
+  return new Error(
+    `LatestArr can't write to the backup folder, ${backupDir}. Check that it exists and that the user LatestArr runs as (node, UID 1000, in Docker) can write to it.`,
+    { cause: err },
+  );
 }
 
 function calendarKeys(date: Date, timezone: string): { day: string; week: string; month: string } {
