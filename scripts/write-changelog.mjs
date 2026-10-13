@@ -47,13 +47,14 @@ function bumpVersion(version, bumpType) {
 }
 
 // Every changeset in this repo lands on main as a single squash-merge
-// commit, so the commit that added its .md file *is* the commit
+// commit, so the commit that added its .md file (not a later edit to its
+// wording) *is* the commit
 // `getCommitInfo` needs to look up the PR it came from. Returns null
 // (never throws) if git can't find one — e.g. a changeset file staged
 // but not yet committed during local testing.
 function findIntroducingCommit(filePath) {
   try {
-    const out = execFileSync("git", ["log", "-1", "--format=%H", "--", filePath], {
+    const out = execFileSync("git", ["log", "--diff-filter=A", "-1", "--format=%H", "--", filePath], {
       cwd: rootDir,
       encoding: "utf8",
     }).trim();
