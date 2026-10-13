@@ -4,6 +4,7 @@ import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecipientsPage } from "./recipients-page";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import { selectOption } from "@/test/select";
 
 const fetchMock = vi.fn();
@@ -230,14 +231,9 @@ describe("RecipientsPage", () => {
     await user.type(within(dialog).getByLabelText("Email"), "alice2@example.com");
     await user.clear(within(dialog).getByLabelText("Name (optional)"));
     await user.type(within(dialog).getByLabelText("Name (optional)"), "Alice Two");
-    // Groups save as they change; the details wait for Save details (#295).
-    expect(within(dialog).getByText("Changes to groups save straight away.")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Save details" }));
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText("Alice Two")).toBeInTheDocument();
-    // The dialog stays open for the groups, with nothing left to save.
-    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Save details" })).toBeDisabled());
-    await user.click(within(dialog).getByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
     const patchCall = fetchMock.mock.calls.find(
@@ -249,22 +245,24 @@ describe("RecipientsPage", () => {
     });
   });
 
-  it("manages a recipient's group membership from the edit dialog, including creating a new group", async () => {
+  // Group changes wait for Save, like the name and email (#295 follow-up).
+  it("changes a recipient's groups from the edit dialog when saved, including a new group", async () => {
     const user = userEvent.setup();
-    const newGroup = {
-      id: "g2",
-      name: "VIPs",
-      description: null,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-    };
+    const vips = { ...everyoneGroup, id: "g2", name: "VIPs" };
+    const writes: string[] = [];
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url === "/api/recipients" && (!init || init.method === undefined))
-        return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
-      if (url === "/api/recipient-groups" && (!init || init.method === undefined))
+      const method = init?.method ?? "GET";
+      if (method !== "GET") writes.push(`${method} ${url}`);
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/api/recipient-groups" && method === "GET")
         return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
-      if (url === "/api/recipients/r1/groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
-      throw new Error(`Unexpected fetch to ${url}`);
+      if (url === "/api/recipients/r1/groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      if (url === "/api/recipient-groups" && method === "POST") return Promise.resolve(jsonResponse(201, { group: vips }));
+      if (url.startsWith("/api/recipient-groups/g") && url.includes("/members"))
+        return Promise.resolve({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
+      if (url.match(/^\/api\/recipient-groups\/g\d$/))
+        return Promise.resolve(jsonResponse(200, { group: everyoneGroup, members: [] }));
+      throw new Error(`Unexpected fetch to ${method} ${url}`);
     });
 
     render(<RecipientsPage />);
@@ -272,35 +270,58 @@ describe("RecipientsPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit alice@example.com" }));
     const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByText("Not in any groups yet.")).toBeInTheDocument();
+    const theirGroups = await within(dialog).findByRole("list", { name: "Their groups" });
+    expect(within(theirGroups).getByText("Everyone")).toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    selectOption(within(dialog).getByLabelText("Add to a group"), "Everyone");
+    await user.click(within(dialog).getByRole("button", { name: "Remove from Everyone" }));
+    await user.type(within(dialog).getByLabelText("New group name"), "VIPs{Enter}");
+    expect(within(dialog).getByText("VIPs")).toBeInTheDocument();
+    expect(within(dialog).getByText("(new)")).toBeInTheDocument();
+    // A new group with an existing group's name just adds them to it.
+    await user.type(within(dialog).getByLabelText("New group name"), "everyone");
+    await user.click(within(dialog).getByRole("button", { name: "New group" }));
+    await user.click(within(dialog).getByRole("button", { name: "Remove from Everyone" }));
+    // Nothing is saved yet.
+    expect(writes).toEqual([]);
+    expect(within(dialog).getByText("Unsaved changes")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(writes).toEqual([
+      "POST /api/recipient-groups",
+      "POST /api/recipient-groups/g2/members",
+      "DELETE /api/recipient-groups/g1/members/r1",
+    ]);
+  });
+
+  it("asks before closing with group changes that aren't saved", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [everyoneGroup] }));
+      if (url === "/api/recipients/r1/groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    render(
+      <>
+        <RecipientsPage />
+        <ConfirmHost />
+      </>,
+    );
+    await screen.findByText("Alice");
+    await user.click(screen.getByRole("button", { name: "Edit alice@example.com" }));
+    const dialog = await screen.findByRole("dialog");
+    selectOption(await within(dialog).findByLabelText("Add to a group"), "Everyone");
     await user.click(within(dialog).getByRole("button", { name: "Add" }));
 
-    expect(await within(dialog).findByText("Everyone")).toBeInTheDocument();
-    const addCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipient-groups/g1/members") as [
-      string,
-      RequestInit,
-    ];
-    expect(JSON.parse(addCall[1].body as string)).toEqual({ recipientId: "r1" });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    const ask = await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
+    await user.click(within(ask).getByRole("button", { name: "Keep editing" }));
+    expect(screen.getByRole("dialog", { name: "Edit recipient" })).toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce(jsonResponse(201, { group: newGroup }));
-    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    await user.type(within(dialog).getByLabelText("New group name"), "VIPs");
-    await user.click(within(dialog).getByRole("button", { name: "Create group" }));
-
-    expect(await within(dialog).findByText("VIPs")).toBeInTheDocument();
-    const createCall = fetchMock.mock.calls.find(
-      ([url, reqInit]) => url === "/api/recipient-groups" && reqInit?.method === "POST",
-    ) as [string, RequestInit];
-    expect(JSON.parse(createCall[1].body as string)).toEqual({ name: "VIPs" });
-
-    fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    await user.click(within(dialog).getByRole("button", { name: "Remove from Everyone" }));
-    await waitFor(() =>
-      expect(within(dialog).queryByRole("button", { name: "Remove from Everyone" })).not.toBeInTheDocument(),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await user.click(await screen.findByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit recipient" })).not.toBeInTheDocument());
   });
 
   // #286: changes made in the edit panel used to show in the Groups section
@@ -342,11 +363,10 @@ describe("RecipientsPage", () => {
       selectOption(within(dialog).getByLabelText("Add to a group"), "Everyone");
       await user.click(within(dialog).getByRole("button", { name: "Add" }));
       await user.type(within(dialog).getByLabelText("New group name"), "VIPs");
-      await user.click(within(dialog).getByRole("button", { name: "Create group" }));
+      await user.click(within(dialog).getByRole("button", { name: "New group" }));
       await within(dialog).findByText("VIPs");
 
-      // Closed without pressing Save changes, as the tester did.
-      await user.keyboard("{Escape}");
+      await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
       expect(await screen.findByLabelText("Remove alice@example.com from group")).toBeInTheDocument();
@@ -651,7 +671,15 @@ describe("RecipientsPage", () => {
     });
 
     await user.click(within(dialog).getByRole("button", { name: "Import 3 changes" }));
-    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1, updated\s*1, 1 added to groups, skipped\s*1/));
+    await within(dialog).findByText("Group memberships");
+    const values = within(dialog).getAllByRole("definition");
+    expect(within(dialog).getAllByRole("term").map((term, i) => `${term.textContent} ${values[i]!.textContent}`)).toEqual([
+      "Added 1",
+      "Updated 1",
+      "Group memberships 1",
+      "Groups created 1",
+      "Skipped 1",
+    ]);
     expect(JSON.parse(calls()[1]![1].body as string)).not.toHaveProperty("dryRun");
 
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
@@ -694,17 +722,21 @@ describe("RecipientsPage", () => {
       }
       throw new Error(`Unexpected fetch to ${url}`);
     });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-
-    render(<RecipientsPage />);
+    render(
+      <>
+        <RecipientsPage />
+        <ConfirmHost />
+      </>,
+    );
     await screen.findByText("Added");
     await user.click(await screen.findByRole("button", { name: "Undo last import" }));
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("removes the 1 person it added"));
+    const ask = await screen.findByRole("alertdialog", { name: "Undo the last import?" });
+    expect(ask).toHaveTextContent("removes the 1 person it added");
+    await user.click(within(ask).getByRole("button", { name: "Undo import" }));
     await waitFor(() => expect(screen.queryByText("Added")).not.toBeInTheDocument());
     expect(screen.getByText("Kept")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Undo last import" })).not.toBeInTheDocument();
-    confirm.mockRestore();
   });
 
   it("has no accessibility violations with the import-recipients dialog open", async () => {

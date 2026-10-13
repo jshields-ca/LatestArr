@@ -146,137 +146,89 @@ function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) =
   );
 }
 
+// Which groups someone is in, as the Edit dialog holds them until Save:
+// existing groups by id, plus names of new groups to create.
+interface GroupChoice {
+  memberIds: string[];
+  newGroups: string[];
+}
+
 // Recipient-centric mirror of the Newsletters page's LinkedGroups pattern
-// (add-via-dropdown, remove-via-chip), plus an inline "create a new group"
-// shortcut — so adding someone to a (possibly brand-new) group doesn't
-// require leaving the Edit dialog to visit the Groups section separately.
-// Each change here saves straight away (#295), unlike the name and email
-// above it, which wait for Save details. Buttons keep an explicit
-// type="button" in case this ends up inside a form again.
-function RecipientGroupsField({ recipientId }: { recipientId: string }) {
-  const [allGroups, setAllGroups] = useState<RecipientGroup[] | null>(null);
-  const [memberGroups, setMemberGroups] = useState<RecipientGroup[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+// (add-via-dropdown, remove-via-chip), plus "new group", so adding someone
+// to a brand-new group doesn't mean leaving the Edit dialog. Like the name
+// and email, nothing here is saved until Save (#295). Buttons are
+// type="button" because this sits inside the dialog's form.
+function RecipientGroupsField({
+  allGroups,
+  value,
+  disabled,
+  onChange,
+}: {
+  allGroups: RecipientGroup[];
+  value: GroupChoice;
+  disabled: boolean;
+  onChange: (value: GroupChoice) => void;
+}) {
   const [selectedId, setSelectedId] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
-  const [creatingGroup, setCreatingGroup] = useState(false);
-  const sync = useContext(GroupSyncContext);
 
-  useEffect(() => {
-    Promise.all([listGroups(), getRecipientGroups(recipientId)])
-      .then(([{ groups }, { groups: member }]) => {
-        setAllGroups(groups);
-        setMemberGroups(member);
-      })
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load groups."));
-  }, [recipientId]);
-
-  const availableToAdd = (allGroups ?? [])
-    .filter((g) => !memberGroups?.some((m) => m.id === g.id))
+  const members = value.memberIds
+    .map((id) => allGroups.find((g) => g.id === id))
+    .filter((g): g is RecipientGroup => g !== undefined);
+  const availableToAdd = allGroups
+    .filter((g) => !value.memberIds.includes(g.id))
     .sort((a, b) => compareText(a.name, b.name));
 
-  async function handleAdd() {
+  function handleAdd() {
     if (!selectedId) return;
-    setAdding(true);
-    try {
-      await addGroupMember(selectedId, recipientId);
-      const added = allGroups?.find((g) => g.id === selectedId);
-      if (added) setMemberGroups((prev) => [...(prev ?? []), added]);
-      setSelectedId("");
-      sync.membershipChanged();
-      toast({ variant: "success", title: "Added to group", description: added?.name });
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Failed to add to group",
-        description: err instanceof ApiError ? err.message : undefined,
-      });
-    } finally {
-      setAdding(false);
-    }
+    onChange({ ...value, memberIds: [...value.memberIds, selectedId] });
+    setSelectedId("");
   }
 
-  async function handleRemove(group: RecipientGroup) {
-    setRemovingId(group.id);
-    try {
-      await removeGroupMember(group.id, recipientId);
-      setMemberGroups((prev) => (prev ?? []).filter((g) => g.id !== group.id));
-      sync.membershipChanged();
-      toast({ variant: "success", title: "Removed from group", description: group.name });
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Failed to remove from group",
-        description: err instanceof ApiError ? err.message : undefined,
-      });
-    } finally {
-      setRemovingId(null);
-    }
-  }
-
-  async function handleCreateGroup() {
+  function handleNewGroup() {
     const name = newGroupName.trim();
     if (!name) return;
-    setCreatingGroup(true);
-    try {
-      const { group } = await createGroup({ name });
-      // Listed straight away, so it shows even if adding them to it fails.
-      sync.groupCreated(group);
-      setAllGroups((prev) => [...(prev ?? []), group]);
-      await addGroupMember(group.id, recipientId);
-      sync.membershipChanged();
-      setMemberGroups((prev) => [...(prev ?? []), group]);
-      setNewGroupName("");
-      toast({ variant: "success", title: "Group created and added", description: group.name });
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Failed to create group",
-        description: err instanceof ApiError ? err.message : undefined,
-      });
-    } finally {
-      setCreatingGroup(false);
+    // A name that's already a group adds them to it instead.
+    const existing = allGroups.find((g) => compareText(g.name, name) === 0);
+    if (existing) {
+      if (!value.memberIds.includes(existing.id)) onChange({ ...value, memberIds: [...value.memberIds, existing.id] });
+    } else if (!value.newGroups.some((n) => compareText(n, name) === 0)) {
+      onChange({ ...value, newGroups: [...value.newGroups, name] });
     }
+    setNewGroupName("");
   }
 
-  if (loadError) {
-    return (
-      <p role="alert" className="text-sm text-destructive">
-        {loadError}
-      </p>
-    );
-  }
-
-  if (allGroups === null || memberGroups === null) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Loading groups...
-      </div>
-    );
-  }
+  const chips = [
+    ...members.map((group) => ({
+      key: group.id,
+      name: group.name,
+      isNew: false,
+      remove: () => onChange({ ...value, memberIds: value.memberIds.filter((id) => id !== group.id) }),
+    })),
+    ...value.newGroups.map((name) => ({
+      key: `new:${name}`,
+      name,
+      isNew: true,
+      remove: () => onChange({ ...value, newGroups: value.newGroups.filter((n) => n !== name) }),
+    })),
+  ];
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-0.5">
-        <Label>Groups</Label>
-        <p className="text-xs text-muted-foreground">Changes to groups save straight away.</p>
-      </div>
-      {memberGroups.length === 0 ? (
+    <fieldset className="flex flex-col gap-2" disabled={disabled}>
+      <legend className="mb-2 text-sm font-medium">Groups</legend>
+      {chips.length === 0 ? (
         <p className="text-sm text-muted-foreground">Not in any groups yet.</p>
       ) : (
-        <ul className="flex flex-wrap gap-2">
-          {memberGroups.map((group) => (
-            <li key={group.id}>
+        <ul className="flex flex-wrap gap-2" aria-label="Their groups">
+          {chips.map((chip) => (
+            <li key={chip.key}>
               <Badge variant="neutral" className="gap-1.5 py-1 pl-2.5 pr-1">
-                {group.name}
+                {chip.name}
+                {chip.isNew ? <span className="text-xs font-normal text-muted-foreground">(new)</span> : null}
                 <button
                   type="button"
-                  aria-label={`Remove from ${group.name}`}
-                  onClick={() => void handleRemove(group)}
-                  disabled={removingId === group.id}
+                  aria-label={`Remove from ${chip.name}`}
+                  onClick={chip.remove}
                   className="-my-1 rounded-full p-1.5 hover:bg-muted-foreground/20"
                 >
                   <X className="size-3" />
@@ -292,7 +244,6 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
             aria-label="Add to a group"
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            disabled={adding}
             className="max-w-xs"
           >
             <option value="">Select a group...</option>
@@ -302,14 +253,7 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
               </option>
             ))}
           </Select>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void handleAdd()}
-            disabled={!selectedId || adding}
-          >
-            {adding ? <Loader2 className="animate-spin" /> : null}
+          <Button type="button" size="sm" variant="outline" onClick={handleAdd} disabled={!selectedId}>
             Add
           </Button>
         </div>
@@ -320,22 +264,28 @@ function RecipientGroupsField({ recipientId }: { recipientId: string }) {
           placeholder="New group name"
           value={newGroupName}
           onChange={(e) => setNewGroupName(e.target.value)}
-          disabled={creatingGroup}
+          onKeyDown={(e) => {
+            // Enter adds the group, rather than saving the form.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleNewGroup();
+            }
+          }}
           className="max-w-xs"
         />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => void handleCreateGroup()}
-          disabled={!newGroupName.trim() || creatingGroup}
-        >
-          {creatingGroup ? <Loader2 className="animate-spin" /> : <Plus />}
-          Create group
+        <Button type="button" size="sm" variant="outline" onClick={handleNewGroup} disabled={!newGroupName.trim()}>
+          <Plus />
+          New group
         </Button>
       </div>
-    </div>
+    </fieldset>
   );
+}
+
+const NO_GROUP_CHANGES: GroupChoice = { memberIds: [], newGroups: [] };
+
+function sameIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id) => b.includes(id));
 }
 
 function EditRecipientDialog({
@@ -348,8 +298,27 @@ function EditRecipientDialog({
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState(recipient.email);
   const [displayName, setDisplayName] = useState(recipient.displayName ?? "");
+  const [allGroups, setAllGroups] = useState<RecipientGroup[] | null>(null);
+  // Their groups as saved, and as chosen in the dialog.
+  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [groups, setGroups] = useState<GroupChoice>(NO_GROUP_CHANGES);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sync = useContext(GroupSyncContext);
+
+  function loadGroups() {
+    setAllGroups(null);
+    setGroupsError(null);
+    Promise.all([listGroups(), getRecipientGroups(recipient.id)])
+      .then(([{ groups: all }, { groups: member }]) => {
+        const ids = member.map((g) => g.id);
+        setAllGroups(all);
+        setSavedIds(ids);
+        setGroups({ memberIds: ids, newGroups: [] });
+      })
+      .catch((err) => setGroupsError(err instanceof ApiError ? err.message : "Failed to load groups."));
+  }
 
   function openWithCurrentValues(next: boolean) {
     setOpen(next);
@@ -357,31 +326,55 @@ function EditRecipientDialog({
       setEmail(recipient.email);
       setDisplayName(recipient.displayName ?? "");
       setError(null);
+      loadGroups();
     }
   }
+
+  const detailsChanged = email !== recipient.email || displayName !== (recipient.displayName ?? "");
+  const groupsChanged = !sameIds(groups.memberIds, savedIds) || groups.newGroups.length > 0;
+  const dirty = detailsChanged || groupsChanged;
+  useUnsavedChanges(open && dirty);
+  const changeOpen = guardClose(dirty, openWithCurrentValues);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setSubmitting(true);
+    let membershipChanged = false;
     try {
-      const { recipient: updated } = await updateRecipient(recipient.id, {
-        email,
-        displayName: displayName || undefined,
-      });
-      onSaved(updated);
+      if (detailsChanged) {
+        const { recipient: updated } = await updateRecipient(recipient.id, {
+          email,
+          displayName: displayName || undefined,
+        });
+        onSaved(updated);
+      }
+      const add = groups.memberIds.filter((id) => !savedIds.includes(id));
+      const remove = savedIds.filter((id) => !groups.memberIds.includes(id));
+      for (const name of groups.newGroups) {
+        const { group } = await createGroup({ name });
+        sync.groupCreated(group);
+        add.push(group.id);
+      }
+      for (const id of add) {
+        await addGroupMember(id, recipient.id);
+        membershipChanged = true;
+      }
+      for (const id of remove) {
+        await removeGroupMember(id, recipient.id);
+        membershipChanged = true;
+      }
       toast({ variant: "success", title: "Recipient updated" });
+      setOpen(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      // Some changes may have saved: show their groups as they are now.
+      if (groupsChanged) loadGroups();
     } finally {
+      if (membershipChanged) sync.membershipChanged();
       setSubmitting(false);
     }
   }
-
-  // Name and email are saved with Save details; groups save as they change.
-  const dirty = email !== recipient.email || displayName !== (recipient.displayName ?? "");
-  useUnsavedChanges(open && dirty);
-  const changeOpen = guardClose(dirty, openWithCurrentValues);
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
@@ -393,7 +386,7 @@ function EditRecipientDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit recipient</DialogTitle>
-          <DialogDescription>Update their details and manage which groups they belong to.</DialogDescription>
+          <DialogDescription>Update their details and which groups they belong to, then save.</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} ref={saveShortcutRef} noValidate>
           <div className="flex flex-col gap-1.5">
@@ -417,24 +410,33 @@ function EditRecipientDialog({
             />
           </div>
 
+          <div className="border-t border-border pt-4">
+            {groupsError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {groupsError}
+              </p>
+            ) : allGroups === null ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                Loading groups...
+              </div>
+            ) : (
+              <RecipientGroupsField allGroups={allGroups} value={groups} disabled={submitting} onChange={setGroups} />
+            )}
+          </div>
+
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>
           ) : null}
 
-          <SaveActions dirty={dirty} saving={submitting} label="Save details" />
+          <SaveActions dirty={dirty} saving={submitting} disabled={allGroups === null}>
+            <Button type="button" variant="outline" onClick={() => changeOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+          </SaveActions>
         </form>
-
-        <div className="border-t border-border pt-4">
-          <RecipientGroupsField recipientId={recipient.id} />
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => changeOpen(false)}>
-            Done
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

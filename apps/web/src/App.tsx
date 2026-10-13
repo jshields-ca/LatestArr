@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { AppShell } from "@/components/app-shell";
 import { ProtectedRoute } from "@/components/protected-route";
 import { RequireRole } from "@/components/require-role";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import { Toaster } from "@/components/ui/toaster";
 import { BackupsPage } from "@/pages/backups-page";
 import { DashboardPage } from "@/pages/dashboard-page";
@@ -63,6 +64,7 @@ export default function App() {
         />
       </Routes>
       <Toaster />
+      <ConfirmHost />
     </>
   );
 }

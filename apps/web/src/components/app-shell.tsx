@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { BookOpen, Bug, Globe, Heart, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
@@ -28,7 +28,8 @@ import { navItems } from "@/lib/nav-items";
 import { ssoMessage, takeSsoOutcome } from "@/lib/sso";
 import { hasRole, ROLE_LABELS } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { confirmDiscard, guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
+import { askToDiscard, guardClose, hasUnsavedChanges, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
+import { confirmAction } from "@/components/confirm-dialog";
 
 const REPO_URL = "https://github.com/jshields-ca/LatestArr";
 const LICENSE_URL = "https://github.com/jshields-ca/LatestArr/blob/main/LICENSE";
@@ -260,7 +261,12 @@ function EditProfileDialog() {
   }
 
   async function handleUnlinkSso() {
-    if (!window.confirm("Unlink SSO? You'll sign in with your password until you link it again.")) return;
+    const confirmed = await confirmAction({
+      title: "Unlink SSO?",
+      description: "You'll sign in with your password until you link it again.",
+      confirmLabel: "Unlink",
+    });
+    if (!confirmed) return;
     setSsoBusy(true);
     setError(null);
     try {
@@ -436,6 +442,7 @@ function UserSummary() {
 // section this list by it.
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   // Pages someone can't use aren't listed (the server refuses them anyway).
   const items = navItems.filter((item) => hasRole(user?.role, item.minRole));
   return (
@@ -446,11 +453,17 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           to={to}
           end={to === "/"}
           onClick={(event) => {
-            if (!confirmDiscard()) {
-              event.preventDefault();
+            if (!hasUnsavedChanges()) {
+              onNavigate?.();
               return;
             }
-            onNavigate?.();
+            // Ask first, and follow the link only if they discard.
+            event.preventDefault();
+            void askToDiscard().then((discard) => {
+              if (!discard) return;
+              navigate(to);
+              onNavigate?.();
+            });
           }}
           className={({ isActive }) =>
             cn(
