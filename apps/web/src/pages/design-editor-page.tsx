@@ -747,7 +747,7 @@ export function DesignEditorPage() {
         <Button variant="ghost" size="icon" aria-label="Back to designs" onClick={() => void handleBack()}>
           <ArrowLeft />
         </Button>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
           <Label htmlFor="design-name" className="sr-only">
             Design name
           </Label>
