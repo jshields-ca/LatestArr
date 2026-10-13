@@ -127,8 +127,8 @@ describe("backup archives", () => {
     // A file where the folder should be.
     const broken = { ...ctx, backupDir: path.join(dir, "blocked") };
     writeFileSync(broken.backupDir, "in the way");
-    await expect(runBackup(broken, "scheduled", log)).rejects.toThrow();
-    expect(loadLastRun(db)).toMatchObject({ ok: false, trigger: "scheduled" });
+    await expect(runBackup(broken, "scheduled", log)).rejects.toThrow(`can't write to the backup folder, ${broken.backupDir}`);
+    expect(loadLastRun(db)).toMatchObject({ ok: false, trigger: "scheduled", error: expect.stringContaining("UID 1000") });
     expect(await listBackups(ctx.backupDir)).toHaveLength(1);
   });
 
