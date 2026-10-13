@@ -1,5 +1,437 @@
 # @latestarr/server
 
+## 0.12.0
+
+### Minor Changes
+
+- [#323](https://github.com/jshields-ca/LatestArr/pull/323) [`d55982b`](https://github.com/jshields-ca/LatestArr/commit/d55982b0ba32a7818d2680101e3df1bcc70ecb68) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** The container image now runs natively on ARM: Apple Silicon Macs, Raspberry Pi 4 and 5 (on a 64-bit OS), ARM NAS boxes and cloud servers. Docker picks the right image for you, so `docker compose pull` just works, with no `--platform linux/amd64` emulation.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#318](https://github.com/jshields-ca/LatestArr/issues/318).
+  - **`publish-image.yml`** is a new reusable workflow used by `dev-image.yml` and `release.yml`.
+    - It builds `linux/amd64` on `ubuntu-latest` and `linux/arm64` natively on `ubuntu-24.04-arm`, rather than under QEMU. Each pushes by digest.
+    - A merge job then publishes one multi-platform manifest per tag, and checks that both architectures are there.
+  - **CI:** builds and smoke-tests the arm64 image too ("Docker build (arm64)"). The native modules (better-sqlite3, sharp, @node-rs/argon2) load at startup, so a missing arm64 binary fails the health check. The required "Docker build" check keeps its name.
+  - **Out of scope:** 32-bit ARM (`linux/arm/v7`), because sharp ships no prebuilt binaries for it.
+
+  </details>
+
+- [#277](https://github.com/jshields-ca/LatestArr/pull/277) [`31615b2`](https://github.com/jshields-ca/LatestArr/commit/31615b2d20e5c5fc3c1e0a1dd315ca2ba8bade4b) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Automatic backups. LatestArr now backs up its database every day at 03:00 and keeps the last seven, with no downtime. It also backs up before every upgrade. The new **Backups** page (admins only) changes the schedule and what's kept, and can **Back up now**, download, or delete a backup. Point `BACKUP_PATH` at another disk or a NAS so a failed disk can't take both the database and its backups. To restore one, run `docker exec -it latestarr node dist/cli.js restore <file>` and restart.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#263](https://github.com/jshields-ca/LatestArr/issues/263).
+  - **Snapshots** use SQLite's online backup API (`better-sqlite3`'s `backup()`), never a raw file copy.
+    - Each snapshot is switched out of WAL mode and must pass `PRAGMA integrity_check` before it's kept.
+    - It's packed into one ZIP with `manifest.json` (version, migration count, item counts, and an `ENCRYPTION_KEY` fingerprint, never the key) and a README.
+    - The file is written under a temporary name and renamed, so a crash never leaves a half-written backup.
+    - The ZIP writer and reader are small and in-house (`backups/zip.ts`), using Node's `zlib` deflate and `crc32`, so there's no new dependency.
+  - **Names:** `latestarr-backup-<UTC time>-v<version>-<scheduled|manual|pre-upgrade>.zip`. The folder itself is the list of backups, so it stays right after a restore or a manual copy. Download and delete only accept names matching this pattern, so no other path can be reached.
+  - **Retention:** keep the newest _N_ (default 7), or calendar rules (the newest of each of the last _D_ days, _W_ weeks, and _M_ months).
+    - The newest backup is always kept, and so are the 3 newest pre-upgrade backups.
+    - Pruning only runs after a backup succeeds.
+  - **Schedule:** on by default, daily at 03:00 in the server's time zone (`TZ`), with the same schedule picker as newsletters.
+  - **Pre-upgrade backup:** taken at startup, before migrations, whenever the version that last ran the database (now saved as `appVersion`) differs from this one. Databases from before 0.12 are labelled "earlier".
+  - **Failures** are logged, shown on the Backups page, and sent as a failure alert (new **A backup fails** option, on by default, at most one an hour).
+  - **Restore** uses the recovery CLI:
+    - `check-backup <file>` reports the version, contents, integrity, and whether the key matches.
+    - `restore <file>` stages a checked database (`restore-pending.db`), and the next start swaps it in, keeping the old one as `latestarr.db.before-restore-<time>`. `restore --cancel` undoes the staging.
+    - It refuses a backup made with another key (unless `--ignore-key-mismatch`) or by a newer version.
+    - At startup, LatestArr warns if `ENCRYPTION_KEY` can't decrypt the saved credentials.
+  - **Routes:** `GET`/`POST /backups`, `PUT /backups/settings`, `GET /backups/:filename/download`, `DELETE /backups/:filename`, all admin only.
+    - Downloads are `no-store` and logged at warn level.
+    - The page warns when backups share the database's disk (same device id).
+  - `docker/entrypoint.sh` gives the `node` user a separate `BACKUP_PATH` mount. Backup files are written `0600`.
+  - Docs: a new "Backups" section with "Restoring a backup" in `docs/self-hosting.md`, plus `BACKUP_PATH` in `.env.example`.
+
+  </details>
+
+- [#312](https://github.com/jshields-ca/LatestArr/pull/312) [`6071248`](https://github.com/jshields-ca/LatestArr/commit/6071248f228f5fd5764568327327d779d43117ee) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** More colour and button options for designs, under **Colours and font** and **Buttons** in the design editor.
+
+  - **More colours:** choose your own colours for type labels (text and background) and for links in the intro and footer note, and under **Buttons**, the button colour and button text. Each follows the accent until you set it, and the × puts it back, so existing designs, Default included, look exactly as before. Custom label and link colours get dark-mode versions too.
+  - **Button style:** rounded, square or pill shape, regular or small, for every button. Your own buttons and "Where to watch" buttons can each be filled or outlined.
+  - **Contrast check:** the editor warns when a colour pair would be hard to read (below WCAG AA, 4.5:1). It doesn't stop you saving.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#293](https://github.com/jshields-ca/LatestArr/issues/293).
+  - **Settings:**
+    - `colors` gains `labelText`, `labelBackground`, `buttonBackground`, `buttonText` and `link`, as nullable hex values defaulting to `null`, which means they follow the accent.
+    - New `buttons: { shape, style, size }`, defaulting to `rounded`, `filled` and `regular`.
+  - **`paletteFor`** works out the label, button and link colours, matching today's output when they're unset. The default-design snapshot is unchanged.
+  - **`darkPaletteFor` and `darkModeHead`** add dark rules only for custom colours that differ from those already covered. Buttons keep their colours in dark mode, as before.
+  - **`button()`** takes the button settings:
+    - shape sets `border-radius` to 0, 8 or 999 px;
+    - size sets the padding and font size, with outlined buttons losing 1 px of padding to their border;
+    - an outlined primary button uses the background and button colour.
+    - `mj-button` keeps all of this working in Outlook.
+  - **Notes' links** use `colors.link`, falling back to the accent.
+  - **Web:** `lib/colour.ts` has `mix`, `contrastRatio`, `effectiveColour` and `contrastWarnings`. The editor gains `AdvancedColours`, `ButtonStyle` and `ContrastNotes`.
+
+  </details>
+
+- [#331](https://github.com/jshields-ca/LatestArr/pull/331) [`f1638c4`](https://github.com/jshields-ca/LatestArr/commit/f1638c4de50fb1f0b39a679ba238e009cb155b61) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** The design editor is easier to work through, and button styles now reach every button.
+
+  - **Where to watch buttons can be filled:** Watch on Plex and Browse movies buttons get their own **Style**. It defaults to Outlined, as they've always been, so existing designs look the same until you change it.
+  - **One place for buttons:** a new **Buttons** section has your buttons (with where they go and their style), Where to watch buttons (on or off, where they go and their style), and the look of all buttons: shape, size, Button colour, and Button text.
+  - **In the order of the email:** Colours and font, Logo, Layout, Text, Buttons, Item details, Sections, and Custom CSS. The date range and counts line moved to Layout, and the intro and footer note share a Text section.
+  - **Easy to review:** each section's header says what's set, like "Cards", "Intro, Footer note", or "6 of 6 shown", so you can check a design without opening everything.
+  - **Contrast warnings** for buttons now show with the button options, and check whichever styles are in use.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#330](https://github.com/jshields-ca/LatestArr/issues/330), from release testing in [#281](https://github.com/jshields-ca/LatestArr/issues/281).
+  - **Server:** `buttons.sourceStyle` (`"filled" | "outline"`, default `"outline"`) in the design settings schema. `button()` uses `style` for the design's own buttons and `sourceStyle` for source buttons and the library link. Saved designs without it get the default, so they render as before.
+  - **Web:** `Section` takes a `summary`. New `Group`, `ColourField`, `AccentColours`, and `ChoiceField` components replace `AdvancedColours` and `ButtonStyle`. Fields that share a visible label ("Where they go", "Style") get distinct accessible names. `contrastWarnings` marks button warnings and checks both filled and outlined pairs when both styles are in use.
+
+  </details>
+
+- [#315](https://github.com/jshields-ca/LatestArr/pull/315) [`9253e16`](https://github.com/jshields-ca/LatestArr/commit/9253e16484b59d1cf9dbf305ec399812d94018b0) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Add your logo to the top of a design, under **Logo** in the design editor.
+
+  - **Upload** a PNG, JPEG or GIF (up to 1 MB). It's included in each email, so it shows even where email apps block images from the web. Or use an **image URL**, either copied into each email (the default) or linked.
+  - **Link it** to your server's site, Overseerr, or your Plex or Jellyfin app.
+  - Put it **above the newsletter's name or in place of it**, aligned left, centre or right, at the width you choose. It shrinks to fit on phones.
+  - Add a **dark mode version** for logos with dark lettering, which would otherwise disappear on dark backgrounds. Switch the preview to Dark to check it.
+  - Code designs can place it themselves with `{{logo}}`.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#302](https://github.com/jshields-ca/LatestArr/issues/302).
+  - **Storage:**
+    - New `design_images` table (migration `0011_design_images`) for uploads, referenced by id from a design's `settings.logo`. Backups include it, since they copy the whole database.
+    - Uploads no design uses are removed after 24 hours (`pruneUnusedDesignImages`, run on upload and when a design is saved or deleted).
+  - **Uploads:** `POST /api/templates/images` (editors and admins) and `GET /api/templates/images/:id` (signed in, cached as immutable).
+    - `cleanImage` checks the contents, not the file name, and accepts PNG, JPEG and GIF only. SVG is refused with its own message.
+    - It re-encodes the image, which drops metadata, turns photos the right way up, and scales anything over 1100 px wide down.
+  - **Settings:** `logo: { source, imageId, darkImageId, url, darkUrl, urlMode, link, placement, align, maxWidth, alt }`. URLs are http(s) only and `maxWidth` runs from 40 to 550 px. Without a logo, the default design's output is unchanged (snapshot test).
+  - **Rendering:**
+    - `resolveLogo` embeds uploads as `cid:` attachments.
+    - When sending, it fetches image URLs with the same timeout and size cap as posters and an image content type only. If that fails, the email links to the URL instead and the send carries on.
+    - Previews never fetch URLs (anyone signed in can preview), so the server never requests an address on a viewer's behalf.
+    - The logo's attachments are kept with the send, so "Send to the rest" includes it.
+  - **Dark mode:** the dark image is hidden and kept from Outlook with a conditional comment. It's swapped in by `prefers-color-scheme` and `[data-ogsc]` rules, which are added only when a dark image is set. A dark design always shows its dark image.
+  - **Web:** `DesignLogoFields` in `components/design-logo-fields.tsx`. An incomplete logo holds back Save and is left out of the preview.
+
+  </details>
+
+- [#311](https://github.com/jshields-ca/LatestArr/pull/311) [`2072152`](https://github.com/jshields-ca/LatestArr/commit/207215221cc56ac3a5e379fd87d990ace7328c02) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** A design's **Intro** and **Footer note** support simple formatting and alignment.
+
+  - **Formatting:** **bold**, _italic_, ~~strikethrough~~, `[links](https://example.com)` (in the design's accent colour), and bulleted or numbered lists.
+  - **Alignment:** each note can be left, centre or right aligned.
+  - **What stays the same:** existing notes look as they did, and HTML typed into a note still shows as text. One thing to check: a `*` or `_` around words, or a line starting with `-` or `1.`, now formats.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#290](https://github.com/jshields-ca/LatestArr/issues/290).
+  - New `render/notes.ts`, using [markdown-it](https://github.com/markdown-it/markdown-it) 15 (a new server dependency) from its `zero` preset.
+    - Enabled: lists, newline (`breaks: true`), emphasis, strikethrough, link, escape, entity. `html: false`.
+    - `validateLink` allows only `http`, `https` and `mailto`.
+    - Paragraphs, lists and links get inline styles, since email clients ignore most stylesheets. Lists are `inline-block` so they follow the note's alignment.
+    - A single paragraph renders unwrapped, so the existing snapshot is unchanged. The last block's bottom gap is dropped.
+  - `{{introText}}` and `{{footerNote}}` now render this Markdown in code-mode designs too, replacing [#289](https://github.com/jshields-ca/LatestArr/issues/289)'s line-break helper. Links use `noteLinkColor`, the design's accent, which `designContentVariables` passes along.
+  - New settings `content.introAlign` and `content.footerAlign` (`left`, `center` or `right`; default `left`) become `mj-text align`.
+  - Editor: a `NoteField` with an alignment picker in design mode and a formatting hint.
+
+  </details>
+
+- [#276](https://github.com/jshields-ca/LatestArr/pull/276) [`e071447`](https://github.com/jshields-ca/LatestArr/commit/e0714475552f1f690bcaf8b267b4b7ae0a0a1c11) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** A way back in when you forget your password. Choose a **System email** profile on the SMTP Profiles page, and the sign-in page gets a **Forgot password?** link that emails you a one-time reset link. Without email, there's a recovery command for whoever runs the server: `docker exec -it latestarr node dist/cli.js reset-password --email you@example.com` asks you for a new password. Another admin can still reset your password from the Users page.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#264](https://github.com/jshields-ca/LatestArr/issues/264).
+  - **Reset links:** `POST /auth/password-reset/request` and `/confirm`.
+    - Tokens are 32 random bytes, stored as SHA-256 hashes in the new `password_reset_tokens` table. They work once, for 30 minutes.
+    - A new link cancels older ones, and an account gets at most one email every 2 minutes. Requests are rate limited (5 per 15 minutes per IP).
+    - The answer is the same whether or not the account exists, and the email is sent after replying, so timing doesn't reveal it either. SSO-only and deactivated accounts never get a link.
+    - Using a link sets the password, signs the account out everywhere, and cancels other links. So does any other password change.
+  - **Links are built from `WEB_ORIGIN`, never the request's Host header.** When the address in use doesn't match `WEB_ORIGIN` (say, a proxy in front of an install still set to localhost), email resets stay off rather than sending a broken link, and the SMTP Profiles page explains why.
+  - The token travels in the URL fragment (`/reset-password#token=…`), which browsers never send to a server, so it can't reach access logs. The page removes it from the address bar.
+  - **System email:** `GET`/`PUT /settings/system-mail` (admin only), stored in `settings`. Deleting the chosen profile turns it off. `/auth/providers` now says whether resets are available.
+  - **Recovery command** (`dist/cli.js`):
+    - `reset-password --email` asks for the new password twice at a hidden prompt (or reads one line with `--password-stdin`), signs the account out everywhere, and reactivates it if needed. The password is never printed, passed as an argument, or read from the environment.
+    - `list-admins` lists the admins.
+    - When run as root (the default for `docker exec`), it switches to the data folder's owner first, so SQLite never leaves root-owned files the server can't write.
+    - Its actions are written to a new `audit_events` table, which the Logs page merges in.
+  - CI's Docker smoke test now runs both commands as root, signs in with a password piped to `--password-stdin`, checks it refuses without a terminal, and checks no root-owned files are left in `/app/data`.
+  - Docs: a "Locked out?" section in `docs/self-hosting.md`, and `WEB_ORIGIN`'s role in reset links.
+
+  </details>
+
+- [#322](https://github.com/jshields-ca/LatestArr/pull/322) [`2e27168`](https://github.com/jshields-ca/LatestArr/commit/2e27168f179c4b871d03ff673bbfcab807803b57) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** A **groups** column in a recipient import adds each person to those groups, and creates any that don't exist yet.
+
+  - Put several groups in one cell separated by `;`, or by commas in a file separated by semicolons. Groups match by name, ignoring case and spaces.
+  - The review lists each group: new or existing, and how many people the import adds to it. Nothing changes until you choose **Import**.
+  - An import only adds people to groups. It never removes anyone.
+  - The template file now includes a groups column.
+
+  <details>
+  <summary>Technical details</summary>
+  - Part 2 of [#288](https://github.com/jshields-ca/LatestArr/issues/288).
+  - **Server:**
+    - Import rows take `groups: string[]` (up to 20 names of up to 100 characters each).
+    - The plan gains `groups: [{ name, isNew, adding }]`, where existing group names keep their own spelling.
+    - Applying, in the same transaction, creates the missing groups and inserts memberships with `onConflictDoNothing`. It returns `createdGroups` and `membershipsAdded`.
+    - An existing recipient who only joins groups no longer counts as unchanged.
+  - **Web:**
+    - The parser reads a Group or Groups column, and in heading mode splits cells on the file's own delimiter.
+    - The review has a Groups section.
+    - New groups and memberships show on the page straight away (`GroupSyncContext`).
+
+  </details>
+
+- [#321](https://github.com/jshields-ca/LatestArr/pull/321) [`6958e27`](https://github.com/jshields-ca/LatestArr/commit/6958e2736e7793a5d7a7ed96ef441000ca4da579) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** Importing recipients now shows what will change before anything is saved, and explains the file format.
+
+  - **Review first:** after pasting or uploading, **Review** lists the new recipients, name changes for people already on your list, who's already there unchanged, and skipped rows with the reason. Nothing changes until you choose **Import**.
+  - **Names update:** a name in the file now updates an existing recipient's name. Before, the row was skipped as "Already exists". A row without a name leaves the existing name alone.
+  - **File format help** with a downloadable template.
+  - **Spreadsheet-friendly:** a heading row is read by column (Email, E-mail or Email address, plus Name, Full name or Display name), in any order, with other columns ignored. Quoted names like `"Smith, Jane"` stay whole, and cells copied straight from a spreadsheet work too.
+
+  <details>
+  <summary>Technical details</summary>
+  - Part 1 of [#288](https://github.com/jshields-ca/LatestArr/issues/288): format help and a preview before applying.
+  - **Server:** `POST /api/recipients/import` takes `dryRun: true` and returns `{ plan: { create, update, unchanged, skipped } }` without writing anything (`planRecipientImport` in `http/routes/recipient-import.ts`).
+    - Applying works the plan out again inside one transaction (`applyRecipientImport`), and returns `{ created, updated, unchanged, skipped }`.
+    - Emails match existing recipients ignoring case.
+  - **Web:**
+    - `components/import-recipients-dialog.tsx` has three steps: edit, review and done. Closing with a pasted list asks first.
+    - The parser (`lib/recipient-import.ts`) gains `splitCells`, which is quote-aware and splits on commas, semicolons and tabs. It also maps heading rows to columns and drops a leading byte-order mark.
+
+  </details>
+
+- [#325](https://github.com/jshields-ca/LatestArr/pull/325) [`e68bd37`](https://github.com/jshields-ca/LatestArr/commit/e68bd37d15a1226fb89323885b2f794f6105bd89) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Import recipients from an Excel file, and undo the last import.
+
+  - **Excel:** upload an `.xlsx` file. Its first sheet is read like a CSV, with the same review before anything changes. Older `.xls` files get a message asking you to save as `.xlsx` or CSV.
+  - **Undo last import** appears next to **Import** for 24 hours, or until your next import. It removes the people and groups the import added, takes people back out of the groups it added them to, and puts back the names it changed. Anything changed since is kept, and Undo tells you what. A person is also kept if they've been sent a newsletter since, so their history stays.
+
+  <details>
+  <summary>Technical details</summary>
+  - Part 3 of [#288](https://github.com/jshields-ca/LatestArr/issues/288), which completes it.
+  - **Excel:**
+    - Read in the browser with [read-excel-file](https://www.npmjs.com/package/read-excel-file) 9.3.10 (MIT), loaded only when a spreadsheet is chosen. The server never parses a spreadsheet.
+    - read-excel-file doesn't run formulas. It reads the values the spreadsheet app saved.
+    - Limits: 5 MB and 1000 rows.
+    - The first sheet becomes tab-separated text in the import box (`lib/spreadsheet.ts`), so it goes through the same parser and review as a paste or CSV.
+    - Works under the app's CSP (checked in a browser).
+  - **Undo:**
+    - New `recipient_imports` table (migration `0012_recipient_imports`), holding the latest import's changes: recipients created, names changed, memberships added, groups created.
+    - `GET /api/recipients/imports/latest` and `POST /api/recipients/imports/:id/undo` are editor-only.
+    - `undoRecipientImport` runs in one transaction and returns what it undid, plus what it kept and why: edited or deactivated people, people sent a newsletter since, names changed again, and groups that were renamed, described, used by a newsletter or given other members.
+    - Logged on the server.
+
+  </details>
+
+- [#309](https://github.com/jshields-ca/LatestArr/pull/309) [`64196a9`](https://github.com/jshields-ca/LatestArr/commit/64196a9e6e8fe286cafd45a9a3b631f55de2ab60) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** **Send to the rest** finishes a newsletter that only reached some of its recipients, without sending anyone a duplicate. Use it when LatestArr stopped partway, the mail server turned some people away, or a rate limit cut a send off. Open the send's **Details** in the newsletter's **History** and choose **Send to the rest**. It sends the same email, with the same items, subject and images, to only the people who didn't get it, including anyone whose delivery failed. A confirmation shows who it will go to, and their results are added to the same send. It works on the newsletter's latest send, within its lookback window, and is for editors and admins.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#283](https://github.com/jshields-ca/LatestArr/issues/283).
+  - **Migration `0010_send_to_the_rest`:**
+    - `send_runs.subject`, set with `rendered_html`;
+    - `send_runs.rest_sent_at`;
+    - a new `send_run_attachments` table holding a send's embedded images (cid, filename, type, bytes). A newsletter's earlier sends' images are deleted when its next send renders, so storage stays at one send per newsletter.
+  - **New `pipeline/send-to-the-rest.ts`:**
+    - `planSendToTheRest()` checks that the send is `partial_failure` or `failed` and has its stored subject, HTML and every referenced image.
+    - It also checks that it's the newsletter's latest send (no later send, by insertion order, reached anyone) and that it started within `lookbackDays`.
+    - It returns the newsletter's active recipients not recorded as `sent`.
+    - `sendToTheRest()` claims the run by setting it to `running` in one conditional `UPDATE`, which shares Send now's "already running" lock and stops two requests from both sending. It then sends, replaces each recipient's earlier result, and sets the final status, `finishedAt` and `restSentAt`, in a `finally` block.
+    - If LatestArr stops partway, the startup clean-up from [#280](https://github.com/jshields-ca/LatestArr/issues/280) closes the send as usual.
+  - **API:**
+    - `GET /newsletters/:id/send-runs/:runId/rest` (editor) returns the plan, or why the send can't be finished.
+    - `POST /newsletters/:id/send-runs/:runId/send-to-rest` (editor) answers 409 when the send can't be finished or another send is running.
+    - The History list adds `canSendToRest` and `restSentAt`, and breaks ties on start time by insertion order.
+  - **Web:** a `SendToRestDialog` in the send's details, and "Sent to the rest" with its time in History.
+  - **Docs:** `self-hosting.md` covers finishing a partly sent newsletter. The interrupted-send message and alert now point to **Send to the rest**.
+
+  </details>
+
+- [#320](https://github.com/jshields-ca/LatestArr/pull/320) [`e359023`](https://github.com/jshields-ca/LatestArr/commit/e359023e436bf16404a9434d0090ad7954e44f62) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** Signing in with SSO from another address, such as the server's LAN IP, failed with "Missing or expired OIDC sign-in attempt". **New:** Link SSO to an existing account from your profile.
+
+  - **Sign-in from another address** now works: **Continue with SSO** first moves you to the address in `OIDC_REDIRECT_URI`, where your identity provider sends you back.
+  - **Link SSO** in your profile connects your SSO account to the account you're signed in to. It works even when your provider doesn't mark your email address as verified, which stopped automatic matching before. **Unlink SSO** is there too, for accounts that also have a password.
+  - **Plain messages:** a failed SSO sign-in now goes back to the sign-in page with a reason, not a page of raw JSON, and the logs say exactly why.
+
+  <details>
+  <summary>Technical details</summary>
+  - Refs [#317](https://github.com/jshields-ca/LatestArr/issues/317).
+  - **`GET /api/auth/oidc/login`** redirects to the `login` URL next to `OIDC_REDIRECT_URI` when the request's host differs. The flow cookie can only be set on the host the provider returns to. The redirect target comes from config, never the request.
+  - **Callback errors** redirect to `/login?sso=<outcome>` (or `/?sso=` for linking) under `WEB_ORIGIN`. The outcomes are `expired`, `failed`, `unverified-email`, `not-linked`, `linked`, `link-taken` and `link-failed`. `OidcAccountNotLinkedError` carries a `reason` (`unverified-email`, `no-account` or `inactive`), which is logged.
+  - **Linking:**
+    - `POST /api/auth/oidc/link` needs a session and passes the same-origin check. It returns the provider URL, and the flow cookie records `link.<userId>`.
+    - The callback links only if the same session is still signed in, and refuses an identity that belongs to another account.
+    - `DELETE /api/auth/me/sso` unlinks, and is refused for an account without a password.
+    - `GET /api/auth/me` adds `ssoLinked` and `hasPassword`.
+  - **Web:** `lib/sso.ts` holds the outcome messages. The login page shows the reason, the app shell shows a toast after linking, and the profile has a Single sign-on section.
+
+  </details>
+
+- [#327](https://github.com/jshields-ca/LatestArr/pull/327) [`5b63cfc`](https://github.com/jshields-ca/LatestArr/commit/5b63cfc8be4696b76d443ca68440f12bfb825b37) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Subject variables, so each issue's subject can change with each send, such as "The latest from {period}" or "{count} new: {counts}".
+
+  - **Variables:** `{newsletter}`, `{date}`, `{shortDate}`, `{period}`, `{month}`, `{year}`, `{count}` and `{counts}`. They're filled in on each send in the newsletter's timezone, so the subject matches the dates in the email.
+  - **In the form:** **Insert a variable** adds one at the cursor, and a live line shows the next subject (with example counts). A misspelled variable like `{dat}` is flagged as you type, and saving refuses it, so a typo never reaches an inbox.
+  - **Preview and history:** **Preview** shows the real next subject, **Send test** uses it (with `[Test]`), and History records the subject as sent.
+  - **Nothing new:** a subject built around `{count}` or `{counts}` becomes "<newsletter>: nothing new" instead of "0 new".
+  - **Unchanged:** a blank subject still uses the newsletter's name, and existing subjects work exactly as before.
+  - **Fixed:** Clearing a newsletter's subject now saves. It used to keep the old one.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#267](https://github.com/jshields-ca/LatestArr/issues/267).
+  - **`render/subject.ts`:**
+    - `renderSubject` uses single-brace placeholders, not Handlebars, so there's no HTML escaping or template errors in a plain-text header. Only known variables are replaced, and other braces stay as typed.
+    - The result has control characters and line breaks turned into spaces (no header injection), is trimmed, and is capped at 200 characters.
+    - `unknownSubjectVariables` backs the save-time check, which uses a plain-language message.
+  - **`render/dates.ts`:** timezone-aware date formatting, now shared by the subject and the email's send date and date range (`generatedAtFormatted`, `periodFormatted`). The email's dates now use the newsletter's timezone instead of the server's. That only differs around midnight, and an invalid timezone falls back to the server's.
+  - **Web:** `components/subject-field.tsx` and `lib/subject.ts`, which mirrors the server's variables and formatting for the live preview.
+
+  </details>
+
+- [#274](https://github.com/jshields-ca/LatestArr/pull/274) [`559eda9`](https://github.com/jshields-ca/LatestArr/commit/559eda95d74ed5c84ce08982722a565bf45a87e9) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **New:** Users can now be admins, editors, or viewers. Viewers see newsletters, designs, previews, and send history without being able to change anything. Editors can also create and send newsletters, edit designs, and manage recipients. Admins can do everything, including sources, SMTP, notifications, users, and logs. Choose a role when you add someone, or change it from the Users page. Existing users stay admins.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#257](https://github.com/jshields-ca/LatestArr/issues/257). Roles are enforced on the server: `requireAuth(db, { read, write })` gives each route group the role it needs for `GET` and for changes, and a route can ask for a different one with `config: { minRole }` (previews are open to viewers; `GET /sources/:id/libraries` and `/users`, recipient lists, and a send's recipient results need an editor).
+  - A refused request answers `403` with `code: "role_required"` and the role needed, and is logged.
+  - `security.test.ts` lists every signed-in route with the role it needs, fails when a new route isn't listed, and checks each route against all three roles.
+  - `POST /users` takes a `role` (default `viewer`) and `PATCH /users/:id` can change it. Admins can't change their own role, and the last active admin can't be demoted, deactivated, or deleted. Role changes apply on the next request.
+  - The web app hides the pages and controls a role can't use: the sidebar is filtered, admin-only pages show a "No access" card, newsletters and designs are read-only for viewers (a disabled `fieldset`, and a read-only code editor), and pages only fetch what the role can read.
+  - The SMTP Profiles page is admin-only; editors still get the profile list for choosing one on a newsletter.
+
+  </details>
+
+### Patch Changes
+
+- [#308](https://github.com/jshields-ca/LatestArr/pull/308) [`43bec4e`](https://github.com/jshields-ca/LatestArr/commit/43bec4ed5f2fa93e83a7759bccf3a9a67e1f7ac1) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** BookOrbit's new logo now shows on the Sources page.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#296](https://github.com/jshields-ca/LatestArr/issues/296).
+  - `assets/logos/bookorbit.svg` is replaced by `bookorbit.webp` (243×243, 16 KB), BookOrbit's new logo from selfh.st/icons. Upstream removed the SVG on 2026-10-05 and now publishes this logo only as PNG and WebP.
+  - `NOTICE.md` has been updated: the file, its source path, and the project link (`bookorbit.app`).
+  - The name stays "BookOrbit", one word, as the project writes it. The sample-preview button added in this release says "Read on BookOrbit".
+
+  </details>
+
+- [#314](https://github.com/jshields-ca/LatestArr/pull/314) [`983ba35`](https://github.com/jshields-ca/LatestArr/commit/983ba359973408cfcb916fff09d9ed7d3134c71f) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** Updated Handlebars, the template engine behind newsletter and design templates, to pick up upstream security fixes.
+
+  <details>
+  <summary>Technical details</summary>
+  - `handlebars` 4.7.9 → 4.7.10, and the server's range raised to `^4.7.10` so older versions can't be resolved.
+  - Fixes three JavaScript-injection advisories (Dependabot alerts [#71](https://github.com/jshields-ca/LatestArr/issues/71), [#72](https://github.com/jshields-ca/LatestArr/issues/72) and [#73](https://github.com/jshields-ca/LatestArr/issues/73)): an own-property check bypass, AST type confusion in `compile`, and unsafe inline embedding of precompiled templates.
+
+  </details>
+
+- [#313](https://github.com/jshields-ca/LatestArr/pull/313) [`01e1b96`](https://github.com/jshields-ca/LatestArr/commit/01e1b9643e9b305c1b2172d685eae52c3ceba01b) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** Updated two bundled libraries to pick up upstream security fixes.
+
+  <details>
+  <summary>Technical details</summary>
+  - Lockfile-only bump of two transitive dependencies:
+    - `source-map-js` 1.2.1 → 1.2.2 (event-loop denial of service via indexed source-map offsets; reached through mjml and Tailwind);
+    - `shell-quote` 1.10.0 → 1.12.0 (command injection in `quote()`; reached only through `@changesets/cli`, a dev tool).
+  - Clears Dependabot alerts [#69](https://github.com/jshields-ca/LatestArr/issues/69) and [#70](https://github.com/jshields-ca/LatestArr/issues/70).
+
+  </details>
+
+- [#319](https://github.com/jshields-ca/LatestArr/pull/319) [`df68075`](https://github.com/jshields-ca/LatestArr/commit/df6807511248275bdc5f717bde5d7bd700ffbddc) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** Saving works the same way everywhere, so it's always clear whether you need to press Save.
+
+  - **Save buttons** for newsletter details, alerts, backup settings, your profile, and editing a source, SMTP profile, group or recipient:
+    - the button is enabled only when something has changed, with **Unsaved changes** beside it;
+    - **Ctrl+S** (or **Cmd+S**) saves;
+    - you're asked before losing changes: on reload, closing the tab, following a sidebar link, closing the dialog, or collapsing the newsletter.
+  - **Editing a recipient:** name, email and groups all save together with **Save changes**, and **Cancel** asks before discarding. A new group typed there is created when you save, and a name that matches an existing group just adds them to it.
+  - **Lookback:** an invalid lookback, such as 0 days, now says "Enter a whole number of days, 1 or more." It used to show a raw validation message.
+
+  <details>
+  <summary>Technical details</summary>
+  - Closes [#295](https://github.com/jshields-ca/LatestArr/issues/295). The audit table is on the issue, and the rule is in CONTRIBUTING.md under "Saving".
+  - **Shared pieces:**
+    - `components/ui/save-actions.tsx` (`SaveActions`);
+    - `lib/unsaved-changes.ts`: `useUnsavedChanges` (an app-wide registry plus `beforeunload`), `useSavedSnapshot`, `guardClose`, `confirmDiscard`, `saveShortcutRef` and `useSaveShortcut`.
+  - **`saveShortcutRef`** is a React 19 ref with cleanup rather than `onKeyDown`, which jsx-a11y rejects on a `<form>`. It does nothing while the Save button is disabled.
+  - **Sidebar links** ask through `confirmDiscard()`. The app uses `BrowserRouter`, so React Router's `useBlocker` isn't available, and the browser's Back button can't be stopped.
+  - **Server:** `lookbackDays` validation messages are now a plain sentence.
+
+  </details>
+
+- [#307](https://github.com/jshields-ca/LatestArr/pull/307) [`4420f7b`](https://github.com/jshields-ca/LatestArr/commit/4420f7bb0721208cebccca9682de9a0adea2832e) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** When a design is set to **Link to the library** for sections with nothing new, the section now shows "Nothing new this time." and a **Browse audiobooks** button styled like the design's other buttons, in its accent colour and in dark mode. Before, it was a bare link that didn't match the design. If the section already ends with its own "Watch on Plex"-style button, the browse button is left out so the same link doesn't appear twice.
+
+  <details>
+  <summary>Technical details</summary>
+  - Fixes [#292](https://github.com/jshields-ca/LatestArr/issues/292).
+  - New Handlebars helper `{{#libraryLinkFor contentType="…" label="…"}}`, which renders its block with `{label, url}` from the linked sources' library address. The else block runs when there's no library address.
+  - Built-in designs no longer use `mediaList`'s `emptyFallback="link"`. They render `emptyMessage` plus the secondary `button()` inside `ifAnyItems`'s else block, wrapped in `sourceButtonsFor`'s else block when source buttons are placed per section.
+  - `mediaList`'s `emptyFallback="link"` is unchanged for code-mode designs. It now shares the `libraryLink()` lookup.
+
+  </details>
+
+- [#282](https://github.com/jshields-ca/LatestArr/pull/282) [`5a8cab1`](https://github.com/jshields-ca/LatestArr/commit/5a8cab192b527d8b5b72ef1164161b18d351d26f) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** If LatestArr stopped partway through sending a newsletter (a crash, restart, or upgrade), that newsletter could never send again: every later send said one was "already running". Now, when LatestArr starts, it closes the interrupted send, marks it partly sent or failed, shows who got it in History, and alerts you. Nobody who already got it is sent a duplicate.
+
+  <details>
+  <summary>Technical details</summary>
+  - Fixes [#280](https://github.com/jshields-ca/LatestArr/issues/280).
+  - New `closeInterruptedSends()` (`pipeline/interrupted-sends.ts`), run by `startScheduler` before refreshing jobs and before catch-up.
+    - Each run still `running` becomes `partial_failure`, or `failed` if no recipient was recorded as sent.
+    - It sets `finishedAt` and an error that says how many of how many recipients were reached, then logs a warning and sends a failure alert (trigger `interrupted`).
+  - Nothing is resent automatically. The interrupted run keeps its `startedAt`, so missed-send catch-up treats that period as sent.
+  - A send now records its item and recipient counts before the send loop rather than at the end, so an interrupted send can report "X of Y".
+  - Known limit: a recipient whose message the SMTP server accepted in the instant before the stop, but which wasn't yet recorded, shows as not sent.
+
+  </details>
+
+- [#305](https://github.com/jshields-ca/LatestArr/pull/305) [`342d273`](https://github.com/jshields-ca/LatestArr/commit/342d273bd18996e1ab4814cbc696a040174b9c73) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** Line breaks in a design's **Intro** and **Footer note** now show in the preview and in sent emails. Before, every line ran together into one paragraph. A blank line leaves a gap between paragraphs.
+
+  <details>
+  <summary>Technical details</summary>
+  - Fixes [#289](https://github.com/jshields-ca/LatestArr/issues/289).
+  - New `textWithLineBreaks()` in `render/mjml-template.ts` escapes each line and joins them with `<br>`. One or more blank lines become a single `<br><br>`.
+  - `{{introText}}` and `{{footerNote}}` are now bound as a Handlebars `SafeString`, so code-mode designs get the line breaks too. The text is still escaped, so HTML typed into either box shows as text.
+  - The plain-text version keeps the breaks, since `<br>` converts to a newline.
+
+  </details>
+
+- [#306](https://github.com/jshields-ca/LatestArr/pull/306) [`ae31270`](https://github.com/jshields-ca/LatestArr/commit/ae3127054e7677b9bf181d9359da186e3dc2c6d3) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** In a design's preview with sample content, the source buttons now match your connected sources, for example "Read on BookOrbit" for a BookOrbit source. Before, the sample always said "Read on BookLore". With no sources connected yet, it shows neutral labels such as "Watch now" and "Read now".
+
+  <details>
+  <summary>Technical details</summary>
+  - Fixes [#291](https://github.com/jshields-ca/LatestArr/issues/291).
+  - `/templates/preview` loads the source connections (kind, name, public URL) and passes them to `renderDesignSample`.
+  - `sampleSourceButtons()` builds the buttons with `buildSourceButtons`, so labels, merging and naming match a real send. A source without a public URL gets a stand-in URL so its button still shows in the sample.
+
+  </details>
+
+- [#279](https://github.com/jshields-ca/LatestArr/pull/279) [`70dda5f`](https://github.com/jshields-ca/LatestArr/commit/70dda5f6ed52a9d5d09d34465677776e87646a6e) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** Updated two third-party libraries with published security fixes, so LatestArr isn't exposed to their denial-of-service and address-matching bugs.
+
+  <details>
+  <summary>Technical details</summary>
+  - `ip-address` 10.7.0 → 10.7.3 (via `@fastify/rate-limit`, so it ships in the server): fixes an unbounded parse diagnostic on long input that could stall the process, and `isInSubnet()` comparing IPv4 and IPv6 addresses as one address space.
+  - `brace-expansion` 1.1.18 → 1.1.21 and 5.0.9 → 5.0.12 (via `minimatch`, build and lint tooling): fixes stack exhaustion on nested or comma-heavy brace patterns and quadratic-time expansion.
+  - Lockfile-only change (`pnpm update --depth Infinity`), within each parent's allowed range. Clears Dependabot alerts [#61](https://github.com/jshields-ca/LatestArr/issues/61)–[#68](https://github.com/jshields-ca/LatestArr/issues/68).
+
+  </details>
+
+- [#301](https://github.com/jshields-ca/LatestArr/pull/301) [`85e9a55`](https://github.com/jshields-ca/LatestArr/commit/85e9a557399feaa32fca6d5fc06cb63b2eb00a7a) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** A design with a **Most watched** section couldn't preview or send for newsletters using a Tautulli source. They failed with "Send failed: data.find is not a function". Most watched now shows Tautulli's most played movies and shows again.
+
+  <details>
+  <summary>Technical details</summary>
+  - Fixes [#284](https://github.com/jshields-ca/LatestArr/issues/284).
+  - With a `stat_id`, Tautulli's `get_home_stats` returns that one stat block as an object, or `[]` when there are no stats. `getHomeStats` expected an array of blocks, so `.find` threw.
+  - It now accepts the single block, still searches an array by `stat_id`, and returns `[]` for an empty result.
+  - Any other shape (null, a different stat, `rows` that isn't a list) throws a clear "unexpected response" error instead of a `TypeError`.
+  - Client, adapter and send-route tests now use Tautulli's real response shape, with tests for the array and unexpected cases.
+
+  </details>
+
+- Updated dependencies [[`31615b2`](https://github.com/jshields-ca/LatestArr/commit/31615b2d20e5c5fc3c1e0a1dd315ca2ba8bade4b), [`9253e16`](https://github.com/jshields-ca/LatestArr/commit/9253e16484b59d1cf9dbf305ec399812d94018b0), [`e071447`](https://github.com/jshields-ca/LatestArr/commit/e0714475552f1f690bcaf8b267b4b7ae0a0a1c11), [`e68bd37`](https://github.com/jshields-ca/LatestArr/commit/e68bd37d15a1226fb89323885b2f794f6105bd89), [`64196a9`](https://github.com/jshields-ca/LatestArr/commit/64196a9e6e8fe286cafd45a9a3b631f55de2ab60), [`85e9a55`](https://github.com/jshields-ca/LatestArr/commit/85e9a557399feaa32fca6d5fc06cb63b2eb00a7a)]:
+  - @latestarr/db@0.12.0
+  - @latestarr/adapter-tautulli@0.12.0
+  - @latestarr/adapter-audiobookshelf@0.12.0
+  - @latestarr/adapter-booklore-family@0.12.0
+  - @latestarr/adapter-core@0.12.0
+  - @latestarr/adapter-jellyfin@0.12.0
+  - @latestarr/adapter-plex@0.12.0
+  - @latestarr/adapter-romm@0.12.0
+  - @latestarr/crypto@0.12.0
+
 ## 0.11.2
 
 ### Patch Changes
