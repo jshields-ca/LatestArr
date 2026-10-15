@@ -307,7 +307,7 @@ function explainFolderError(err: unknown, backupDir: string): unknown {
   const code = (err as { code?: unknown } | null)?.code;
   if (typeof code !== "string" || !FOLDER_ERRORS.has(code)) return err;
   return new Error(
-    `LatestArr can't write to the backup folder, ${backupDir}. Check that it exists and that the user LatestArr runs as (node, UID 1000, in Docker) can write to it.`,
+    `LatestArr can't write to the backup folder, ${backupDir}. Check that it exists and that the user LatestArr runs as (node, UID 1000, in Docker) can write to it. See https://www.latestarr.app/docs/backups#cant-write`,
     { cause: err },
   );
 }
