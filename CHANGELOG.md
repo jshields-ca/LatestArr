@@ -11,6 +11,65 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.12.1] - 2026-10-15
+
+### Improved
+
+- The Backups page's help links open the Backups guide on latestarr.app. ([#348](https://github.com/jshields-ca/LatestArr/pull/348))
+
+  **Restoring a backup** and the note about where backups are saved now link to the friendly guide instead of the repository's technical reference.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `RESTORE_DOCS_URL` and `BACKUP_PATH_DOCS_URL` in `pages/backups-page.tsx` point to `latestarr.app/docs/backups#restoring-a-backup` and `#where-theyre-saved`. The `README.txt` inside each backup still links to `docs/self-hosting.md#restoring-a-backup`, which ships with the code.
+
+  </details>
+
+- Clearer **Base URL** and **Public URL** fields when adding or editing a source. ([#343](https://github.com/jshields-ca/LatestArr/pull/343))
+
+  Each field now has its own short explanation. The **Base URL** is where LatestArr connects, so a local address is fine. The **Public URL** is where recipients go when they click. Before, one hint under Public URL tried to explain both, and called the Base URL "the address above".
+
+  <details>
+  <summary>Technical details</summary>
+
+  `BaseUrlHint` and `PublicUrlHint` in `pages/sources-page.tsx`, shared by the Add and Edit source dialogs, each linked to its input with `aria-describedby`.
+
+  </details>
+
+### Fixed
+
+- A backup that can't be written now says which folder is the problem. ([#341](https://github.com/jshields-ca/LatestArr/pull/341))
+
+  Before, a backup folder LatestArr couldn't write to failed with SQLite's "unable to open database file", on the Backups page, in the log, and in the failure alert. It now names the folder and says to check that LatestArr can write to it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `makeBackup` maps `SQLITE_CANTOPEN` and file-system errors (`EACCES`, `EPERM`, `EROFS`, `ENOENT`, `ENOTDIR`, `EEXIST`) to a message naming `backupDir`, keeping the original error as `cause`.
+
+  </details>
+
+- The Notifications page's cards now span the page like every other page's. ([#342](https://github.com/jshields-ca/LatestArr/pull/342))
+
+  They were narrower than the rest on a desktop. The fields inside them keep a comfortable width, as on the Backups page.
+
+  <details>
+  <summary>Technical details</summary>
+
+  The `max-w-2xl` cap moves from the form to each card's `CardContent`.
+
+  </details>
+
+- Each person's result in a send's details reads as a word (**Sent**, **Failed**, **Bounced** or **Unsubscribed**), like the send's own status, instead of `sent` or `failed`. ([#339](https://github.com/jshields-ca/LatestArr/pull/339))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **`components/send-run-history.tsx`:** a `RECIPIENT_STATUS_LABEL` map for `SendRunRecipientResult["status"]`, alongside the run labels in `lib/send-run.ts` from #336.
+
+  </details>
+
 ## [0.12.0] - 2026-10-13
 
 ### New
