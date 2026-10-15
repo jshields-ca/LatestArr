@@ -1,42 +1,47 @@
 # Email deliverability
 
-> This guide is also on the docs site: **[latestarr.app/docs/email-delivery/deliverability](https://www.latestarr.app/docs/email-delivery/deliverability)**.
+> The friendly version of this guide is on the docs site: **[latestarr.app/docs/email-delivery/deliverability](https://www.latestarr.app/docs/email-delivery/deliverability)**.
 
-A digest newsletter that lands in spam is worse than useless — recipients stop trusting it and stop opening it even once it's fixed. This covers the two things that actually move the needle: sender authentication (SPF/DKIM/DMARC) and a few LatestArr-specific settings.
+A digest that lands in spam stops being read, even after it's fixed. Two things matter most: authenticating your sending domain (SPF, DKIM and DMARC), and a few LatestArr settings.
 
-## Why authentication matters here specifically
+## Why it matters
 
-LatestArr sends mail on a recurring schedule, from an address you configure, through an SMTP server you configure — that's exactly the shape of traffic spam filters are built to scrutinize, because it's also exactly the shape of a compromised-account spam campaign. Without SPF/DKIM/DMARC telling receiving mail servers "yes, this SMTP server is authorized to send as this domain," a real recurring digest and a spam run are indistinguishable to them on the first few sends.
+LatestArr sends scheduled mail from an address you choose, through an SMTP server you choose. That's also what a spam run from a hijacked account looks like. SPF, DKIM and DMARC tell receiving servers that your SMTP server is allowed to send as your domain. Without them, your first few digests look no different from spam.
 
-## SPF, DKIM, and DMARC in one paragraph each
+## SPF, DKIM and DMARC
 
-- **SPF** (Sender Policy Framework) is a DNS TXT record on your sending domain listing which mail servers are allowed to send mail claiming to be from it. It doesn't require anything from LatestArr or nodemailer — it's pure DNS configuration on whatever domain your `defaultFromEmail` uses.
-- **DKIM** (DomainKeys Identified Mail) cryptographically signs each outgoing message so the receiving server can verify it wasn't altered in transit and genuinely came from a server holding your domain's private key. The SMTP provider or server signs the message — LatestArr just needs to send through a server that's configured to do this, it doesn't sign anything itself.
-- **DMARC** tells receiving servers what to do when a message fails SPF or DKIM (quarantine, reject, or nothing), and gives you a reporting address to see who's sending mail claiming to be your domain. It's a DNS TXT record too, and it's what actually gets enforced — SPF/DKIM alone are advisory without it.
+- **SPF** is a DNS TXT record on your sending domain that lists the servers allowed to send as it. It's DNS only; nothing changes in LatestArr.
+- **DKIM** signs each message, so the receiver can check it came from a server holding your domain's key and wasn't changed on the way. Your SMTP provider or server does the signing, not LatestArr.
+- **DMARC** is another DNS TXT record. It tells receivers what to do when SPF or DKIM fails (nothing, quarantine or reject) and where to send reports. It's what makes SPF and DKIM count.
 
-## Setting these up depends entirely on your SMTP provider
+They go on the domain of the SMTP profile's **From email**. That's not the domain LatestArr runs on, and not your provider's own domain.
 
-LatestArr talks to SMTP over the standard protocol (via nodemailer) and has no opinion on which provider you use — configure any of these as an SMTP profile:
+## Choosing an SMTP provider
 
-- **A transactional email provider** (Mailgun, Postmark, SendGrid, Amazon SES, Brevo, etc.) — the easiest path. These providers walk you through adding their SPF include and a DKIM CNAME/TXT record to your domain's DNS when you verify a sending domain in their dashboard, and DKIM signing happens automatically on their end from then on. Use the SMTP credentials they issue, not your provider account's own login.
-- **Gmail/Google Workspace** — usable via an [app password](https://support.google.com/accounts/answer/185833) if you're sending a low volume from a personal or Workspace account, but Gmail already applies its own SPF/DKIM for `smtp.gmail.com`, and Google's sending limits (500/day on free Gmail) make it a poor fit for anything beyond a small household setup.
-- **A self-hosted mail server** — full control, full responsibility: you configure SPF/DKIM/DMARC on your own domain's DNS yourself and are responsible for your own sending IP's reputation, which is the hardest path to get right for infrequent, low-volume sends like a weekly digest (reputation is built by volume and consistency).
+LatestArr works with any standard SMTP server. Add it on the **SMTP Profiles** page.
 
-Whichever you choose, the domain that needs SPF/DKIM/DMARC configured is the domain in your SMTP profile's **`defaultFromEmail`** — not the domain LatestArr itself is hosted at, and not your SMTP provider's own domain.
+- **A transactional email provider** (Mailgun, Postmark, SendGrid, Amazon SES, Brevo and others) is the easiest. When you verify your domain, they show the SPF and DKIM records to add, and they sign every message from then on. Use the SMTP credentials they give you, not your account login.
+- **Gmail or Google Workspace** works with an [app password](https://support.google.com/accounts/answer/185833) for a small household list. Google signs mail for `smtp.gmail.com` itself, but free Gmail's limit of 500 messages a day rules it out for larger lists.
+- **Your own mail server** gives full control and full responsibility: you set up SPF, DKIM and DMARC yourself, and build your server's reputation. That's hardest for a small weekly digest, because reputation comes from steady volume.
 
-## Verifying it worked
+## Checking it works
 
-After setting up DNS records, use **Send test email** on the SMTP profile's detail page, then check the received message's headers (most webmail clients show this as "Show original" or similar) for `spf=pass` and `dkim=pass`. [mail-tester.com](https://www.mail-tester.com/) gives a more thorough score if you want a second check.
+After adding the DNS records, use **Send test email** on the SMTP profile. Open the message's headers (often called "Show original") and look for `spf=pass` and `dkim=pass`. [mail-tester.com](https://www.mail-tester.com/) gives a fuller score.
 
 ### If DKIM shows `temperror` or `fail`
 
-- **`dkim=temperror`** means the receiving server couldn't look up your DKIM key at that moment. It's often a passing DNS hiccup, but if it keeps happening, the key record may be missing or malformed. The `DKIM-Signature` header in the received message names the selector (`s=`) and domain (`d=`). Look up `<selector>._domainkey.<domain>` as a TXT record with any DNS tool (for example `nslookup -type=TXT <selector>._domainkey.<domain>`). It should return one record starting `v=DKIM1`.
-- **`dkim=fail`** usually means the record doesn't match the key your SMTP server signs with, often after a provider rotates keys. Copy the current record from your provider's DNS or DKIM settings.
-- **No `DKIM-Signature` header at all** means your SMTP server isn't signing. Turn DKIM on in your provider's settings for the sending domain.
+The message's `DKIM-Signature` header names the selector (`s=`) and domain (`d=`). The key lives at `<selector>._domainkey.<domain>`, as a TXT record starting `v=DKIM1`. Check it with any DNS tool, e.g. `nslookup -type=TXT <selector>._domainkey.<domain>`.
 
-## What LatestArr does and doesn't do for you
+- **`dkim=temperror`:** the receiver couldn't look up the key at that moment. Often a passing DNS problem; if it keeps happening, the record may be missing or malformed.
+- **`dkim=fail`:** the record doesn't match the key your server signs with, often after a provider rotates keys. Copy the current record from your provider.
+- **No `DKIM-Signature` header:** your server isn't signing. Turn on DKIM for the sending domain in your provider's settings.
 
-- The `defaultFromName`/`defaultFromEmail` on an SMTP profile become the message's `From` header on every send — make sure the address matches whichever domain you've authenticated.
-- **There's no built-in unsubscribe mechanism yet** — no `List-Unsubscribe` header, no self-serve opt-out link in the sent email. Today, removing someone from future sends means an admin toggling that recipient inactive (or deleting them) from the Recipients screen. If you're sending to more than a handful of people who didn't explicitly ask to be on the list, be aware this is a real gap against CAN-SPAM/GDPR one-click-unsubscribe expectations, not just a deliverability nicety — mailbox providers increasingly penalize senders without it, independent of authentication.
-- Every newsletter is sent with a plain-text version alongside the HTML, generated from the same content. HTML-only mail scores worse with spam filters, and some readers only show the text.
-- Every send goes out individually per recipient (not one message BCC'd to the whole group), which avoids the "large recipient list in one message" pattern spam filters also scrutinize.
+## What LatestArr does for you
+
+- **From name** and **From email** on the SMTP profile become each message's `From`. Use an address on the domain you've authenticated.
+- **One message per recipient,** never one message to the whole list, which spam filters also distrust.
+- **A plain-text version** goes with every HTML email. HTML-only mail scores worse with spam filters.
+
+## What it doesn't do yet
+
+**There's no unsubscribe link or `List-Unsubscribe` header yet.** To stop sending to someone, an editor or admin turns them off (**Active**) or deletes them on the **Recipients** page. Mailbox providers increasingly expect one-click unsubscribe, and laws like CAN-SPAM and GDPR may too. If you send to people who didn't ask to be on the list, keep this gap in mind.
