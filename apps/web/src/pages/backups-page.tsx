@@ -49,8 +49,8 @@ import {
 } from "@/lib/schedule";
 import { saveShortcutRef, useSavedSnapshot, useUnsavedChanges } from "@/lib/unsaved-changes";
 
-const RESTORE_DOCS_URL = "https://github.com/jshields-ca/LatestArr/blob/main/docs/self-hosting.md#restoring-a-backup";
-const BACKUP_PATH_DOCS_URL = "https://github.com/jshields-ca/LatestArr/blob/main/docs/self-hosting.md#backups";
+const RESTORE_DOCS_URL = "https://www.latestarr.app/docs/backups#restoring-a-backup";
+const BACKUP_PATH_DOCS_URL = "https://www.latestarr.app/docs/backups#where-theyre-saved";
 
 const TRIGGER_LABELS: Record<BackupTrigger, string> = {
   scheduled: "Scheduled",
