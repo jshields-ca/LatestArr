@@ -129,6 +129,7 @@ describe("backup archives", () => {
     writeFileSync(broken.backupDir, "in the way");
     await expect(runBackup(broken, "scheduled", log)).rejects.toThrow(`can't write to the backup folder, ${broken.backupDir}`);
     expect(loadLastRun(db)).toMatchObject({ ok: false, trigger: "scheduled", error: expect.stringContaining("UID 1000") });
+    expect(loadLastRun(db)?.error).toContain("latestarr.app/docs/backups#cant-write");
     expect(await listBackups(ctx.backupDir)).toHaveLength(1);
   });
 
