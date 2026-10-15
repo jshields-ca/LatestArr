@@ -82,7 +82,7 @@ The repo's docs (`README.md`, `docs/`, `.env.example`, this file) are the techni
 - **Use the app's own words.** Name pages, buttons and fields exactly as the UI shows them, in **bold**.
 - **Each fact in one place.** Link to it rather than repeating it, so copies can't drift.
 - **Change them together.** A new or changed setting updates `.env.example`, `docker-compose.yml` and `docs/self-hosting.md` in the same PR. CI checks the first two agree.
-- **Keep anchors stable.** The app links to some headings in `docs/self-hosting.md` (`#locked-out`, `#backups`, `#restoring-a-backup`). Renaming one means updating those links.
+- **Keep anchors stable.** The app links to `docs/self-hosting.md#locked-out`, and a backup's `README.txt` to `#restoring-a-backup`. Renaming one means updating those links.
 - **Tell the site.** When a change affects what latestarr.app says, note it for the site, with the corrected facts. If the site moves a page, update the app's and README's links to it.
 
 ## Pull requests

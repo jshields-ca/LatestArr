@@ -117,7 +117,12 @@ The dashboard's setup checklist then walks through the same pages you'll use day
 
 On the **Recipients** page, **Import** takes a pasted list, a CSV, or an Excel file (`.xlsx`, first sheet only; `.xls` isn't supported). **Download a template** gives you a starting file. Up to 1,000 rows at a time.
 
-- **With a heading row,** columns are matched by name, in any order and ignoring case: `Email` (required), `Name` or `Full name`, and `Groups`, with several groups separated by `;`. Other columns are ignored.
+- **With a heading row,** columns are matched by name, in any order and ignoring case:
+  - email (required): `Email`, `E-mail` or `Email address`;
+  - name: `Name`, `Full name` or `Display name`;
+  - groups: `Groups` or `Group`, with several separated by `;`.
+
+  Other columns are ignored.
 - **Without headings,** use one person per line: `jane@example.com`, `jane@example.com, Jane`, or `Jane <jane@example.com>`.
 
 **Review** shows the result before anything is saved: new people, changed names, groups to create and join, and skipped rows with the reason. Groups are matched by name and created if missing. An import never removes anyone from a group.
@@ -144,19 +149,31 @@ For example, `{count} new from {period}`. **Insert a variable** adds one, and th
 
 LatestArr serves plain HTTP on port 3000. Put a reverse proxy in front of it for HTTPS (Caddy, nginx, Traefik, or your platform's ingress), and:
 
-1. **Forward the client's address and protocol** with `X-Forwarded-For` and `X-Forwarded-Proto`. Most proxies do by default.
-2. **Set `TRUST_PROXY=true`.** LatestArr then reads those headers, so:
+1. **Pass the original `Host` header through.** LatestArr only accepts sign-ins and changes when the browser's address matches the `Host` it receives (its CSRF check). If the proxy rewrites `Host`, every sign-in fails with "Cross-origin request rejected". Caddy and Traefik keep it by default; nginx needs `proxy_set_header Host $host;`.
+2. **Forward the client's address and protocol** with `X-Forwarded-For` and `X-Forwarded-Proto`. Most proxies do by default.
+3. **Set `TRUST_PROXY=true`.** LatestArr then reads those headers, so:
    - the session cookie is marked `Secure`;
    - sign-in limits and the Logs page see each person's own IP, not the proxy's.
 
    Leave it unset when nothing sits in front of LatestArr. Otherwise anyone could fake their IP with a header and get round the sign-in limit.
-3. **Set `WEB_ORIGIN`** to the `https://` address people use.
+4. **Set `WEB_ORIGIN`** to the `https://` address people use. Password sign-in doesn't depend on it, but SSO and password reset links do.
 
-A minimal Caddy example:
+Caddy:
 
 ```
 newsletter.example.com {
     reverse_proxy localhost:3000
+}
+```
+
+nginx (inside your `server { ... }` block for HTTPS):
+
+```nginx
+location / {
+    proxy_pass http://localhost:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
 
@@ -171,7 +188,7 @@ LatestArr is built to be reachable from the internet. Your part:
 
 What LatestArr does:
 
-- **Sign-in required everywhere** except sign-in itself, first-run setup, and the version and health checks. A test checks every route, so a new one can't be left open by accident.
+- **Sign-in required everywhere** except signing in and out (including SSO), first-run setup, password reset by email, and the version and health checks. A test checks every route, so a new one can't be left open by accident.
 - **Sessions** are random tokens, stored hashed, in `HttpOnly`, `SameSite=Lax` cookies. Deactivating a user or resetting their password signs them out everywhere.
 - **CSRF protection:** changes are only accepted from LatestArr's own pages. Responses carry a strict Content Security Policy and other security headers.
 - **Temporary passwords** can only be used to choose a new one.
@@ -248,7 +265,7 @@ The **Logs** page shows recent server activity, newest first. Expand an entry to
 - every newsletter send (manual, scheduled, or caught up after downtime) and how many people it reached;
 - recipients that couldn't be delivered to, and sources that couldn't be reached;
 - sign-ins and failed sign-ins;
-- settings changes, with the admin who made them.
+- changes to newsletters, recipients and settings, with the person who made them.
 
 The same lines go to `docker logs latestarr`. The page keeps the latest 500 entries in memory, so it starts empty after a restart.
 
@@ -262,7 +279,7 @@ The **Notifications** page can alert you when:
 - a scheduled send only reaches some recipients;
 - a backup fails, scheduled or manual.
 
-Alerts go by email through one of your SMTP profiles, by webhook (Discord, Slack, ntfy, Apprise or generic JSON), or both. **Send test alert** checks them before you rely on them.
+All three are on by default, but nothing is sent until you turn on a destination: email through one of your SMTP profiles, a webhook (Discord, Slack, ntfy, Apprise or generic JSON), or both. **Send test alert** checks them before you rely on them.
 
 - **Send now doesn't alert,** since you see its result yourself.
 - **At most one alert an hour** per newsletter, and one an hour for backups.
