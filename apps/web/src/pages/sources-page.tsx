@@ -254,11 +254,16 @@ function BaseUrlHint({ id }: { id: string }) {
   );
 }
 
-function PublicUrlHint({ id }: { id: string }) {
+// Tautulli's Base URL is its own API host, never a page for recipients, so
+// its adapter makes no item links at all without a Public URL (see
+// tautulli-adapter.ts); every other source falls back to the Base URL.
+function PublicUrlHint({ id, kind }: { id: string; kind: string }) {
   return (
     <p id={id} className="text-xs text-muted-foreground">
-      Where your recipients go when they click an item or a Where to watch button (like Watch on Plex). Leave it
-      blank and item links use the Base URL, with no Where to watch button.
+      Where your recipients go when they click an item or a Where to watch button (like Watch on Plex).{" "}
+      {kind === "tautulli"
+        ? "Set it to your Plex server's address, since Tautulli's isn't one recipients can use. Leave it blank and items have no links, and there's no Where to watch button."
+        : "Leave it blank and item links use the Base URL, with no Where to watch button."}
     </p>
   );
 }
@@ -409,7 +414,7 @@ function AddSourceDialog({
               disabled={submitting}
               aria-describedby="source-public-url-hint"
             />
-            <PublicUrlHint id="source-public-url-hint" />
+            <PublicUrlHint id="source-public-url-hint" kind={kind} />
           </div>
           {config.fields.map((field) => (
             <div className="flex flex-col gap-1.5" key={field.key}>
@@ -567,7 +572,7 @@ function EditSourceDialog({
               disabled={submitting}
               aria-describedby={`edit-source-public-url-hint-${source.id}`}
             />
-            <PublicUrlHint id={`edit-source-public-url-hint-${source.id}`} />
+            <PublicUrlHint id={`edit-source-public-url-hint-${source.id}`} kind={source.kind} />
           </div>
           {config.fields.map((field) => (
             <div className="flex flex-col gap-1.5" key={field.key}>

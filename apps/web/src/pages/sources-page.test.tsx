@@ -144,6 +144,21 @@ describe("SourcesPage", { timeout: 30_000 }, () => {
     });
   });
 
+  it("explains that a Tautulli source has no item links without a Public URL", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [] });
+    render(<SourcesPage />);
+    await screen.findByText("No sources yet");
+
+    await user.click(screen.getByRole("button", { name: "Add source" }));
+    const dialog = await screen.findByRole("dialog");
+    const publicUrl = () => within(dialog).getByLabelText("Public URL (optional)");
+
+    expect(publicUrl()).toHaveAccessibleDescription(/item links use the Base URL/);
+    selectOption(within(dialog).getByLabelText("Source type"), "Tautulli");
+    expect(publicUrl()).toHaveAccessibleDescription(/Leave it blank and items have no links/);
+  });
+
   it("adds a new source with an optional publicUrl", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [] });
