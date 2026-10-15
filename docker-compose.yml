@@ -8,17 +8,10 @@ name: latestarr
 services:
   latestarr:
     container_name: latestarr
-    # Published on every tagged release (see .github/workflows/release.yml).
-    # `build:` below is what actually runs when no image tagged
-    # latestarr:${LATESTARR_VERSION:-latest} exists locally yet, or when you
-    # explicitly ask for it (`docker compose build` / `up --build`) — useful
-    # for contributors testing a Dockerfile change. Run `docker compose
-    # pull` first if you want the published image even when a locally-built
-    # one already exists under the same tag.
+    # The published image, built for every tagged release, so there's
+    # nothing to build. To build your own from a checkout instead, add
+    # docker-compose.build.yml (see that file).
     image: ghcr.io/jshields-ca/latestarr:${LATESTARR_VERSION:-latest}
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
     ports:
       # Change the host side (left of the colon) via PORT in .env if 3000
       # collides with something else already running — the app inside the
@@ -29,6 +22,7 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
       TRUST_PROXY: ${TRUST_PROXY:-}
       LOG_LEVEL: ${LOG_LEVEL:-}
+      TZ: ${TZ:-}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
