@@ -36,19 +36,46 @@ docker compose pull   # fetch the published image from ghcr.io
 docker compose up -d
 ```
 
-`docker-compose.yml` points at `ghcr.io/jshields-ca/latestarr` — every tagged release publishes an image there, and `:latest` always tracks the most recent release (not every commit to `main`). Images are published for `linux/amd64` and `linux/arm64` (Apple Silicon, Raspberry Pi 4 and 5 on a 64-bit OS, and ARM servers), and Docker picks the right one; 32-bit ARM isn't supported. Skip `docker compose pull` and run `docker compose up -d --build` instead if you'd rather build from [`docker/Dockerfile`](../docker/Dockerfile) locally (e.g. testing a change of your own). Either way you end up with one container exposing port `3000`, with a named Docker volume (`latestarr-data`) holding the SQLite database at `/app/data`. Nothing else to stand up — no separate database or cache container.
+`docker-compose.yml` points at `ghcr.io/jshields-ca/latestarr` — every tagged release publishes an image there, and `:latest` always tracks the most recent release (not every commit to `main`). Images are published for `linux/amd64` and `linux/arm64` (Apple Silicon, Raspberry Pi 4 and 5 on a 64-bit OS, and ARM servers), and Docker picks the right one; 32-bit ARM isn't supported. Nothing is built locally. To build from [`docker/Dockerfile`](../docker/Dockerfile) instead (e.g. testing a change of your own), add the override file: `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`. Either way you end up with one container exposing port `3000`, with a named Docker volume (`latestarr-data`) holding the SQLite database at `/app/data`. Nothing else to stand up — no separate database or cache container.
 
 If you'd rather not use Compose, the equivalent is:
 
 ```bash
-docker build -t latestarr -f docker/Dockerfile .
 docker run -d \
   -p 3000:3000 \
-  -e ENCRYPTION_KEY="$(openssl rand -base64 32)" \
+  -e ENCRYPTION_KEY="your-saved-key" \
   -v latestarr-data:/app/data \
+  --restart unless-stopped \
   --name latestarr \
-  latestarr
+  ghcr.io/jshields-ca/latestarr:latest
 ```
+
+Use the same `ENCRYPTION_KEY` every time you recreate the container.
+
+### Portainer, or any one-file setup
+
+To paste a stack into Portainer (**Stacks → Add stack → Web editor**), or anywhere else without the `.env` file, use this with your own key and address:
+
+```yaml
+services:
+  latestarr:
+    container_name: latestarr
+    image: ghcr.io/jshields-ca/latestarr:latest
+    ports:
+      - "3000:3000"
+    environment:
+      ENCRYPTION_KEY: "paste-your-key-here"   # openssl rand -base64 32; keep a copy
+      WEB_ORIGIN: "http://localhost:3000"     # the address you open LatestArr at
+      TZ: "America/Winnipeg"                  # so the daily backup runs at 3:00 AM your time
+    volumes:
+      - latestarr-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  latestarr-data:
+```
+
+Any other setting from [`.env.example`](../.env.example) goes under `environment` the same way. In Portainer you can keep the key out of the stack instead: write `ENCRYPTION_KEY: ${ENCRYPTION_KEY}` and set it under **Environment variables**. To update, use **Pull and redeploy** on the stack.
 
 ## 4. First run
 

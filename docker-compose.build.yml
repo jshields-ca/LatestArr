@@ -1,0 +1,11 @@
+# For contributors: builds the image from this checkout instead of
+# pulling the published one. Use it alongside docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Self-hosters don't need this file.
+services:
+  latestarr:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
