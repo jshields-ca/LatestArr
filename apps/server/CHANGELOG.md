@@ -1,5 +1,31 @@
 # @latestarr/server
 
+## 0.12.1
+
+### Patch Changes
+
+- [#341](https://github.com/jshields-ca/LatestArr/pull/341) [`0342a45`](https://github.com/jshields-ca/LatestArr/commit/0342a4538edcc845564183d749d1fef9c7ea04a3) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** A backup that can't be written now says which folder is the problem.
+
+  Before, a backup folder LatestArr couldn't write to failed with SQLite's "unable to open database file", on the Backups page, in the log, and in the failure alert. It now names the folder and says to check that LatestArr can write to it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `makeBackup` maps `SQLITE_CANTOPEN` and file-system errors (`EACCES`, `EPERM`, `EROFS`, `ENOENT`, `ENOTDIR`, `EEXIST`) to a message naming `backupDir`, keeping the original error as `cause`.
+
+  </details>
+
+- Updated dependencies []:
+  - @latestarr/adapter-audiobookshelf@0.12.1
+  - @latestarr/adapter-booklore-family@0.12.1
+  - @latestarr/adapter-core@0.12.1
+  - @latestarr/adapter-jellyfin@0.12.1
+  - @latestarr/adapter-plex@0.12.1
+  - @latestarr/adapter-romm@0.12.1
+  - @latestarr/adapter-tautulli@0.12.1
+  - @latestarr/crypto@0.12.1
+  - @latestarr/db@0.12.1
+
 ## 0.12.0
 
 ### Minor Changes

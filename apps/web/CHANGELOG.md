@@ -1,5 +1,50 @@
 # @latestarr/web
 
+## 0.12.1
+
+### Patch Changes
+
+- [#348](https://github.com/jshields-ca/LatestArr/pull/348) [`457d60f`](https://github.com/jshields-ca/LatestArr/commit/457d60fa33316e202b75a1b90ac60850ad284070) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** The Backups page's help links open the Backups guide on latestarr.app.
+
+  **Restoring a backup** and the note about where backups are saved now link to the friendly guide instead of the repository's technical reference.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `RESTORE_DOCS_URL` and `BACKUP_PATH_DOCS_URL` in `pages/backups-page.tsx` point to `latestarr.app/docs/backups#restoring-a-backup` and `#where-theyre-saved`. The `README.txt` inside each backup still links to `docs/self-hosting.md#restoring-a-backup`, which ships with the code.
+
+  </details>
+
+- [#342](https://github.com/jshields-ca/LatestArr/pull/342) [`448f3a7`](https://github.com/jshields-ca/LatestArr/commit/448f3a7d9e81d5d447da23857b87562ffc23a011) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** The Notifications page's cards now span the page like every other page's.
+
+  They were narrower than the rest on a desktop. The fields inside them keep a comfortable width, as on the Backups page.
+
+  <details>
+  <summary>Technical details</summary>
+
+  The `max-w-2xl` cap moves from the form to each card's `CardContent`.
+
+  </details>
+
+- [#343](https://github.com/jshields-ca/LatestArr/pull/343) [`b8fd221`](https://github.com/jshields-ca/LatestArr/commit/b8fd2214fa807d4b950e794780ab66406a46315d) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Improved:** Clearer **Base URL** and **Public URL** fields when adding or editing a source.
+
+  Each field now has its own short explanation. The **Base URL** is where LatestArr connects, so a local address is fine. The **Public URL** is where recipients go when they click. Before, one hint under Public URL tried to explain both, and called the Base URL "the address above".
+
+  <details>
+  <summary>Technical details</summary>
+
+  `BaseUrlHint` and `PublicUrlHint` in `pages/sources-page.tsx`, shared by the Add and Edit source dialogs, each linked to its input with `aria-describedby`.
+
+  </details>
+
+- [#339](https://github.com/jshields-ca/LatestArr/pull/339) [`ba14876`](https://github.com/jshields-ca/LatestArr/commit/ba148767d4b7f4e2b9dab24c346d190a8955454b) Thanks [@jshields-ca](https://github.com/jshields-ca)! - **Fixed:** Each person's result in a send's details reads as a word (**Sent**, **Failed**, **Bounced** or **Unsubscribed**), like the send's own status, instead of `sent` or `failed`.
+
+  <details>
+  <summary>Technical details</summary>
+  - **`components/send-run-history.tsx`:** a `RECIPIENT_STATUS_LABEL` map for `SendRunRecipientResult["status"]`, alongside the run labels in `lib/send-run.ts` from [#336](https://github.com/jshields-ca/LatestArr/issues/336).
+
+  </details>
+
 ## 0.12.0
 
 ### Minor Changes
