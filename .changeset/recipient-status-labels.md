@@ -2,7 +2,7 @@
 "@latestarr/web": patch
 ---
 
-**Fixed:** A send's per-person results read as words too: **Sent**, **Failed**, **Bounced** or **Unsubscribed**, matching the send's own status. They said `sent` or `failed`.
+**Fixed:** Each person's result in a send's details reads as a word (**Sent**, **Failed**, **Bounced** or **Unsubscribed**), like the send's own status, instead of `sent` or `failed`.
 
 <details>
 <summary>Technical details</summary>
