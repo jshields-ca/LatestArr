@@ -41,9 +41,14 @@ Every source (Plex, Tautulli, Audiobookshelf, RomM, ...) is an isolated package 
 
 1. Create `packages/adapters/<your-source>/`.
 2. Implement `testConnection`, `listLibraries`, and `fetchRecentItems`, returning the normalized `NewItem` shape defined in `packages/adapters/core`.
-3. Register your adapter's `kind` in the adapter registry.
-4. Add tests covering at least a successful fetch and an auth-failure case.
-5. Open a PR — no changes to the scheduler, database schema, or UI core should be necessary for a new adapter.
+3. Add tests covering at least a successful fetch and an auth-failure case.
+4. Register the adapter in `apps/server/src/app.ts` (`registerAdapter`), and give it a "Watch on"-style button label in `apps/server/src/render/source-buttons.ts`.
+5. Add it to the web app:
+   - its form (label, examples, credential fields) in `apps/web/src/pages/sources-page.tsx`, plus its setup-guide slug and, if it can list users, `KINDS_WITH_USER_IMPORT`;
+   - its logo in `apps/web/src/assets/logos/` and `components/source-logo.tsx`, with attribution in `NOTICE.md`.
+6. Add it to the README's supported-sources table (🧪 until someone confirms it on a real server), and open a PR.
+
+The scheduler, database schema and email rendering don't need changes for a new adapter.
 
 If you're proposing support for a source that isn't in the README's supported-sources table, please open an "Adapter request" issue first so we can discuss API stability and auth model before you invest implementation time.
 
@@ -67,6 +72,18 @@ Every screen follows one rule (#295), so people always know whether they need to
   - `ref={saveShortcutRef}` on the form for Ctrl/Cmd+S.
 - **Never both in one form.** Everything in a form or edit dialog waits for its Save, including lists like a recipient's groups. A dialog whose changes all save straight away gets **Done**, not **Save changes**.
 - **Ask in the app's own dialog,** never `window.confirm`: `confirmAction()` from `components/confirm-dialog.tsx` (resolves true or false), with a specific title, a confirm label that names the action ("Undo import", not "OK"), and `destructive` for anything that removes or discards.
+
+### Writing docs
+
+The repo's docs (`README.md`, `docs/`, `.env.example`, this file) are the technical reference: precise and complete, for people comfortable with Docker and for contributors. [latestarr.app](https://www.latestarr.app/docs) is the friendly, task-first guide, written from the facts here.
+
+- **One topic per section,** under a heading that says what people look for. Background and rationale go after the instructions, or in a code comment.
+- **Short paragraphs.** Use numbered lists for steps, bullets for options, and a table for settings or variables.
+- **Use the app's own words.** Name pages, buttons and fields exactly as the UI shows them, in **bold**.
+- **Each fact in one place.** Link to it rather than repeating it, so copies can't drift.
+- **Change them together.** A new or changed setting updates `.env.example`, `docker-compose.yml` and `docs/self-hosting.md` in the same PR. CI checks the first two agree.
+- **Keep anchors stable.** The app links to some headings in `docs/self-hosting.md` (`#locked-out`, `#backups`, `#restoring-a-backup`). Renaming one means updating those links.
+- **Tell the site.** When a change affects what latestarr.app says, note it for the site, with the corrected facts. If the site moves a page, update the app's and README's links to it.
 
 ## Pull requests
 
@@ -103,17 +120,17 @@ Adds `sections.mostWatched` to the design settings schema and renders it with th
 </details>
 ```
 
-In `CHANGELOG.md` this renders as a collapsible section on GitHub. `scripts/write-changelog.mjs` flattens each changeset onto one line per bullet, and `scripts/build-release-notes.mjs` strips the `<details>` block when it builds the Release notes.
+In `CHANGELOG.md` this renders as a collapsible section on GitHub. `scripts/write-changelog.mjs` keeps each changeset's structure (the lede on one line with its PR link, then any bullets and the `<details>` block indented beneath it), and `scripts/build-release-notes.mjs` strips the `<details>` block when it builds the Release notes.
 
 ## Versioning & releases
 
 LatestArr follows [Semantic Versioning](https://semver.org/) and keeps a [Keep a Changelog](https://keepachangelog.com/)-formatted `CHANGELOG.md`, managed with [Changesets](https://github.com/changesets/changesets). While the major version is `0` (pre-1.0), expect faster-moving, potentially breaking changes between minor versions — this is normal per semver's own rules for initial development, and matches where the project actually is right now (no stability guarantees yet).
 
-- Every workspace package versions together in lockstep (see `.changeset/config.json`'s `fixed` group) — there's one meaningful version number for the whole app, not independent versions per internal package. Every package is `private: true` (this app isn't published to npm), so `.changeset/config.json` sets `privatePackages.version: true` — without it, Changesets silently skips versioning private packages entirely, which is exactly what happened for months before this was caught.
+- Every workspace package versions together in lockstep (see `.changeset/config.json`'s `fixed` group) — there's one meaningful version number for the whole app, not independent versions per internal package. Every package is `private: true` (this app isn't published to npm), so `.changeset/config.json` sets `privatePackages.version: true`; without it, Changesets silently skips versioning private packages.
 - Picking a bump type when running `pnpm changeset`: `patch` for bug fixes and internal improvements, `minor` for new features (including a new source adapter), `major` reserved for 1.0 and any deliberate breaking change after that.
-- **Releases are automated** (`.github/workflows/release.yml`): every push to `main` that carries pending changesets opens or updates a "Version Packages" PR. Merging that PR runs `pnpm version-packages` (writes one consolidated `CHANGELOG.md` entry via `scripts/write-changelog.mjs`, bumps every package version, syncs the root `package.json`), and the next push — the merge itself — cuts a git tag and a GitHub Release. Nothing to run by hand; a maintainer's job is writing the release highlights (below), then reviewing and merging the Version Packages PR.
+- **Releases are automated** (`.github/workflows/release.yml`): every push to `main` that carries pending changesets opens or updates a "Version Packages" PR. Merging that PR runs `pnpm version-packages` (writes one consolidated `CHANGELOG.md` entry via `scripts/write-changelog.mjs`, bumps every package version, syncs the root `package.json`), and the next push — the merge itself — cuts a git tag and a GitHub Release. Nothing to run by hand; a maintainer's job is writing the release highlights (below), then reviewing and merging the Version Packages PR. That PR is pushed with `GITHUB_TOKEN`, which doesn't start other workflows, so only CodeQL runs on it at first: close and reopen it to run the required checks before merging.
 - **Release notes are built, not copied**: `scripts/build-release-notes.mjs` assembles the GitHub Release body from the version's highlights file, that version's `CHANGELOG.md` section with the Technical details removed, an "Upgrading" section (the `docker pull` line, plus a database-changes note when the release added migrations), and a link to the full changelog. Preview it locally with `node scripts/build-release-notes.mjs <version>`.
-- **CHANGELOG.md entries are grouped and auto-linked**: `scripts/write-changelog.mjs` buckets each version's changesets under `### New` / `### Improved` / `### Fixed` subheadings (parsed from the bold lede tag — see "Writing a changeset" above), and resolves each changeset's own PR via `@changesets/get-github-info` (using the `repo` field in `.changeset/config.json`), appending `([#123](...))` right after the lede sentence. This is best-effort — no `GITHUB_TOKEN`, a network hiccup, or GitHub not yet indexing a very fresh commit all degrade to "no link" rather than failing the release. A changeset that doesn't start with a recognized category tag still renders, under an `### Other` heading, rather than being dropped.
+- **CHANGELOG.md entries are grouped and auto-linked**: `scripts/write-changelog.mjs` buckets each version's changesets under `### New` / `### Improved` / `### Fixed` subheadings (parsed from the bold lede tag — see "Writing a changeset" above), and resolves the PR that added each changeset (`git log --diff-filter=A`, so rewording a changeset later doesn't move its link) via `@changesets/get-github-info` (using the `repo` field in `.changeset/config.json`), appending `([#123](...))` right after the lede sentence. This is best-effort — no `GITHUB_TOKEN`, a network hiccup, or GitHub not yet indexing a very fresh commit all degrade to "no link" rather than failing the release. A changeset that doesn't start with a recognized category tag still renders, under an `### Other` heading, rather than being dropped.
 - **Batch releases around a coherent theme rather than cutting one for every merge.** A release with a clear "why" (a described feature, a themed round of fixes) reads as intentional; a trickle of thinly-described patch releases reads as noisy and can make the project look less stable than it is. Hold the Version Packages PR open and keep letting it accumulate changesets from related work — merge it when there's a coherent story to tell, not on every single PR. The exception is an urgent fix (a real bug, a security issue) that shouldn't wait on unrelated work to land.
 - **After the release is out**, do a quick full docs pass: `README.md` (feature list, supported-sources table, screenshots), `CONTRIBUTING.md`, and anything under `docs/`, for anything the release makes stale, not just files the release's own PRs happened to touch.
 

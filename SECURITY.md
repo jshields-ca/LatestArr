@@ -50,8 +50,8 @@ Given the project's design goals, we're especially interested in reports
 involving:
 
 - Authentication/authorization bypass (local auth or OIDC/SSO flows)
-- Credential handling (source connection tokens, SMTP credentials, encryption
-  at rest)
+- Credential handling (source connection tokens, SMTP credentials, webhook
+  URLs, encryption at rest)
 - Injection vulnerabilities (SQL, template/HTML injection in the newsletter
   builder or rendered emails, SSRF via source connection URLs)
 - Cross-site scripting (XSS) or cross-site request forgery (CSRF) in the admin

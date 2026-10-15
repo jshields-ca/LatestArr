@@ -68,6 +68,8 @@ docker compose up -d
 
 Open `http://localhost:3000`, create the admin account, and follow the checklist on the dashboard: connect a source, add recipients, set up SMTP, and create your first newsletter.
 
+Using Portainer, or prefer one file with no `.env`? See the [one-file setup](docs/self-hosting.md#portainer-or-any-one-file-setup).
+
 - **Keep a copy of `ENCRYPTION_KEY`** somewhere other than `.env`. Without it, the credentials stored in the database can't be read.
 - Before sending to real people, read [Deliverability](https://www.latestarr.app/docs/email-delivery/deliverability) (SPF, DKIM, and DMARC), or your digests may land in spam.
 - Exposing it to the internet? Put it behind a [reverse proxy with HTTPS](https://www.latestarr.app/docs/installation/reverse-proxy). It works just as well on your LAN or a VPN; only your SMTP server needs to reach recipients.
@@ -85,7 +87,7 @@ The full docs live at **[latestarr.app/docs](https://www.latestarr.app/docs)**:
 - [Users](https://www.latestarr.app/docs/users), [security](https://www.latestarr.app/docs/security), and [SSO with OIDC](https://www.latestarr.app/docs/security/sso)
 - [FAQ](https://www.latestarr.app/docs/faq)
 
-This repository keeps [`docs/self-hosting.md`](docs/self-hosting.md) and [`docs/deliverability.md`](docs/deliverability.md) as offline copies of the essentials, and [`.env.example`](.env.example) lists every setting.
+This repository keeps the technical reference alongside the code: [`docs/self-hosting.md`](docs/self-hosting.md) (every setting, command and default), [`docs/deliverability.md`](docs/deliverability.md), and [`.env.example`](.env.example).
 
 ## Project status
 
