@@ -10,7 +10,7 @@
 
 - **BookOrbit, BookLore and Grimmory links:** a book now links to its own page, at your Public URL. Before, every book linked to the library's front page, because these apps' feeds don't include a link to each book.
 - **BookOrbit audiobooks:** an item whose files are all audio now shows as an **Audiobook**, under Audiobooks, instead of as a book. A book with both an ebook and its audio stays a book, labelled **Ebook + audio**. MOBI, AZW3 and FB2 books now show as **Ebook**, and CB7 comics as **Comic**, instead of just "Book".
-- **Plex links on app.plex.tv:** with `https://app.plex.tv` as the Public URL, links now use Plex's own `/desktop/` address. Some browsers, especially those in email apps, lost the item when Plex redirected the old link, and showed the Plex home page instead.
+- **Plex links on app.plex.tv:** with `https://app.plex.tv` as the Public URL, links now use Plex's own `/desktop/` address. The old link reached `/desktop/` through a redirect, and the item could be lost on the way, especially when Plex asked people to sign in first, leaving them on the Plex home page.
 - **OPDS hint:** BookLore, BookOrbit and Grimmory use separate OPDS accounts, not your normal sign-in. The hint now says so, and where to create one. It used to say to use your normal sign-in.
 
 <details>
