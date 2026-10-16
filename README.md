@@ -43,7 +43,7 @@
 | [Jellyfin](https://jellyfin.org/) | Movies, TV, books, audiobooks | Jellyfin API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
 | [Emby](https://emby.media/) | Movies, TV, books, audiobooks | Emby API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
 | [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
-| [BookOrbit](https://github.com/bookorbit/bookorbit) | Books | OPDS | ✅ Working |
+| [BookOrbit](https://github.com/bookorbit/bookorbit) | Books, audiobooks | OPDS | ✅ Working |
 | [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | OPDS | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
 | [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks, podcasts | Audiobookshelf API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
 | [RomM](https://github.com/rommapp/romm) | Games | RomM API | ✅ Working |
