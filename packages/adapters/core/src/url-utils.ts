@@ -97,8 +97,26 @@ export function withOrigin(url: string, origin: string): string {
 }
 
 /**
+ * Where the Plex web app lives for a recipient-facing address: a Plex
+ * server serves it at /web/index.html, but Plex's hosted app.plex.tv serves
+ * it at /desktop/ and redirects /web/index.html there. Linking to
+ * /desktop/ directly keeps an item's #! route, which some browsers (notably
+ * those built into email apps) drop across that redirect.
+ */
+export function plexWebAppUrl(webUrl: string): string {
+  let host: string | undefined;
+  try {
+    host = new URL(webUrl).hostname.toLowerCase();
+  } catch {
+    host = undefined;
+  }
+  if (host === "app.plex.tv") return "https://app.plex.tv/desktop/";
+  return `${trimTrailingSlashes(webUrl)}/web/index.html`;
+}
+
+/**
  * Builds a Plex web app deep link to one item's detail pane —
- * `{webUrl}/web/index.html#!/server/{machineIdentifier}/details?key=...` —
+ * `{plexWebAppUrl(webUrl)}#!/server/{machineIdentifier}/details?key=...` —
  * shared by the Plex adapter (which reads its own server's
  * machineIdentifier) and the Tautulli adapter (which proxies Plex and
  * reads the same identifier via Tautulli's own API), so the two don't
@@ -112,7 +130,6 @@ export function buildPlexWebDeepLink(
   machineIdentifier: string,
   ratingKey: string,
 ): string {
-  const trimmedBase = trimTrailingSlashes(webUrl);
   const key = encodeURIComponent(`/library/metadata/${ratingKey}`);
-  return `${trimmedBase}/web/index.html#!/server/${machineIdentifier}/details?key=${key}`;
+  return `${plexWebAppUrl(webUrl)}#!/server/${machineIdentifier}/details?key=${key}`;
 }

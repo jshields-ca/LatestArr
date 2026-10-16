@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlexWebDeepLink,
   isHttpUrl,
+  plexWebAppUrl,
   sameOrigin,
   trimTrailingSlashes,
   withOrigin,
@@ -113,7 +114,21 @@ describe("withOrigin", () => {
   });
 });
 
+describe("plexWebAppUrl", () => {
+  it("uses /web/index.html on a Plex server, and /desktop/ on app.plex.tv", () => {
+    expect(plexWebAppUrl("https://plex.example.com/")).toBe("https://plex.example.com/web/index.html");
+    expect(plexWebAppUrl("https://app.plex.tv")).toBe("https://app.plex.tv/desktop/");
+    expect(plexWebAppUrl("https://APP.plex.tv/desktop")).toBe("https://app.plex.tv/desktop/");
+  });
+});
+
 describe("buildPlexWebDeepLink", () => {
+  it("links app.plex.tv items through /desktop/, keeping the item route", () => {
+    expect(buildPlexWebDeepLink("https://app.plex.tv", "abc123", "456")).toBe(
+      "https://app.plex.tv/desktop/#!/server/abc123/details?key=%2Flibrary%2Fmetadata%2F456",
+    );
+  });
+
   it("builds a Plex web app details deep link for a rating key", () => {
     expect(buildPlexWebDeepLink("https://plex.example.com", "abc123", "456")).toBe(
       "https://plex.example.com/web/index.html#!/server/abc123/details?key=%2Flibrary%2Fmetadata%2F456",

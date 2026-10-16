@@ -9,7 +9,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, trimTrailingSlashes } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl } from "@latestarr/adapter-core";
 import {
   buildImageUrl,
   fetchImage,
@@ -91,7 +91,7 @@ function buildExternalUrl(
   ratingKey: string,
 ): string {
   if (machineIdentifier) return buildPlexWebDeepLink(webUrl, machineIdentifier, ratingKey);
-  return `${trimTrailingSlashes(webUrl)}/web/index.html`;
+  return plexWebAppUrl(webUrl);
 }
 
 // Episodes use the series poster, so every image is the same portrait

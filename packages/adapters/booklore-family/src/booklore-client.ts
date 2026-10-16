@@ -87,15 +87,31 @@ export function getEntryImageHref(entry: OpdsEntry): string | undefined {
 const OPDS_ALTERNATE_REL = "alternate";
 const OPDS_SELF_REL = "self";
 
+/** The href of an entry's rel="alternate" link, its human-readable page,
+ * if the feed gives one. Resolve with resolveOpdsUrl before use. */
+export function getEntryAlternateHref(entry: OpdsEntry): string | undefined {
+  return getEntryLinks(entry).find((link) => link["@_rel"] === OPDS_ALTERNATE_REL)?.["@_href"];
+}
+
 /** The href of an entry's own permalink, if the feed gives one — see the
  * rel preference above. Resolve with resolveOpdsUrl before use, the same
  * as getEntryImageHref's result. */
 export function getEntryPermalinkHref(entry: OpdsEntry): string | undefined {
-  const links = getEntryLinks(entry);
-  const alternate = links.find((link) => link["@_rel"] === OPDS_ALTERNATE_REL);
-  if (alternate?.["@_href"]) return alternate["@_href"];
-  const self = links.find((link) => link["@_rel"] === OPDS_SELF_REL);
+  const alternate = getEntryAlternateHref(entry);
+  if (alternate) return alternate;
+  const self = getEntryLinks(entry).find((link) => link["@_rel"] === OPDS_SELF_REL);
   return self?.["@_href"];
+}
+
+// BookLore and Grimmory identify a book as urn:booklore:book:<id>, and
+// BookOrbit as urn:bookorbit:book:<id>; all three show that book at
+// /book/<id> in their web app. Their feeds carry no rel="alternate" link,
+// so this id is the only way to link a recipient to the book itself.
+const BOOK_URN = /^urn:(?:booklore|bookorbit):book:([A-Za-z0-9-]+)$/;
+
+/** The app's own id for the book an entry describes, if its id says. */
+export function getEntryBookId(entry: OpdsEntry): string | undefined {
+  return BOOK_URN.exec(String(entry.id))?.[1];
 }
 
 // Comic archive MIME types BookLore/BookOrbit/Grimmory serve their
@@ -107,18 +123,30 @@ const COMIC_MIME_TYPES = new Set([
   "application/x-cbr",
 ]);
 
+function getAcquisitionLinks(entry: OpdsEntry): OpdsLink[] {
+  return getEntryLinks(entry).filter((link) => (link["@_rel"] ?? "").startsWith("http://opds-spec.org/acquisition"));
+}
+
 /**
- * A short "Ebook"/"Comic"/"Book" badge derived from the acquisition
+ * Whether an entry is an audiobook: every file it offers is audio. BookOrbit
+ * serves audiobook files with audio/* types (audio/mp4 for .m4b, audio/mpeg
+ * for .mp3, ...). A book with both an ebook and its audio stays a book.
+ */
+export function isAudiobookEntry(entry: OpdsEntry): boolean {
+  const types = getAcquisitionLinks(entry).map((link) => link["@_type"] ?? "");
+  return types.length > 0 && types.every((type) => type.startsWith("audio/"));
+}
+
+/**
+ * A short "Audiobook"/"Ebook"/"Comic"/"Book" badge derived from the acquisition
  * link's declared MIME type — OPDS itself has no dedicated field for this,
  * so the file format on the download link is the only signal available.
  * Falls back to the generic "Book" label when there's no acquisition link
  * or its type isn't one we recognize, rather than guessing.
  */
 export function getEntryFormatLabel(entry: OpdsEntry): string {
-  const acquisitionLink = getEntryLinks(entry).find((link) =>
-    (link["@_rel"] ?? "").startsWith("http://opds-spec.org/acquisition"),
-  );
-  const type = acquisitionLink?.["@_type"];
+  if (isAudiobookEntry(entry)) return "Audiobook";
+  const type = getAcquisitionLinks(entry)[0]?.["@_type"];
   if (type && COMIC_MIME_TYPES.has(type)) return "Comic";
   if (type === "application/epub+zip" || type === "application/pdf") return "Ebook";
   return "Book";

@@ -282,9 +282,8 @@ describe("SourcesPage", { timeout: 30_000 }, () => {
     await user.click(screen.getByRole("button", { name: "Edit Home Tautulli" }));
     const dialog = await screen.findByRole("dialog");
 
-    const hint = await within(dialog).findByText(/OPDS is just how Grimmory shares its catalog/);
-    expect(hint).toBeInTheDocument();
-    expect(hint).toHaveTextContent("Grimmory's own web reader");
+    const hint = await within(dialog).findByText(/Use an OPDS account, not your Grimmory sign-in/);
+    expect(hint).toHaveTextContent("Create one in Grimmory's settings, under OPDS.");
     expect(
       within(dialog).getByLabelText("OPDS username (leave blank to keep current)"),
     ).toHaveAttribute("aria-describedby", hint.id);
@@ -299,7 +298,7 @@ describe("SourcesPage", { timeout: 30_000 }, () => {
     await user.click(screen.getByRole("button", { name: "Edit Home Tautulli" }));
     const dialog = await screen.findByRole("dialog");
 
-    expect(within(dialog).queryByText(/OPDS is just how/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Use an OPDS account/)).not.toBeInTheDocument();
   });
 
   // This test does two selectOption round-trips in sequence (RomM, then

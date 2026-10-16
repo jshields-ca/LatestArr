@@ -10,7 +10,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, trimTrailingSlashes } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl } from "@latestarr/adapter-core";
 import {
   buildImageProxyUrl,
   fetchImage,
@@ -124,7 +124,7 @@ function buildExternalUrl(
 ): string | undefined {
   if (!publicUrl) return undefined;
   if (machineIdentifier) return buildPlexWebDeepLink(publicUrl, machineIdentifier, ratingKey);
-  return `${trimTrailingSlashes(publicUrl)}/web/index.html`;
+  return plexWebAppUrl(publicUrl);
 }
 
 function mapHomeStatRow(
