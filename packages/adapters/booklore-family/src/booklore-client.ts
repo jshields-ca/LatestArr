@@ -121,7 +121,19 @@ const COMIC_MIME_TYPES = new Set([
   "application/vnd.comicbook-rar",
   "application/x-cbz",
   "application/x-cbr",
+  "application/x-cb7",
 ]);
+
+// Ebook MIME types these apps serve: EPUB, PDF, MOBI, AZW/AZW3 and FB2.
+const EBOOK_MIME_TYPES = new Set([
+  "application/epub+zip",
+  "application/pdf",
+  "application/x-mobipocket-ebook",
+  "application/vnd.amazon.ebook",
+  "application/x-fictionbook+xml",
+]);
+
+const isAudioType = (type: string) => type.startsWith("audio/");
 
 function getAcquisitionLinks(entry: OpdsEntry): OpdsLink[] {
   return getEntryLinks(entry).filter((link) => (link["@_rel"] ?? "").startsWith("http://opds-spec.org/acquisition"));
@@ -134,11 +146,12 @@ function getAcquisitionLinks(entry: OpdsEntry): OpdsLink[] {
  */
 export function isAudiobookEntry(entry: OpdsEntry): boolean {
   const types = getAcquisitionLinks(entry).map((link) => link["@_type"] ?? "");
-  return types.length > 0 && types.every((type) => type.startsWith("audio/"));
+  return types.length > 0 && types.every(isAudioType);
 }
 
 /**
- * A short "Audiobook"/"Ebook"/"Comic"/"Book" badge derived from the acquisition
+ * A short "Audiobook"/"Ebook"/"Comic"/"Book" badge (plus " + audio" when
+ * the item also has audio files) derived from the acquisition
  * link's declared MIME type — OPDS itself has no dedicated field for this,
  * so the file format on the download link is the only signal available.
  * Falls back to the generic "Book" label when there's no acquisition link
@@ -146,10 +159,12 @@ export function isAudiobookEntry(entry: OpdsEntry): boolean {
  */
 export function getEntryFormatLabel(entry: OpdsEntry): string {
   if (isAudiobookEntry(entry)) return "Audiobook";
-  const type = getAcquisitionLinks(entry)[0]?.["@_type"];
-  if (type && COMIC_MIME_TYPES.has(type)) return "Comic";
-  if (type === "application/epub+zip" || type === "application/pdf") return "Ebook";
-  return "Book";
+  const types = getAcquisitionLinks(entry).map((link) => link["@_type"] ?? "");
+  const type = types.find((candidate) => !isAudioType(candidate));
+  const label =
+    type && COMIC_MIME_TYPES.has(type) ? "Comic" : type && EBOOK_MIME_TYPES.has(type) ? "Ebook" : "Book";
+  // One item with both a readable file and its audio, e.g. an EPUB and an M4B.
+  return types.some(isAudioType) ? `${label} + audio` : label;
 }
 
 /** Resolves a (possibly relative) OPDS link href against the feed's own

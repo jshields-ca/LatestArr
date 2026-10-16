@@ -335,7 +335,7 @@ describe("fetchRecentItems", () => {
       expect(items.map((item) => [item.title, item.kind, item.contentLabel])).toEqual([
         ["Ebook", "book", "Ebook"],
         ["Audiobook", "audiobook", "Audiobook"],
-        ["Both", "book", "Ebook"],
+        ["Both", "book", "Ebook + audio"],
       ]);
     });
 

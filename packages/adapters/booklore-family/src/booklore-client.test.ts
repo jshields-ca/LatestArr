@@ -186,6 +186,28 @@ describe("getEntryFormatLabel", () => {
     expect(getEntryFormatLabel(pdf)).toBe("Ebook");
   });
 
+  it("labels MOBI, AZW3 and FB2 as Ebook, and CB7 as Comic", () => {
+    const withType = (type: string) => ({
+      id: "1",
+      title: "Book",
+      link: { "@_rel": "http://opds-spec.org/acquisition", "@_type": type },
+    });
+    expect(getEntryFormatLabel(withType("application/x-mobipocket-ebook"))).toBe("Ebook");
+    expect(getEntryFormatLabel(withType("application/vnd.amazon.ebook"))).toBe("Ebook");
+    expect(getEntryFormatLabel(withType("application/x-fictionbook+xml"))).toBe("Ebook");
+    expect(getEntryFormatLabel(withType("application/x-cb7"))).toBe("Comic");
+  });
+
+  it("labels audio-only items Audiobook, and adds + audio when a book also has audio", () => {
+    const withTypes = (...types: string[]) => ({
+      id: "1",
+      title: "Book",
+      link: types.map((type) => ({ "@_rel": "http://opds-spec.org/acquisition", "@_type": type })),
+    });
+    expect(getEntryFormatLabel(withTypes("audio/mp4"))).toBe("Audiobook");
+    expect(getEntryFormatLabel(withTypes("audio/mpeg", "application/epub+zip"))).toBe("Ebook + audio");
+  });
+
   it("falls back to Book when there's no acquisition link or an unrecognized type", () => {
     expect(getEntryFormatLabel({ id: "1", title: "Book" })).toBe("Book");
   });
