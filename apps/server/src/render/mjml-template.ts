@@ -45,6 +45,9 @@ interface RenderableItem {
   episodeCount?: number;
   moreEpisodes?: number;
   externalUrl?: string;
+  /** An episode's season and series links; see NewItem. */
+  seasonUrl?: string;
+  seriesUrl?: string;
   /** Set only on an item substituted in by a Media List block's
    * emptyFallback="random" — lets a template's card markup mark it as a
    * suggestion rather than something newly added. */
@@ -195,6 +198,8 @@ function toRenderable(item: NewItem): RenderableItem {
       : undefined,
     platform: item.platform,
     externalUrl: item.externalUrl,
+    seasonUrl: item.seasonUrl,
+    seriesUrl: item.seriesUrl,
   };
   return { ...renderable, detailsLine: detailsLineOf(renderable), overviewShort: shorten(renderable.overview) };
 }
@@ -238,7 +243,10 @@ function matchesContentType(item: RenderableItem, contentType: string | undefine
 const MAX_LISTED_EPISODES = 5;
 
 // Several new episodes of one series become a single row: the first
-// episode's details (title, poster, link) with the rest listed beneath.
+// episode's details (title, poster) with the rest listed beneath, each
+// linked. The row itself links to the season when every episode is from
+// one, else to the show, as Tautulli's newsletter does; the first
+// episode's link when the source gives neither.
 // Rows keep the order of each series' first appearance.
 function groupEpisodes(items: RenderableItem[]): RenderableItem[] {
   const bySeries = new Map<string, RenderableItem[]>();
@@ -256,8 +264,11 @@ function groupEpisodes(items: RenderableItem[]): RenderableItem[] {
     }
     if (done.has(item.title)) continue;
     done.add(item.title);
+    const seasons = new Set(series.map((episode) => episode.seasonUrl));
+    const shared = seasons.size === 1 ? item.seasonUrl : undefined;
     rows.push({
       ...item,
+      externalUrl: shared ?? item.seriesUrl ?? item.externalUrl,
       subtitle: undefined,
       overview: undefined,
       overviewShort: undefined,
@@ -396,7 +407,13 @@ Handlebars.registerHelper("sourceButtonsFor", function sourceButtonsFor(
     (button) => !wanted || button.kinds.some((kind) => wanted.includes(kind)),
   );
   if (buttons.length === 0) return options.inverse(this);
-  return buttons.map((button) => options.fn(button)).join("");
+  return buttons
+    .map((button) => {
+      // Under a section, the verb fits it: "Listen on BookOrbit" under Audiobooks.
+      const kind = wanted?.find((candidate) => button.kinds.includes(candidate));
+      return options.fn({ ...button, label: (kind && button.labelsByKind?.[kind]) ?? button.label });
+    })
+    .join("");
 });
 
 // True when one of the newsletter's linked sources provides this content

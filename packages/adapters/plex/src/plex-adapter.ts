@@ -195,6 +195,12 @@ export const plexAdapter: SourceAdapter = {
           releaseDate: item.originallyAvailableAt ? new Date(item.originallyAvailableAt) : undefined,
           posterUrl: poster ? buildImageUrl(config.baseUrl, token, poster) : undefined,
           externalUrl: buildExternalUrl(webUrl, machineIdentifier, item.ratingKey),
+          ...(kind === "tv_episode" && machineIdentifier && {
+            seasonUrl: item.parentRatingKey ? buildPlexWebDeepLink(webUrl, machineIdentifier, item.parentRatingKey) : undefined,
+            seriesUrl: item.grandparentRatingKey
+              ? buildPlexWebDeepLink(webUrl, machineIdentifier, item.grandparentRatingKey)
+              : undefined,
+          }),
           raw: item,
         });
       }

@@ -19,6 +19,9 @@ export interface PlexMetadataItem {
   art?: string;
   grandparentTitle?: string;
   parentTitle?: string;
+  /** An episode's season and series. */
+  parentRatingKey?: string;
+  grandparentRatingKey?: string;
   parentIndex?: number;
   index?: number;
   year?: number;

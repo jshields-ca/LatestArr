@@ -8,6 +8,9 @@ export interface SourceButton {
   url: string;
   /** Content kinds the source provides, for placing it under a section. */
   kinds: string[];
+  /** The label under one kind's section, where the verb fits what's there:
+   *  "Listen on BookOrbit" under Audiobooks, "Read on BookOrbit" under Books. */
+  labelsByKind?: Record<string, string>;
 }
 
 export interface SourceButtonInput {
@@ -28,6 +31,16 @@ const SERVICES: Record<string, { verb: string; service: string }> = {
   grimmory: { verb: "Read on", service: "Grimmory" },
   audiobookshelf: { verb: "Listen on", service: "Audiobookshelf" },
   romm: { verb: "Play on", service: "RomM" },
+};
+
+// The verb for a section, so a source with several kinds reads right in each.
+const VERB_BY_KIND: Record<string, string> = {
+  movie: "Watch on",
+  tv_episode: "Watch on",
+  tv_season: "Watch on",
+  book: "Read on",
+  audiobook: "Listen on",
+  game: "Play on",
 };
 
 export function buildSourceButtons(sources: SourceButtonInput[]): SourceButton[] {
@@ -53,7 +66,13 @@ export function buildSourceButtons(sources: SourceButtonInput[]): SourceButton[]
     const label = serviceLabel(source);
     const known = SERVICES[source.kind];
     // Two Plex servers become "Watch on Home Plex" and "Watch on Cabin Plex".
-    const distinct = counts.get(label)! > 1 && known ? `${known.verb} ${source.name}` : label;
-    return { label: distinct, url: source.publicUrl, kinds: source.kinds };
+    const named = counts.get(label)! > 1;
+    const distinct = named && known ? `${known.verb} ${source.name}` : label;
+    const labelsByKind = known
+      ? Object.fromEntries(
+          source.kinds.map((kind) => [kind, `${VERB_BY_KIND[kind] ?? known.verb} ${named ? source.name : known.service}`]),
+        )
+      : undefined;
+    return { label: distinct, url: source.publicUrl, kinds: source.kinds, ...(labelsByKind && { labelsByKind }) };
   });
 }

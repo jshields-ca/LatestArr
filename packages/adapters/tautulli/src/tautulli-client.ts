@@ -28,6 +28,9 @@ export interface TautulliRecentlyAddedItem {
   parent_title?: string;
   parent_media_index?: number;
   media_index?: number;
+  /** An episode's season and series. */
+  parent_rating_key?: string;
+  grandparent_rating_key?: string;
   // Paths relative to the underlying Plex server (Tautulli proxies Plex),
   // not standalone URLs — resolved into a fetchable image URL via
   // buildImageProxyUrl below, which routes the request back through

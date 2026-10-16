@@ -27,6 +27,9 @@ export interface OpdsEntry {
   updated?: string;
   author?: OpdsAuthor | OpdsAuthor[];
   summary?: string | { "#text"?: string };
+  // BookOrbit puts the description here instead of <summary>, as
+  // <content type="text">...</content> (or an empty <content type="text"/>).
+  content?: string | { "#text"?: string };
   // fast-xml-parser coerces a purely-numeric text node (e.g. a bare
   // publication year like "2020") into a JS number, not a string — callers
   // must stringify before treating this as a date string.
@@ -50,9 +53,15 @@ export function getEntryAuthorName(entry: OpdsEntry): string | undefined {
   return author?.name;
 }
 
+function textOf(node: OpdsEntry["summary"]): string | undefined {
+  const text = typeof node === "string" ? node : node?.["#text"];
+  return typeof text === "string" && text.trim() ? text.trim() : undefined;
+}
+
+/** An entry's description: <summary> (BookLore, Grimmory), or <content>
+ * when there's no summary (BookOrbit). */
 export function getEntrySummaryText(entry: OpdsEntry): string | undefined {
-  if (typeof entry.summary === "string") return entry.summary;
-  return entry.summary?.["#text"];
+  return textOf(entry.summary) ?? textOf(entry.content);
 }
 
 function getEntryLinks(entry: OpdsEntry): OpdsLink[] {

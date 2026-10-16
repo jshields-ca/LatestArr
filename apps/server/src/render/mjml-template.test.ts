@@ -615,6 +615,22 @@ describe("the summary, grouping, and section helpers", () => {
   const episode = (n: number, series = "The Daily Show") =>
     item({ id: `${series}-${n}`, title: series, kind: "tv_episode", subtitle: `S31E10${n} - Guest ${n}` });
 
+  it("links a folded row to the season when its episodes share one, else to the show", async () => {
+    const linked = (n: number, season: string) => ({
+      ...episode(n),
+      externalUrl: `ep-${n}`,
+      seasonUrl: `season-${season}`,
+      seriesUrl: "show",
+    });
+    const template = `{{#mediaList groupEpisodes="true"}}<mj-text>@@{{externalUrl}}|{{#each episodes}}{{externalUrl}};{{/each}}@@</mj-text>{{/mediaList}}`;
+    const rows = async (items: NewItem[]) =>
+      [...(await render(template, items)).matchAll(/@@([^@]*)@@/g)].map((m) => m[1]);
+
+    expect(await rows([linked(1, "31"), linked(2, "31")])).toEqual(["season-31|ep-1;ep-2;"]);
+    expect(await rows([linked(1, "31"), linked(2, "32")])).toEqual(["show|ep-1;ep-2;"]);
+    expect(await rows([{ ...episode(1), externalUrl: "ep-1" }, { ...episode(2), externalUrl: "ep-2" }])).toEqual(["ep-1|ep-1;ep-2;"]);
+  });
+
   it("folds several episodes of one series into one row, keeping the order and listing up to five", async () => {
     const items = [
       episode(1),
