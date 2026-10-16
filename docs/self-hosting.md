@@ -99,7 +99,10 @@ Open `http://localhost:3000`, or wherever you've exposed it, and create the admi
 
 The dashboard's setup checklist then walks through the same pages you'll use day to day:
 
-1. **Connect a source.** Enter its address and API credentials, and use **Test connection** before saving.
+1. **Connect a source.** Enter its credentials and two addresses, then use **Test connection** before saving:
+   - **Base URL:** where LatestArr connects. It only has to work from LatestArr's server, so a local address is fine.
+   - **Public URL** (optional): where recipients go when they click an item or a Where to watch button. Left blank, item links use the Base URL and there's no Where to watch button. **Tautulli** is the exception: its address isn't one recipients can use, so without a Public URL its items have no links. For Plex and Tautulli, `https://app.plex.tv` works for anyone you share your server with; no domain of your own is needed.
+   - **BookLore, BookOrbit and Grimmory** use an OPDS account, not your normal sign-in. Create one in the app's settings, under OPDS. Audio-only items (e.g. BookOrbit audiobooks) show as audiobooks.
 2. **Add recipients and a group.** Add people one at a time, import your source's users, or [import a list](#importing-recipients). A newsletter sends to groups, not to individual people.
 3. **Configure SMTP.** Add an SMTP profile and use **Send test email**. Set **From name** and **From email** as described in [Deliverability](deliverability.md).
 4. **Choose a design** (optional). Duplicate the built-in **Default** and change it with a live preview, or use **Edit as code** for hand-written MJML. Newsletters use Default until you choose another.
@@ -328,7 +331,7 @@ services:
       - /mnt/nas/latestarr-backups:/backups
 ```
 
-LatestArr's `node` user (UID 1000) must be able to write there. The container sets that up when it starts, where the filesystem allows.
+LatestArr's `node` user (UID 1000) must be able to write there. The container sets that up when it starts, where the filesystem allows. If it can't, a backup fails with an error naming the folder, linked to [how to fix it](https://www.latestarr.app/docs/backups#cant-write).
 
 **Keep `ENCRYPTION_KEY` separately.** Backups leave it out on purpose. Without it, a restored backup works, but its source and SMTP credentials and webhook URLs have to be entered again.
 
