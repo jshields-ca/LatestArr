@@ -11,6 +11,51 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.12.2] - 2026-10-16
+
+### Improved
+
+- When a backup can't be written, the error links to the fix on latestarr.app. ([#352](https://github.com/jshields-ca/LatestArr/pull/352))
+
+  The message, on the Backups page, in the log and in the failure alert, now ends with a link to the Backups guide's **Can't write** section, which walks through checking and fixing the folder's permissions.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `explainFolderError` in `backups/service.ts` appends `https://www.latestarr.app/docs/backups#cant-write`. The site keeps that anchor stable.
+
+  </details>
+
+### Fixed
+
+- Book and Plex links in newsletters open the right item, BookOrbit audiobooks show as audiobooks, and the OPDS sign-in hint is corrected. ([#355](https://github.com/jshields-ca/LatestArr/pull/355))
+
+  - **BookOrbit, BookLore and Grimmory links:** a book now links to its own page, at your Public URL. Before, every book linked to the library's front page, because these apps' feeds don't include a link to each book.
+  - **BookOrbit audiobooks:** an item whose files are all audio now shows as an **Audiobook**, under Audiobooks, instead of as a book. A book with both an ebook and its audio stays a book, labelled **Ebook + audio**. MOBI, AZW3 and FB2 books now show as **Ebook**, and CB7 comics as **Comic**, instead of just "Book".
+  - **Plex links on app.plex.tv:** with `https://app.plex.tv` as the Public URL, links now use Plex's own `/desktop/` address. The old link reached `/desktop/` through a redirect, and the item could be lost on the way, especially when Plex asked people to sign in first, leaving them on the Plex home page.
+  - **OPDS hint:** BookLore, BookOrbit and Grimmory use separate OPDS accounts, not your normal sign-in. The hint now says so, and where to create one. It used to say to use your normal sign-in.
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **`booklore-client.ts`:** `getEntryBookId` reads `urn:booklore:book:<id>` and `urn:bookorbit:book:<id>`, and `isAudiobookEntry` is true when every acquisition link has an `audio/*` type. `getEntryFormatLabel` recognises the MIME types BookOrbit serves for MOBI, AZW and AZW3, FB2 and CB7, and adds " + audio" when an item also has audio files. BookOrbit serves `.m4b` as `audio/mp4` and `.mp3` as `audio/mpeg`.
+  - **`booklore-adapter.ts`:** links are chosen in this order: `rel="alternate"`, then `/book/<id>` (the route in all three apps), then `rel="self"`, then the library root. `supportsMediaKinds` is now `["book", "audiobook"]`, and `mediaKinds` filters each item. The app always saves an empty filter, so existing newsletters keep their audiobooks.
+  - **`adapter-core`:** a new `plexWebAppUrl` returns `https://app.plex.tv/desktop/` for app.plex.tv, and `<url>/web/index.html` otherwise. `buildPlexWebDeepLink` and the Plex and Tautulli fallback links use it.
+  - Reported in #353.
+
+  </details>
+
+- For a Tautulli source, the **Public URL** hint now says to use your Plex server's address, and that without one, items have no links. ([#350](https://github.com/jshields-ca/LatestArr/pull/350))
+
+  It said item links fall back to the Base URL, which is true for every other source but not Tautulli: Tautulli's address isn't a page recipients can use, so LatestArr makes no links from it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `PublicUrlHint` in `pages/sources-page.tsx` takes the source kind, matching `buildExternalUrl` in `tautulli-adapter.ts`, which returns no link without `publicUrl` and builds a Plex Web link from it.
+
+  </details>
+
 ## [0.12.1] - 2026-10-15
 
 ### Improved
