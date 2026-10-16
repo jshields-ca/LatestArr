@@ -1,5 +1,31 @@
 # @latestarr/server
 
+## 0.12.2
+
+### Patch Changes
+
+- [#352](https://github.com/jshields-ca/LatestArr/pull/352) [`0add56d`](https://github.com/jshields-ca/LatestArr/commit/0add56d90bba292ff68c82321cea0b9ef318c886) - **Improved:** When a backup can't be written, the error links to the fix on latestarr.app.
+
+  The message, on the Backups page, in the log and in the failure alert, now ends with a link to the Backups guide's **Can't write** section, which walks through checking and fixing the folder's permissions.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `explainFolderError` in `backups/service.ts` appends `https://www.latestarr.app/docs/backups#cant-write`. The site keeps that anchor stable.
+
+  </details>
+
+- Updated dependencies [[`3bf312b`](https://github.com/jshields-ca/LatestArr/commit/3bf312bf0183ced27ea078ad3d78a62aded159d7)]:
+  - @latestarr/adapter-core@0.12.2
+  - @latestarr/adapter-plex@0.12.2
+  - @latestarr/adapter-tautulli@0.12.2
+  - @latestarr/adapter-booklore-family@0.12.2
+  - @latestarr/adapter-audiobookshelf@0.12.2
+  - @latestarr/adapter-jellyfin@0.12.2
+  - @latestarr/adapter-romm@0.12.2
+  - @latestarr/crypto@0.12.2
+  - @latestarr/db@0.12.2
+
 ## 0.12.1
 
 ### Patch Changes
