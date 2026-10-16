@@ -11,12 +11,15 @@ import { isHttpUrl, sameOrigin, trimTrailingSlashes, withOrigin } from "@latesta
 import {
   fetchOpdsImage,
   getEntryAuthorName,
+  getEntryAlternateHref,
+  getEntryBookId,
   getEntryFormatLabel,
   getEntryImageHref,
   getEntryPermalinkHref,
   getEntrySummaryText,
   getLibraries,
   getRecentEntries,
+  isAudiobookEntry,
   resolveOpdsUrl,
   type OpdsEntry,
 } from "./booklore-client.js";
@@ -52,23 +55,29 @@ function resolveWebUrl(config: SourceConnectionConfig): string {
 // not the local server) is left alone rather than force-rebased into a
 // broken URL with the wrong host and an unrelated path.
 //
-// Falls back to the library root when the entry carries no usable
-// permalink at all (omitted, or rejected by the scheme check above), which
-// is still strictly better than no link.
+// In order: the entry's rel="alternate" page; the book's page in the app,
+// /book/<id>, from its id (what BookLore, BookOrbit and Grimmory feeds
+// actually give); its rel="self" link; and last the library root, which is
+// still better than no link.
 function buildExternalUrl(entry: OpdsEntry, baseUrl: string, webUrl: string): string {
-  const permalinkHref = getEntryPermalinkHref(entry);
-  if (permalinkHref) {
-    let resolved: string | undefined;
-    try {
-      resolved = resolveOpdsUrl(baseUrl, permalinkHref);
-    } catch {
-      resolved = undefined;
-    }
-    if (resolved && isHttpUrl(resolved)) {
-      return sameOrigin(resolved, baseUrl) ? withOrigin(resolved, webUrl) : resolved;
-    }
+  const alternate = getEntryAlternateHref(entry);
+  const fromAlternate = alternate ? resolvePermalink(alternate, baseUrl, webUrl) : undefined;
+  if (fromAlternate) return fromAlternate;
+  const bookId = getEntryBookId(entry);
+  if (bookId) return `${trimTrailingSlashes(webUrl)}/book/${encodeURIComponent(bookId)}`;
+  const permalink = getEntryPermalinkHref(entry);
+  return (permalink ? resolvePermalink(permalink, baseUrl, webUrl) : undefined) ?? trimTrailingSlashes(webUrl);
+}
+
+function resolvePermalink(href: string, baseUrl: string, webUrl: string): string | undefined {
+  let resolved: string | undefined;
+  try {
+    resolved = resolveOpdsUrl(baseUrl, href);
+  } catch {
+    return undefined;
   }
-  return trimTrailingSlashes(webUrl);
+  if (!isHttpUrl(resolved)) return undefined;
+  return sameOrigin(resolved, baseUrl) ? withOrigin(resolved, webUrl) : resolved;
 }
 
 function mapEntry(entry: OpdsEntry, baseUrl: string, webUrl: string): NewItem {
@@ -92,7 +101,7 @@ function mapEntry(entry: OpdsEntry, baseUrl: string, webUrl: string): NewItem {
   return {
     id: entry.id,
     externalId: entry.id,
-    kind: "book",
+    kind: isAudiobookEntry(entry) ? "audiobook" : "book",
     contentLabel: getEntryFormatLabel(entry),
     title: entry.title,
     subtitle: getEntryAuthorName(entry),
@@ -123,7 +132,7 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
   return {
     kind,
     capabilities: {
-      supportsMediaKinds: ["book"],
+      supportsMediaKinds: ["book", "audiobook"],
       supportsIncrementalSync: false,
     },
 
@@ -149,9 +158,8 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
       config: SourceConnectionConfig,
       params: FetchRecentItemsParams,
     ): Promise<NewItem[]> {
-      // Every item this adapter can return is a book, so a mediaKinds
-      // filter that excludes "book" entirely means nothing qualifies.
-      if (params.mediaKinds && !params.mediaKinds.includes("book")) {
+      const mediaKinds = params.mediaKinds;
+      if (mediaKinds && !mediaKinds.includes("book") && !mediaKinds.includes("audiobook")) {
         return [];
       }
 
@@ -169,7 +177,8 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
       const webUrl = resolveWebUrl(config);
       return entries
         .map((entry) => mapEntry(entry, config.baseUrl, webUrl))
-        .filter((item) => item.addedAt >= params.since);
+        .filter((item) => item.addedAt >= params.since)
+        .filter((item) => !mediaKinds || mediaKinds.includes(item.kind));
     },
 
     async fetchImageBytes(config: SourceConnectionConfig, item: NewItem): Promise<FetchedImage | null> {

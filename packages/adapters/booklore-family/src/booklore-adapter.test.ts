@@ -307,6 +307,66 @@ describe("fetchRecentItems", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
+  describe("BookOrbit's own feed", () => {
+    // Shaped like BookOrbit's real /api/v1/opds/recent entries: an id of
+    // urn:bookorbit:book:<id>, no rel="alternate" or rel="self", and one
+    // acquisition link per file, typed by format.
+    const entry = (id: number, title: string, files: string[]) => `
+  <entry>
+    <title>${title}</title>
+    <id>urn:bookorbit:book:${id}</id>
+    <updated>2026-01-15T00:00:00Z</updated>
+    ${files.map((type, i) => `<link rel="http://opds-spec.org/acquisition" href="/api/v1/opds/${id}/download?fileId=${i}" type="${type}"/>`).join("")}
+  </entry>`;
+    const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>urn:bookorbit:recent</id>
+  <title>Recent Books</title>
+  <updated>2026-01-20T00:00:00Z</updated>
+  ${entry(7, "Ebook", ["application/epub+zip"])}
+  ${entry(8, "Audiobook", ["audio/mp4"])}
+  ${entry(9, "Both", ["application/epub+zip", "audio/mpeg"])}
+</feed>`;
+    const publicConfig = { ...config, publicUrl: "https://books.example.com" };
+
+    it("shows audio-only items as audiobooks, and keeps a book with an ebook a book", async () => {
+      mockFetch.mockResolvedValueOnce(xmlResponse(feed));
+      const items = await bookOrbitAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+      expect(items.map((item) => [item.title, item.kind, item.contentLabel])).toEqual([
+        ["Ebook", "book", "Ebook"],
+        ["Audiobook", "audiobook", "Audiobook"],
+        ["Both", "book", "Ebook"],
+      ]);
+    });
+
+    it("links each item to its own page at the public URL", async () => {
+      mockFetch.mockResolvedValueOnce(xmlResponse(feed));
+      const items = await bookOrbitAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+      expect(items.map((item) => item.externalUrl)).toEqual([
+        "https://books.example.com/book/7",
+        "https://books.example.com/book/8",
+        "https://books.example.com/book/9",
+      ]);
+    });
+
+    it("links BookLore and Grimmory books the same way", async () => {
+      mockFetch.mockResolvedValueOnce(
+        xmlResponse(feed.replaceAll("urn:bookorbit:book:", "urn:booklore:book:")),
+      );
+      const items = await grimmoryAdapter.fetchRecentItems(config, { since: new Date(0) });
+      expect(items[0]?.externalUrl).toBe("http://booklore.local:6060/book/7");
+    });
+
+    it("keeps only the kinds a newsletter asks for", async () => {
+      mockFetch.mockResolvedValueOnce(xmlResponse(feed));
+      const items = await bookOrbitAdapter.fetchRecentItems(publicConfig, {
+        since: new Date(0),
+        mediaKinds: ["audiobook"],
+      });
+      expect(items.map((item) => item.title)).toEqual(["Audiobook"]);
+    });
+  });
+
   it("passes the requested limit through as the size param", async () => {
     mockFetch.mockResolvedValueOnce(xmlResponse(RECENT_FEED));
 

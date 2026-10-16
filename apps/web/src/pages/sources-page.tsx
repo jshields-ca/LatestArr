@@ -95,9 +95,9 @@ interface SourceKindConfig {
   label: string;
   description: string;
   fields: SourceKindField[];
-  /** BookLore, BookOrbit, and Grimmory authenticate over OPDS, a protocol
-   *  name most self-hosters won't recognize — this shows a plain-language
-   *  note next to their username/password fields instead. */
+  /** BookLore, BookOrbit, and Grimmory are read over OPDS, with OPDS
+   *  accounts kept separate from the app's own sign-in; this says so next
+   *  to their username and password fields. */
   opdsHint?: boolean;
   /** Where to find the credential, shown under its field. */
   fieldHint?: string;
@@ -228,7 +228,7 @@ const FALLBACK_KINDS = sortKinds(Object.keys(KIND_CONFIG));
 function OpdsHint({ id, label }: { id: string; label: string }) {
   return (
     <p id={id} className="text-xs text-muted-foreground">
-      OPDS is just how {label} shares its catalog — use the same username and password you already use to sign in to {label}&apos;s own web reader, not a separate API key.
+      Use an OPDS account, not your {label} sign-in. Create one in {label}&apos;s settings, under OPDS.
     </p>
   );
 }
