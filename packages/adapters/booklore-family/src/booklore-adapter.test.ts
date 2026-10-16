@@ -316,6 +316,7 @@ describe("fetchRecentItems", () => {
     <title>${title}</title>
     <id>urn:bookorbit:book:${id}</id>
     <updated>2026-01-15T00:00:00Z</updated>
+    ${id === 7 ? '<content type="text">A synopsis from BookOrbit.</content>' : '<content type="text"/>'}
     ${files.map((type, i) => `<link rel="http://opds-spec.org/acquisition" href="/api/v1/opds/${id}/download?fileId=${i}" type="${type}"/>`).join("")}
   </entry>`;
     const feed = `<?xml version="1.0" encoding="UTF-8"?>
@@ -337,6 +338,12 @@ describe("fetchRecentItems", () => {
         ["Audiobook", "audiobook", "Audiobook"],
         ["Both", "book", "Ebook + audio"],
       ]);
+    });
+
+    it("reads the synopsis from <content>, where BookOrbit puts it", async () => {
+      mockFetch.mockResolvedValueOnce(xmlResponse(feed));
+      const items = await bookOrbitAdapter.fetchRecentItems(publicConfig, { since: new Date(0) });
+      expect(items.map((item) => item.overview)).toEqual(["A synopsis from BookOrbit.", undefined, undefined]);
     });
 
     it("links each item to its own page at the public URL", async () => {

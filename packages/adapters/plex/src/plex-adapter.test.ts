@@ -349,6 +349,24 @@ describe("fetchRecentItems", () => {
       );
     });
 
+    it("gives an episode links to its season and series", async () => {
+      mockIdentity("srv-abc123");
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          MediaContainer: {
+            Metadata: [
+              { ...baseItem, ratingKey: "42", type: "episode", parentRatingKey: "41", grandparentRatingKey: "40", addedAt: 1700000000 },
+            ],
+          },
+        }),
+      );
+
+      const items = await plexAdapter.fetchRecentItems({ ...config, publicUrl: "https://app.plex.tv" }, { since: new Date(0) });
+
+      const link = (key: string) => `https://app.plex.tv/desktop/#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F${key}`;
+      expect(items[0]).toMatchObject({ externalUrl: link("42"), seasonUrl: link("41"), seriesUrl: link("40") });
+    });
+
     it("builds the deep link from publicUrl instead of baseUrl when configured", async () => {
       mockIdentity("srv-abc123");
       mockFetch.mockResolvedValueOnce(

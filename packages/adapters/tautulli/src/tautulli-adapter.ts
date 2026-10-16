@@ -264,6 +264,16 @@ export const tautulliAdapter: SourceAdapter = {
             item.art,
           ),
           externalUrl: buildExternalUrl(config.publicUrl, machineIdentifier, item.rating_key),
+          ...(kind === "tv_episode" &&
+            config.publicUrl &&
+            machineIdentifier && {
+              seasonUrl: item.parent_rating_key
+                ? buildPlexWebDeepLink(config.publicUrl, machineIdentifier, item.parent_rating_key)
+                : undefined,
+              seriesUrl: item.grandparent_rating_key
+                ? buildPlexWebDeepLink(config.publicUrl, machineIdentifier, item.grandparent_rating_key)
+                : undefined,
+            }),
           raw: item,
         });
       }

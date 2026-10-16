@@ -28,6 +28,11 @@ export interface NewItem {
   platform?: string;
   libraryName?: string;
   externalUrl?: string;
+  /** For an episode, links to its season and its series, so a row grouping
+   * several new episodes can link to what they share, as Tautulli's own
+   * newsletter does: the season when they're all from one, else the show. */
+  seasonUrl?: string;
+  seriesUrl?: string;
   /** Play count over the window a "most watched" query was made for —
    * only present on items returned by fetchPopularItems. */
   playCount?: number;
