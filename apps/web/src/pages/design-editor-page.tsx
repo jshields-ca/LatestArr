@@ -1009,6 +1009,7 @@ export function DesignEditorPage() {
                 <Label htmlFor="design-limit">
                   {settings.sections.groupByType ? "Most items per section" : "Most items in total"}
                 </Label>
+                {/* 1–100, matching MAX_SHOWN_ITEMS in apps/server/src/render/design.ts. */}
                 <Input
                   id="design-limit"
                   type="number"
