@@ -225,6 +225,7 @@ export const tautulliAdapter: SourceAdapter = {
         key: (item) => item.rating_key,
         since: params.since,
         limit: params.limit,
+        onCapReached: params.onCapReached,
       });
       for (const item of items) {
         const kind = mapMediaType(item.media_type);

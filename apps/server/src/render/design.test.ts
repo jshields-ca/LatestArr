@@ -50,6 +50,11 @@ describe("items shown", () => {
     expect(shown(await render(design({ sections: { groupByType: false } }), { items: many }))).toBe(100);
   });
 
+  it("accepts a limit up to 100", () => {
+    expect(design({ sections: { limit: 100 } }).sections.limit).toBe(100);
+    expect(() => design({ sections: { limit: 101 } })).toThrow();
+  });
+
   it("keeps the design's own limit", async () => {
     expect(shown(await render(design({ sections: { groupByType: true, limit: 5 } }), { items: many }))).toBe(5);
   });

@@ -3,6 +3,7 @@ import Handlebars from "handlebars";
 import { formatDate, formatPeriod } from "./dates.js";
 import { renderNote } from "./notes.js";
 import mjml2html from "mjml";
+import { MAX_SHOWN_ITEMS } from "./design.js";
 import type { SourceButton } from "./source-buttons.js";
 
 // Every design renders through here: MJML containing Handlebars tokens
@@ -323,9 +324,11 @@ Handlebars.registerHelper("mediaList", function mediaList(
 
   const isShowAll = showAll === true || showAll === "true";
   const limit = Number(count);
-  let selected = isShowAll
-    ? filtered
-    : filtered.slice(0, Number.isFinite(limit) && limit > 0 ? limit : filtered.length);
+  // Even "show all", or a code design with no count, stops at
+  // MAX_SHOWN_ITEMS: sources are read in full now (up to 1,000 each), so
+  // an unbounded list could make a very long email.
+  const wanted = !isShowAll && Number.isFinite(limit) && limit > 0 ? limit : filtered.length;
+  let selected = filtered.slice(0, Math.min(wanted, MAX_SHOWN_ITEMS));
 
   if (selected.length === 0 && emptyFallback === "random") {
     const fallbackPool = (this.fallbackItems ?? []).filter((item) => matchesContentType(item, contentType));

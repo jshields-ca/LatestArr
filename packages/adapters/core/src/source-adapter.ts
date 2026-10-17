@@ -92,6 +92,9 @@ export interface FetchRecentItemsParams {
   mediaKinds?: MediaKind[];
   libraryIds?: string[];
   limit?: number;
+  /** Called when a read stopped at MAX_RECENT_ITEMS (per source, or per
+   *  library for Audiobookshelf), so there may be newer items it missed. */
+  onCapReached?: () => void;
 }
 
 export interface FetchPopularItemsParams {

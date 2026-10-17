@@ -98,6 +98,7 @@ export const audiobookshelfAdapter: SourceAdapter = {
         key: (item) => item.id,
         since: params.since,
         limit: params.limit,
+        onCapReached: params.onCapReached,
       });
       for (const item of items) {
         const mapped = mapItem(item, config.baseUrl, token, webUrl);
