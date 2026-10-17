@@ -771,6 +771,10 @@ export function convertDesignToCode(id: string): Promise<{ template: Template }>
   return apiFetch<{ template: Template }>(`/templates/${id}/convert-to-code`, { method: "POST" });
 }
 
+export function convertDesignToOptions(id: string): Promise<{ template: Template }> {
+  return apiFetch<{ template: Template }>(`/templates/${id}/convert-to-options`, { method: "POST" });
+}
+
 export function listTemplates(): Promise<{ templates: Template[] }> {
   return apiFetch<{ templates: Template[] }>("/templates");
 }

@@ -234,6 +234,29 @@ export function registerTemplateRoutes(app: FastifyInstance, db: Db): void {
       return reply.send({ template });
     });
 
+    // The way back from convert-to-code (#381). A design keeps its option
+    // settings while it's code (saving in code mode updates their content),
+    // so this only drops the markup: the options are as they were when it
+    // switched, plus any intro, footer or buttons changed since. A design
+    // that started as code (a template converted in 0.11) has default
+    // options, which the web app warns about before calling this.
+    scope.post<{ Params: IdParams }>("/templates/:id/convert-to-options", async (request, reply) => {
+      const [existing] = await db.select().from(templates).where(eq(templates.id, request.params.id));
+      if (!existing) {
+        return reply.code(404).send({ error: "Not found" });
+      }
+      if (existing.mode !== "code") {
+        return reply.send({ template: existing });
+      }
+      const [template] = await db
+        .update(templates)
+        .set({ mode: "design", compiledMjml: null, updatedAt: new Date() })
+        .where(eq(templates.id, existing.id))
+        .returning();
+      request.log.info({ templateId: template!.id }, `Switched design "${template!.name}" back to options`);
+      return reply.send({ template });
+    });
+
     scope.delete<{ Params: IdParams }>("/templates/:id", async (request, reply) => {
       // Newsletters using this design go back to Default rather than
       // blocking the delete (the web app says so before confirming).
