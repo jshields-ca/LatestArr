@@ -10,7 +10,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, plexWebAppUrl } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl, readNewest } from "@latestarr/adapter-core";
 import {
   buildImageProxyUrl,
   fetchImage,
@@ -199,7 +199,6 @@ export const tautulliAdapter: SourceAdapter = {
     params: FetchRecentItemsParams,
   ): Promise<NewItem[]> {
     const apiKey = config.credentials.apiKey ?? "";
-    const count = params.limit ?? DEFAULT_FETCH_COUNT;
     // Tautulli's get_recently_added only accepts one section_id per call, so
     // a multi-library filter means one request per library, merged below.
     const sectionIds =
@@ -219,7 +218,14 @@ export const tautulliAdapter: SourceAdapter = {
 
     const results: NewItem[] = [];
     for (const sectionId of sectionIds) {
-      const items = await getRecentlyAdded(config.baseUrl, apiKey, count, sectionId);
+      // Newest first, page by page, back to the start of the lookback window.
+      const items = await readNewest({
+        fetchPage: (offset, size) => getRecentlyAdded(config.baseUrl, apiKey, size, sectionId, offset),
+        addedAt: (item) => new Date(Number(item.added_at) * 1000),
+        key: (item) => item.rating_key,
+        since: params.since,
+        limit: params.limit,
+      });
       for (const item of items) {
         const kind = mapMediaType(item.media_type);
         if (!kind) continue;

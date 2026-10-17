@@ -213,8 +213,9 @@ export async function getRecentlyAdded(
   apiKey: string,
   count: number,
   sectionId?: string,
+  start = 0,
 ): Promise<TautulliRecentlyAddedItem[]> {
-  const params: Record<string, string> = { count: String(count) };
+  const params: Record<string, string> = { count: String(count), start: String(start) };
   if (sectionId) {
     params.section_id = sectionId;
   }

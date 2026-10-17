@@ -102,11 +102,13 @@ export async function getRoms(
   token: string,
   count: number,
   platformIds?: string[],
+  offset = 0,
 ): Promise<RommRom[]> {
   const params: Record<string, string | string[]> = {
     order_by: "created_at",
     order_dir: "desc",
     limit: String(count),
+    offset: String(offset),
   };
   if (platformIds && platformIds.length > 0) {
     params.platform_ids = platformIds;

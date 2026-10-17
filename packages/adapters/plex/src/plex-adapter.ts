@@ -9,7 +9,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, plexWebAppUrl } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl, readNewest } from "@latestarr/adapter-core";
 import {
   buildImageUrl,
   fetchImage,
@@ -20,7 +20,6 @@ import {
   type PlexMetadataItem,
 } from "./plex-client.js";
 
-const DEFAULT_FETCH_COUNT = 100;
 
 function mapMediaType(type: string): MediaKind | null {
   switch (type) {
@@ -145,7 +144,6 @@ export const plexAdapter: SourceAdapter = {
     params: FetchRecentItemsParams,
   ): Promise<NewItem[]> {
     const token = config.credentials.token ?? "";
-    const count = params.limit ?? DEFAULT_FETCH_COUNT;
     // Plex's recentlyAdded is per-library when scoped, so a multi-library
     // filter means one request per library, merged below — same shape as
     // the Tautulli adapter's equivalent loop.
@@ -162,7 +160,14 @@ export const plexAdapter: SourceAdapter = {
 
     const results: NewItem[] = [];
     for (const sectionKey of sectionKeys) {
-      const items = await getRecentlyAdded(config.baseUrl, token, count, sectionKey);
+      // Newest first, page by page, back to the start of the lookback window.
+      const items = await readNewest({
+        fetchPage: (offset, size) => getRecentlyAdded(config.baseUrl, token, size, sectionKey, offset),
+        addedAt: (item) => new Date(item.addedAt * 1000),
+        key: (item) => item.ratingKey,
+        since: params.since,
+        limit: params.limit,
+      });
       for (const item of items) {
         const kind = mapMediaType(item.type);
         if (!kind) continue;

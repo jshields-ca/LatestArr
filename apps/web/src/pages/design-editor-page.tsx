@@ -1014,7 +1014,7 @@ export function DesignEditorPage() {
                   type="number"
                   min={1}
                   max={50}
-                  placeholder="No limit"
+                  placeholder="Up to 100"
                   value={settings.sections.limit ?? ""}
                   onChange={(e) => {
                     const value = e.target.value === "" ? null : Math.max(1, Math.min(50, Number(e.target.value)));

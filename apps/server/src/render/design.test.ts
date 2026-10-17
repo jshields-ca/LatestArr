@@ -41,6 +41,20 @@ function render(settings: DesignSettings, context: Partial<MjmlRenderContext> = 
   });
 }
 
+describe("items shown", () => {
+  const many = Array.from({ length: 130 }, (_, n) => item({ title: `Movie number ${n}` }));
+  const shown = (html: string) => (html.match(/Movie number \d+/g) ?? []).filter((title, i, all) => all.indexOf(title) === i).length;
+
+  it("shows at most 100 per section when the design sets no limit", async () => {
+    expect(shown(await render(design({ sections: { groupByType: true } }), { items: many }))).toBe(100);
+    expect(shown(await render(design({ sections: { groupByType: false } }), { items: many }))).toBe(100);
+  });
+
+  it("keeps the design's own limit", async () => {
+    expect(shown(await render(design({ sections: { groupByType: true, limit: 5 } }), { items: many }))).toBe(5);
+  });
+});
+
 describe("design settings", () => {
   it("fills every missing option with its default", () => {
     expect(DEFAULT_DESIGN_SETTINGS).toMatchObject({

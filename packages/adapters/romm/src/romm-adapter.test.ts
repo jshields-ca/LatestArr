@@ -189,3 +189,35 @@ describe("listUsers", () => {
     await expect(rommAdapter.listUsers!(config)).rejects.toThrow(/users\.read scope/);
   });
 });
+
+// 150 items added an hour apart, newest first: more than one page of 100.
+const PAGED_NOW = new Date("2026-10-17T12:00:00Z");
+const pagedAt = (n: number) => new Date(PAGED_NOW.getTime() - n * 3_600_000);
+const pagedSince = new Date(PAGED_NOW.getTime() - 7 * 24 * 3_600_000);
+const PAGED_TOTAL = 150;
+const pagedSlice = (start: number, size: number) =>
+  Array.from({ length: PAGED_TOTAL }, (_, n) => n).slice(start, start + size);
+
+describe("reading past one page", () => {
+  it("pages with offset until it has everything in the window", async () => {
+    mockFetch.mockImplementation(async (input: string) => {
+      const url = new URL(input);
+      const offset = Number(url.searchParams.get("offset"));
+      const limit = Number(url.searchParams.get("limit"));
+      return jsonResponse({
+        items: pagedSlice(offset, limit).map((n) => ({
+          ...baseRom,
+          id: n,
+          name: `Game ${n}`,
+          created_at: pagedAt(n).toISOString(),
+        })),
+      });
+    });
+
+    const items = await rommAdapter.fetchRecentItems(config, { since: pagedSince });
+
+    expect(items).toHaveLength(PAGED_TOTAL);
+    const offsets = mockFetch.mock.calls.map(([input]) => new URL(input as string).searchParams.get("offset"));
+    expect(offsets).toEqual(["0", "100"]);
+  });
+});

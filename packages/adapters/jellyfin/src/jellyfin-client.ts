@@ -127,7 +127,7 @@ export async function getRecentItems(
   flavor: ServerFlavor,
   baseUrl: string,
   apiKey: string,
-  options: { limit: number; parentId?: string; itemTypes?: string[] },
+  options: { limit: number; startIndex?: number; parentId?: string; itemTypes?: string[] },
 ): Promise<BaseItem[]> {
   const body = await call<{ Items?: BaseItem[] }>(flavor, baseUrl, apiKey, "/Items", {
     Recursive: "true",
@@ -135,6 +135,7 @@ export async function getRecentItems(
     SortBy: "DateCreated",
     SortOrder: "Descending",
     Limit: String(options.limit),
+    StartIndex: String(options.startIndex ?? 0),
     Fields: RECENT_ITEM_FIELDS.join(","),
     ...(options.parentId && { ParentId: options.parentId }),
   });

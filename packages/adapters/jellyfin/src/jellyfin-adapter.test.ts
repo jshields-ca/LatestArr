@@ -269,3 +269,38 @@ describe("fetchImageBytes", () => {
     await expect(embyAdapter.fetchImageBytes!(config, { ...item, posterUrl: undefined })).resolves.toBeNull();
   });
 });
+
+// 150 items added an hour apart, newest first: more than one page of 100.
+const PAGED_NOW = new Date("2026-10-17T12:00:00Z");
+const pagedAt = (n: number) => new Date(PAGED_NOW.getTime() - n * 3_600_000);
+const pagedSince = new Date(PAGED_NOW.getTime() - 7 * 24 * 3_600_000);
+const PAGED_TOTAL = 150;
+const pagedSlice = (start: number, size: number) =>
+  Array.from({ length: PAGED_TOTAL }, (_, n) => n).slice(start, start + size);
+
+describe("reading past one page", () => {
+  it("pages with StartIndex until it has everything in the window", async () => {
+    mockFetch.mockImplementation(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname.endsWith("/System/Info")) return jsonResponse({ Id: "srv", ServerName: "Media" });
+      const start = Number(url.searchParams.get("StartIndex"));
+      const limit = Number(url.searchParams.get("Limit"));
+      return jsonResponse({
+        Items: pagedSlice(start, limit).map((n) => ({
+          Id: `m${n}`,
+          Name: `Movie ${n}`,
+          Type: "Movie",
+          DateCreated: pagedAt(n).toISOString(),
+        })),
+      });
+    });
+
+    const items = await jellyfinAdapter.fetchRecentItems(config, { since: pagedSince });
+
+    expect(items).toHaveLength(PAGED_TOTAL);
+    const starts = mockFetch.mock.calls
+      .map(([input]) => new URL(input as string).searchParams.get("StartIndex"))
+      .filter((start) => start !== null);
+    expect(starts).toEqual(["0", "100"]);
+  });
+});
