@@ -11,6 +11,40 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.12.3] - 2026-10-17
+
+### Improved
+
+- Buttons and TV links in newsletters fit what they point to. ([#360](https://github.com/jshields-ca/LatestArr/pull/360))
+
+  - **Listen on BookOrbit:** under Audiobooks, a source's button now says **Listen on**, under Books **Read on**, under Movies and TV **Watch on**, and under Games **Play on**. Before, one source had one label everywhere, so BookOrbit's audiobooks had a **Read on BookOrbit** button.
+  - **TV rows link to the season or show:** a row that groups several new episodes now links to their season, or to the show when they're from different seasons, as Tautulli's newsletter does. Each episode listed under it still links to that episode. This works for Plex and Tautulli sources.
+
+### Fixed
+
+- BookOrbit books and audiobooks now show their synopsis, like movies do. ([#360](https://github.com/jshields-ca/LatestArr/pull/360))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **Synopsis:** BookOrbit puts an entry's description in `<content type="text">`; BookLore and Grimmory use `<summary>`. `getEntrySummaryText` now falls back to `<content>`, and ignores an empty one.
+  - **Verbs:** `buildSourceButtons` adds `labelsByKind`, with the verb chosen by kind (`VERB_BY_KIND`), and the `sourceButtonsFor` helper uses the label for its section's kind. Buttons not under a section keep the app's own verb.
+  - **TV links:** `NewItem` gains `seasonUrl` and `seriesUrl`. Plex fills them from `parentRatingKey` and `grandparentRatingKey`, and Tautulli from `parent_rating_key` and `grandparent_rating_key`, as Plex Web deep links. `groupEpisodes` links the row to the shared season, else the series, else the first episode.
+  - Reported in #353 and #359.
+
+  </details>
+
+- Plex links through `https://app.plex.tv` now open the item, even when Plex first asks people to sign in or choose a profile. ([#364](https://github.com/jshields-ca/LatestArr/pull/364))
+
+  They opened the Plex home page instead. Links now use the same form as Tautulli's newsletter links, `https://app.plex.tv/desktop#!/…`, which a user confirmed in #353 keeps the item through Plex's profile picker. Links to a self-hosted Plex address are unchanged.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `plexWebAppUrl` returns `https://app.plex.tv/desktop` (no trailing slash) for app.plex.tv. In #353, `/desktop#!/…` reached the item after the profile picker, while `/desktop/#!/…` (0.12.2) and `/web/index.html#!/…` (0.12.1) both ended on the home page. Item, season and series links and the fallback link all use it.
+
+  </details>
+
 ## [0.12.2] - 2026-10-16
 
 ### Improved

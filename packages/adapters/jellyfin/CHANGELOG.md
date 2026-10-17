@@ -1,5 +1,12 @@
 # @latestarr/adapter-jellyfin
 
+## 0.12.3
+
+### Patch Changes
+
+- Updated dependencies [[`8b4f0b6`](https://github.com/jshields-ca/LatestArr/commit/8b4f0b6bb00276b68e741fbb7e10959f34f8bcf4), [`51b9fad`](https://github.com/jshields-ca/LatestArr/commit/51b9fadc224064b035ac129fd253492540a0832f)]:
+  - @latestarr/adapter-core@0.12.3
+
 ## 0.12.2
 
 ### Patch Changes
