@@ -640,6 +640,16 @@ describe("the summary, grouping, and section helpers", () => {
     expect(await rows('count="7"')).toBe(7);
   });
 
+  it("caps the random fallback at 100 too", async () => {
+    const library = Array.from({ length: 150 }, (_, n) => item({ id: `l${n}`, title: `Old film ${n}` }));
+    const html = await render(
+      `{{#mediaList emptyFallback="random" fallbackCount="500"}}<mj-text>@@{{title}}@@</mj-text>{{/mediaList}}`,
+      [],
+      { fallbackItems: library },
+    );
+    expect([...html.matchAll(/@@/g)].length / 2).toBe(100);
+  });
+
   it("folds several episodes of one series into one row, keeping the order and listing up to five", async () => {
     const items = [
       episode(1),

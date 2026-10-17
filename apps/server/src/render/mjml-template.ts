@@ -334,7 +334,7 @@ Handlebars.registerHelper("mediaList", function mediaList(
     const fallbackPool = (this.fallbackItems ?? []).filter((item) => matchesContentType(item, contentType));
     const fallbackLimit = Number(fallbackCount) || (Number.isFinite(limit) && limit > 0 ? limit : 5);
     selected = shuffled(fallbackPool)
-      .slice(0, fallbackLimit)
+      .slice(0, Math.min(fallbackLimit, MAX_SHOWN_ITEMS))
       .map((item) => ({ ...item, isFallback: true }));
   }
 
