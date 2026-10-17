@@ -8,6 +8,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
+import { readNewest } from "@latestarr/adapter-core";
 import {
   buildCoverUrl,
   buildItemWebUrl,
@@ -18,7 +19,6 @@ import {
   type AudiobookshelfLibraryItem,
 } from "./audiobookshelf-client.js";
 
-const DEFAULT_FETCH_COUNT = 100;
 
 // Audiobookshelf's item mediaType is "book" or "podcast" (episode), but our
 // MediaKind vocabulary only models "audiobook" — every item this adapter
@@ -77,7 +77,6 @@ export const audiobookshelfAdapter: SourceAdapter = {
     }
 
     const token = config.credentials.token ?? "";
-    const count = params.limit ?? DEFAULT_FETCH_COUNT;
 
     // Unlike Tautulli/Plex/BookLore, Audiobookshelf has no global
     // cross-library "recent items" endpoint — items are only queryable
@@ -92,7 +91,14 @@ export const audiobookshelfAdapter: SourceAdapter = {
 
     const results: NewItem[] = [];
     for (const libraryId of libraryIds) {
-      const items = await getLibraryItems(config.baseUrl, token, libraryId, count);
+      // Newest first, page by page, back to the start of the lookback window.
+      const items = await readNewest({
+        fetchPage: (offset, size) => getLibraryItems(config.baseUrl, token, libraryId, size, offset / size),
+        addedAt: (item) => mapItem(item, config.baseUrl, token, webUrl).addedAt,
+        key: (item) => item.id,
+        since: params.since,
+        limit: params.limit,
+      });
       for (const item of items) {
         const mapped = mapItem(item, config.baseUrl, token, webUrl);
         if (mapped.addedAt >= params.since) {

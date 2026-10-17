@@ -9,7 +9,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { trimTrailingSlashes } from "@latestarr/adapter-core";
+import { readNewest, trimTrailingSlashes } from "@latestarr/adapter-core";
 import {
   type BaseItem,
   buildImageUrl,
@@ -22,7 +22,6 @@ import {
   type ServerFlavor,
 } from "./jellyfin-client.js";
 
-const DEFAULT_FETCH_COUNT = 100;
 const TICKS_PER_SECOND = 10_000_000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -153,7 +152,6 @@ function createAdapter(flavor: ServerFlavor): SourceAdapter {
 
     async fetchRecentItems(config: SourceConnectionConfig, params: FetchRecentItemsParams): Promise<NewItem[]> {
       const apiKey = apiKeyOf(config);
-      const limit = params.limit ?? DEFAULT_FETCH_COUNT;
       const itemTypes = params.mediaKinds
         ? params.mediaKinds.map((kind) => ITEM_TYPES_FOR_KIND[kind]).filter((type): type is string => Boolean(type))
         : RECENT_ITEM_TYPES;
@@ -169,7 +167,15 @@ function createAdapter(flavor: ServerFlavor): SourceAdapter {
       const results: NewItem[] = [];
       const seen = new Set<string>();
       for (const parentId of parentIds) {
-        const items = await getRecentItems(flavor, config.baseUrl, apiKey, { limit, parentId, itemTypes });
+        // Newest first, page by page, back to the start of the lookback window.
+        const items = await readNewest({
+          fetchPage: (offset, size) =>
+            getRecentItems(flavor, config.baseUrl, apiKey, { limit: size, startIndex: offset, parentId, itemTypes }),
+          addedAt: (item) => (item.DateCreated ? new Date(item.DateCreated) : undefined),
+          key: (item) => item.Id,
+          since: params.since,
+          limit: params.limit,
+        });
         for (const item of items) {
           const kind = ITEM_KIND[item.Type];
           if (!kind || !item.DateCreated || seen.has(item.Id)) continue;

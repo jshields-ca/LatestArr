@@ -277,6 +277,10 @@ export async function getRecentEntries(
   username: string,
   password: string,
   count: number,
+  page = 1,
 ): Promise<OpdsEntry[]> {
-  return fetchOpdsFeed(baseUrl, "/api/v1/opds/recent", username, password, { size: String(count) });
+  return fetchOpdsFeed(baseUrl, "/api/v1/opds/recent", username, password, {
+    size: String(count),
+    page: String(page),
+  });
 }

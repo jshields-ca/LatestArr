@@ -7,7 +7,7 @@ import type {
   SourceConnectionConfig,
   SourceLibrary,
 } from "@latestarr/adapter-core";
-import { isHttpUrl, sameOrigin, trimTrailingSlashes, withOrigin } from "@latestarr/adapter-core";
+import { isHttpUrl, readNewest, sameOrigin, trimTrailingSlashes, withOrigin } from "@latestarr/adapter-core";
 import {
   fetchOpdsImage,
   getEntryAuthorName,
@@ -24,7 +24,6 @@ import {
   type OpdsEntry,
 } from "./booklore-client.js";
 
-const DEFAULT_FETCH_COUNT = 100;
 
 // The address a recipient's browser should actually open — publicUrl when
 // the source connection has one configured (this server's own baseUrl may
@@ -167,12 +166,22 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
       // per-library variant in BookLore's documented integration surface,
       // so libraryIds can't be honored here the way the Tautulli/Plex
       // adapters scope per-section — this always reads the whole catalog.
-      const entries = await getRecentEntries(
-        config.baseUrl,
-        config.credentials.username ?? "",
-        config.credentials.password ?? "",
-        params.limit ?? DEFAULT_FETCH_COUNT,
-      );
+      // Newest first, page by page, back to the start of the lookback window. BookOrbit and
+      // BookLore cap a page at 100 entries.
+      const entries = await readNewest({
+        fetchPage: (offset, size) =>
+          getRecentEntries(
+            config.baseUrl,
+            config.credentials.username ?? "",
+            config.credentials.password ?? "",
+            size,
+            offset / size + 1,
+          ),
+        addedAt: (entry) => (entry.updated ? new Date(entry.updated) : undefined),
+        key: (entry) => String(entry.id),
+        since: params.since,
+        limit: params.limit,
+      });
 
       const webUrl = resolveWebUrl(config);
       return entries

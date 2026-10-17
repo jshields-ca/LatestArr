@@ -119,12 +119,13 @@ export async function getLibraryItems(
   token: string,
   libraryId: string,
   count: number,
+  page = 0,
 ): Promise<AudiobookshelfLibraryItem[]> {
   const body = await callAudiobookshelf<LibraryItemsResponse>(
     baseUrl,
     `/api/libraries/${libraryId}/items`,
     token,
-    { sort: "addedAt", desc: "1", limit: String(count) },
+    { sort: "addedAt", desc: "1", limit: String(count), page: String(page) },
   );
   return body.results ?? [];
 }

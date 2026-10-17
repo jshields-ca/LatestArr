@@ -8,9 +8,9 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
+import { readNewest } from "@latestarr/adapter-core";
 import { buildRomWebUrl, fetchImage, getPlatforms, getRoms, getUsers, type RommRom } from "./romm-client.js";
 
-const DEFAULT_FETCH_COUNT = 100;
 
 function mapRom(rom: RommRom, webUrl: string): NewItem {
   return {
@@ -59,14 +59,16 @@ export const rommAdapter: SourceAdapter = {
     // Unlike Audiobookshelf, RomM's rom-listing endpoint accepts a
     // repeatable platform_ids query param directly, so a multi-library
     // filter is a single request rather than a per-library loop.
-    const roms = await getRoms(
-      config.baseUrl,
-      config.credentials.token ?? "",
-      params.limit ?? DEFAULT_FETCH_COUNT,
-      params.libraryIds,
-    );
-
     const webUrl = config.publicUrl ?? config.baseUrl;
+    // Newest first, page by page, back to the start of the lookback window.
+    const roms = await readNewest({
+      fetchPage: (offset, size) =>
+        getRoms(config.baseUrl, config.credentials.token ?? "", size, params.libraryIds, offset),
+      addedAt: (rom) => mapRom(rom, webUrl).addedAt,
+      key: (rom) => String(rom.id),
+      since: params.since,
+      limit: params.limit,
+    });
     return roms.map((rom) => mapRom(rom, webUrl)).filter((item) => item.addedAt >= params.since);
   },
 

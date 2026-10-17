@@ -509,12 +509,17 @@ function orderedSections(order: DesignKind[]) {
   return [...SECTIONS].sort((a, b) => rank(a.kinds) - rank(b.kinds));
 }
 
+// With no item limit set, a section (or the whole list) still stops at this
+// many, so a busy week can't produce an email hundreds of items long now
+// that sources are read back to the start of the lookback window.
+export const MAX_SHOWN_ITEMS = 100;
+
 function ungroupedItems(settings: DesignSettings, p: Palette, font: string): string {
   const { limit, empty, groupEpisodes } = settings.sections;
   const card = itemMarkup(settings, p, font, false);
-  const hash = [limit ? `count="${limit}"` : "", groupEpisodes ? `groupEpisodes="true"` : ""].filter(Boolean).join(" ");
-  const open = hash ? `{{#mediaList ${hash}}}` : `{{#each items}}`;
-  const close = hash ? `{{/mediaList}}` : `{{/each}}`;
+  const hash = [`count="${limit ?? MAX_SHOWN_ITEMS}"`, groupEpisodes ? `groupEpisodes="true"` : ""].filter(Boolean).join(" ");
+  const open = `{{#mediaList ${hash}}}`;
+  const close = `{{/mediaList}}`;
   const list = [
     `    <mj-section padding="4px 0 12px">`,
     `      <mj-column>`,
@@ -563,7 +568,7 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
     const contentType = section.kinds.join(",");
     const hash = [
       `contentType="${contentType}"`,
-      limit ? `count="${limit}"` : "",
+      `count="${limit ?? MAX_SHOWN_ITEMS}"`,
       groupEpisodes ? `groupEpisodes="true"` : "",
       empty === "random" ? `emptyFallback="random" fallbackCount="${limit ?? 5}"` : "",
     ]

@@ -421,3 +421,34 @@ describe("fetchImageBytes", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
+
+// 150 items added an hour apart, newest first: more than one page of 100.
+const PAGED_NOW = new Date("2026-10-17T12:00:00Z");
+const pagedAt = (n: number) => new Date(PAGED_NOW.getTime() - n * 3_600_000);
+const pagedSince = new Date(PAGED_NOW.getTime() - 7 * 24 * 3_600_000);
+const PAGED_TOTAL = 150;
+const pagedSlice = (start: number, size: number) =>
+  Array.from({ length: PAGED_TOTAL }, (_, n) => n).slice(start, start + size);
+
+describe("reading past one page", () => {
+  it("pages the OPDS feed until it has everything in the window", async () => {
+    mockFetch.mockImplementation(async (input: string) => {
+      const url = new URL(input);
+      const page = Number(url.searchParams.get("page"));
+      const size = Number(url.searchParams.get("size"));
+      const entries = pagedSlice((page - 1) * size, size)
+        .map(
+          (n) =>
+            `<entry><title>Book ${n}</title><id>urn:bookorbit:book:${n}</id><updated>${pagedAt(n).toISOString()}</updated></entry>`,
+        )
+        .join("");
+      return xmlResponse(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><id>r</id><title>Recent</title>${entries}</feed>`);
+    });
+
+    const items = await bookOrbitAdapter.fetchRecentItems(config, { since: pagedSince });
+
+    expect(items).toHaveLength(PAGED_TOTAL);
+    const pages = mockFetch.mock.calls.map(([input]) => new URL(input as string).searchParams.get("page"));
+    expect(pages).toEqual(["1", "2"]);
+  });
+});

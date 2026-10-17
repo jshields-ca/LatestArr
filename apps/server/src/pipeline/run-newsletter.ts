@@ -1,5 +1,6 @@
 import {
   getAdapter,
+  MAX_RECENT_ITEMS,
   type MediaKind,
   type NewItem,
   type SourceAdapter,
@@ -183,6 +184,12 @@ async function fetchRecentItemsFromSources(
       }),
     );
     log.debug({ sourceId: source.id, count: sourceItems.length }, `Fetched ${sourceItems.length} items from "${source.name}"`);
+    if (sourceItems.length >= MAX_RECENT_ITEMS) {
+      log.warn(
+        { sourceId: source.id, count: sourceItems.length },
+        `"${source.name}" may have more new items than LatestArr read: it reads up to ${MAX_RECENT_ITEMS} per source (per library for Audiobookshelf) each time`,
+      );
+    }
     for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
     items.push(...sourceItems);
   }

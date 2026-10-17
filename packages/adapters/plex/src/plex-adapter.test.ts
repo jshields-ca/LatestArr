@@ -447,3 +447,40 @@ describe("fetchImageBytes", () => {
     expect(result).toBeNull();
   });
 });
+
+// 150 items added an hour apart, newest first: more than one page of 100.
+const PAGED_NOW = new Date("2026-10-17T12:00:00Z");
+const pagedAt = (n: number) => new Date(PAGED_NOW.getTime() - n * 3_600_000);
+const pagedSince = new Date(PAGED_NOW.getTime() - 7 * 24 * 3_600_000);
+const PAGED_TOTAL = 150;
+const pagedSlice = (start: number, size: number) =>
+  Array.from({ length: PAGED_TOTAL }, (_, n) => n).slice(start, start + size);
+
+describe("reading past one page", () => {
+  it("pages with X-Plex-Container-Start until it has everything in the window", async () => {
+    mockFetch.mockImplementation(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/identity") return jsonResponse({ MediaContainer: { machineIdentifier: "srv" } });
+      const start = Number(url.searchParams.get("X-Plex-Container-Start"));
+      const size = Number(url.searchParams.get("X-Plex-Container-Size"));
+      return jsonResponse({
+        MediaContainer: {
+          Metadata: pagedSlice(start, size).map((n) => ({
+            ratingKey: String(n),
+            title: `Movie ${n}`,
+            type: "movie",
+            addedAt: pagedAt(n).getTime() / 1000,
+          })),
+        },
+      });
+    });
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: pagedSince });
+
+    expect(items).toHaveLength(PAGED_TOTAL);
+    const starts = mockFetch.mock.calls
+      .map(([input]) => new URL(input as string).searchParams.get("X-Plex-Container-Start"))
+      .filter((start) => start !== null);
+    expect(starts).toEqual(["0", "100"]);
+  });
+});
