@@ -20,8 +20,8 @@
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@changesets/get-github-info": "^1.0.1",
-    "prettier": "^3.9.9",
-    "turbo": "^2.11.7"
+    "prettier": "^3.9.10",
+    "turbo": "^2.11.8"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
