@@ -85,9 +85,36 @@ The repo's docs (`README.md`, `docs/`, `.env.example`, this file) are the techni
 - **Keep anchors stable.** The app links to `docs/self-hosting.md#locked-out`, and a backup's `README.txt` to `#restoring-a-backup`. Renaming one means updating those links.
 - **Tell the site.** When a change affects what latestarr.app says, note it for the site, with the corrected facts. If the site moves a page, update the app's and README's links to it.
 
+## Testing and review
+
+CI runs lint, typecheck, build, every package's tests (including axe-core accessibility checks) on Node 24 and 26, and builds and smoke-tests the Docker image for amd64 and arm64. That catches broken code. It can't catch a wrong assumption, and most bugs that reached a release were in what a change *affected*, not in the lines that changed. So match the effort to the risk:
+
+| Change | What to do |
+| --- | --- |
+| Wording, docs, small visual tweaks | CI only. |
+| Bug fixes | A test that fails without the fix, and the **What else this affects** check below. |
+| Behaviour changes: limits, fetching, sending, links, sources, auth | Both of the above, a second-pass review, and one real send on `:dev` before the release is cut. |
+
+- **What else this affects.** Before opening a PR, search for everything that uses what you changed: a value, a limit, a default, a function or an API field. Each one either gets a test or a reason it's unaffected. Put shared limits in one constant that every user reads, so they can't drift apart. For example, `MAX_SHOWN_ITEMS` sets both the 100-item default and the **Most items per section** maximum.
+- **Test data from the real thing.** An adapter's fixtures should be copied from the real app's responses or its source code, not invented. Made-up feeds hid real differences (BookOrbit's `<content>`, entry ids and audio types).
+- **A second pass for behaviour changes.** Review the PR with `/code-review`, plus `/security-review` when it touches anything in the security list below. Not needed for small fixes.
+- **A real send before release.** Push to `dev` (`git push origin main:dev`), let `:dev` send one real newsletter, and check it, before merging the Version Packages PR. For behaviour changes, don't cut the release the same day the change was written.
+
+### Security
+
+LatestArr is built to be exposed to the internet, so treat these as security-relevant, and say how each is handled in the PR:
+
+- **Untrusted data in emails or pages.** Titles, summaries, links and images come from sources; names and emails come from recipients and imports. Keep Handlebars' escaping (`{{ }}`, never `{{{ }}}` for that data), check every URL with `isHttpUrl` before it reaches an `href` or `src`, and validate request bodies with zod.
+- **New or changed API routes.** Every route needs a signed-in user and the right role. `security.test.ts` fails for a route that isn't listed as public or given a role, so add yours there deliberately.
+- **Outbound requests.** Anything that fetches a URL (sources, webhooks, images) uses the shared timeout (`SOURCE_REQUEST_TIMEOUT_MS`) and size limits (`readBytesCapped`), and only admins can choose its address.
+- **Credentials and sessions.** Secrets are encrypted at rest, never returned by the API, and never logged. The logger redacts known fields, so name a new secret field so it's caught, or add it to the redaction list.
+- **New settings and defaults.** Default to the safe option, and document what changes when someone turns it on (like `TRUST_PROXY`).
+
+Report vulnerabilities privately; see [`SECURITY.md`](SECURITY.md).
+
 ## Pull requests
 
-- Fill out the PR template — it includes a short checklist (tests, docs, accessibility) that reviewers will check for.
+- Fill out the PR template: what else your change affects, then a short checklist (tests, docs, accessibility, security, and for behaviour changes a review pass and a real send). See [Testing and review](#testing-and-review).
 - Link the issue your PR addresses, if any.
 - Be responsive to review feedback; PRs that go quiet for a long time may be closed and can always be reopened.
 - **If your change is user-facing** (a new feature, a fix, a behavior change — not internal refactors, tests-only changes, or docs typos), add a changeset: run `pnpm changeset`, pick a bump type (see below), and write it in two parts — see "Writing a changeset" below. Commit the generated `.changeset/*.md` file with your PR.

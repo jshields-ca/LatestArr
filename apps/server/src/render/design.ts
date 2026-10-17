@@ -1,6 +1,13 @@
 import { z } from "zod";
 import { EMAIL_FONTS, type EmailFont } from "./email-fonts.js";
 
+// The most items a section (or the whole list) shows: the default with no
+// "Most items per section" set, and that setting's maximum, so the two can't
+// drift apart. Sources are read in full (up to 1,000 each), so this is
+// what keeps an email a sensible length. The design editor's field
+// (apps/web design-editor-page.tsx) uses the same number.
+export const MAX_SHOWN_ITEMS = 100;
+
 // A "design" is a set of options (colours, font, layout, what each item
 // shows, how items are grouped) that the renderer turns into MJML. Unlike a
 // hand-authored template it can't produce a broken email. The default
@@ -86,7 +93,7 @@ export const designSettingsSchema = z.object({
       // Several new episodes of one series share a row.
       groupEpisodes: z.boolean().default(true),
       order: z.array(z.enum(DESIGN_KINDS)).default([...DESIGN_KINDS]),
-      limit: z.number().int().min(1).max(100).nullable().default(null),
+      limit: z.number().int().min(1).max(MAX_SHOWN_ITEMS).nullable().default(null),
       // What an empty section (or, ungrouped, an empty issue) shows: nothing,
       // a "nothing new" line, a link to browse the library (grouped only),
       // or a few random picks from the whole library.
@@ -508,11 +515,6 @@ function orderedSections(order: DesignKind[]) {
   }));
   return [...SECTIONS].sort((a, b) => rank(a.kinds) - rank(b.kinds));
 }
-
-// With no item limit set, a section (or the whole list) still stops at this
-// many, so a busy week can't produce an email hundreds of items long now
-// that sources are read back to the start of the lookback window.
-export const MAX_SHOWN_ITEMS = 100;
 
 function ungroupedItems(settings: DesignSettings, p: Palette, font: string): string {
   const { limit, empty, groupEpisodes } = settings.sections;
