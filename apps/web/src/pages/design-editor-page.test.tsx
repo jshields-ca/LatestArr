@@ -69,6 +69,9 @@ beforeEach(() => {
       const body = JSON.parse(init.body as string);
       return Promise.resolve(jsonResponse(200, { template: { ...codeDesign, ...body } }));
     }
+    if (url === "/api/templates/c1/convert-to-options") {
+      return Promise.resolve(jsonResponse(200, { template: { ...codeDesign, mode: "design", compiledMjml: null } }));
+    }
     if (url === "/api/templates/d1/convert-to-code") {
       return Promise.resolve(jsonResponse(200, { template: { ...design, mode: "code", compiledMjml: CODE } }));
     }
@@ -416,6 +419,21 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
       expect(await screen.findByText("Line 3: {{/if}} closes a {{#each}} block.", { selector: "li" })).toBeInTheDocument();
       expect(screen.getByRole("alert")).toHaveTextContent("Line 3: {{/if}} closes a {{#each}} block.");
       expect(screen.getByLabelText("Email markup (MJML)")).toHaveAttribute("data-issue-lines", "3");
+    });
+
+    it("goes back from code to options after confirming", async () => {
+      const user = userEvent.setup();
+      renderEditor("c1");
+      render(<ConfirmHost />);
+      await screen.findByLabelText("Email markup (MJML)");
+
+      await user.click(screen.getByRole("button", { name: "Back to options" }));
+      const dialog = await screen.findByRole("alertdialog", { name: "Go back to options?" });
+      expect(dialog).toHaveTextContent("Changes you made to the code will be lost.");
+      await user.click(within(dialog).getByRole("button", { name: "Back to options" }));
+      expect(await screen.findByText("Colours and font")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Email markup (MJML)")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Edit as code" })).toBeInTheDocument();
     });
 
     it("switches an options design to code after confirming", async () => {

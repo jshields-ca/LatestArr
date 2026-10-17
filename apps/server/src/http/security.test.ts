@@ -113,6 +113,7 @@ const ROLE_NEEDED: Record<string, Role> = {
   "PATCH /api/templates/:id": "editor",
   "DELETE /api/templates/:id": "editor",
   "POST /api/templates/:id/convert-to-code": "editor",
+  "POST /api/templates/:id/convert-to-options": "editor",
   "POST /api/templates/images": "editor",
   "GET /api/sources/:id/libraries": "editor",
   "GET /api/sources/:id/users": "editor",

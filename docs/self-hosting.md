@@ -105,7 +105,7 @@ The dashboard's setup checklist then walks through the same pages you'll use day
    - **BookLore, BookOrbit and Grimmory** use an OPDS account, not your normal sign-in. Create one in the app's settings, under OPDS. Audio-only items (e.g. BookOrbit audiobooks) show as audiobooks.
 2. **Add recipients and a group.** Add people one at a time, import your source's users, or [import a list](#importing-recipients). A newsletter sends to groups, not to individual people.
 3. **Configure SMTP.** Add an SMTP profile and use **Send test email**. Set **From name** and **From email** as described in [Deliverability](deliverability.md).
-4. **Choose a design** (optional). Duplicate the built-in **Default** and change it with a live preview, or use **Edit as code** for hand-written MJML. Newsletters use Default until you choose another. **Most items per section** limits how many items each section shows; left blank, a section shows up to 100.
+4. **Choose a design** (optional). Duplicate the built-in **Default** and change it with a live preview, or use **Edit as code** for hand-written MJML (**Back to options** returns to the options it had, dropping code changes). Newsletters use Default until you choose another. **Most items per section** limits how many items each section shows; left blank, a section shows up to 100.
 5. **Create a newsletter.** Choose:
    - its schedule, a simple one (**Repeats**) or a cron expression, and a timezone;
    - how many days back to look for new items (**Lookback**). LatestArr reads everything added in that window, up to 1,000 items per source (per library for Audiobookshelf), and logs a warning if a source reaches that;

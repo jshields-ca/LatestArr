@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Loader2, Plus, Save, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Loader2, Plus, Save, SlidersHorizontal, X } from "lucide-react";
 
 import { DesignCodeReference } from "@/components/design-code-reference";
 import { DesignLogoFields } from "@/components/design-logo-fields";
@@ -20,6 +20,7 @@ import {
   type CodeCheck,
   codeCheckFrom,
   convertDesignToCode,
+  convertDesignToOptions,
   getTemplate,
   listNewsletters,
   previewDesign,
@@ -543,6 +544,32 @@ export function DesignEditorPage() {
     }
   }
 
+  async function handleConvertToOptions() {
+    if (!id) return;
+    if (dirty) {
+      toast({ variant: "destructive", title: "Save your changes first", description: "Then switch this design back to options." });
+      return;
+    }
+    const confirmed = await confirmAction({
+      title: "Go back to options?",
+      description:
+        "The design goes back to the options it had when you switched to code, keeping its intro, footer note and buttons. Changes you made to the code will be lost. A design that started as code (from the old template builder) gets the default options.",
+      confirmLabel: "Back to options",
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setConverting(true);
+    try {
+      const { template } = await convertDesignToOptions(id);
+      load(template);
+      toast({ variant: "success", title: "Now editing with options", description: template.name });
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Couldn't switch this design back to options.");
+    } finally {
+      setConverting(false);
+    }
+  }
+
   async function handleConvertToCode() {
     if (!id) return;
     if (dirty) {
@@ -769,7 +796,12 @@ export function DesignEditorPage() {
                 {converting ? <Loader2 className="animate-spin" /> : <Code />}
                 Edit as code
               </Button>
-            ) : null}
+            ) : (
+              <Button variant="outline" onClick={() => void handleConvertToOptions()} disabled={converting || saving}>
+                {converting ? <Loader2 className="animate-spin" /> : <SlidersHorizontal />}
+                Back to options
+              </Button>
+            )}
             <Button onClick={() => void handleSave()} disabled={!canSave}>
               {saving ? <Loader2 className="animate-spin" /> : <Save />}
               Save

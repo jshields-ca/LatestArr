@@ -364,6 +364,23 @@ describe("code designs", () => {
     expect(missing.statusCode).toBe(404);
   });
 
+  it("switches a code design back to its options, keeping them as they were", async () => {
+    const created = await app.inject(
+      authed({ method: "POST", url: "/api/templates", payload: { name: "Grid", settings: { layout: "grid" } } }),
+    );
+    const id = created.json().template.id;
+    await app.inject(authed({ method: "POST", url: `/api/templates/${id}/convert-to-code` }));
+
+    const back = await app.inject(authed({ method: "POST", url: `/api/templates/${id}/convert-to-options` }));
+    expect(back.statusCode).toBe(200);
+    expect(back.json().template).toMatchObject({ mode: "design", compiledMjml: null, settings: { layout: "grid" } });
+
+    const again = await app.inject(authed({ method: "POST", url: `/api/templates/${id}/convert-to-options` }));
+    expect(again.json().template.mode).toBe("design");
+    const missing = await app.inject(authed({ method: "POST", url: "/api/templates/nope/convert-to-options" }));
+    expect(missing.statusCode).toBe(404);
+  });
+
   it("keeps a converted design's dark-mode styles behind one marker line, added back when rendered", async () => {
     const created = await app.inject(authed({ method: "POST", url: "/api/templates", payload: { name: "Plain", settings: {} } }));
     const id = created.json().template.id;
