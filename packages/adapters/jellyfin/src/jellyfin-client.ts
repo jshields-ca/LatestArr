@@ -1,4 +1,4 @@
-import { trimTrailingSlashes, readBytesCapped } from "@latestarr/adapter-core";
+import { IMAGE_REQUEST_TIMEOUT_MS, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS, trimTrailingSlashes } from "@latestarr/adapter-core";
 
 // Jellyfin began as a fork of Emby, and the two still share most of their
 // REST API: the same /Items, /Library/MediaFolders, /Users, and image
@@ -57,12 +57,6 @@ export interface ServerUser {
   Policy?: { IsDisabled?: boolean };
 }
 
-const REQUEST_TIMEOUT_MS = 15_000;
-// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
-// waits on every poster at once, so a server that hangs instead of
-// erroring must not stall the whole send.
-const IMAGE_FETCH_TIMEOUT_MS = 10_000;
-
 // Jellyfin reads the key from its own Authorization scheme; its older
 // X-Emby-Token header is deprecated and can be switched off. Emby reads
 // X-Emby-Token.
@@ -92,7 +86,7 @@ async function call<T>(
   const label = flavor === "jellyfin" ? "Jellyfin" : "Emby";
   const response = await fetch(buildUrl(baseUrl, path, params), {
     headers: { Accept: "application/json", ...authHeaders(flavor, apiKey) },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.timeout(SOURCE_REQUEST_TIMEOUT_MS),
   });
   if (response.status === 401 || response.status === 403) {
     throw new Error(`${label} rejected the API key (HTTP ${response.status})`);
@@ -161,7 +155,7 @@ export async function fetchImage(
   try {
     const response = await fetch(imageUrl, {
       headers: { Accept: "image/*", ...authHeaders(flavor, apiKey) },
-      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(IMAGE_REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";

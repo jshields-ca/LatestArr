@@ -4,6 +4,12 @@
 /** How long any one API request to a source may take. */
 export const SOURCE_REQUEST_TIMEOUT_MS = 30_000;
 
+/** How long downloading one poster or cover image may take. The send
+ *  waits on every poster at once (apps/server/src/pipeline/embed-images.ts),
+ *  so a server that hangs instead of erroring must not stall the whole send:
+ *  that image is left out instead. */
+export const IMAGE_REQUEST_TIMEOUT_MS = 10_000;
+
 /** The largest poster or cover image LatestArr will download. */
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 

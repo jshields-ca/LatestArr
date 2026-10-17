@@ -1,4 +1,4 @@
-import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
+import { IMAGE_REQUEST_TIMEOUT_MS, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS, trimTrailingSlashes } from "@latestarr/adapter-core";
 
 export interface TautulliLibrary {
   section_id: string;
@@ -178,14 +178,6 @@ export function buildImageProxyUrl(baseUrl: string, apiKey: string, imagePath: s
   return buildUrl(baseUrl, "pms_image_proxy", apiKey, { img: imagePath }).toString();
 }
 
-// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
-// awaits every referenced item's image via Promise.all, so a source that's
-// gone unreachable in a way that just hangs (rather than erroring — no
-// RST, no timeout of its own) would otherwise never let that Promise.all
-// settle, stalling the entire send indefinitely instead of failing this
-// one item's poster softly.
-const IMAGE_FETCH_TIMEOUT_MS = 10_000;
-
 /**
  * Fetches an image proxied through pms_image_proxy. Unlike the JSON
  * commands above, this endpoint returns the image bytes directly (no
@@ -198,7 +190,7 @@ export async function fetchImage(
   imageUrl: string,
 ): Promise<{ data: Uint8Array; contentType: string } | null> {
   try {
-    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
+    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_REQUEST_TIMEOUT_MS) });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
     const data = await readBytesCapped(response);
