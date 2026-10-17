@@ -744,210 +744,1024 @@ see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
 ### Improved
 
-- LatestArr has a new icon: a postage stamp with an L, lifted off a rose tile. It replaces the envelope and sparkle in the app, the browser tab, and the social previews, and comes in light and dark versions. The app now also has icons for adding it to your phone's or computer's home screen. ([#270](https://github.com/jshields-ca/LatestArr/pull/270)) <details> <summary>Technical details</summary> - Chosen in #269, after four exploration rounds (kept on the `design/icon-exploration` branch). - `docs/assets/brand/generate.mjs` is the single source for the icon:   - the brand SVGs (tile, dark, light, maskable, marks, one colour) and PNGs;   - `apps/web/public` (`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`);   - `apps/web/src/components/logo-geometry.ts`, which the in-app `LogoMark` draws from, using per-instance mask IDs. - `index.html` adds the PNG favicon, the Apple touch icon, and a `manifest.webmanifest`. The browser theme colour moves to `#c31d4c`. - The social images are rendered from `docs/assets/brand/social-preview.html`: `docs/assets/social-preview.png` (1280×640, GitHub and README) and `docs/assets/brand/og-image.png` (1200×630, the website). - Usage notes are in `docs/assets/brand/brand.md`. </details>
+- LatestArr has a new icon: a postage stamp with an L, lifted off a rose tile. It replaces the envelope and sparkle in the app, the browser tab, and the social previews, and comes in light and dark versions. The app now also has icons for adding it to your phone's or computer's home screen. ([#270](https://github.com/jshields-ca/LatestArr/pull/270))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - Chosen in #269, after four exploration rounds (kept on the `design/icon-exploration` branch).
+  - `docs/assets/brand/generate.mjs` is the single source for the icon:
+    - the brand SVGs (tile, dark, light, maskable, marks, one colour) and PNGs;
+    - `apps/web/public` (`favicon.svg`, `favicon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png`);
+    - `apps/web/src/components/logo-geometry.ts`, which the in-app `LogoMark` draws from, using per-instance mask IDs.
+  - `index.html` adds the PNG favicon, the Apple touch icon, and a `manifest.webmanifest`. The browser theme colour moves to `#c31d4c`.
+  - The social images are rendered from `docs/assets/brand/social-preview.html`: `docs/assets/social-preview.png` (1280×640, GitHub and README) and `docs/assets/brand/og-image.png` (1200×630, the website).
+  - Usage notes are in `docs/assets/brand/brand.md`.
+
+  </details>
 
 ## [0.11.1] - 2026-09-29
 
 ### Improved
 
-- LatestArr now points to its new home at [latestarr.app](https://www.latestarr.app). The web UI footer links the website, the docs, GitHub Discussions, issue reporting and the license, and credits LatestArr's contributors, as the site does. The Add source dialog links each source type's setup guide, and the Default design's email footer links LatestArr.app instead of GitHub. ([#258](https://github.com/jshields-ca/LatestArr/pull/258)) <details> <summary>Technical details</summary> - **Web UI footer:** the links (LatestArr.app, Docs, Discussions, Report an issue, GPLv3 license) sit in a labelled `nav`, with "© 2026 LatestArr contributors · Led by Jeremy Shields" beneath, linking jeremyshields.ca. The old scootr.ca author link is gone. (#251) - **Add source dialog:** a "Setup guide for …" link to that type's page under `latestarr.app/docs/sources`. Plex, BookLore, Grimmory and Audiobookshelf now show the testers note too, linking #244, to match the README; Jellyfin and Emby still link #196. - **Code mode:** the variables reference links the code mode guide. - **Email footer:** the Default design links `https://www.latestarr.app` (with a globe icon) in place of the repository, and keeps "Report an issue". (#252) - **Footer icons fixed:** the email footer icons were never visible. Their SVG stroke colour was written `%23978490` inside base64, where it isn't URL-decoded, so it was an invalid colour. They now use a literal `#978490`. - The default design snapshots were re-recorded for the footer change. </details>
+- LatestArr now points to its new home at [latestarr.app](https://www.latestarr.app). The web UI footer links the website, the docs, GitHub Discussions, issue reporting and the license, and credits LatestArr's contributors, as the site does. The Add source dialog links each source type's setup guide, and the Default design's email footer links LatestArr.app instead of GitHub. ([#258](https://github.com/jshields-ca/LatestArr/pull/258))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **Web UI footer:** the links (LatestArr.app, Docs, Discussions, Report an issue, GPLv3 license) sit in a labelled `nav`, with "© 2026 LatestArr contributors · Led by Jeremy Shields" beneath, linking jeremyshields.ca. The old scootr.ca author link is gone. (#251)
+  - **Add source dialog:** a "Setup guide for …" link to that type's page under `latestarr.app/docs/sources`. Plex, BookLore, Grimmory and Audiobookshelf now show the testers note too, linking #244, to match the README; Jellyfin and Emby still link #196.
+  - **Code mode:** the variables reference links the code mode guide.
+  - **Email footer:** the Default design links `https://www.latestarr.app` (with a globe icon) in place of the repository, and keeps "Report an issue". (#252)
+  - **Footer icons fixed:** the email footer icons were never visible. Their SVG stroke colour was written `%23978490` inside base64, where it isn't URL-decoded, so it was an invalid colour. They now use a literal `#978490`.
+  - The default design snapshots were re-recorded for the footer change.
+
+  </details>
 
 ### Fixed
 
-- LatestArr now checks `ENCRYPTION_KEY` when it starts. If the key is missing or invalid, it stops with a message saying how to generate one. Before, it started anyway, and saving a source or SMTP profile failed with a generic error. ([#259](https://github.com/jshields-ca/LatestArr/pull/259)) <details> <summary>Technical details</summary> - `encryptionKeyProblem()` (`apps/server/src/secrets.ts`) requires `ENCRYPTION_KEY` to be base64 that decodes to exactly 32 bytes. `index.ts` logs the problem at `fatal` and exits 1 before touching the database. - The wrong-length message warns that credentials already saved need the key they were saved with. (#256) - The CI smoke test now starts the container with a generated key, and `CONTRIBUTING.md` describes the new startup error for dev setups where Turborepo's strict env mode drops the key. </details>
+- LatestArr now checks `ENCRYPTION_KEY` when it starts. If the key is missing or invalid, it stops with a message saying how to generate one. Before, it started anyway, and saving a source or SMTP profile failed with a generic error. ([#259](https://github.com/jshields-ca/LatestArr/pull/259))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - `encryptionKeyProblem()` (`apps/server/src/secrets.ts`) requires `ENCRYPTION_KEY` to be base64 that decodes to exactly 32 bytes. `index.ts` logs the problem at `fatal` and exits 1 before touching the database.
+  - The wrong-length message warns that credentials already saved need the key they were saved with. (#256)
+  - The CI smoke test now starts the container with a generated key, and `CONTRIBUTING.md` describes the new startup error for dev setups where Turborepo's strict env mode drops the key.
+
+  </details>
 
 ## [0.11.0] - 2026-09-29
 
 ### New
 
-- Designs can be edited as code. On any design, **Edit as code** switches it to hand-written MJML. You start from exactly the markup its options produce, so you never start from a blank page. The code editor highlights Handlebars tags, flags mistakes on the line where they happen before you save, and sits beside the same live preview. A **Variables and helpers** panel lists everything you can use. The intro, footer note, and buttons stay in **Text and buttons**, so they work the same in code designs. ([#210](https://github.com/jshields-ca/LatestArr/pull/210)) <details> <summary>Technical details</summary> Closes #200 (part of #199). - Editor: CodeMirror 6 (`components/code-editor.tsx`, loaded on demand in its own chunk), with HTML highlighting coloured from the app's theme tokens, Handlebars tags marked, and server-reported issues as lint diagnostics. `components/design-code-reference.tsx` documents the render context and the `mediaList`, `ifAnyItems`, and `ifKindLinked` helpers. - Server: `render/code-template.ts` checks code before preview and save. A Handlebars syntax error, or markup MJML can't render at all, is an error (422, with `issues`), shown in plain words with its line. MJML's own validation messages are warnings, since sends still render best-effort HTML. MJML is validated with the `{{ }}` tags blanked out, so line numbers still match. - `POST /templates/preview` accepts `mjml` alongside `settings`. `POST /templates/:id/convert-to-code` switches a design to code. `POST`/`PATCH /templates` take an explicit `mode`, and saving a code design with its `settings` no longer turns it back into an options design. - Designs list: code designs sit with the others (marked "Code") and duplicate with their code. - The built-in design's buttons no longer set `width="auto"`, which MJML flags as invalid. The rendered email looks the same, since the button's table already shrinks to fit. </details>
+- Designs can be edited as code. On any design, **Edit as code** switches it to hand-written MJML. You start from exactly the markup its options produce, so you never start from a blank page. The code editor highlights Handlebars tags, flags mistakes on the line where they happen before you save, and sits beside the same live preview. A **Variables and helpers** panel lists everything you can use. The intro, footer note, and buttons stay in **Text and buttons**, so they work the same in code designs. ([#209](https://github.com/jshields-ca/LatestArr/pull/209))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #200 (part of #199).
+
+  - Editor: CodeMirror 6 (`components/code-editor.tsx`, loaded on demand in its own chunk), with HTML highlighting coloured from the app's theme tokens, Handlebars tags marked, and server-reported issues as lint diagnostics. `components/design-code-reference.tsx` documents the render context and the `mediaList`, `ifAnyItems`, and `ifKindLinked` helpers.
+  - Server: `render/code-template.ts` checks code before preview and save. A Handlebars syntax error, or markup MJML can't render at all, is an error (422, with `issues`), shown in plain words with its line. MJML's own validation messages are warnings, since sends still render best-effort HTML. MJML is validated with the `{{ }}` tags blanked out, so line numbers still match.
+  - `POST /templates/preview` accepts `mjml` alongside `settings`. `POST /templates/:id/convert-to-code` switches a design to code. `POST`/`PATCH /templates` take an explicit `mode`, and saving a code design with its `settings` no longer turns it back into an options design.
+  - Designs list: code designs sit with the others (marked "Code") and duplicate with their code.
+  - The built-in design's buttons no longer set `width="auto"`, which MJML flags as invalid. The rendered email looks the same, since the button's table already shrinks to fit.
+
+  </details>
+
 - Several new episodes of the same show now share one row, like "The Daily Show · 4 new episodes", with each episode listed underneath, so a week of a daily show doesn't fill the email. It's on by default, and you can switch it off in a design's Sections settings. Designs you saved earlier keep their "Group by type" setting; turn it on in the design editor to get the new sections. ([#226](https://github.com/jshields-ca/LatestArr/pull/226))
-- Design how your newsletters look without drag-and-drop. The new **Designs** page (it replaces Templates) lets you pick colours, font, and layout (cards, compact list, or grid); choose which details each item shows; group items by type in your own order; decide what an empty section shows; add a "Most watched" section; and add custom CSS. A live preview updates as you change things, with sample content or any of your real newsletters. Existing newsletters look exactly as before: they use the Default design, which you can duplicate as a starting point. ([#210](https://github.com/jshields-ca/LatestArr/pull/210)) <details> <summary>Technical details</summary> Part of #199 (phases 1 and 2; phase 1's renderer shipped in #205) and closes #197. - Web: `pages/designs-page.tsx` (list, with the built-in Default shown first; create from Default, duplicate, delete) and `pages/design-editor-page.tsx` (settings in collapsible sections, with a sticky preview that re-renders 400 ms after the last change through `POST /templates/preview`, ignoring stale responses; unsaved-changes indicator and leave warning; explicit Save). Nav item and route `/designs`; `/templates` redirects there. - Newsletter Content panel: `DesignPicker` replaces the Template picker (Default and your designs, with Edit linking to the design editor), saving with an inline `SaveStatus` instead of a toast. The intro, footer note, buttons, and font moved into the design in #207. - `lib/design.ts` mirrors the server's design settings shape and defaults (`withDesignDefaults` fills options missing from older saved designs). - Server: the ungrouped compact and grid layouts line up with the title, like grouped sections; ungrouped cards stays flush so the Default design's recorded output is unchanged. </details>
-- Jellyfin and Emby sources, for movies, TV episodes, books, and audiobooks. Add one with an API key. Newsletters show each item's poster, details, and a link that opens it in your server's web app, and you can import the server's users as recipients. **These need testers:** they're built from the published API docs but haven't been tried on a real server yet. If you run Jellyfin or Emby, please [tell us how it went](https://github.com/jshields-ca/LatestArr/issues/196). ([#211](https://github.com/jshields-ca/LatestArr/pull/211)) <details> <summary>Technical details</summary> Part of #196 (the issue stays open until both are confirmed on real servers). - New `@latestarr/adapter-jellyfin` package: one client over the API Jellyfin and Emby share (`/System/Info`, `/Library/MediaFolders`, `/Users`, `/Items`, `/Items/{id}/Images/Primary`), with two thin adapters, `jellyfin` and `emby`. They differ only in how the key is sent (Jellyfin: `Authorization: MediaBrowser Token="…"`; Emby: `X-Emby-Token`) and in the web app's item link format. The key is never put in a URL. - Recent items are sorted by date added (neither server filters on it), requested once per chosen library, and cut at the lookback window. Episodes are titled by series with an `SxxExx - episode` subtitle and use the series poster. Books and audiobooks show their author; audiobooks show their length. - Web: both appear in Add source with an API-key hint and a "needs testers" note linking to #196, and support Import users. README marks both "🧪 Needs testers" with a call for testers. </details>
-- Preview a newsletter before it goes out. The new **Preview** button shows exactly what the next send would contain, with real items, images, and your intro and buttons, without emailing anyone. From the same window you can send a test copy to just yourself. ([#202](https://github.com/jshields-ca/LatestArr/pull/202)) <details> <summary>Technical details</summary> Closes #193. `apps/server/src/pipeline/run-newsletter.ts` now separates loading a newsletter (`loadNewsletter`), its SMTP sender (`loadSender`), and rendering from delivery. Real sends, `previewNewsletter`, and `sendTestNewsletter` all use the same render path, so the preview matches the sent email. - `POST /newsletters/:id/preview` returns `{ subject, html, items }`. Embedded images (normally `cid:` attachments) are swapped for inline `data:` URIs so a browser can show them. It needs no SMTP profile, creates no send-run, and doesn't affect missed-send catch-up. A failure returns 502 with the same readable reason as Send now and is logged as a warning. - `POST /newsletters/:id/send-test` (`{ to }`) sends the render to one address with a `[Test]` subject prefix, with no send-run, and logs `Sent a test of "…" to …` with `trigger: "test"` and the admin's email. - Web: `NewsletterPreviewDialog` renders the HTML in a sandboxed `<iframe srcdoc>` (no scripts or same-origin access; popups allowed so the email's links open in a new tab) and prefills the test address with the signed-in admin's email via a new `useOptionalAuth()`. This preview is also the live preview the upcoming design editor (#199) and code mode (#200) will build on. </details>
-- Get alerted when a scheduled newsletter fails. A new **Notifications** page can email you through one of your SMTP profiles, post to Discord, Slack, ntfy, or Apprise, or send generic JSON to your own endpoint. It covers sends that fail entirely, sends that only reach some recipients, and newsletters that can't send at all, for example because their SMTP profile was deleted. Use **Send test alert** to check a destination before saving. ([#204](https://github.com/jshields-ca/LatestArr/pull/204)) <details> <summary>Technical details</summary> Closes #195. - `apps/server/src/notifications/alerts.ts`: settings live in the `settings` table (key `notifications`), with the webhook URL encrypted like other credentials, since Discord and Slack webhook URLs grant posting rights. `sendFailureAlert` never throws, rate-limits to one alert per newsletter and kind per hour (in memory), and logs each delivery attempt. Formats: Discord `{content}`, Slack `{text}`, ntfy plain-text body with `Title`/`Priority`/`Tags` headers, Apprise `{title, body, type}`, and generic JSON `{event, title, message, newsletter, trigger, sendRunId, time}`. Webhook requests time out after 10s. - `run-newsletter.ts` alerts for scheduled and catch-up sends only: on a thrown failure (including `NewsletterMisconfiguredError`, but not an overlapping run or a deleted newsletter), when a send reaches none of its recipients, and on partial failure. Manual Send now never alerts. - `GET/PUT /notifications` (the URL is never returned, only `hasUrl`/`urlHost`; an omitted `url` keeps the saved one; `http(s)` only) and `POST /notifications/test`, which tests the settings as entered without saving them. - SMTP credential building moved to a shared `mailer/credentials.ts` (`smtpCredentialsFor`), used by the SMTP profile routes, the send pipeline, and alerts. - Web: `/notifications` page (nav item "Notifications") with an explicit Save; the only SMTP profile and the admin's email are prefilled. Documented under "Failure alerts" in `docs/self-hosting.md`. </details>
-- A newsletter can skip its scheduled send when there's nothing new, so recipients don't get an empty email. It's on for newsletters you create from now on; existing newsletters keep sending as before until you turn it on under **Delivery**. Skipped sends show in History as "Skipped (nothing new)", and **Send now** always sends. ([#203](https://github.com/jshields-ca/LatestArr/pull/203)) <details> <summary>Technical details</summary> Closes #194. - `newsletters.skip_when_empty` (migration `0005_confused_penance.sql`, default `false` so existing rows are unchanged); `POST /newsletters` sets it to `true` unless given, and `PATCH` accepts it. - New `skipped` send-run status (the column is TypeScript-enum text, so no migration). In `run-newsletter.ts`, after rendering, a scheduled or catch-up run with zero newly added items and the option on is marked `skipped` without storing HTML or emailing anyone, and logs `Skipped "…": nothing new in the last N days`. The skipped run keeps its `startedAt`, so missed-send catch-up treats it as handled rather than retrying. A custom template's empty-section fallback content doesn't count as "new". Manual Send now is never skipped. - Web: a switch in the Details form's Delivery section, saved with **Save changes**; History and the Dashboard show "Skipped (nothing new)". </details>
-- More than one person can manage LatestArr. The new **Users** page lets you add people with a temporary password, which they replace with their own the first time they sign in. You can also reset passwords, deactivate or reactivate accounts, and delete users. Everyone has full admin access for now. With SSO set up, add someone with the email their provider uses, and they can sign in with SSO straight away. ([#230](https://github.com/jshields-ca/LatestArr/pull/230)) <details> <summary>Technical details</summary> Closes #227. - Server: `GET/POST /users` and `PATCH/DELETE /users/:id`, admin-only. Users can't deactivate or delete themselves, and a last-active-admin check is kept as a safeguard. Deleting a user clears `templates.createdBy` and keeps the design. Deactivating or resetting a password ends that user's sessions (`deleteUserSessions`). Changes are logged with who made them. - Migration `0008_user_management` adds `users.must_change_password`, set on accounts created or reset by an admin. `PATCH /auth/me` clears it on a password change, refuses reusing the current password, and ends the user's other sessions. - `getSessionUser` rejects sessions of deactivated users. Login matches email case-insensitively. - OIDC links a new SSO identity to an existing active account with the same email when `email_verified` is true. It still never creates accounts once one exists. - Web: a Users page (nav item, `/users`) with add, reset-password, deactivate, and delete; `ProtectedRoute` shows a "Choose a new password" screen while `mustChangePassword` is set. The self-hosting guide gains a Users section and notes on SSO linking. - The `role` column already allows editor and viewer. Enforcing those roles is a follow-up. </details>
-- Newsletters can now show where to watch. Designs add a button for each linked source that has a public URL, such as **Watch on Plex**, **Read on BookLore** or **Play on RomM**. You choose where the buttons go: after the items, under each section, or near the top. You can also place your own buttons above the intro, below it, or at the end. ([#238](https://github.com/jshields-ca/LatestArr/pull/238)) <details> <summary>Technical details</summary> - New design settings: `content.sourceButtons` `{ enabled (default true), placement: "top" | "sections" | "end" (default "end") }` and `content.ctaPlacement: "beforeIntro" | "afterIntro" (default) | "end"`. With grouping off, "sections" falls back to "end". (#234, #235) - `buildSourceButtons` (`render/source-buttons.ts`) builds the buttons from each linked source's public URL only, never its base URL.   - The verb and service name come from the source type; a Tautulli source's button says Plex.   - Sources that share a URL become one button.   - When two buttons would have the same label, each uses its source's name instead. (#234) - Source buttons are outlined; your own buttons stay filled. - Code-mode designs get `{{#each sourceButtons}}` (`label`, `url`, `kinds`) and the `{{#sourceButtonsFor contentType="movie,tv_episode"}}` helper, both listed in the code reference. - The design preview shows sample buttons. - The Default design's output is unchanged when no source has a public URL. </details>
+
+- Design how your newsletters look without drag-and-drop. The new **Designs** page (it replaces Templates) lets you pick colours, font, and layout (cards, compact list, or grid); choose which details each item shows; group items by type in your own order; decide what an empty section shows; add a "Most watched" section; and add custom CSS. A live preview updates as you change things, with sample content or any of your real newsletters. Existing newsletters look exactly as before: they use the Default design, which you can duplicate as a starting point. ([#206](https://github.com/jshields-ca/LatestArr/pull/206))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Part of #199 (phases 1 and 2; phase 1's renderer shipped in #205) and closes #197.
+
+  - Web: `pages/designs-page.tsx` (list, with the built-in Default shown first; create from Default, duplicate, delete) and `pages/design-editor-page.tsx` (settings in collapsible sections, with a sticky preview that re-renders 400 ms after the last change through `POST /templates/preview`, ignoring stale responses; unsaved-changes indicator and leave warning; explicit Save). Nav item and route `/designs`; `/templates` redirects there.
+  - Newsletter Content panel: `DesignPicker` replaces the Template picker (Default and your designs, with Edit linking to the design editor), saving with an inline `SaveStatus` instead of a toast. The intro, footer note, buttons, and font moved into the design in #207.
+  - `lib/design.ts` mirrors the server's design settings shape and defaults (`withDesignDefaults` fills options missing from older saved designs).
+  - Server: the ungrouped compact and grid layouts line up with the title, like grouped sections; ungrouped cards stays flush so the Default design's recorded output is unchanged.
+
+  </details>
+
+- Jellyfin and Emby sources, for movies, TV episodes, books, and audiobooks. Add one with an API key. Newsletters show each item's poster, details, and a link that opens it in your server's web app, and you can import the server's users as recipients. **These need testers:** they're built from the published API docs but haven't been tried on a real server yet. If you run Jellyfin or Emby, please [tell us how it went](https://github.com/jshields-ca/LatestArr/issues/196). ([#211](https://github.com/jshields-ca/LatestArr/pull/211))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Part of #196 (the issue stays open until both are confirmed on real servers).
+
+  - New `@latestarr/adapter-jellyfin` package: one client over the API Jellyfin and Emby share (`/System/Info`, `/Library/MediaFolders`, `/Users`, `/Items`, `/Items/{id}/Images/Primary`), with two thin adapters, `jellyfin` and `emby`. They differ only in how the key is sent (Jellyfin: `Authorization: MediaBrowser Token="…"`; Emby: `X-Emby-Token`) and in the web app's item link format. The key is never put in a URL.
+  - Recent items are sorted by date added (neither server filters on it), requested once per chosen library, and cut at the lookback window. Episodes are titled by series with an `SxxExx - episode` subtitle and use the series poster. Books and audiobooks show their author; audiobooks show their length.
+  - Web: both appear in Add source with an API-key hint and a "needs testers" note linking to #196, and support Import users. README marks both "🧪 Needs testers" with a call for testers.
+
+  </details>
+
+- Preview a newsletter before it goes out. The new **Preview** button shows exactly what the next send would contain, with real items, images, and your intro and buttons, without emailing anyone. From the same window you can send a test copy to just yourself. ([#202](https://github.com/jshields-ca/LatestArr/pull/202))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #193. `apps/server/src/pipeline/run-newsletter.ts` now separates loading a newsletter (`loadNewsletter`), its SMTP sender (`loadSender`), and rendering from delivery. Real sends, `previewNewsletter`, and `sendTestNewsletter` all use the same render path, so the preview matches the sent email.
+
+  - `POST /newsletters/:id/preview` returns `{ subject, html, items }`. Embedded images (normally `cid:` attachments) are swapped for inline `data:` URIs so a browser can show them. It needs no SMTP profile, creates no send-run, and doesn't affect missed-send catch-up. A failure returns 502 with the same readable reason as Send now and is logged as a warning.
+  - `POST /newsletters/:id/send-test` (`{ to }`) sends the render to one address with a `[Test]` subject prefix, with no send-run, and logs `Sent a test of "…" to …` with `trigger: "test"` and the admin's email.
+  - Web: `NewsletterPreviewDialog` renders the HTML in a sandboxed `<iframe srcdoc>` (no scripts or same-origin access; popups allowed so the email's links open in a new tab) and prefills the test address with the signed-in admin's email via a new `useOptionalAuth()`.
+
+  This preview is also the live preview the upcoming design editor (#199) and code mode (#200) will build on.
+
+  </details>
+
+- Get alerted when a scheduled newsletter fails. A new **Notifications** page can email you through one of your SMTP profiles, post to Discord, Slack, ntfy, or Apprise, or send generic JSON to your own endpoint. It covers sends that fail entirely, sends that only reach some recipients, and newsletters that can't send at all, for example because their SMTP profile was deleted. Use **Send test alert** to check a destination before saving. ([#204](https://github.com/jshields-ca/LatestArr/pull/204))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #195.
+
+  - `apps/server/src/notifications/alerts.ts`: settings live in the `settings` table (key `notifications`), with the webhook URL encrypted like other credentials, since Discord and Slack webhook URLs grant posting rights. `sendFailureAlert` never throws, rate-limits to one alert per newsletter and kind per hour (in memory), and logs each delivery attempt. Formats: Discord `{content}`, Slack `{text}`, ntfy plain-text body with `Title`/`Priority`/`Tags` headers, Apprise `{title, body, type}`, and generic JSON `{event, title, message, newsletter, trigger, sendRunId, time}`. Webhook requests time out after 10s.
+  - `run-newsletter.ts` alerts for scheduled and catch-up sends only: on a thrown failure (including `NewsletterMisconfiguredError`, but not an overlapping run or a deleted newsletter), when a send reaches none of its recipients, and on partial failure. Manual Send now never alerts.
+  - `GET/PUT /notifications` (the URL is never returned, only `hasUrl`/`urlHost`; an omitted `url` keeps the saved one; `http(s)` only) and `POST /notifications/test`, which tests the settings as entered without saving them.
+  - SMTP credential building moved to a shared `mailer/credentials.ts` (`smtpCredentialsFor`), used by the SMTP profile routes, the send pipeline, and alerts.
+  - Web: `/notifications` page (nav item "Notifications") with an explicit Save; the only SMTP profile and the admin's email are prefilled. Documented under "Failure alerts" in `docs/self-hosting.md`.
+
+  </details>
+
+- A newsletter can skip its scheduled send when there's nothing new, so recipients don't get an empty email. It's on for newsletters you create from now on; existing newsletters keep sending as before until you turn it on under **Delivery**. Skipped sends show in History as "Skipped (nothing new)", and **Send now** always sends. ([#203](https://github.com/jshields-ca/LatestArr/pull/203))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #194.
+
+  - `newsletters.skip_when_empty` (migration `0005_confused_penance.sql`, default `false` so existing rows are unchanged); `POST /newsletters` sets it to `true` unless given, and `PATCH` accepts it.
+  - New `skipped` send-run status (the column is TypeScript-enum text, so no migration). In `run-newsletter.ts`, after rendering, a scheduled or catch-up run with zero newly added items and the option on is marked `skipped` without storing HTML or emailing anyone, and logs `Skipped "…": nothing new in the last N days`. The skipped run keeps its `startedAt`, so missed-send catch-up treats it as handled rather than retrying. A custom template's empty-section fallback content doesn't count as "new". Manual Send now is never skipped.
+  - Web: a switch in the Details form's Delivery section, saved with **Save changes**; History and the Dashboard show "Skipped (nothing new)".
+
+  </details>
+
+- More than one person can manage LatestArr. The new **Users** page lets you add people with a temporary password, which they replace with their own the first time they sign in. You can also reset passwords, deactivate or reactivate accounts, and delete users. Everyone has full admin access for now. With SSO set up, add someone with the email their provider uses, and they can sign in with SSO straight away. ([#230](https://github.com/jshields-ca/LatestArr/pull/230))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #227.
+
+  - Server: `GET/POST /users` and `PATCH/DELETE /users/:id`, admin-only. Users can't deactivate or delete themselves, and a last-active-admin check is kept as a safeguard. Deleting a user clears `templates.createdBy` and keeps the design. Deactivating or resetting a password ends that user's sessions (`deleteUserSessions`). Changes are logged with who made them.
+  - Migration `0008_user_management` adds `users.must_change_password`, set on accounts created or reset by an admin. `PATCH /auth/me` clears it on a password change, refuses reusing the current password, and ends the user's other sessions.
+  - `getSessionUser` rejects sessions of deactivated users. Login matches email case-insensitively.
+  - OIDC links a new SSO identity to an existing active account with the same email when `email_verified` is true. It still never creates accounts once one exists.
+  - Web: a Users page (nav item, `/users`) with add, reset-password, deactivate, and delete; `ProtectedRoute` shows a "Choose a new password" screen while `mustChangePassword` is set. The self-hosting guide gains a Users section and notes on SSO linking.
+  - The `role` column already allows editor and viewer. Enforcing those roles is a follow-up.
+
+  </details>
+
+- Newsletters can now show where to watch. Designs add a button for each linked source that has a public URL, such as **Watch on Plex**, **Read on BookLore** or **Play on RomM**. You choose where the buttons go: after the items, under each section, or near the top. You can also place your own buttons above the intro, below it, or at the end. ([#238](https://github.com/jshields-ca/LatestArr/pull/238))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - New design settings: `content.sourceButtons` `{ enabled (default true), placement: "top" | "sections" | "end" (default "end") }` and `content.ctaPlacement: "beforeIntro" | "afterIntro" (default) | "end"`. With grouping off, "sections" falls back to "end". (#234, #235)
+  - `buildSourceButtons` (`render/source-buttons.ts`) builds the buttons from each linked source's public URL only, never its base URL.
+    - The verb and service name come from the source type; a Tautulli source's button says Plex.
+    - Sources that share a URL become one button.
+    - When two buttons would have the same label, each uses its source's name instead. (#234)
+  - Source buttons are outlined; your own buttons stay filled.
+  - Code-mode designs get `{{#each sourceButtons}}` (`label`, `url`, `kinds`) and the `{{#sourceButtonsFor contentType="movie,tv_episode"}}` helper, both listed in the code reference.
+  - The design preview shows sample buttons.
+  - The Default design's output is unchanged when no source has a public URL.
+
+  </details>
 
 ### Improved
 
-- The Logs page now records what's actually happening: every newsletter send and how many people it reached, recipients that couldn't be delivered to, sources that couldn't be reached, sign-ins and failed sign-in attempts, and each settings change along with who made it. A new `LOG_LEVEL` setting controls how much detail is kept. ([#177](https://github.com/jshields-ca/LatestArr/pull/177)) <details> <summary>Technical details</summary> Closes #168. Previously the server had three explicit log calls in total, so the Logs page only ever showed startup lines. - **Shared logger** (`apps/server/src/logger.ts`): one pino instance for Fastify, the send pipeline, and the scheduler, so scheduled sends (which have no request) reach the Logs page too. `LOG_LEVEL` (default `info`) is read from the environment and passed through `docker-compose.yml`; an unknown value falls back to `info` with a warning instead of crashing on startup. - **Who did it**: `requireAuth` swaps `request.log` for a child logger carrying `user` (the signed-in admin's email), so every line from an authenticated route records the actor. - **Sends** (`pipeline/run-newsletter.ts`): `runNewsletter` takes `{ trigger, log }` and logs every outcome exactly once — start, success/partial/total failure with counts and duration, each undeliverable recipient (warn), the specific source that couldn't be fetched (warn), a send with no active recipients or no usable sources (warn), and a refused send (not found / misconfigured / already running) as a warn rather than an error. The send-now route and scheduler no longer log send failures themselves. - **Scheduler**: each refresh logs one line listing every enabled newsletter's next run; startup catch-ups are logged and tagged `trigger: "catch-up"`, cron fires `"scheduled"`, and send-now `"manual"`. - **Settings changes**: create/update/delete for sources, SMTP profiles, recipients (plus a one-line import summary), groups and memberships, newsletters (with "Enabled"/"Paused" for the toggle and a `fields` list of what changed), templates, and newsletter source/group links. Connection and test-email results for sources and SMTP profiles. Sign-in, failed sign-in (with IP), sign-out, SSO sign-in/rejection, first-admin creation, and password/profile changes. - Field names are logged for updates, never values, so passwords and API keys can't leak into logs. Tests assert log levels, the `user`/`trigger` fields, and that a password never appears in the buffer. </details>
-- The Default design has a fresh look to match the LatestArr app. The newsletter sits on a white card with an accent bar, and the header shows the date range, how many items are new, and a count for each type. Items are grouped into Movies, TV, Books, and so on, with smaller posters, tidier spacing, and summaries trimmed to about two lines. ([#226](https://github.com/jshields-ca/LatestArr/pull/226)) <details> <summary>Technical details</summary> Closes #218 and #219. - `render/design.ts`: the email is an `mj-wrapper` card with a 4px accent top border on a tinted page (`page` colour, with its own dark-mode rule), with the credits below the card. Cards rows have a 72px poster and hairline dividers, `overviewShort`, and a pill badge. `groupByType` now defaults to true, and TV episodes and seasons share one "TV" section (`contentType="tv_episode,tv_season"`). New option `sections.groupEpisodes` (default true). - `render/mjml-template.ts`: `mediaList` takes `groupEpisodes="true"` and comma-separated `contentType`. `ifAnyItems` and `ifKindLinked` accept several types, and `ifKindLinked` is also true when a type has items, so a section never hides real items. New context values: `periodFormatted`, `itemCount`, `kindCounts`, `hasLinkedSources`, and per item `overviewShort`, `episodes`, `episodeCount`, `moreEpisodes`. The code-mode reference documents them. - An issue with nothing new and no linked sources says "No new items in this period." instead of rendering nothing. - Design editor: a "Group a show's new episodes" switch; the section order lists Movies, TV, Books, Audiobooks, Games and moves TV's two types together; the "lookback line" option is now "Show the date range and counts". The sample preview includes two episodes of one show. - Default snapshots re-recorded. </details>
-- The old drag-and-drop template editor is gone, replaced by designs. Templates you built with it become code designs automatically. They send exactly as before, and you can now edit them in the code editor with a live preview. The web app is also much smaller: the drag-and-drop editor alone was a 2.3 MB download. ([#210](https://github.com/jshields-ca/LatestArr/pull/210)) <details> <summary>Technical details</summary> Closes #199. - Removed `grapesjs` and `grapesjs-mjml`, `apps/web/src/lib/grapesjs-*` and `pages/template-editor-page.tsx` (and their tests), and the `cdnjs.cloudflare.com` style and font CSP sources the editor's icon font needed. `/templates/:id/edit` redirects to `/designs/:id`. - Migration `0007_retire_drag_and_drop` drops `templates.design_json` (the editor's own project state) and `templates.compiled_html` (never read). A template that was never saved from the editor has no markup and always sent with Default, so it becomes an options design with the default settings. - `POST /templates` with only a name now creates an options design. `PATCH` changes `mode` only when it's given explicitly, so saving a code design's text and buttons can't turn it back into an options design. - README, self-hosting guide, and CONTRIBUTING describe designs instead of drag-and-drop. </details>
-- Import users works for every source that has users, including Plex, Jellyfin, and Emby. Those servers don't share email addresses, so the import list now has an email field next to anyone without one; fill it in and that person is imported too. Audiobookshelf and RomM sources can now import their users as well, with the emails those servers already have. For Emby, a user linked to Emby Connect with an email address is filled in for you. ([#214](https://github.com/jshields-ca/LatestArr/pull/214)) <details> <summary>Technical details</summary> Closes #213. - Import users dialog: users without an email get an "Email for {name}" field. A complete address selects them, and clearing it deselects them. Import sends typed addresses alongside the source's own. - Audiobookshelf `listUsers`: `GET /api/users` (needs an admin token); active users only, with `email` when set. - RomM `listUsers`: `GET /api/users` (needs the client API token's `users.read` scope, which the error message now names on a 401 or 403); enabled users only, with `email` when set. - Jellyfin/Emby `listUsers` skips disabled accounts. Emby uses `ConnectUserName` as the email when it is one (untested on a real server; see #196). - Import users now appears for Plex, Tautulli, Jellyfin, Emby, Audiobookshelf, and RomM. The BookLore family has no user API over OPDS. </details>
-- Sources now show each service's own logo, including Jellyfin and Emby, and the Source type list is alphabetical. The setup checklist also suggests failure alerts and a second admin, both optional. ([#236](https://github.com/jshields-ca/LatestArr/pull/236)) <details> <summary>Technical details</summary> - Bundled `jellyfin.svg` and `emby.svg` from selfh.st/icons (CC BY 4.0), credited in `assets/logos/NOTICE.md`. (#231) - Source types are sorted by display name; the Add source dialog defaults to the first. (#231) - A source row's leading icon is the service logo, with the category icon kept as a fallback (`hasSourceLogo`); the type badge is now plain text. (#232) - The dashboard checklist adds optional **Get failure alerts** (done when an email or webhook alert is enabled for failures) and **Add another admin** (done with more than one user). Screen readers now hear "Done" on completed steps. (#233) </details>
-- The Docker image now runs on Node.js 24, the current long-term support release. Node 22 stops getting security fixes in April 2027. Nothing changes for your setup: pull the new image and restart, and your data and settings carry over. ([#215](https://github.com/jshields-ca/LatestArr/pull/215)) <details> <summary>Technical details</summary> Closes #186. - `docker/Dockerfile`: both stages use `node:24-alpine`. - `.nvmrc` and `engines.node` are 24; `@types/node` is `^24.19.0` in every package, matching the runtime (Dependabot still ignores its majors). - CI tests on Node 24 and 26 (26 becomes LTS in October 2026); the release workflow runs on 24. </details>
-- Building or developing LatestArr from source now needs Node.js 22 or newer. Node 20 reached end of life in April 2026. Nothing changes if you run the Docker image, which already uses Node 22. ([#188](https://github.com/jshields-ca/LatestArr/pull/188)) <details> <summary>Technical details</summary> `engines.node` is now `>=22` and the CI matrix tests Node 22 (what the Docker image runs) and Node 24 (the next LTS) instead of 20 and 22. This unblocks `jsdom` 30, which requires Node `^22.22.2 || ^24.15.0 || >=26`. </details>
-- A security review for installs exposed to the internet. The container no longer runs as root, and someone given a temporary password must change it before they can do anything else. Sources and mail servers that stop responding now time out instead of holding up a send, and server errors no longer show internal details. A new guide covers exposing LatestArr safely. ([#239](https://github.com/jshields-ca/LatestArr/pull/239)) <details> <summary>Technical details</summary> Found and fixed in the review for #237: **Authentication and sessions** - `requireAuth` answers `403 password_change_required` to a user with `mustChangePassword`. Before, only the web UI enforced it, and the API still worked. - Signing in to an account that doesn't exist now takes as long as a real password check (`verifyDummyPassword`), so response times don't reveal which emails have accounts. - First-run setup checks for existing users and creates the admin in one transaction, so two simultaneous requests can't both create an admin. **Requests and responses** - The same-origin (CSRF) check rejects `Origin: null`, which a sandboxed iframe or `data:` page sends. - A new error handler logs server errors in full and returns a generic message, so SQL errors, file paths and stack details never reach the client. Client errors still say what went wrong. - A stored copy of a sent email is served with a `sandbox` Content Security Policy. - Pino redacts cookies, authorization headers, and password, token, API key and secret fields as a precaution. **Outbound requests and content from sources** - Every adapter's API requests time out after 30s (`SOURCE_REQUEST_TIMEOUT_MS`); only the Jellyfin/Emby adapter had a timeout before. - Poster downloads are capped at 20 MB (`readBytesCapped`), and sharp refuses images over 40 megapixels. - BookLore-family covers linked on another host no longer receive the OPDS Basic credentials. - SMTP connections time out after 30s (connect and greeting) and 60s (idle socket), down from Nodemailer's 2 and 10 minutes. - MJML `ignoreIncludes` is pinned on, so a code-mode design can't use `<mj-include>` to read server files. MJML 5 already defaults to this. **Container** - The Docker image runs as the `node` user. An entrypoint uses `su-exec` to hand `/app/data` to that user first, so volumes created by older images keep working. The CI smoke test checks both. **Tests and docs** - `security.test.ts` walks every registered route and requires a 401 without a session, except an explicit public list. It also covers temporary passwords, the bootstrap race, cross-origin and null-origin writes, error hiding, security headers and cookie flags. - `docs/self-hosting.md` has a new "Exposing LatestArr to the internet" section. Reviewed with no change needed: - OIDC: PKCE, state and nonce are checked and the redirect target is fixed. - Queries are parameterized. - Handlebars (4.7.9) has prototype access off, and every value is escaped. - Credentials are encrypted and stripped from responses. - Helmet sets a CSP with `frame-ancestors 'self'`. - Sign-in and setup are rate-limited. - `pnpm audit` finds no known vulnerabilities. </details>
-- The web UI works better on phones. The Recipients table shows each email under the name instead of cutting it off, dialogs fit the screen and scroll when they're long, buttons no longer squash together, small icons are easier to tap, and iPhones no longer zoom in when you tap a text field. ([#210](https://github.com/jshields-ca/LatestArr/pull/210)) <details> <summary>Technical details</summary> Closes #187. Measured every page at 375px wide (horizontal overflow, element widths, tap targets under 24px) before and after. - `components/ui/button.tsx`: `size="icon"` buttons get `shrink-0`; they were being squeezed to 23px wide in crowded rows. - `components/list-row.tsx`: the actions cluster wraps below `sm` instead of shrinking its children (Sources' four actions didn't fit in 309px). - `components/ui/dialog.tsx`: `w-[calc(100%-1.5rem)]` side margins, `max-h-[calc(100dvh-2rem)]` with `overflow-y-auto` (dvh tracks mobile browser toolbars), `p-5 sm:p-6`, and a 32px Close target. Removed the per-page `max-h-[90vh]` overrides this makes redundant. The sheet's Close button gets the same target. - `components/ui/input.tsx`, `textarea.tsx`, `select.tsx`: `text-base sm:text-sm`. iOS Safari zooms the page when focusing any field under 16px. - Recipients table: below `sm` the Email column is hidden and the address shows as a second line in the Name cell; the Status label is hidden (the switch keeps its `aria-label`); Status and Actions shrink to their content. Sort header buttons get a 28px-tall target. - Newsletters: linked-source/group chip "×" buttons (also on Recipients) grow from 16px to 24px without changing chip height. - Header GitHub/Star icon buttons grow to 28px targets via `-m-1.5 p-1.5`, so the visuals don't move. </details>
-- The Add source dialog's example name and addresses now match the source type you pick (for example `http://localhost:8096` for Jellyfin), instead of always showing Tautulli's. A design switched to code no longer opens with about 25 lines of generated dark-mode styles. One short comment stands in for them and adds them when the email is sent; delete it to leave them out. ([#229](https://github.com/jshields-ca/LatestArr/pull/229)) <details> <summary>Technical details</summary> Closes #228. - `sources-page.tsx`: each source kind has `examples` for the Name, Base URL, and Public URL placeholders, used in the Add and Edit dialogs. - `render/design.ts`: `buildDesignMjml(settings, { darkModeMarker: true })` writes a `<!-- latestarr:dark-mode … -->` marker instead of the generated head styles, and `expandDarkModeMarker` replaces it with them at render time. That happens in the send pipeline, previews, and the sample preview. Convert-to-code uses the marker. Code designs without it, including old drag-and-drop templates, are unchanged. </details>
-- A newsletter's intro, footer note, buttons, and font are now part of its design, set in the design editor where the live preview shows them. The newsletter's settings keep to what goes out, when, and to whom. When you upgrade, each newsletter's existing text, buttons, and font move into a design automatically, so every email looks exactly as before. A newsletter on Default with any of those set gets its own copy of Default, named after it. ([#208](https://github.com/jshields-ca/LatestArr/pull/208)) <details> <summary>Technical details</summary> Closes #207 (part of #199). - Design settings gain `content: { intro, footerNote, ctas }` (up to 4 buttons, http(s) links only). The pipeline passes them to every template as `{{introText}}`, `{{footerNote}}`, and `{{#each ctas}}`, so code templates keep working. The Default design no longer takes a per-newsletter font. - `render/migrate-content-into-designs.ts` runs once at startup (flagged by the `migration.contentIntoDesigns` settings key). Newsletters sharing a design with different text get a copy each; newsletters with no text keep the original. The old `newsletters` columns stay unused for one release so you can roll back. - The newsletter API no longer accepts `emailFont`, `introText`, `footerNote`, or `ctas`. The design editor gets a "Text and buttons" section; Save waits until every button is complete, and half-finished buttons are left out of the preview. </details>
-- Newsletters now include a plain-text version alongside the HTML, which spam filters prefer and text-only email readers can show. The deliverability guide also explains how to check your DKIM record when a received email reports `dkim=temperror` or `dkim=fail`. ([#222](https://github.com/jshields-ca/LatestArr/pull/222)) <details> <summary>Technical details</summary> Closes #220. - `render/plain-text.ts` converts the rendered HTML with `html-to-text`: wrapped at 78 characters, links shown as `Title [url]`, images and styles dropped. It is generated from the final HTML, so code designs get one too. Sent as `text` on both real sends and test sends, so messages become `multipart/alternative`. - `docs/deliverability.md`: a "temperror or fail" section on checking the DKIM selector record, and a note about the text part. </details>
+- The Logs page now records what's actually happening: every newsletter send and how many people it reached, recipients that couldn't be delivered to, sources that couldn't be reached, sign-ins and failed sign-in attempts, and each settings change along with who made it. A new `LOG_LEVEL` setting controls how much detail is kept. ([#177](https://github.com/jshields-ca/LatestArr/pull/177))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #168. Previously the server had three explicit log calls in total, so the Logs page only ever showed startup lines.
+
+  - **Shared logger** (`apps/server/src/logger.ts`): one pino instance for Fastify, the send pipeline, and the scheduler, so scheduled sends (which have no request) reach the Logs page too. `LOG_LEVEL` (default `info`) is read from the environment and passed through `docker-compose.yml`; an unknown value falls back to `info` with a warning instead of crashing on startup.
+  - **Who did it**: `requireAuth` swaps `request.log` for a child logger carrying `user` (the signed-in admin's email), so every line from an authenticated route records the actor.
+  - **Sends** (`pipeline/run-newsletter.ts`): `runNewsletter` takes `{ trigger, log }` and logs every outcome exactly once — start, success/partial/total failure with counts and duration, each undeliverable recipient (warn), the specific source that couldn't be fetched (warn), a send with no active recipients or no usable sources (warn), and a refused send (not found / misconfigured / already running) as a warn rather than an error. The send-now route and scheduler no longer log send failures themselves.
+  - **Scheduler**: each refresh logs one line listing every enabled newsletter's next run; startup catch-ups are logged and tagged `trigger: "catch-up"`, cron fires `"scheduled"`, and send-now `"manual"`.
+  - **Settings changes**: create/update/delete for sources, SMTP profiles, recipients (plus a one-line import summary), groups and memberships, newsletters (with "Enabled"/"Paused" for the toggle and a `fields` list of what changed), templates, and newsletter source/group links. Connection and test-email results for sources and SMTP profiles. Sign-in, failed sign-in (with IP), sign-out, SSO sign-in/rejection, first-admin creation, and password/profile changes.
+  - Field names are logged for updates, never values, so passwords and API keys can't leak into logs. Tests assert log levels, the `user`/`trigger` fields, and that a password never appears in the buffer.
+
+  </details>
+
+- The Default design has a fresh look to match the LatestArr app. The newsletter sits on a white card with an accent bar, and the header shows the date range, how many items are new, and a count for each type. Items are grouped into Movies, TV, Books, and so on, with smaller posters, tidier spacing, and summaries trimmed to about two lines. ([#226](https://github.com/jshields-ca/LatestArr/pull/226))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #218 and #219.
+
+  - `render/design.ts`: the email is an `mj-wrapper` card with a 4px accent top border on a tinted page (`page` colour, with its own dark-mode rule), with the credits below the card. Cards rows have a 72px poster and hairline dividers, `overviewShort`, and a pill badge. `groupByType` now defaults to true, and TV episodes and seasons share one "TV" section (`contentType="tv_episode,tv_season"`). New option `sections.groupEpisodes` (default true).
+  - `render/mjml-template.ts`: `mediaList` takes `groupEpisodes="true"` and comma-separated `contentType`. `ifAnyItems` and `ifKindLinked` accept several types, and `ifKindLinked` is also true when a type has items, so a section never hides real items. New context values: `periodFormatted`, `itemCount`, `kindCounts`, `hasLinkedSources`, and per item `overviewShort`, `episodes`, `episodeCount`, `moreEpisodes`. The code-mode reference documents them.
+  - An issue with nothing new and no linked sources says "No new items in this period." instead of rendering nothing.
+  - Design editor: a "Group a show's new episodes" switch; the section order lists Movies, TV, Books, Audiobooks, Games and moves TV's two types together; the "lookback line" option is now "Show the date range and counts". The sample preview includes two episodes of one show.
+  - Default snapshots re-recorded.
+
+  </details>
+
+- The old drag-and-drop template editor is gone, replaced by designs. Templates you built with it become code designs automatically. They send exactly as before, and you can now edit them in the code editor with a live preview. The web app is also much smaller: the drag-and-drop editor alone was a 2.3 MB download. ([#210](https://github.com/jshields-ca/LatestArr/pull/210))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #199.
+
+  - Removed `grapesjs` and `grapesjs-mjml`, `apps/web/src/lib/grapesjs-*` and `pages/template-editor-page.tsx` (and their tests), and the `cdnjs.cloudflare.com` style and font CSP sources the editor's icon font needed. `/templates/:id/edit` redirects to `/designs/:id`.
+  - Migration `0007_retire_drag_and_drop` drops `templates.design_json` (the editor's own project state) and `templates.compiled_html` (never read). A template that was never saved from the editor has no markup and always sent with Default, so it becomes an options design with the default settings.
+  - `POST /templates` with only a name now creates an options design. `PATCH` changes `mode` only when it's given explicitly, so saving a code design's text and buttons can't turn it back into an options design.
+  - README, self-hosting guide, and CONTRIBUTING describe designs instead of drag-and-drop.
+
+  </details>
+
+- Import users works for every source that has users, including Plex, Jellyfin, and Emby. Those servers don't share email addresses, so the import list now has an email field next to anyone without one; fill it in and that person is imported too. Audiobookshelf and RomM sources can now import their users as well, with the emails those servers already have. For Emby, a user linked to Emby Connect with an email address is filled in for you. ([#214](https://github.com/jshields-ca/LatestArr/pull/214))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #213.
+
+  - Import users dialog: users without an email get an "Email for {name}" field. A complete address selects them, and clearing it deselects them. Import sends typed addresses alongside the source's own.
+  - Audiobookshelf `listUsers`: `GET /api/users` (needs an admin token); active users only, with `email` when set.
+  - RomM `listUsers`: `GET /api/users` (needs the client API token's `users.read` scope, which the error message now names on a 401 or 403); enabled users only, with `email` when set.
+  - Jellyfin/Emby `listUsers` skips disabled accounts. Emby uses `ConnectUserName` as the email when it is one (untested on a real server; see #196).
+  - Import users now appears for Plex, Tautulli, Jellyfin, Emby, Audiobookshelf, and RomM. The BookLore family has no user API over OPDS.
+
+  </details>
+
+- Sources now show each service's own logo, including Jellyfin and Emby, and the Source type list is alphabetical. The setup checklist also suggests failure alerts and a second admin, both optional. ([#236](https://github.com/jshields-ca/LatestArr/pull/236))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - Bundled `jellyfin.svg` and `emby.svg` from selfh.st/icons (CC BY 4.0), credited in `assets/logos/NOTICE.md`. (#231)
+  - Source types are sorted by display name; the Add source dialog defaults to the first. (#231)
+  - A source row's leading icon is the service logo, with the category icon kept as a fallback (`hasSourceLogo`); the type badge is now plain text. (#232)
+  - The dashboard checklist adds optional **Get failure alerts** (done when an email or webhook alert is enabled for failures) and **Add another admin** (done with more than one user). Screen readers now hear "Done" on completed steps. (#233)
+
+  </details>
+
+- The Docker image now runs on Node.js 24, the current long-term support release. Node 22 stops getting security fixes in April 2027. Nothing changes for your setup: pull the new image and restart, and your data and settings carry over. ([#215](https://github.com/jshields-ca/LatestArr/pull/215))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #186.
+
+  - `docker/Dockerfile`: both stages use `node:24-alpine`.
+  - `.nvmrc` and `engines.node` are 24; `@types/node` is `^24.19.0` in every package, matching the runtime (Dependabot still ignores its majors).
+  - CI tests on Node 24 and 26 (26 becomes LTS in October 2026); the release workflow runs on 24.
+
+  </details>
+
+- Building or developing LatestArr from source now needs Node.js 22 or newer. Node 20 reached end of life in April 2026. Nothing changes if you run the Docker image, which already uses Node 22. ([#188](https://github.com/jshields-ca/LatestArr/pull/188))
+
+  <details>
+  <summary>Technical details</summary>
+
+  `engines.node` is now `>=22` and the CI matrix tests Node 22 (what the Docker image runs) and Node 24 (the next LTS) instead of 20 and 22. This unblocks `jsdom` 30, which requires Node `^22.22.2 || ^24.15.0 || >=26`.
+
+  </details>
+
+- A security review for installs exposed to the internet. The container no longer runs as root, and someone given a temporary password must change it before they can do anything else. Sources and mail servers that stop responding now time out instead of holding up a send, and server errors no longer show internal details. A new guide covers exposing LatestArr safely. ([#239](https://github.com/jshields-ca/LatestArr/pull/239))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Found and fixed in the review for #237:
+
+  **Authentication and sessions**
+  - `requireAuth` answers `403 password_change_required` to a user with `mustChangePassword`. Before, only the web UI enforced it, and the API still worked.
+  - Signing in to an account that doesn't exist now takes as long as a real password check (`verifyDummyPassword`), so response times don't reveal which emails have accounts.
+  - First-run setup checks for existing users and creates the admin in one transaction, so two simultaneous requests can't both create an admin.
+
+  **Requests and responses**
+  - The same-origin (CSRF) check rejects `Origin: null`, which a sandboxed iframe or `data:` page sends.
+  - A new error handler logs server errors in full and returns a generic message, so SQL errors, file paths and stack details never reach the client. Client errors still say what went wrong.
+  - A stored copy of a sent email is served with a `sandbox` Content Security Policy.
+  - Pino redacts cookies, authorization headers, and password, token, API key and secret fields as a precaution.
+
+  **Outbound requests and content from sources**
+  - Every adapter's API requests time out after 30s (`SOURCE_REQUEST_TIMEOUT_MS`); only the Jellyfin/Emby adapter had a timeout before.
+  - Poster downloads are capped at 20 MB (`readBytesCapped`), and sharp refuses images over 40 megapixels.
+  - BookLore-family covers linked on another host no longer receive the OPDS Basic credentials.
+  - SMTP connections time out after 30s (connect and greeting) and 60s (idle socket), down from Nodemailer's 2 and 10 minutes.
+  - MJML `ignoreIncludes` is pinned on, so a code-mode design can't use `<mj-include>` to read server files. MJML 5 already defaults to this.
+
+  **Container**
+  - The Docker image runs as the `node` user. An entrypoint uses `su-exec` to hand `/app/data` to that user first, so volumes created by older images keep working. The CI smoke test checks both.
+
+  **Tests and docs**
+  - `security.test.ts` walks every registered route and requires a 401 without a session, except an explicit public list. It also covers temporary passwords, the bootstrap race, cross-origin and null-origin writes, error hiding, security headers and cookie flags.
+  - `docs/self-hosting.md` has a new "Exposing LatestArr to the internet" section.
+
+  Reviewed with no change needed:
+  - OIDC: PKCE, state and nonce are checked and the redirect target is fixed.
+  - Queries are parameterized.
+  - Handlebars (4.7.9) has prototype access off, and every value is escaped.
+  - Credentials are encrypted and stripped from responses.
+  - Helmet sets a CSP with `frame-ancestors 'self'`.
+  - Sign-in and setup are rate-limited.
+  - `pnpm audit` finds no known vulnerabilities.
+
+  </details>
+
+- The web UI works better on phones. The Recipients table shows each email under the name instead of cutting it off, dialogs fit the screen and scroll when they're long, buttons no longer squash together, small icons are easier to tap, and iPhones no longer zoom in when you tap a text field. ([#192](https://github.com/jshields-ca/LatestArr/pull/192))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #187. Measured every page at 375px wide (horizontal overflow, element widths, tap targets under 24px) before and after.
+
+  - `components/ui/button.tsx`: `size="icon"` buttons get `shrink-0`; they were being squeezed to 23px wide in crowded rows.
+  - `components/list-row.tsx`: the actions cluster wraps below `sm` instead of shrinking its children (Sources' four actions didn't fit in 309px).
+  - `components/ui/dialog.tsx`: `w-[calc(100%-1.5rem)]` side margins, `max-h-[calc(100dvh-2rem)]` with `overflow-y-auto` (dvh tracks mobile browser toolbars), `p-5 sm:p-6`, and a 32px Close target. Removed the per-page `max-h-[90vh]` overrides this makes redundant. The sheet's Close button gets the same target.
+  - `components/ui/input.tsx`, `textarea.tsx`, `select.tsx`: `text-base sm:text-sm`. iOS Safari zooms the page when focusing any field under 16px.
+  - Recipients table: below `sm` the Email column is hidden and the address shows as a second line in the Name cell; the Status label is hidden (the switch keeps its `aria-label`); Status and Actions shrink to their content. Sort header buttons get a 28px-tall target.
+  - Newsletters: linked-source/group chip "×" buttons (also on Recipients) grow from 16px to 24px without changing chip height.
+  - Header GitHub/Star icon buttons grow to 28px targets via `-m-1.5 p-1.5`, so the visuals don't move.
+
+  </details>
+
+- The Add source dialog's example name and addresses now match the source type you pick (for example `http://localhost:8096` for Jellyfin), instead of always showing Tautulli's. A design switched to code no longer opens with about 25 lines of generated dark-mode styles. One short comment stands in for them and adds them when the email is sent; delete it to leave them out. ([#229](https://github.com/jshields-ca/LatestArr/pull/229))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #228.
+
+  - `sources-page.tsx`: each source kind has `examples` for the Name, Base URL, and Public URL placeholders, used in the Add and Edit dialogs.
+  - `render/design.ts`: `buildDesignMjml(settings, { darkModeMarker: true })` writes a `<!-- latestarr:dark-mode … -->` marker instead of the generated head styles, and `expandDarkModeMarker` replaces it with them at render time. That happens in the send pipeline, previews, and the sample preview. Convert-to-code uses the marker. Code designs without it, including old drag-and-drop templates, are unchanged.
+
+  </details>
+
+- A newsletter's intro, footer note, buttons, and font are now part of its design, set in the design editor where the live preview shows them. The newsletter's settings keep to what goes out, when, and to whom. When you upgrade, each newsletter's existing text, buttons, and font move into a design automatically, so every email looks exactly as before. A newsletter on Default with any of those set gets its own copy of Default, named after it. ([#208](https://github.com/jshields-ca/LatestArr/pull/208))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #207 (part of #199).
+
+  - Design settings gain `content: { intro, footerNote, ctas }` (up to 4 buttons, http(s) links only). The pipeline passes them to every template as `{{introText}}`, `{{footerNote}}`, and `{{#each ctas}}`, so code templates keep working. The Default design no longer takes a per-newsletter font.
+  - `render/migrate-content-into-designs.ts` runs once at startup (flagged by the `migration.contentIntoDesigns` settings key). Newsletters sharing a design with different text get a copy each; newsletters with no text keep the original. The old `newsletters` columns stay unused for one release so you can roll back.
+  - The newsletter API no longer accepts `emailFont`, `introText`, `footerNote`, or `ctas`. The design editor gets a "Text and buttons" section; Save waits until every button is complete, and half-finished buttons are left out of the preview.
+
+  </details>
+
+- Newsletters now include a plain-text version alongside the HTML, which spam filters prefer and text-only email readers can show. The deliverability guide also explains how to check your DKIM record when a received email reports `dkim=temperror` or `dkim=fail`. ([#222](https://github.com/jshields-ca/LatestArr/pull/222))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #220.
+
+  - `render/plain-text.ts` converts the rendered HTML with `html-to-text`: wrapped at 78 characters, links shown as `Title [url]`, images and styles dropped. It is generated from the final HTML, so code designs get one too. Sent as `text` on both real sends and test sends, so messages become `multipart/alternative`.
+  - `docs/deliverability.md`: a "temperror or fail" section on checking the DKIM selector record, and a note about the text part.
+
+  </details>
 
 ### Fixed
 
-- Setting `TRUST_PROXY=true` in `.env` now takes effect. Before, Docker Compose never passed it to the container, so instances behind a reverse proxy saw every visitor as the proxy's IP address (sharing one sign-in rate limit) and didn't mark the session cookie as secure. ([#179](https://github.com/jshields-ca/LatestArr/pull/179)) <details> <summary>Technical details</summary> Closes #176. `TRUST_PROXY` was documented in `.env.example` and `docs/self-hosting.md` but missing from `docker-compose.yml`'s `environment:` block, so `process.env.TRUST_PROXY` was always unset inside the container and Fastify's `trustProxy` stayed off. Added `TRUST_PROXY: ${TRUST_PROXY:-}`. CI now fails if any key in `.env.example` isn't referenced in `docker-compose.yml`, so a newly documented setting can't be silently dropped again. </details>
-- Newsletters look right in dark-mode email apps. Emails now say they support light and dark mode, and include dark versions of the design's own colours, so apps like Apple Mail and Outlook.com use those instead of guessing. Type badges have a thin outline, so they stay visible in apps that remove backgrounds (such as Thunderbird's dark message view). ([#224](https://github.com/jshields-ca/LatestArr/pull/224)) <details> <summary>Technical details</summary> Closes #216. - Designs declare `color-scheme: light dark` (meta tags and `:root`) and always set an explicit body background. - For a light design, dark colours are derived from its palette. `@media (prefers-color-scheme: dark)` rules, plus `[data-ogsc]`/`[data-ogsb]` rules for Outlook.com, swap each inline colour by value (e.g. `[style*="color:#241521"]`), so no element needs its own class and custom palettes work too. Palette colours are lower-cased so the selectors match. A design that's already dark only declares support. - Badges get a 1px border mixed from the accent colour. The Default design's snapshot changes accordingly. - Gmail's apps apply their own dark mode and ignore these styles, so results there vary. </details>
-- Deleting a design that a newsletter uses no longer fails with an error. Those newsletters switch back to the Default design, and the Designs page now shows which newsletters use each design and says so before you confirm. ([#212](https://github.com/jshields-ca/LatestArr/pull/212)) <details> <summary>Technical details</summary> `DELETE /templates/:id` failed with `SQLITE_CONSTRAINT_FOREIGNKEY` whenever a newsletter referenced the design. It now clears those newsletters' `templateId` and deletes the design in one transaction, logging which newsletters changed. `ConfirmDeleteButton` takes an optional `prompt`. </details>
-- Buttons no longer need a separate "Save buttons" click. They now live in the design and save with everything else. ([#210](https://github.com/jshields-ca/LatestArr/pull/210))
-- The Logs page description now matches what it shows (sends, delivery and source problems, sign-ins, and settings changes) and says the log clears when the server restarts. The page also now shows all 500 entries the server keeps, not just the latest 200, and the empty message reflects the level filter. ([#201](https://github.com/jshields-ca/LatestArr/pull/201)) <details> <summary>Technical details</summary> Closes #198. The old description promised "source sync errors" (LatestArr never syncs sources in the background; they're only contacted during sends and connection tests) and "routine request traffic is filtered out", which read as false once #177 started logging every settings change. `logs-page.tsx` now requests `limit=500`, the server's buffer size (`apps/server/src/log-buffer.ts`), instead of the endpoint's default of 200, so "latest 500" is accurate. The empty state is per level filter ("No errors since the server last started."). </details>
-- TV episodes from Plex and Tautulli now show the show's poster instead of a wide video still, so every image in the newsletter is the same shape. Items with no runtime, page count, or rating no longer leave an empty line, and a rating on its own no longer starts with a stray "·". ([#221](https://github.com/jshields-ca/LatestArr/pull/221)) <details> <summary>Technical details</summary> Closes #217. - Plex uses `grandparentThumb` for episodes, and Tautulli uses `grandparent_thumb`, each falling back to the episode's own `thumb`. Seasons already use their own portrait art. - The render context gains `detailsLine`: runtime, pages, length, or platform, then rating, joined with " · ". Designs render the details line only when it has content. The code-mode reference lists `detailsLine`, and the individual fields are unchanged for existing code designs. </details>
+- Setting `TRUST_PROXY=true` in `.env` now takes effect. Before, Docker Compose never passed it to the container, so instances behind a reverse proxy saw every visitor as the proxy's IP address (sharing one sign-in rate limit) and didn't mark the session cookie as secure. ([#179](https://github.com/jshields-ca/LatestArr/pull/179))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #176. `TRUST_PROXY` was documented in `.env.example` and `docs/self-hosting.md` but missing from `docker-compose.yml`'s `environment:` block, so `process.env.TRUST_PROXY` was always unset inside the container and Fastify's `trustProxy` stayed off. Added `TRUST_PROXY: ${TRUST_PROXY:-}`.
+
+  CI now fails if any key in `.env.example` isn't referenced in `docker-compose.yml`, so a newly documented setting can't be silently dropped again.
+
+  </details>
+
+- Newsletters look right in dark-mode email apps. Emails now say they support light and dark mode, and include dark versions of the design's own colours, so apps like Apple Mail and Outlook.com use those instead of guessing. Type badges have a thin outline, so they stay visible in apps that remove backgrounds (such as Thunderbird's dark message view). ([#224](https://github.com/jshields-ca/LatestArr/pull/224))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #216.
+
+  - Designs declare `color-scheme: light dark` (meta tags and `:root`) and always set an explicit body background.
+  - For a light design, dark colours are derived from its palette. `@media (prefers-color-scheme: dark)` rules, plus `[data-ogsc]`/`[data-ogsb]` rules for Outlook.com, swap each inline colour by value (e.g. `[style*="color:#241521"]`), so no element needs its own class and custom palettes work too. Palette colours are lower-cased so the selectors match. A design that's already dark only declares support.
+  - Badges get a 1px border mixed from the accent colour. The Default design's snapshot changes accordingly.
+  - Gmail's apps apply their own dark mode and ignore these styles, so results there vary.
+
+  </details>
+
+- Deleting a design that a newsletter uses no longer fails with an error. Those newsletters switch back to the Default design, and the Designs page now shows which newsletters use each design and says so before you confirm. ([#212](https://github.com/jshields-ca/LatestArr/pull/212))
+
+  <details>
+  <summary>Technical details</summary>
+
+  `DELETE /templates/:id` failed with `SQLITE_CONSTRAINT_FOREIGNKEY` whenever a newsletter referenced the design. It now clears those newsletters' `templateId` and deletes the design in one transaction, logging which newsletters changed. `ConfirmDeleteButton` takes an optional `prompt`.
+
+  </details>
+
+- Buttons no longer need a separate "Save buttons" click. They now live in the design and save with everything else. ([#206](https://github.com/jshields-ca/LatestArr/pull/206))
+
+- The Logs page description now matches what it shows (sends, delivery and source problems, sign-ins, and settings changes) and says the log clears when the server restarts. The page also now shows all 500 entries the server keeps, not just the latest 200, and the empty message reflects the level filter. ([#201](https://github.com/jshields-ca/LatestArr/pull/201))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #198. The old description promised "source sync errors" (LatestArr never syncs sources in the background; they're only contacted during sends and connection tests) and "routine request traffic is filtered out", which read as false once #177 started logging every settings change. `logs-page.tsx` now requests `limit=500`, the server's buffer size (`apps/server/src/log-buffer.ts`), instead of the endpoint's default of 200, so "latest 500" is accurate. The empty state is per level filter ("No errors since the server last started.").
+
+  </details>
+
+- TV episodes from Plex and Tautulli now show the show's poster instead of a wide video still, so every image in the newsletter is the same shape. Items with no runtime, page count, or rating no longer leave an empty line, and a rating on its own no longer starts with a stray "·". ([#221](https://github.com/jshields-ca/LatestArr/pull/221))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes #217.
+
+  - Plex uses `grandparentThumb` for episodes, and Tautulli uses `grandparent_thumb`, each falling back to the episode's own `thumb`. Seasons already use their own portrait art.
+  - The render context gains `detailsLine`: runtime, pages, length, or platform, then rating, joined with " · ". Designs render the details line only when it has content. The code-mode reference lists `detailsLine`, and the individual fields are unchanged for existing code designs.
+
+  </details>
+
 - Deactivating an account now signs it out immediately; before, an open session kept working until it expired. Sign-in email addresses are no longer case-sensitive. ([#230](https://github.com/jshields-ca/LatestArr/pull/230))
-- The main button on each page now glides up on hover and eases when pressed, instead of jumping into place. ([#241](https://github.com/jshields-ca/LatestArr/pull/241)) <details> <summary>Technical details</summary> - Tailwind v4 compiles `hover:-translate-y-0.5` and `active:scale-[0.98]` to the separate `translate` and `scale` properties, but `button.tsx` only transitioned `transform`. - The transition list now names `translate` and `scale`, so the lift and press use the intended spring easing. (#240) </details>
-- The GitHub star in the header glows and grows on hover again. Its one-time pulse when the page loads had been switching the hover effect off. ([#243](https://github.com/jshields-ca/LatestArr/pull/243)) <details> <summary>Technical details</summary> - `.star-glow-intro` used animation fill mode `both`, so the finished pulse kept applying its last frame, and that overrode the hover and focus styles on `.star-glow`. - It now uses `backwards`. The pulse ends at the resting state, so nothing needs holding. (#242) </details>
+
+- The main button on each page now glides up on hover and eases when pressed, instead of jumping into place. ([#241](https://github.com/jshields-ca/LatestArr/pull/241))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - Tailwind v4 compiles `hover:-translate-y-0.5` and `active:scale-[0.98]` to the separate `translate` and `scale` properties, but `button.tsx` only transitioned `transform`.
+  - The transition list now names `translate` and `scale`, so the lift and press use the intended spring easing. (#240)
+
+  </details>
+
+- The GitHub star in the header glows and grows on hover again. Its one-time pulse when the page loads had been switching the hover effect off. ([#243](https://github.com/jshields-ca/LatestArr/pull/243))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - `.star-glow-intro` used animation fill mode `both`, so the finished pulse kept applying its last frame, and that overrode the hover and focus styles on `.star-glow`.
+  - It now uses `backwards`. The pulse ends at the resting state, so nothing needs holding. (#242)
+
+  </details>
 
 ## [0.10.0] - 2026-09-23
 
 ### New
 
-- Import a Plex or Tautulli source's known users as recipients, grouped together, from the Sources page. ([#147](https://github.com/jshields-ca/LatestArr/pull/147)) <details> <summary>Technical details</summary> `SourceAdapter` (`packages/adapters/core/src/source-adapter.ts`) gains an optional `listUsers?(config): Promise<SourceUser[]>`, the same optional-capability pattern as `fetchPopularItems`/`fetchImageBytes`. Implemented for: - **Tautulli**, via its `get_users` API (`getUsers` in `tautulli-client.ts`) — includes each user's `email` when Tautulli has it (synced from the underlying Plex server's shared-user list), filtering out its "Local" pseudo-user (id 0). - **Plex**, via the local server's own `/accounts` endpoint (`getAccounts` in `plex-client.ts`) — usernames only, no email. A local server token can't reach plex.tv's own account API, which is the only place a shared user's email is visible; `SourceUser.email` is optional specifically to let a caller (and `NewItem`'s doc comment) handle this per-source gap rather than assuming every source can supply one. New `GET /sources/:id/users` (`apps/server/src/http/routes/sources.ts`) 404s (not a 200 with an empty array) when the adapter doesn't implement `listUsers`, so the web UI can tell "unsupported" apart from "zero users right now." New "Import users" action on a Plex/Tautulli source row (`apps/web/src/pages/sources-page.tsx`) opens a dialog listing the source's users — pre-checked when they have an email, disabled when they don't (a recipient can't exist without one) — and imports the selected ones via the existing bulk-import endpoint (`POST /recipients/import`, from the CSV/text-paste import feature), then adds each newly-created recipient to a group named after the source, reusing an existing group of that name on a repeat import rather than creating a duplicate. </details>
-- Newsletters can now include an intro note, a footer note, and up to 4 call-to-action buttons (e.g. a link to your Plex/Jellyfin app, a donation link, "browse the library") in the default template. ([#173](https://github.com/jshields-ca/LatestArr/pull/173)) <details> <summary>Technical details</summary> Addresses the feature request in #163, folded in alongside the default-template visual refresh (#162). - Three new `newsletters` columns — `intro_text`, `footer_note` (both nullable text), `ctas` (nullable JSON `{label, url}[]`, migration `0004_busy_ares.sql`) — validated server-side via zod in `apps/server/src/http/routes/newsletters.ts` (`ctas` capped at 4, `url` must be a valid URL, `label` 1-40 chars). - `apps/server/src/render/newsletter-template.ts`: intro text renders as a line under the "Here's what's new" intro; CTAs render as a row of `<mj-button>` elements (native MJML, so Outlook VML fallbacks come for free) right below that; the footer note renders as its own line above the existing "Generated by LatestArr" credit. All three are also passed through generically to `renderMjmlTemplate` (`apps/server/src/render/mjml-template.ts`) so a custom GrapesJS-authored template could reference `{{introText}}`/`{{footerNote}}`/`{{#each ctas}}` directly, though only the default template does today. - Web UI: two new components on the Newsletters page's Content panel (`apps/web/src/pages/newsletters-page.tsx`) — `NewsletterTextField` (shared by Intro and Footer note, saves on blur only when the value actually changed) and `CtaButtonsField` (a row-editor list with an explicit "Save buttons" button, since a half-typed URL blurring mid-edit shouldn't silently commit). Both hidden once a custom template is picked, same as the existing Font picker. - Icon support per CTA (raised in the original request) was intentionally left out of this pass — email-safe icon rendering (inline SVG/data-URI, per the footer icons added in #162) adds real scope for a picker UI, and label+URL alone already covers the core use case. </details>
-- A Logs page in the web UI shows recent server activity — failed sends, source sync errors, auth events, and anything else worth troubleshooting — without needing to `docker logs` the container. ([#149](https://github.com/jshields-ca/LatestArr/pull/149)) <details> <summary>Technical details</summary> The server's pino logger now writes to two destinations via `pino.multistream`: stdout (unchanged — still what `docker logs` shows) and a new in-memory ring buffer (`apps/server/src/log-buffer.ts`, capped at 500 entries), which drops Fastify's routine per-request "incoming request"/"request completed" pair so the buffer holds actual events instead of being drowned out by ordinary traffic. New `GET /logs` (`?level=warn|error|...` and `?limit=`) serves recent entries with a human-readable level label. The new Logs page polls this on load/refresh/filter-change, showing each entry's level (color-coded), timestamp, and message, with a "Details" toggle that expands the entry's full raw context (request info, error type/message/stack) for whichever ones carry it. Note for anyone extending `apps/server/src/app.ts`: pino's actual destination is its *second* constructor argument — `pino(multistreamResult)` alone silently falls back to pino's own default stdout destination and never writes to any custom stream in the multistream array; it has to be `pino(options, multistreamResult)`. Confirmed via a minimal repro while building this — easy to get wrong and have it look like it's working (the primary stdout destination still logs normally) while the second destination silently receives nothing. </details>
-- Bulk-import recipients by pasting a list of emails or uploading a CSV, instead of adding people one at a time. ([#146](https://github.com/jshields-ca/LatestArr/pull/146)) <details> <summary>Technical details</summary> New "Import" button on the Recipients page opens a dialog with a paste area (or an "Upload CSV" button that reads a file's text into the same field). `apps/web/src/lib/recipient-import.ts` parses the pasted/uploaded text tolerating the formats people actually paste: one bare email per line, `email,Name` or `Name,email` CSV-style pairs (either order), `Name <email>` mailto-style entries, and a flat comma/semicolon-separated address list copied straight from a mail client's To field — with a live "N recipients ready to import, M lines couldn't be parsed" preview and the unparseable lines shown before anything is submitted. New `POST /recipients/import` (`apps/server/src/http/routes/recipients.ts`) accepts the parsed rows and processes them one at a time rather than as a single multi-row insert, so one bad or duplicate row doesn't fail the whole batch — it returns which rows were `created` and which were `skipped` with a reason (invalid email, already exists, or duplicate within the same import), which the dialog displays after submitting. </details>
-- Recent Sends history now shows exactly who a send went to and what it included, with a link to the actual rendered copy — not just aggregate counts. ([#148](https://github.com/jshields-ca/LatestArr/pull/148)) <details> <summary>Technical details</summary> `send_runs` gains two columns, set once rendering succeeds (independent of whether individual recipient deliveries later fail): `items_snapshot` (a lightweight `{title, kind}[]` JSON snapshot — the same set `item_count_included` has always counted, now also captured with titles) and `rendered_html` (the actual HTML that was sent, stored verbatim rather than re-rendered on demand, so it reflects exactly what a recipient received even if templates/sources changed since). Per-recipient detail already existed in `send_run_recipient_results` (populated by the send pipeline, but never exposed) — new `GET /newsletters/:id/send-runs/:runId/recipients` joins it with `recipients` for each row's email/displayName. New `GET /newsletters/:id/send-runs/:runId/html` serves the stored `rendered_html` directly as `text/html` (a link target, not a JSON-fetched value). The existing list endpoint (`GET /newsletters/:id/send-runs`) explicitly excludes `rendered_html` from each row — it can be tens to hundreds of KB and the list can return many runs at once. The newsletter History tab's send-run rows gain a "Details" toggle (only shown when there's something to show) that lazily fetches recipients and renders included-item badges, a per-recipient status list, and a "View a copy of this send" link to the raw HTML endpoint. </details>
+- Import a Plex or Tautulli source's known users as recipients, grouped together, from the Sources page. ([#147](https://github.com/jshields-ca/LatestArr/pull/147))
+
+  <details>
+  <summary>Technical details</summary>
+
+  `SourceAdapter` (`packages/adapters/core/src/source-adapter.ts`) gains an optional `listUsers?(config): Promise<SourceUser[]>`, the same optional-capability pattern as `fetchPopularItems`/`fetchImageBytes`. Implemented for:
+
+  - **Tautulli**, via its `get_users` API (`getUsers` in `tautulli-client.ts`) — includes each user's `email` when Tautulli has it (synced from the underlying Plex server's shared-user list), filtering out its "Local" pseudo-user (id 0).
+  - **Plex**, via the local server's own `/accounts` endpoint (`getAccounts` in `plex-client.ts`) — usernames only, no email. A local server token can't reach plex.tv's own account API, which is the only place a shared user's email is visible; `SourceUser.email` is optional specifically to let a caller (and `NewItem`'s doc comment) handle this per-source gap rather than assuming every source can supply one.
+
+  New `GET /sources/:id/users` (`apps/server/src/http/routes/sources.ts`) 404s (not a 200 with an empty array) when the adapter doesn't implement `listUsers`, so the web UI can tell "unsupported" apart from "zero users right now."
+
+  New "Import users" action on a Plex/Tautulli source row (`apps/web/src/pages/sources-page.tsx`) opens a dialog listing the source's users — pre-checked when they have an email, disabled when they don't (a recipient can't exist without one) — and imports the selected ones via the existing bulk-import endpoint (`POST /recipients/import`, from the CSV/text-paste import feature), then adds each newly-created recipient to a group named after the source, reusing an existing group of that name on a repeat import rather than creating a duplicate.
+
+  </details>
+
+- Newsletters can now include an intro note, a footer note, and up to 4 call-to-action buttons (e.g. a link to your Plex/Jellyfin app, a donation link, "browse the library") in the default template. ([#173](https://github.com/jshields-ca/LatestArr/pull/173))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses the feature request in #163, folded in alongside the default-template visual refresh (#162).
+
+  - Three new `newsletters` columns — `intro_text`, `footer_note` (both nullable text), `ctas` (nullable JSON `{label, url}[]`, migration `0004_busy_ares.sql`) — validated server-side via zod in `apps/server/src/http/routes/newsletters.ts` (`ctas` capped at 4, `url` must be a valid URL, `label` 1-40 chars).
+  - `apps/server/src/render/newsletter-template.ts`: intro text renders as a line under the "Here's what's new" intro; CTAs render as a row of `<mj-button>` elements (native MJML, so Outlook VML fallbacks come for free) right below that; the footer note renders as its own line above the existing "Generated by LatestArr" credit. All three are also passed through generically to `renderMjmlTemplate` (`apps/server/src/render/mjml-template.ts`) so a custom GrapesJS-authored template could reference `{{introText}}`/`{{footerNote}}`/`{{#each ctas}}` directly, though only the default template does today.
+  - Web UI: two new components on the Newsletters page's Content panel (`apps/web/src/pages/newsletters-page.tsx`) — `NewsletterTextField` (shared by Intro and Footer note, saves on blur only when the value actually changed) and `CtaButtonsField` (a row-editor list with an explicit "Save buttons" button, since a half-typed URL blurring mid-edit shouldn't silently commit). Both hidden once a custom template is picked, same as the existing Font picker.
+  - Icon support per CTA (raised in the original request) was intentionally left out of this pass — email-safe icon rendering (inline SVG/data-URI, per the footer icons added in #162) adds real scope for a picker UI, and label+URL alone already covers the core use case.
+
+  </details>
+
 - The Edit recipient dialog now lets you add or remove group membership — and create a brand-new group — without leaving the dialog. ([#169](https://github.com/jshields-ca/LatestArr/pull/169))
+
+- A Logs page in the web UI shows recent server activity — failed sends, source sync errors, auth events, and anything else worth troubleshooting — without needing to `docker logs` the container. ([#149](https://github.com/jshields-ca/LatestArr/pull/149))
+
+  <details>
+  <summary>Technical details</summary>
+
+  The server's pino logger now writes to two destinations via `pino.multistream`: stdout (unchanged — still what `docker logs` shows) and a new in-memory ring buffer (`apps/server/src/log-buffer.ts`, capped at 500 entries), which drops Fastify's routine per-request "incoming request"/"request completed" pair so the buffer holds actual events instead of being drowned out by ordinary traffic. New `GET /logs` (`?level=warn|error|...` and `?limit=`) serves recent entries with a human-readable level label.
+
+  The new Logs page polls this on load/refresh/filter-change, showing each entry's level (color-coded), timestamp, and message, with a "Details" toggle that expands the entry's full raw context (request info, error type/message/stack) for whichever ones carry it.
+
+  Note for anyone extending `apps/server/src/app.ts`: pino's actual destination is its *second* constructor argument — `pino(multistreamResult)` alone silently falls back to pino's own default stdout destination and never writes to any custom stream in the multistream array; it has to be `pino(options, multistreamResult)`. Confirmed via a minimal repro while building this — easy to get wrong and have it look like it's working (the primary stdout destination still logs normally) while the second destination silently receives nothing.
+
+  </details>
+
+- Bulk-import recipients by pasting a list of emails or uploading a CSV, instead of adding people one at a time. ([#146](https://github.com/jshields-ca/LatestArr/pull/146))
+
+  <details>
+  <summary>Technical details</summary>
+
+  New "Import" button on the Recipients page opens a dialog with a paste area (or an "Upload CSV" button that reads a file's text into the same field). `apps/web/src/lib/recipient-import.ts` parses the pasted/uploaded text tolerating the formats people actually paste: one bare email per line, `email,Name` or `Name,email` CSV-style pairs (either order), `Name <email>` mailto-style entries, and a flat comma/semicolon-separated address list copied straight from a mail client's To field — with a live "N recipients ready to import, M lines couldn't be parsed" preview and the unparseable lines shown before anything is submitted.
+
+  New `POST /recipients/import` (`apps/server/src/http/routes/recipients.ts`) accepts the parsed rows and processes them one at a time rather than as a single multi-row insert, so one bad or duplicate row doesn't fail the whole batch — it returns which rows were `created` and which were `skipped` with a reason (invalid email, already exists, or duplicate within the same import), which the dialog displays after submitting.
+
+  </details>
+
+- Recent Sends history now shows exactly who a send went to and what it included, with a link to the actual rendered copy — not just aggregate counts. ([#148](https://github.com/jshields-ca/LatestArr/pull/148))
+
+  <details>
+  <summary>Technical details</summary>
+
+  `send_runs` gains two columns, set once rendering succeeds (independent of whether individual recipient deliveries later fail): `items_snapshot` (a lightweight `{title, kind}[]` JSON snapshot — the same set `item_count_included` has always counted, now also captured with titles) and `rendered_html` (the actual HTML that was sent, stored verbatim rather than re-rendered on demand, so it reflects exactly what a recipient received even if templates/sources changed since).
+
+  Per-recipient detail already existed in `send_run_recipient_results` (populated by the send pipeline, but never exposed) — new `GET /newsletters/:id/send-runs/:runId/recipients` joins it with `recipients` for each row's email/displayName. New `GET /newsletters/:id/send-runs/:runId/html` serves the stored `rendered_html` directly as `text/html` (a link target, not a JSON-fetched value). The existing list endpoint (`GET /newsletters/:id/send-runs`) explicitly excludes `rendered_html` from each row — it can be tens to hundreds of KB and the list can return many runs at once.
+
+  The newsletter History tab's send-run rows gain a "Details" toggle (only shown when there's something to show) that lazily fetches recipients and renders included-item badges, a per-recipient status list, and a "View a copy of this send" link to the raw HTML endpoint.
+
+  </details>
 
 ### Improved
 
-- The expanded newsletter row is now organized into two clearly labeled panels — Schedule (with its own Delivery subsection) and Content (Template/Sources/Groups) — instead of one long stack of boxes, and the collapsed row's schedule line now highlights the frequency and time instead of reading as one flat muted sentence. ([#161](https://github.com/jshields-ca/LatestArr/pull/161)) <details> <summary>Technical details</summary> Addresses production feedback that the Details tab (`NewsletterDetailsForm`/`NewsletterCard` in `apps/web/src/pages/newsletters-page.tsx`) dumped everything — Name, Schedule, Delivery, Subject template, Template, Sources, Groups — as one flat vertical stack, and that the collapsed row's summary line (e.g. "Weekly on Monday at 8:00 AM (America/Winnipeg) · 7-day lookback") was a single undifferentiated muted string. - Added `describeScheduleParts()` (`apps/web/src/lib/schedule.ts`) — same parsing as the existing `formatScheduleForDisplay`, but returns `{ frequency, when, timezone }` separately instead of one sentence, so the collapsed row can render frequency as a `Badge` and the day/time in a bolder weight, with timezone/lookback staying muted. - Restructured the expanded Details tab into a `sm:grid-cols-2` layout: the left column is `NewsletterDetailsForm` (Name, then a "Schedule" panel containing the existing `ScheduleField` — cron/advanced toggle unchanged — plus a nested "Delivery" subsection for lookback/SMTP profile/subject template); the right column is a new "Content" panel wrapping the existing `TemplatePicker`/`LinkedSources`/`LinkedGroups` (unchanged behavior — same add-via-dropdown, remove-via-chip pattern). Stacks to one column below `sm`. - No functional changes to any picker or the schedule/cron logic — this is a layout and typography pass only. </details>
-- The Logs page now looks and behaves like an actual console — a dense, monospace-font scrolling view instead of separated card panels — and can auto-refresh live instead of requiring a manual Refresh click. ([#156](https://github.com/jshields-ca/LatestArr/pull/156)) <details> <summary>Technical details</summary> Addresses production feedback on the v0.9.0+dev Logs page (`apps/web/src/pages/logs-page.tsx`): - Replaced the bordered-card `LogRow` list with a single terminal-style panel (`bg-zinc-950`, `divide-y divide-zinc-900`) where each entry is one line: `HH:MM:SS  LEVEL  message`, level-colored text instead of a badge, expandable inline via a chevron for entries with extra fields (error details, request metadata). - Added a JetBrains Mono web font (`index.html`'s existing single Google Fonts request, `--font-mono` in `index.css`'s `@theme inline` block) so the console view and any future code/log surface can reach for `font-mono`. - Added a "Live" toggle button that polls `GET /logs` every 3s while enabled (`setInterval` in a `useEffect` keyed on `[live]`, cleared on toggle-off/unmount); polling reuses the existing level filter and refreshes silently (no full-page loading spinner) so it doesn't flicker mid-tail. </details>
-- The default newsletter template now looks more like LatestArr — bigger, more readable text, warmer Bloom-tinted colors instead of generic gray, a restyled footer with small GitHub/Report-an-issue icons — and each newsletter can now pick which font it sends with (Ubuntu, Arial, Georgia, or Verdana). ([#165](https://github.com/jshields-ca/LatestArr/pull/165)) <details> <summary>Technical details</summary> Addresses production feedback after reviewing a real test send's raw .eml: font sizes felt too small for comfortable/accessible reading, the palette (`#0f172a`/`#64748b`/`#94a3b8`/`#999999`) read as generic rather than Bloom, and the footer was two bare text links. - `apps/server/src/render/newsletter-template.ts`: bumped font sizes across the per-item card and header/footer (title 24→28px, item title 16→18px, subtitle 13→14px, overview 13→14px, meta lines 11-12→12-13px), replaced the generic slate palette with the app's own Bloom neutrals (`TEXT_COLOR`/`MUTED_COLOR`/`SUBTLE_COLOR`, derived from `--foreground`/`--muted-foreground`), added a soft tinted fill to the content-kind badge, and rebuilt the footer as a bordered row with small inline-SVG (data: URI) GitHub/report icons next to the existing links — `ACCENT_COLOR` itself was already exactly the app's `--primary`, unchanged. - Added a small **Font** picker (`apps/server/src/render/email-fonts.ts`'s `EMAIL_FONTS` catalog: Ubuntu, Arial, Georgia, Verdana — curated web-safe stacks, not arbitrary font upload, which email clients don't support reliably) as a new `newsletters.email_font` column (`packages/db/src/schema.ts`, migration `0003_grey_stardust.sql`, default `"ubuntu"`), validated server-side via a zod enum in `apps/server/src/http/routes/newsletters.ts`, and exposed in the web UI as `EmailFontPicker` next to the existing Template picker in the Newsletters page's Content panel — hidden once a custom template is picked, since a GrapesJS-authored template defines its own fonts. - Found along the way: MJML's `<mj-attributes>`/`<mj-all>` defaults aren't honored by the installed `mjml` version for `<mj-text>`'s `font-family` — worked around by setting `font-family` explicitly on every `<mj-text>` tag and in the raw per-item/footer markup instead of relying on template-wide defaults. - Scoped to the default template only — the GrapesJS "Media List" block (`apps/web/src/lib/grapesjs-blocks.ts`) that a custom template can use keeps its existing appearance; restyling it was out of scope for this pass. </details>
-- The dashboard's setup checklist collapses to a thin, full-width bar once setup is complete, positioned above the stat tiles instead of sharing a half-width row with Recent sends — and every dashboard card now uses the same circular icon-chip treatment instead of a mix of bare icons and colored tiles. ([#144](https://github.com/jshields-ca/LatestArr/pull/144)) <details> <summary>Technical details</summary> Two related changes to `apps/web/src/pages/dashboard-page.tsx`: - The checklist card and its collapsed "Setup complete" summary were two separately-shaped `Card`s swapped in and out of a two-column grid alongside Recent sends, so the collapsed state still took up as much horizontal room as the full checklist. They're now one `Card` — a single header (icon chip + title + toggle) with conditionally-rendered content — functioning as a real accordion: one row tall when collapsed, positioned in its own full-width row above the stat tiles. - Introduced a shared `CardIconChip` component (the circular tinted-background icon treatment the stat tiles already used) and applied it to the checklist header and the Recent sends header too, replacing a bare `CheckCircle2`/no icon at all. Added `emerald` and `tertiary` entries to the accent palette (renamed from `STAT_ACCENTS` to `CARD_ICON_ACCENTS`) for the checklist's "done" state and to match Recent sends' existing tertiary-glass card tint. </details>
-- The Recipients page is now a dense, sortable table with a search box and real pagination — click Name/Email/Status to sort, search narrows results live, and large lists page 25 at a time — instead of one long scrolling list of cards. ([#159](https://github.com/jshields-ca/LatestArr/pull/159)) <details> <summary>Technical details</summary> Addresses production feedback that a real-world recipient list (~50 rows from a Tautulli user import) made `apps/web/src/pages/recipients-page.tsx`'s flat card list hard to navigate. A few layout options were sketched and reviewed before picking this one. - Replaced the per-recipient `ListRow` cards with a `<table>` (`RecipientTableRow`), each row: Name, Email, an inline Active/Inactive `Switch`, and Edit/Delete actions. - Added click-to-sort column headers (`SortableColumnHeader`) for Name/Email/Status, toggling ascending/descending on repeat clicks, with proper `aria-sort` on each `<th>` and a visible up/down/unsorted icon. - Added a client-side search box (`matchesRecipientQuery`) filtering by email or display name, case-insensitive substring match — no API changes, `listRecipients()` still fetches the full list once. - Replaced incremental "Show more" with real Previous/Next pagination (`RECIPIENTS_PAGE_SIZE = 25`), resetting to page 1 whenever the search query changes. - Header shows a live count ("N recipients" / "N of M match" while searching). </details>
-- The newsletter row is easier to act on: "Send now" and the "Enabled" toggle now sit in the row header next to Delete, so neither needs the row expanded, and Send now no longer sits crowded next to "Save changes". ([#171](https://github.com/jshields-ca/LatestArr/pull/171)) <details> <summary>Technical details</summary> Closes out the remaining part of #167 (the button-crowding and Send-now-visibility parts were addressed separately). The toggle was a small control that didn't need a whole `SettingRow` to itself; moved it into `NewsletterCard`'s header `actions` (`apps/web/src/pages/newsletters-page.tsx`) as a compact `<label>`-wrapped `Switch`, and removed the now-empty standalone row. </details>
- <details> <summary>Technical details</summary> Addresses feedback that Save changes and Send now rendered right next to each other with no clear separation between them, and that Send now was only reachable after expanding a newsletter row. Moved the "Send now" button from inside the Details tab into `NewsletterCard`'s always-visible header action cluster (`apps/web/src/pages/newsletters-page.tsx`), alongside Delete. The inline send-result/error feedback moved with it — now rendered right below the Enabled row, outside the `expanded` block, same as Enabled itself, so it shows regardless of whether the row happens to be expanded. </details>
-- The Dashboard's "Recent sends" card now shows the same expandable send detail as the Newsletters page's History tab — included items, per-recipient delivery status, and a link to view a copy of the sent HTML — instead of just a status line. ([#157](https://github.com/jshields-ca/LatestArr/pull/157)) <details> <summary>Technical details</summary> Addresses production feedback that the enhanced send-run history from the Newsletters page (added in #137/#148) wasn't reflected on the Dashboard. Extracted the newsletters-page's `SendRunHistoryList`/`SendRunDetails` pair into a shared `apps/web/src/components/send-run-history.tsx`, dropping the separate `newsletterId` prop in favor of reading it off `run.newsletterId` (already present on every `SendRun`) so the same list can render runs spanning multiple newsletters. Added an optional `newsletterName` field the Dashboard's cross-newsletter feed populates and the per-newsletter History tab leaves unset. `apps/web/src/pages/newsletters-page.tsx` and `dashboard-page.tsx` both now import from the shared module instead of each keeping their own copy — `dashboard-page.tsx`'s old flat `RecentRunRow` is gone. </details>
-- The Edit SMTP profile dialog is now split into Connection / Authentication / Sender identity tabs instead of one long scrolling form. ([#143](https://github.com/jshields-ca/LatestArr/pull/143)) <details> <summary>Technical details</summary> Same pattern as the newsletter edit page's Details/History split (`newsletters-page.tsx`) — the Port & encryption group (port field, the always-visible port-convention reference, and the implicit-TLS switch) took up a lot of vertical space on its own, which is what made the dialog feel cramped as a single stacked view. `EditSmtpProfileDialog` in `apps/web/src/pages/smtp-profiles-page.tsx` now wraps Host/Port/encryption, Username/Password, and From name/From email in `Tabs`, with Name staying outside the tabs since it's the profile's own label. The Add SMTP profile dialog is unchanged — it's shorter and wasn't the one reported as cramped. </details>
+- The expanded newsletter row is now organized into two clearly labeled panels — Schedule (with its own Delivery subsection) and Content (Template/Sources/Groups) — instead of one long stack of boxes, and the collapsed row's schedule line now highlights the frequency and time instead of reading as one flat muted sentence. ([#161](https://github.com/jshields-ca/LatestArr/pull/161))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that the Details tab (`NewsletterDetailsForm`/`NewsletterCard` in `apps/web/src/pages/newsletters-page.tsx`) dumped everything — Name, Schedule, Delivery, Subject template, Template, Sources, Groups — as one flat vertical stack, and that the collapsed row's summary line (e.g. "Weekly on Monday at 8:00 AM (America/Winnipeg) · 7-day lookback") was a single undifferentiated muted string.
+
+  - Added `describeScheduleParts()` (`apps/web/src/lib/schedule.ts`) — same parsing as the existing `formatScheduleForDisplay`, but returns `{ frequency, when, timezone }` separately instead of one sentence, so the collapsed row can render frequency as a `Badge` and the day/time in a bolder weight, with timezone/lookback staying muted.
+  - Restructured the expanded Details tab into a `sm:grid-cols-2` layout: the left column is `NewsletterDetailsForm` (Name, then a "Schedule" panel containing the existing `ScheduleField` — cron/advanced toggle unchanged — plus a nested "Delivery" subsection for lookback/SMTP profile/subject template); the right column is a new "Content" panel wrapping the existing `TemplatePicker`/`LinkedSources`/`LinkedGroups` (unchanged behavior — same add-via-dropdown, remove-via-chip pattern). Stacks to one column below `sm`.
+  - No functional changes to any picker or the schedule/cron logic — this is a layout and typography pass only.
+
+  </details>
+
+- The Logs page now looks and behaves like an actual console — a dense, monospace-font scrolling view instead of separated card panels — and can auto-refresh live instead of requiring a manual Refresh click. ([#156](https://github.com/jshields-ca/LatestArr/pull/156))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback on the v0.9.0+dev Logs page (`apps/web/src/pages/logs-page.tsx`):
+
+  - Replaced the bordered-card `LogRow` list with a single terminal-style panel (`bg-zinc-950`, `divide-y divide-zinc-900`) where each entry is one line: `HH:MM:SS  LEVEL  message`, level-colored text instead of a badge, expandable inline via a chevron for entries with extra fields (error details, request metadata).
+  - Added a JetBrains Mono web font (`index.html`'s existing single Google Fonts request, `--font-mono` in `index.css`'s `@theme inline` block) so the console view and any future code/log surface can reach for `font-mono`.
+  - Added a "Live" toggle button that polls `GET /logs` every 3s while enabled (`setInterval` in a `useEffect` keyed on `[live]`, cleared on toggle-off/unmount); polling reuses the existing level filter and refreshes silently (no full-page loading spinner) so it doesn't flicker mid-tail.
+
+  </details>
+
+- The default newsletter template now looks more like LatestArr — bigger, more readable text, warmer Bloom-tinted colors instead of generic gray, a restyled footer with small GitHub/Report-an-issue icons — and each newsletter can now pick which font it sends with (Ubuntu, Arial, Georgia, or Verdana). ([#165](https://github.com/jshields-ca/LatestArr/pull/165))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback after reviewing a real test send's raw .eml: font sizes felt too small for comfortable/accessible reading, the palette (`#0f172a`/`#64748b`/`#94a3b8`/`#999999`) read as generic rather than Bloom, and the footer was two bare text links.
+
+  - `apps/server/src/render/newsletter-template.ts`: bumped font sizes across the per-item card and header/footer (title 24→28px, item title 16→18px, subtitle 13→14px, overview 13→14px, meta lines 11-12→12-13px), replaced the generic slate palette with the app's own Bloom neutrals (`TEXT_COLOR`/`MUTED_COLOR`/`SUBTLE_COLOR`, derived from `--foreground`/`--muted-foreground`), added a soft tinted fill to the content-kind badge, and rebuilt the footer as a bordered row with small inline-SVG (data: URI) GitHub/report icons next to the existing links — `ACCENT_COLOR` itself was already exactly the app's `--primary`, unchanged.
+  - Added a small **Font** picker (`apps/server/src/render/email-fonts.ts`'s `EMAIL_FONTS` catalog: Ubuntu, Arial, Georgia, Verdana — curated web-safe stacks, not arbitrary font upload, which email clients don't support reliably) as a new `newsletters.email_font` column (`packages/db/src/schema.ts`, migration `0003_grey_stardust.sql`, default `"ubuntu"`), validated server-side via a zod enum in `apps/server/src/http/routes/newsletters.ts`, and exposed in the web UI as `EmailFontPicker` next to the existing Template picker in the Newsletters page's Content panel — hidden once a custom template is picked, since a GrapesJS-authored template defines its own fonts.
+  - Found along the way: MJML's `<mj-attributes>`/`<mj-all>` defaults aren't honored by the installed `mjml` version for `<mj-text>`'s `font-family` — worked around by setting `font-family` explicitly on every `<mj-text>` tag and in the raw per-item/footer markup instead of relying on template-wide defaults.
+  - Scoped to the default template only — the GrapesJS "Media List" block (`apps/web/src/lib/grapesjs-blocks.ts`) that a custom template can use keeps its existing appearance; restyling it was out of scope for this pass.
+
+  </details>
+
+- The dashboard's setup checklist collapses to a thin, full-width bar once setup is complete, positioned above the stat tiles instead of sharing a half-width row with Recent sends — and every dashboard card now uses the same circular icon-chip treatment instead of a mix of bare icons and colored tiles. ([#144](https://github.com/jshields-ca/LatestArr/pull/144))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Two related changes to `apps/web/src/pages/dashboard-page.tsx`:
+
+  - The checklist card and its collapsed "Setup complete" summary were two separately-shaped `Card`s swapped in and out of a two-column grid alongside Recent sends, so the collapsed state still took up as much horizontal room as the full checklist. They're now one `Card` — a single header (icon chip + title + toggle) with conditionally-rendered content — functioning as a real accordion: one row tall when collapsed, positioned in its own full-width row above the stat tiles.
+  - Introduced a shared `CardIconChip` component (the circular tinted-background icon treatment the stat tiles already used) and applied it to the checklist header and the Recent sends header too, replacing a bare `CheckCircle2`/no icon at all. Added `emerald` and `tertiary` entries to the accent palette (renamed from `STAT_ACCENTS` to `CARD_ICON_ACCENTS`) for the checklist's "done" state and to match Recent sends' existing tertiary-glass card tint.
+
+  </details>
+
+- The Recipients page is now a dense, sortable table with a search box and real pagination — click Name/Email/Status to sort, search narrows results live, and large lists page 25 at a time — instead of one long scrolling list of cards. ([#158](https://github.com/jshields-ca/LatestArr/pull/158))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that a real-world recipient list (~50 rows from a Tautulli user import) made `apps/web/src/pages/recipients-page.tsx`'s flat card list hard to navigate. A few layout options were sketched and reviewed before picking this one.
+
+  - Replaced the per-recipient `ListRow` cards with a `<table>` (`RecipientTableRow`), each row: Name, Email, an inline Active/Inactive `Switch`, and Edit/Delete actions.
+  - Added click-to-sort column headers (`SortableColumnHeader`) for Name/Email/Status, toggling ascending/descending on repeat clicks, with proper `aria-sort` on each `<th>` and a visible up/down/unsorted icon.
+  - Added a client-side search box (`matchesRecipientQuery`) filtering by email or display name, case-insensitive substring match — no API changes, `listRecipients()` still fetches the full list once.
+  - Replaced incremental "Show more" with real Previous/Next pagination (`RECIPIENTS_PAGE_SIZE = 25`), resetting to page 1 whenever the search query changes.
+  - Header shows a live count ("N recipients" / "N of M match" while searching).
+
+  </details>
+
+- The newsletter row is easier to act on: "Send now" and the "Enabled" toggle now sit in the row header next to Delete, so neither needs the row expanded, and Send now no longer sits crowded next to "Save changes". ([#171](https://github.com/jshields-ca/LatestArr/pull/171))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes out the remaining part of #167 (the button-crowding and Send-now-visibility parts were addressed separately). The toggle was a small control that didn't need a whole `SettingRow` to itself; moved it into `NewsletterCard`'s header `actions` (`apps/web/src/pages/newsletters-page.tsx`) as a compact `<label>`-wrapped `Switch`, and removed the now-empty standalone row.
+
+  </details>
+
+- The Dashboard's "Recent sends" card now shows the same expandable send detail as the Newsletters page's History tab — included items, per-recipient delivery status, and a link to view a copy of the sent HTML — instead of just a status line. ([#157](https://github.com/jshields-ca/LatestArr/pull/157))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Addresses production feedback that the enhanced send-run history from the Newsletters page (added in #137/#148) wasn't reflected on the Dashboard.
+
+  Extracted the newsletters-page's `SendRunHistoryList`/`SendRunDetails` pair into a shared `apps/web/src/components/send-run-history.tsx`, dropping the separate `newsletterId` prop in favor of reading it off `run.newsletterId` (already present on every `SendRun`) so the same list can render runs spanning multiple newsletters. Added an optional `newsletterName` field the Dashboard's cross-newsletter feed populates and the per-newsletter History tab leaves unset. `apps/web/src/pages/newsletters-page.tsx` and `dashboard-page.tsx` both now import from the shared module instead of each keeping their own copy — `dashboard-page.tsx`'s old flat `RecentRunRow` is gone.
+
+  </details>
+
+- The Edit SMTP profile dialog is now split into Connection / Authentication / Sender identity tabs instead of one long scrolling form. ([#143](https://github.com/jshields-ca/LatestArr/pull/143))
+
+  <details>
+  <summary>Technical details</summary>
+
+  Same pattern as the newsletter edit page's Details/History split (`newsletters-page.tsx`) — the Port & encryption group (port field, the always-visible port-convention reference, and the implicit-TLS switch) took up a lot of vertical space on its own, which is what made the dialog feel cramped as a single stacked view. `EditSmtpProfileDialog` in `apps/web/src/pages/smtp-profiles-page.tsx` now wraps Host/Port/encryption, Username/Password, and From name/From email in `Tabs`, with Name staying outside the tabs since it's the profile's own label. The Add SMTP profile dialog is unchanged — it's shorter and wasn't the one reported as cramped.
+
+  </details>
 
 ### Fixed
 
-- A book's release year from Book Orbit/BookLore could show one year earlier than its actual publication year, for anyone self-hosting in a timezone west of UTC. ([#170](https://github.com/jshields-ca/LatestArr/pull/170)) <details> <summary>Technical details</summary> `mapEntry()` in `packages/adapters/booklore-family/src/booklore-adapter.ts` built `releaseDate` from OPDS's `dc:issued` field via `new Date(issued)`. `dc:issued` only ever appears as a bare 4-digit year (e.g. `"2020"`), and `new Date("2020")` parses that as UTC midnight — reading it back with local-time getters (`getFullYear()`, `toLocaleDateString()`, ...) in any negative-UTC-offset timezone rolls it back to December 31 of the previous year. Also the root cause of a flaky test (`booklore-adapter.test.ts`'s "maps entries and filters by the since cutoff", filed as #164) that only failed on a non-UTC-configured machine. Fixed by constructing the date in local time (`new Date(Number(issued), 0, 1)`) when `dc:issued` is a bare year, so the year survives the round trip regardless of the host's timezone. A full date string, should one ever appear, still goes through the plain `Date` parser unchanged. </details>
-- The page footer now stays pinned to the bottom of the browser window on short pages instead of sitting mid-page above empty background. ([#139](https://github.com/jshields-ca/LatestArr/pull/139)) <details> <summary>Technical details</summary> The design-polish-round-2 layout change (#125) dropped `flex-1` from the header/sidebar/main content row to fix a different bug — an explicit `h-[calc(100vh-3.5rem)]` height on `aside` was forcing that row to a full viewport height regardless of the footer, causing scroll dead-space on short pages. Removing `flex-1` fixed that but introduced this one: without it, the content row no longer grows to fill leftover space in the `min-h-screen` flex column, so `AppFooter` renders right after short content instead of at the bottom of the viewport. Restored `flex-1` on the content row (`apps/web/src/components/app-shell.tsx`) without restoring `aside`'s explicit height — `flex-1` alone (paired with `min-h-screen` on the root) fills exactly the space the header and footer leave, with no explicit-height side effect that would force `100vh` regardless of footer height. Also fixed the local dev proxy (`apps/web/vite.config.ts`): `changeOrigin: true` rewrote the outgoing `Host` header to match the API server but left `Origin` as the Vite dev origin, which tripped the server's same-origin CSRF check (`requireSameOrigin`) on every mutating request when running `apps/web` and `apps/server` as separate dev servers. The proxy now rewrites `Origin` to match too. </details>
-- The Recipients table's Name column no longer reads as cramped against the left border. ([#169](https://github.com/jshields-ca/LatestArr/pull/169)) <details> <summary>Technical details</summary> - `apps/web/src/pages/recipients-page.tsx`: the Name `<td>` was missing the left padding its `<th>` had (`px-4` vs `pr-4`-only), so header text sat indented while row text sat flush against the border. - Added `GET /recipients/:id/groups` (`apps/server/src/http/routes/recipients.ts`) — the reverse of the existing `GET /recipient-groups/:id`'s `members`, so a recipient-centric UI doesn't need to fetch every group's member list to figure out which ones a given recipient is already in. - Added `RecipientGroupsField` to `EditRecipientDialog`, mirroring the Newsletters page's `LinkedGroups` pattern (add-via-dropdown, remove-via-chip) plus an inline "create a new group" shortcut that creates and adds in one action. Reuses the existing `POST/DELETE /recipient-groups/:id/members` endpoints — no new mutation endpoints needed. </details>
-- SMTP profile cards now correctly label STARTTLS connections (e.g. port 587) instead of showing a misleading "No TLS", and give the "Authenticated" badge success styling instead of neutral. ([#142](https://github.com/jshields-ca/LatestArr/pull/142)) <details> <summary>Technical details</summary> The connection-security badge only checked the `secure` boolean (implicit TLS, i.e. port 465), so any STARTTLS profile — the common case for providers like Dreamhost on port 587 — showed "No TLS" even though the connection is encrypted, just via an upgrade after the initial handshake rather than from the start. `connectionSecurityLabel()` in `apps/web/src/pages/smtp-profiles-page.tsx` now also checks `port`, matching the existing `PORT_GUIDE` convention (465 → Implicit TLS, 587 → STARTTLS, anything else → No TLS), and gives both TLS variants `success` badge styling. The "Authenticated" badge also switches from `neutral` to `success` when `hasAuth` is true. </details>
+- A book's release year from Book Orbit/BookLore could show one year earlier than its actual publication year, for anyone self-hosting in a timezone west of UTC. ([#170](https://github.com/jshields-ca/LatestArr/pull/170))
+
+  <details>
+  <summary>Technical details</summary>
+
+  `mapEntry()` in `packages/adapters/booklore-family/src/booklore-adapter.ts` built `releaseDate` from OPDS's `dc:issued` field via `new Date(issued)`. `dc:issued` only ever appears as a bare 4-digit year (e.g. `"2020"`), and `new Date("2020")` parses that as UTC midnight — reading it back with local-time getters (`getFullYear()`, `toLocaleDateString()`, ...) in any negative-UTC-offset timezone rolls it back to December 31 of the previous year.
+
+  Also the root cause of a flaky test (`booklore-adapter.test.ts`'s "maps entries and filters by the since cutoff", filed as #164) that only failed on a non-UTC-configured machine.
+
+  Fixed by constructing the date in local time (`new Date(Number(issued), 0, 1)`) when `dc:issued` is a bare year, so the year survives the round trip regardless of the host's timezone. A full date string, should one ever appear, still goes through the plain `Date` parser unchanged.
+
+  </details>
+
+- The page footer now stays pinned to the bottom of the browser window on short pages instead of sitting mid-page above empty background. ([#139](https://github.com/jshields-ca/LatestArr/pull/139))
+
+  <details>
+  <summary>Technical details</summary>
+
+  The design-polish-round-2 layout change (#125) dropped `flex-1` from the header/sidebar/main content row to fix a different bug — an explicit `h-[calc(100vh-3.5rem)]` height on `aside` was forcing that row to a full viewport height regardless of the footer, causing scroll dead-space on short pages. Removing `flex-1` fixed that but introduced this one: without it, the content row no longer grows to fill leftover space in the `min-h-screen` flex column, so `AppFooter` renders right after short content instead of at the bottom of the viewport.
+
+  Restored `flex-1` on the content row (`apps/web/src/components/app-shell.tsx`) without restoring `aside`'s explicit height — `flex-1` alone (paired with `min-h-screen` on the root) fills exactly the space the header and footer leave, with no explicit-height side effect that would force `100vh` regardless of footer height.
+
+  Also fixed the local dev proxy (`apps/web/vite.config.ts`): `changeOrigin: true` rewrote the outgoing `Host` header to match the API server but left `Origin` as the Vite dev origin, which tripped the server's same-origin CSRF check (`requireSameOrigin`) on every mutating request when running `apps/web` and `apps/server` as separate dev servers. The proxy now rewrites `Origin` to match too.
+
+  </details>
+
+- The Recipients table's Name column no longer reads as cramped against the left border. ([#169](https://github.com/jshields-ca/LatestArr/pull/169))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - `apps/web/src/pages/recipients-page.tsx`: the Name `<td>` was missing the left padding its `<th>` had (`px-4` vs `pr-4`-only), so header text sat indented while row text sat flush against the border.
+  - Added `GET /recipients/:id/groups` (`apps/server/src/http/routes/recipients.ts`) — the reverse of the existing `GET /recipient-groups/:id`'s `members`, so a recipient-centric UI doesn't need to fetch every group's member list to figure out which ones a given recipient is already in.
+  - Added `RecipientGroupsField` to `EditRecipientDialog`, mirroring the Newsletters page's `LinkedGroups` pattern (add-via-dropdown, remove-via-chip) plus an inline "create a new group" shortcut that creates and adds in one action. Reuses the existing `POST/DELETE /recipient-groups/:id/members` endpoints — no new mutation endpoints needed.
+
+  </details>
+
+- SMTP profile cards now correctly label STARTTLS connections (e.g. port 587) instead of showing a misleading "No TLS", and give the "Authenticated" badge success styling instead of neutral. ([#142](https://github.com/jshields-ca/LatestArr/pull/142))
+
+  <details>
+  <summary>Technical details</summary>
+
+  The connection-security badge only checked the `secure` boolean (implicit TLS, i.e. port 465), so any STARTTLS profile — the common case for providers like Dreamhost on port 587 — showed "No TLS" even though the connection is encrypted, just via an upgrade after the initial handshake rather than from the start. `connectionSecurityLabel()` in `apps/web/src/pages/smtp-profiles-page.tsx` now also checks `port`, matching the existing `PORT_GUIDE` convention (465 → Implicit TLS, 587 → STARTTLS, anything else → No TLS), and gives both TLS variants `success` badge styling. The "Authenticated" badge also switches from `neutral` to `success` when `hasAuth` is true.
+
+  </details>
 
 ## [0.9.0] - 2026-09-21
 
-- **Improved:** Button hovers and the "Star on GitHub" icon now feel smoother and easier to notice at the same time — a longer, gentler light sweep on buttons, and a clear pop-and-glow on the star when you hover it. <details> <summary>Technical details</summary> Addresses production feedback that round 1's button animation was "clunky and abrupt" while the GitHub-star hover was "too subtle" — two different problems, not opposite fixes. Buttons: the primary variant's hover lift (`button.tsx`) swaps its bouncy `cubic-bezier(0.34, 1.56, 0.64, 1)` easing (56% overshoot) for a gentle spring, `cubic-bezier(0.22, 1.08, 0.36, 1)` (~8% overshoot) at 240ms — enough life to feel intentional without the bounce that read as jittery on a 2px lift. `.btn-glint`'s light-sweep pseudo-element (`index.css`) gets the same easing swap (a pure ease-out-expo curve, `cubic-bezier(0.22, 1, 0.36, 1)`, since a straight-line translateX sweep has no business overshooting) plus a wider/brighter gradient band (30–70% stops instead of 40–60%, 0.45 alpha instead of 0.35) and a longer 0.85s duration (was 0.6s) so it reads as a deliberate, visible sweep rather than a quick flicker. GitHub star (`app-shell.tsx`'s `ProjectInfoCard`): previously just `text-amber-500` → `hover:text-amber-400`. Now a `.star-glow` class scales the star up (`scale(1.22)`) and adds a warm amber `drop-shadow` glow on hover/focus, plus a one-shot `.star-glow-intro` keyframe pulse (scale + glow, ~1.1s, 0.5s after mount, `both` fill mode so it never replays) to catch the eye once on first paint without becoming a nagging loop. Both respect `prefers-reduced-motion` (animations/transitions disabled, falling back to a plain color change). </details>
-- **New:** Newsletter items are now clickable — a movie, show, book, audiobook, or game in a sent newsletter links straight to that item on its source (Plex, Tautulli, Audiobookshelf, RomM, or a BookLore-family reader), instead of being plain unlinked text. <details> <summary>Technical details</summary> Two gaps combined to make nothing in a sent newsletter clickable before this: `sourceConnections` had only one URL column (`baseUrl`), used both for an adapter's own API calls and as the one place a link was ever rendered (the Media List block's `emptyFallback="link"` fallback) — which breaks for Tautulli (`baseUrl` is the Tautulli API host, not a Plex-watchable URL) and for a source whose `baseUrl` is a Tailscale/LAN address unreachable by an email recipient. And `NewItem.externalUrl` (`packages/adapters/core/src/source-adapter.ts`), though already threaded through the render pipeline (`RenderableItem.externalUrl` in `apps/server/src/render/mjml-template.ts`), was never actually set by any adapter. Adds an optional `publicUrl` column to `source_connections` (`packages/db/src/schema.ts`, migration `packages/db/drizzle/0001_nostalgic_ulik.sql`, generated with `drizzle-kit generate`) — the address a recipient can actually reach, falling back to `baseUrl` when unset so every existing source connection keeps behaving exactly as it does today. Threaded through `SourceConnectionConfig` (`packages/adapters/core/src/source-adapter.ts`) and the Sources API (`apps/server/src/http/routes/sources.ts`, validated as a URL when present, or an empty string to clear it). Every adapter now builds a real per-item deep link where the source's URL scheme supports it: - **Plex**: `{publicUrl}/web/index.html#!/server/{machineIdentifier}/details?key=%2Flibrary%2Fmetadata%2F{ratingKey}` — fetches the server's `machineIdentifier` from `/identity` (new `getServerIdentity` in `plex-client.ts`) once per fetch, falling back to a plain library link if that lookup fails. An unset `publicUrl` falls back to building the same link from `baseUrl`, matching today's behavior for a fully-public single-Plex setup. - **Tautulli**: the same Plex web deep-link format, built from Tautulli's own `get_server_id` API (proxying the underlying Plex server's `machineIdentifier`) and `rating_key` — shares `buildPlexWebDeepLink` with the Plex adapter (new export in `packages/adapters/core/src/url-utils.ts`). Unlike every other adapter here, an unset `publicUrl` means **no** `externalUrl` is set at all (not a `baseUrl` fallback) — Tautulli's own `baseUrl` is its API host, never a page a recipient should be sent to, so building a link from it would produce a plausible-looking link to a page that doesn't exist there; this exactly matches Tautulli-linked items' behavior before this release (no link) rather than introducing a new broken one. The `get_server_id` lookup itself is skipped entirely (not just its result discarded) when there's no `publicUrl` to build a link from, so a Tautulli connection with no `publicUrl` set makes no additional API calls at all. - **BookLore family** (BookLore/BookOrbit/Grimmory): reads an OPDS entry's own `rel="alternate"`/`rel="self"` link (new `getEntryPermalinkHref` in `booklore-client.ts`) and rebases it onto `publicUrl`'s origin (new `withOrigin` helper) instead of the internal host the feed itself was served from — but only when the permalink resolves to `baseUrl`'s own origin; a permalink that already points at a genuinely different, distinct host (some catalogs point `rel="alternate"` at a publisher/mirror page) is left untouched instead of being force-rebased into a broken URL. Falls back to the library root when an entry carries no usable permalink at all. An entry's OPDS `<link>` is untrusted content from the source server itself, so its scheme is validated (`isHttpUrl`, new export alongside `withOrigin`) before ever being used — a `javascript:`/`data:` href is treated as "no usable permalink" rather than reaching a sent email's `<a href>` (Handlebars' default `{{}}` escaping used to render `{{externalUrl}}` guards markup characters, not URL schemes, so nothing downstream would otherwise have caught this). An unset `publicUrl` falls back to `baseUrl`. - **Audiobookshelf**: `{publicUrl}/item/{itemId}`, falling back to `baseUrl` when unset. - **RomM**: `{publicUrl}/rom/{id}`, falling back to `baseUrl` when unset. The Sources API's `publicUrl` field is itself restricted to `http`/`https` (`apps/server/src/http/routes/sources.ts`), for the same reason: it flows straight into every adapter's link construction. The default (non-custom-template) newsletter layout (`apps/server/src/render/newsletter-template.ts`) now wraps an item's title and poster in `<a href="{{externalUrl}}">` when present, styled to inherit the surrounding text color with no underline so a linked title doesn't read differently from an unlinked one; falls back to plain text/image otherwise. The Media List block's `emptyFallback="link"` "browse the library" link (`apps/server/src/pipeline/run-newsletter.ts`'s `buildSourceLinksByContentType`, consumed by `mjml-template.ts`) now prefers `publicUrl` over `baseUrl` too. </details>
-- **Fixed:** Every item in a sent newsletter now shows a small badge naming what it is — "Movie", "TV Episode", "TV Season", "Game", "Book", or "Audiobook". Previously only Ebooks, Comics, Audiobooks and Podcasts (from BookLore-family and Audiobookshelf) got a badge; movies, TV episodes, TV seasons and games showed no badge at all. <details> <summary>Technical details</summary> The badge markup in both the default template (`apps/server/src/render/newsletter-template.ts`) and the GrapesJS-authored one (`apps/web/src/lib/grapesjs-blocks.ts`'s `CONTENT_LABEL_BADGE`) has always rendered `{{contentLabel}}`, an optional, adapter-set free-text field on `NewItem` — only BookLore-family and Audiobookshelf ever set it (to distinguish Ebook/Comic within "book" or Audiobook/Podcast within "audiobook"). The `kind` field itself (movie/tv_episode/tv_season/book/audiobook/game) was never mapped to a display label anywhere in the render path. Rather than duplicating a label map in both consumers, the fallback is resolved once, upstream of both: `apps/server/src/render/mjml-template.ts`'s `toRenderable()` (the single function both the default and custom/GrapesJS-authored templates' items pass through before either ever sees them) now resolves `contentLabel` via a new `KIND_LABELS` map when the adapter didn't set one, so `RenderableItem.contentLabel` is always populated. Both templates already just read `{{contentLabel}}`, so neither needed any change — `grapesjs-blocks.ts`'s badge markup works unmodified. An adapter-set `contentLabel` (Comic, Podcast, etc.) still takes priority over the kind fallback. </details>
-- **Fixed:** On pages with little content, the page footer no longer gets pushed off the bottom of the screen behind a wall of empty space — it now sits right after the content, without needing to scroll to find it. <details> <summary>Technical details</summary> Addresses production feedback that there was "a lot of dead space between the bottom of content and the footer" and that short pages forced a scroll just to reach it. The root cause (`app-shell.tsx`): the content row (`flex-1`, between the sidebar and `<main>`) and the sidebar (`h-[calc(100vh-3.5rem)]`, a viewport-relative fixed height) were both independently forcing that row to be at least one full viewport tall on every page, regardless of how much actual content there was — pushing the footer to just past the fold on every page, not only long ones. Fix: drop `flex-1` from the content row and the sidebar's explicit `h-[calc(100vh-3.5rem)]`. The sidebar now sizes via the row's default `align-items: stretch`, so its `border-r` divider still spans the full height of whichever of the sidebar/main is taller on any page with real content — no visual change there. The root `<div>`'s `min-h-screen` is left as-is, so short pages still fill at least one viewport; any leftover space now falls *below* the footer (ordinary bottom-of-page whitespace) instead of being forced in *above* it. Verified visually (headless Chromium against the dev build): a minimal page's `document.documentElement.scrollHeight` now equals `window.innerHeight` with no scrollbar, and the footer is visible immediately below the content. </details>
-- **Improved:** The "LatestArr" wordmark in the header is bigger and plain white/foreground-colored instead of a rose gradient, with "Latest" in bold and "Arr" in a lighter weight for a clearer two-part logo. <details> <summary>Technical details</summary> Addresses production feedback that the wordmark's `bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent` treatment (`logo.tsx`) read as too loud next to the mark, and should instead match how the rest of the header's text behaves. Removes the gradient/clip-text entirely in favor of plain `text-foreground`, bumps the size from `text-xl` to `text-2xl` to hold its own next to the mark without the gradient, and splits the text into two `<span>`s — `font-bold` for "Latest", `font-normal` for "Arr" — for a deliberate two-weight wordmark instead of one uniformly-bold word. The `textClassName` prop (used by the login/setup pages for a smaller variant) still overrides the size via `cn`/tailwind-merge on the wrapping span, which the two inner spans inherit. </details>
-- **Improved:** Editing a newsletter is now a clear Details/History split — Details holds every configuration field (name, schedule, delivery, subject, and now the Template, Sources, and Recipient groups pickers too), and History shows only its send runs. <details> <summary>Technical details</summary> Addresses production feedback that the Template/Sources/Groups pickers lived only in the newsletter row's expanded "accordion" section, separate from the pencil-icon "Edit newsletter" dialog that held name/schedule/lookback/SMTP profile/subject — so a user opening a newsletter to configure it wouldn't find the Template dropdown where they'd expect it, and the accordion looked purely informational. Restructures each `NewsletterCard`'s expanded content (`apps/web/src/pages/newsletters-page.tsx`) into a new `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent` primitive (`apps/web/src/components/ui/tabs.tsx`, wrapping `@radix-ui/react-tabs` — newly added to `apps/web/package.json`, following the same forwardRef/`cn` wrapping convention as `select.tsx` and `dialog.tsx`) with two tabs: **Details** and **History**. The former "Edit newsletter" dialog is gone — its fields (now `NewsletterDetailsForm`, same `updateNewsletter` call and validation, just rendered inline instead of inside a `Dialog`) live in the Details tab alongside the existing `TemplatePicker`, `LinkedSources`, and `LinkedGroups` components (unchanged). "Send now" stays in Details since it's an action tied to that configuration, not history. History is now just the `SendRunHistoryList`, nothing else. The "Enabled" toggle is untouched by this restructure — it stays on the always-visible collapsed row exactly as before, so it can still be flipped without expanding a newsletter at all. Field ids across the moved-in form are namespaced per newsletter (`newsletter-<id>-name`, etc.) to stay unique with multiple rows expanded at once. Radix's Tabs gives this ARIA `tablist`/`tab`/`tabpanel` roles and roving-focus arrow-key navigation for free, matching the accessibility this app already relies on elsewhere. </details>
-- **Improved:** The default newsletter layout now opens with a short line under the title ("Here's what's new in the last 7 days.", using your newsletter's own lookback setting) and its footer now links to LatestArr's GitHub repo and to where you can report an issue. <details> <summary>Technical details</summary> Both changes are in the default MJML template (`apps/server/src/render/newsletter-template.ts`), the layout a newsletter falls back to when no custom template is picked. Intro line: `NewsletterRenderContext` and `MjmlRenderContext` (`apps/server/src/render/mjml-template.ts`) both gained an optional `lookbackDays?: number`, threaded from `newsletter.lookbackDays` (`packages/db/src/schema.ts`) through `renderNewsletterContent` in `apps/server/src/pipeline/run-newsletter.ts`'s call to `renderDefaultNewsletterHtml`, and bound as `{{lookbackDays}}` in the Handlebars data `renderMjmlTemplate` passes to `Handlebars.compile`. Guarded by `{{#if lookbackDays}}` so the line is simply omitted for a caller that doesn't pass it (e.g. existing tests). A custom, GrapesJS-authored template has no built-in use for this today, but can reference `{{lookbackDays}}` directly since it's now part of the general render context. Footer links: two plain `<a>` tags added inside the existing footer `<mj-text>`, pointing at `https://github.com/jshields-ca/LatestArr` and `https://github.com/jshields-ca/LatestArr/issues`, styled inline to match the existing muted footer text (no external CSS, consistent with the rest of this template's email-safe conventions). </details>
-- **New:** Sources now have an optional "Public URL" field, for when a source's own address isn't one you'd want a recipient clicking into — e.g. Tautulli's address is its own API host, not the Plex link people actually want, or a source's address is a Tailscale/LAN address unreachable from outside your network. <details> <summary>Technical details</summary> Adds a "Public URL (optional)" input to both the Add-source and Edit-source dialogs (`apps/web/src/pages/sources-page.tsx`), right under the existing Base URL field, with helper text explaining when a self-hoster would want it: "The address your recipients can actually reach — leave blank to use the address above. Useful when this source's address above is internal-only (e.g. a Tailscale IP or an API host like Tautulli that isn't itself the link you want people to click)." Wired into the same create/update API calls as `baseUrl` (`createSource`/`updateSource` in `apps/web/src/lib/api.ts`); left blank, it's simply omitted on create and clears any previously-set value on update. Server-side support (the `publicUrl` column and its use in building per-item links) ships alongside this in `@latestarr/server`. Also makes items in a GrapesJS-authored Media List block (and the composite "All New (This Period)" block, which reuses the same card markup) clickable: `mediaListCardBody` in `apps/web/src/lib/grapesjs-blocks.ts` now wraps an item's title and poster in `<a href="{{externalUrl}}">` when the rendered item has one, styled to inherit the surrounding title color with no underline, falling back to plain text/image when it doesn't — mirroring the same treatment the default (non-custom) newsletter layout got in `@latestarr/server`. </details>
-- **Improved:** The tertiary blue accent now shows up in a few more places — a frosted-glass look on the header's version/GitHub cluster and a couple of secondary info panels, and a distinct blue tint on the footer's attribution links — instead of being limited to just the version badge. <details> <summary>Technical details</summary> Expands the tertiary token (`--tertiary`/`--tertiary-foreground`, see the "Tertiary" note in `index.css`) past its previous badge-only use, per production feedback that it was introduced but under-used. Picked 3 deliberately secondary-info surfaces rather than a global reskin, so it stays an accent, not competing with the rose primary: - `ProjectInfoCard` (`app-shell.tsx`, the version/GitHub/Star cluster in both the desktop header and mobile nav sheet): `bg-muted/40` → a translucent tertiary-tinted glass surface (`bg-tertiary/10`, `border-tertiary/25`, `backdrop-blur-sm`), consistent with it sitting inside the already-blurred sticky header. - `AppFooter`: a faint `bg-tertiary/[0.03]` wash and `border-tertiary/15` top border, tying the footer visually to the header's glass cluster. - Dashboard's "Recent sends" card (`dashboard-page.tsx`): `border-tertiary/20 bg-tertiary/[0.04] backdrop-blur-sm`, since it's a secondary activity-feed panel next to the actionable checklist card, not a primary CTA. Footer links (`app-shell.tsx`): the author/license/issue-tracker links move from plain `text-muted-foreground` to a new `footerLinkClassName` using `text-tertiary` (with a dimmed `hover:text-tertiary/75`), the same pattern the app's `link` button variant already uses for `text-primary` — reserved for these three secondary links, not applied to the header's own GitHub icon link, which stays muted so the two clusters don't visually clash. </details>
-- **Fixed:** A newly added TV season now shows the show's name (e.g. "Breaking Bad") as its title, with the season itself (e.g. "Season 1") as the subtitle — previously it just showed "Season 1" with no indication of which show it belonged to, the same problem episodes had before an earlier fix. <details> <summary>Technical details</summary> Both `packages/adapters/plex/src/plex-adapter.ts` and `packages/adapters/tautulli/src/tautulli-adapter.ts` already had this fix for `tv_episode` items (promoting the show name from `grandparentTitle`/`grandparent_title` into the primary title, demoting the episode's own name to the subtitle via `buildEpisodeTitle`/`buildEpisodeSubtitle`), but had no equivalent for `tv_season` items. Added mirrored `buildSeasonTitle`/`buildSeasonSubtitle` helpers to both adapters. Plex's `PlexMetadataItem` already declared `parentTitle` (the direct-parent show name, one level up from a season — not `grandparentTitle`, which is two levels up and only populated for episodes) but it was never read; it's now used the same way `grandparentTitle` is for episodes. Tautulli's `TautulliRecentlyAddedItem` had no equivalent field, so a `parent_title?: string` field was added to it (mirroring the existing `grandparent_title`/`parent_media_index` fields already proxied through from the underlying Plex server). Both fixes fall back to the season's own bare title with no subtitle when the parent-title field is absent, matching the existing defensive pattern for episodes without a `grandparentTitle`/`grandparent_title`. Test cases covering both the happy path and the fallback were added to `plex-adapter.test.ts` and `tautulli-adapter.test.ts`. </details>
+### New
+
+- Items in a sent newsletter are clickable. A movie, show, book, audiobook or game links straight to that item on its source: Plex, Tautulli, Audiobookshelf, RomM, or a BookLore-family app. ([#127](https://github.com/jshields-ca/LatestArr/pull/127))
+- Sources have an optional **Public URL**, the address recipients' links use, for when a source's own address isn't one they can open. For example, Tautulli's address is its API, not the Plex page people want, and a Tailscale or LAN address doesn't work from outside your network. ([#127](https://github.com/jshields-ca/LatestArr/pull/127))
+
+### Improved
+
+- Editing a newsletter has two tabs. **Details** holds every setting, now including its template, sources and recipient groups, and **History** shows its sends. ([#124](https://github.com/jshields-ca/LatestArr/pull/124))
+- The default layout opens with a short line under the title ("Here's what's new in the last 7 days.", using the newsletter's lookback). Its footer links to the project on GitHub and to where to report an issue. ([#123](https://github.com/jshields-ca/LatestArr/pull/123))
+- A clearer look. ([#125](https://github.com/jshields-ca/LatestArr/pull/125))
+
+  - **Wordmark:** larger and solid instead of a gradient, with "Latest" bold and "Arr" lighter.
+  - **Motion:** a gentler light sweep on buttons, and a clear pop and glow on the GitHub star.
+  - **Blue accent:** used in a few more places, such as the header's version and GitHub links.
+
+### Fixed
+
+- Every item in a newsletter has a badge saying what it is: **Movie**, **TV Episode**, **TV Season**, **Game**, **Book** or **Audiobook**. Before, only books, comics, audiobooks and podcasts had one. ([#123](https://github.com/jshields-ca/LatestArr/pull/123))
+- A new TV season shows the show's name as its title, with "Season 1" underneath. Before, it showed just "Season 1". ([#123](https://github.com/jshields-ca/LatestArr/pull/123))
+- On pages with little content, the footer sits right after it instead of being pushed below the screen. ([#125](https://github.com/jshields-ca/LatestArr/pull/125))
+
+<details>
+<summary>Technical details</summary>
+
+- **Links:** a new `publicUrl` column on source connections. Every adapter now sets `externalUrl` where its app has a page for an item:
+  - Plex and Tautulli use Plex Web deep links, built from the server's machine identifier.
+  - Tautulli without a Public URL makes no links, since its address is its API.
+  - BookLore-family entries use their OPDS permalink, rebased onto the Public URL.
+  - Audiobookshelf uses `/item/<id>` and RomM uses `/rom/<id>`.
+- **Safety:** link schemes are checked, so a source can't put a `javascript:` link into an email.
+- **Rendering:** the default layout wraps an item's title and poster in its link.
+
+</details>
 
 ## [0.8.0] - 2026-09-20
 
-- **New:** Add a single "All New (This Period)" block to the template editor — drop it into a newsletter and it shows everything added recently, grouped by type (movies, TV episodes, TV seasons, books, audiobooks, games), instead of needing to drag in and configure six separate blocks by hand. <details> <summary>Technical details</summary> Addresses the most common request in production feedback on the Media List blocks: "there isn't any options for 'all new' based on the lookback settings in the Newsletter itself... they would expect all of the latest media (audiobooks, tv shows, movies, books, etc) for that lookback period." Getting that today meant dragging in all six content-kind presets one at a time and turning on each one's "Show all items in the period" trait by hand — this is the same result as one block. Dragging in "All New (This Period)" exports one heading + Media List pair per adapter content kind, each reading from the same lookback-scoped `items` pool a per-kind block already does and each already using the existing, shipped `showAll="true"` mechanism (from a previous release's "Show all items in the period" trait) rather than a capped count. A kind with nothing added this period is skipped entirely — heading included, not just its (empty) list — via a new `ifAnyItems` Handlebars block helper (`apps/server/src/render/mjml-template.ts`) that applies the exact same pool + content-type filter `mediaList` itself does, purely to decide whether to render a heading. Without it, a newsletter with e.g. no new games this week would still show a bare "Games" heading over nothing. It's registered as its own GrapesJS component type (`media-list-all-new`), not a second implementation of the card markup: the poster+text `<table>` layout and the `{{#mediaList ...}}` hash-argument tag are now both extracted into shared functions (`mediaListCardBody`/`mediaListOpenTag` in `apps/web/src/lib/grapesjs-blocks.ts`) that the standalone Media List block's own `toHTML()` also calls, so the two can't drift apart. Like the standalone block, its canvas preview is a friendly static summary (real per-kind grouping only happens at MJML export time, against real item data at send time) and has no configurable traits — narrowing to one kind is what the existing per-kind presets are for. </details>
-- **Improved:** Buttons now feel smoother and more premium to hover over — a subtle light sweep and an easier lift, instead of an abrupt bump. <details> <summary>Technical details</summary> Addresses production feedback that the primary button's hover lift felt "bumpy" rather than premium. The hover-triggered lift/shadow now transitions on a slower, spring-like `cubic-bezier(0.34, 1.56, 0.64, 1)` curve at 220ms (up from the shared 150ms linear-ish default), scoped to the `default` variant only via `hover:` utilities so every other button's snappy press-state timing is untouched. A one-shot diagonal light sweep (`.btn-glint` in `index.css`, a `::after` gradient translated across the button and clipped by `overflow-hidden`) plays once per hover-enter rather than looping, and is disabled under `prefers-reduced-motion`. </details>
-- **Improved:** The LatestArr logo is more prominent, the version/GitHub/Star links now sit right next to it on mobile too (matching how they already looked on desktop), and the old hidden "About" info icon has been replaced with a real page footer showing the license, the author, and a link to report an issue. <details> <summary>Technical details</summary> Makes the wordmark more prominent (a larger `LogoMark`, larger tracked-out text with a subtle rose gradient fill) and moves the version/GitHub/Star cluster up next to the `Logo` in the mobile nav sheet, matching where it already sits in the desktop header — the two surfaces now read as one consistent design. Removes the sidebar's "About" info-icon popover (author/license/site) entirely and replaces it with a real page footer, visible on every page instead of hidden behind a click: author link, GPLv3 license link, a "Report an issue" link to the GitHub issue tracker, and an "In Active Development" badge. </details>
-- **Fixed:** Saving a template no longer briefly rebuilds the entire editor canvas behind the scenes (harmless today, but wasteful and a source of subtle glitches down the line). <details> <summary>Technical details</summary> Root-caused while investigating a test that failed intermittently on CI (`template-editor-page.test.tsx`'s "warns on tab close/refresh..." test, "expected true to be false"). Two separate issues, found via instrumented reproduction rather than assumed: 1. **Real production bug**: `handleSave`'s `setTemplate(updated)` on a successful save gives `template` a new object identity every time. The GrapesJS-init `useEffect` was keyed on `[template]`, so this retriggered it — and a dependency-array change always runs the *previous* run's cleanup (`editor.destroy()`, `editorRef.current = null`) before the new run's own `editorRef.current` guard is even evaluated, so the guard couldn't prevent it. Every save destroyed and fully reinitialized the GrapesJS editor (confirmed via an instrumented test run: `mockInit` called twice, `destroy` called once, for a single save). Fixed by keying the effect on `Boolean(template)` instead — true exactly once, on the null-to-loaded transition — which matches the effect's actual intent ("initialize once, when data first arrives") without discarding the canvas on every subsequent save. Added a regression assertion (`mockInit`/`mockEditor.destroy` call counts) to the existing save test. 2. **Real test-helper race** (this was the CI flake's actual cause, confirmed by reproducing it locally — 2 failures in 60 runs before the fix, 0 in 80 after): `simulateEditorContentChange()` fired GrapesJS's mocked content-change handlers immediately after `await screen.findByText("Weekly Digest")` resolved. But `findByText`'s MutationObserver-based resolution isn't guaranteed to happen after *every* passive effect from the same commit has flushed — the GrapesJS-init effect (which registers the content-change handler at all) is a separate, independently-scheduled effect, so `contentChangeHandlers` could still be empty at that point, making the simulated "edit" a silent no-op. Fixed by having the shared test helper itself wait for a handler to actually be registered before firing it, rather than relying on each call site to remember to check — the same synchronization other tests in this file already used for `mockInit`, just not applied here. </details>
-- **Improved:** It's now easier to see which page you're on — the active item in the sidebar gets a clear accent bar, not just a subtle color change. <details> <summary>Technical details</summary> Gives the sidebar/nav-sheet's active nav item a left-edge accent bar (a 3px `bg-primary` pill) on top of its existing background tint, and gives the hover state a slightly slower, clearer background transition — production feedback was that the active state alone was easy to miss at a glance. `navItems` remains a flat list (no section grouping was added, since the current six items don't split into a natural, non-arbitrary category split). </details>
-- **Improved:** Added a new accent color (a calm blue) used for informational badges like the version number and the "In Active Development" label, giving the app's look a bit more depth. <details> <summary>Technical details</summary> Adds a third palette hue — `--tertiary`/`--tertiary-foreground` (indigo/blue, hue ~228) — as a genuine design token alongside `--primary`, following production feedback that the "Bloom" palette had nowhere to go for calm, informational UI beyond the rose primary and the ad hoc violet secondary accent. Indigo/blue was picked as the clearest complementary/triadic partner to rose while staying clear of green (already success) and red/orange (already destructive, and Plex's own brand color); both the light and dark pairs clear 4.5:1+ text contrast the same way every other token pair in `index.css` does. Wired into Tailwind as `bg-tertiary`/`text-tertiary-foreground` and exposed as a new `Badge` `tertiary` variant, used for the header's running-version badge and the new footer's "In Active Development" badge — reserved for informational labels, never a semantic success/warning/destructive state. </details>
+### New
+
+- An **All New (This Period)** block for the template builder. Drop it in, and it shows everything added recently, grouped by type, instead of six separate blocks to add and set up. ([#118](https://github.com/jshields-ca/LatestArr/pull/118))
+
+### Improved
+
+- A more polished look. ([#119](https://github.com/jshields-ca/LatestArr/pull/119))
+
+  - **Buttons:** a subtle light sweep and a softer lift on hover.
+  - **Logo:** more prominent, with the version, GitHub and star links beside it on phones too.
+  - **Navigation:** the current page has a clear accent bar in the sidebar.
+  - **Footer:** a real page footer with the license, the author and a link to report an issue, replacing the hidden "About" icon.
+  - **Colour:** a calm blue accent for informational badges, such as the version number.
+
+### Fixed
+
+- Saving a template no longer rebuilds the whole editor in the background, which could cause glitches. ([#122](https://github.com/jshields-ca/LatestArr/pull/122))
 
 ## [0.7.1] - 2026-09-20
 
-- Bump better-sqlite3 (11 → 12.11.1) — the DB driver, and the last of the deferred major-version Dependabot pass. Runtime dependency, and a native module, so this carries the same "native module" build risk as before across platforms, not just app-level behavior. Landed on 12.11.1 rather than Dependabot's proposed 13.0.3: better-sqlite3 13 dropped Node 20 support entirely (`engines: {"node": ">=22"}`), which would break this repo's Node 20.x CI job — the same class of issue jsdom 30 had (see the earlier `bump-eslint-jsdom` changeset). 12.11.1 is the latest release that still supports Node 20.x through 26.x. - `packages/db/src/client.ts`'s usage (`new Database(path)`, `.pragma()`) and `migrate.ts`'s `drizzle-orm/better-sqlite3/migrator` are both stable, long-standing API surface — unaffected by the 11→12 bump. - `drizzle-orm`'s own peer range for `better-sqlite3` is `>=7`, so no drizzle-orm compatibility concern either. - The native module installs cleanly (`prebuild-install` resolved a prebuilt binary, no compile-from-source fallback needed) on this platform/Node combination. - `pnpm turbo run lint typecheck build test` is fully green (40/40 tasks) — `packages/db`'s own tests (WAL mode, foreign keys, migrations) pass, plus every server route test that touches the DB. - The actual cross-compile for the Docker image's `node:22-alpine` (musl libc) target isn't something this sandbox can validate directly (no Docker daemon available here) — that's what the PR's own CI "Docker build" job checks for real, same as every other bump in this batch.
-- Bump croner (9 → 10), the scheduler library. Runtime dependency — this is the highest-risk bump in the deferred major-version pass, since a subtle regression here could silently stop newsletters from firing on schedule rather than failing loudly. Extra scrutiny beyond the usual test suite, since `apps/server/src/scheduler/engine.ts`'s missed-schedule catch-up logic (`nextScheduledRunAfter`) always constructs a real `Cron` directly — it isn't behind the tests' injectable `cronFactory` mock, so `apps/server/src/scheduler/engine.test.ts`'s catch-up tests already exercise real croner behavior at exact date boundaries, not a stub: - All 11 scheduler tests pass unchanged, including the three missed-schedule catch-up boundary cases. - Directly verified `nextRun(since)` is still strictly-after-exclusive of `since` (matching the code's own documented assumption) at the exact same boundary the tests use (`"0 9 * * 1"` around `2024-01-01T09:00:00Z`). - Directly verified the exact 3-arg `new Cron(pattern, options, callback)` constructor shape `defaultCronFactory` depends on, plus `.stop()`, still work unchanged. `pnpm turbo run lint typecheck build test` is fully green (40/40 tasks).
-- Bump eslint (9 → 10) and @eslint/js (9 → 10) across every package, and jsdom (25 → 29.1.1) in apps/web's test environment. Dev-tooling only, no runtime dependency changes. The Dependabot PRs for eslint/@eslint/js (#97, #105) failed CI with a stale, out-of-sync pnpm-lock.yaml on their branch — reproduced locally with a freshly regenerated lockfile and confirmed all 40 lint/typecheck/build/test tasks pass cleanly; `eslint-plugin-jsx-a11y`'s declared peer range hasn't caught up to eslint 10 yet, but it lints without error in practice. jsdom's own Dependabot PR (#104) proposed 25 → 30, but jsdom 30 dropped Node 20 support entirely (`engines: "^22.22.2 || ^24.15.0 || >=26.0.0"`), which broke this repo's Node 20.x CI job with `TypeError: webidl.util.markAsUncloneable is not a function` — a real Node-runtime incompatibility, not a lockfile issue. Landing on 29.1.1 instead (the latest jsdom release that still supports Node 20.19+) gets most of the version currency without dropping Node 20 CI support, which is a bigger call than a routine dependency bump.
-- Bump react and react-dom (18 → 19) and their `@types` packages. Dev/runtime dependency only. Low migration risk in this codebase: `main.tsx` already uses `ReactDOM.createRoot` (no legacy `ReactDOM.render` to migrate), there's no direct `react-dom/test-utils` import (React 19 moved `act` into `react` itself), and no component uses `defaultProps` on a function component (removed in 19). `@testing-library/react@16` (already in use) and `react-router-dom@7` already support React 19. `pnpm turbo run lint typecheck build test` is fully green (40/40 tasks, 225 web tests, no React deprecation warnings in test output). Beyond the test suite, built the app and drove it with a real headless Chromium session against the built server (signup → dashboard → navigated Sources/Recipients/Newsletters/Templates → opened the Add Source dialog) — no console errors, no visual regressions, confirmed by screenshot.
-- Bump vite (6 → 8, apps/web only), vitest (4 → 5, every package), and @vitejs/plugin-react (4 → 6, apps/web only). Dev-tooling only, no runtime dependency changes. Bumped all three together since they're an interlocking build/test toolchain — vitest 5 pins a vite 6+ peer, and @vitejs/plugin-react needs to track the vite major it's paired with. `pnpm turbo run lint typecheck build test` is fully green (40/40 tasks, 189 server tests, 225 web tests); no config changes needed in `apps/web/vite.config.ts` or any `vitest.config`.
+A maintenance release with no changes to how LatestArr works. It updates core libraries to their next major versions: React, the scheduler, the database driver and the image library, plus the build and test tools.
+
+<details>
+<summary>Behind the scenes</summary>
+
+- **Runtime libraries:**
+  - React and React DOM 18 → 19 ([#115](https://github.com/jshields-ca/LatestArr/pull/115));
+  - croner, the scheduler, 9 → 10, checked against missed-send catch-up ([#116](https://github.com/jshields-ca/LatestArr/pull/116));
+  - better-sqlite3, the database driver, 11 → 12.11.1. 13 would have dropped Node 20. ([#117](https://github.com/jshields-ca/LatestArr/pull/117));
+  - sharp 0.34 → 0.35 ([#111](https://github.com/jshields-ca/LatestArr/pull/111)).
+- **Build and test tools:**
+  - Vite 8, Vitest 5 and the React plugin 6 ([#114](https://github.com/jshields-ca/LatestArr/pull/114));
+  - ESLint 10 and jsdom ([#112](https://github.com/jshields-ca/LatestArr/pull/112)).
+
+</details>
 
 ## [0.7.0] - 2026-09-19
 
-- Design system refresh addressing v0.6.0 production feedback: typography, type hierarchy, visual personality, and consistent save/error feedback across every admin page. - **Typography**: adds Plus Jakarta Sans as the app's UI/body face (via `--font-sans`), replacing the unstyled default system-font stack. Newsreader — previously reserved for the "LatestArr" wordmark — now also sets each page's own `<h1>` (a new `PageHeader` component, used on Dashboard, Sources, Recipients, SMTP Profiles, Newsletters, and Templates) at a larger display size, giving the app an actual typographic voice at the one spot per page where it doesn't compete with body text. - **Hierarchy**: standardizes the in-page section-label tier (previously plain `text-sm font-medium` — the same weight as plenty of nearby bold body text, e.g. "Template", "Sources", "Recipient groups", "Send history" on the Newsletters page) into a new `SubsectionHeading` component: a small uppercase, tracked-out label distinct from both the page `<h1>` and from bold body copy. Page titles and `<h2>` section headers were already consistent and are unchanged. - **Visual personality**: adds violet as a restrained secondary accent (Tailwind's own palette, matching how Badge's success/warning variants and the dashboard's stat tiles already work — no new color tokens) via a new `accent` Badge variant, used on the dashboard's "Optional" checklist tag and a template's "Designed" status. Floating chrome that has real content behind it to blur — Popover, Select, Dialog/Sheet content, and the new toast notifications — gets a translucent, blurred ("glassy") background instead of a flat opaque one; static cards get a faint inset highlight ring for the same read without the wasted compositing cost of blurring nothing. Every button now gets a quick press-down scale on `:active` (previously only the primary variant's hover-lift existed, from the original Bloom rebrand), and the primary button's hover-lift transition now animates only `transform`/`box-shadow`/`background-color`/`color`/`border-color` instead of `transition-all`. - **Toasts**: adds a Radix-based toast system (`ui/toast.tsx` + `ui/use-toast.ts` + a `Toaster` mounted once in `App.tsx`, following this codebase's existing Radix-wrapper pattern) and wires it into every save/update/delete/toggle/test/send action across Sources, Recipients, Groups, SMTP Profiles, Newsletters, and Templates — including several actions (the Newsletters template picker, group-member add/remove, the enabled toggle) that previously gave no feedback at all, or reused unrelated inline error state. The template editor's existing inline "Saved" indicator is untouched; it now gets a corresponding toast alongside it rather than being replaced. - Reuses the existing `SourceLogo` component on the Newsletters page's linked-source badges, which were missing the per-source-kind icon that the Sources page itself already shows. All recolored/retinted surfaces were checked against WCAG AA (4.5:1) in both themes, including the new translucent surfaces at worst-case backdrop extremes.
-- Redesign the relationship between the top banner and the sidebar footer, addressing feedback from a production user: the header was mostly dead space (just the theme toggle), the sidebar footer's account email got cut off next to the Edit profile/Sign out buttons, and the Star icon linked straight out to GitHub with no context. The version/GitHub/Star/About cluster and the account summary (name, email, edit, sign out) now live in the desktop header, which has the width to give the email room to stay legible (still truncates gracefully with a `title` tooltip if needed) instead of the cramped 240px sidebar column; the sidebar itself is now just branding-free navigation. The Star icon now opens a small popover — matching the existing About popover's pattern — with a short explanation of why starring helps, and a button that actually links out to GitHub, instead of linking out immediately. The version badge's text is also a size larger while keeping the same mini-card styling. The mobile nav sheet keeps the same compact card layout as before, unchanged.
-- Addresses the most common piece of v0.6.0 production feedback: newsletters rendering "very plain, no images/posters/covers." Only the RomM adapter ever populated `posterUrl` — Plex, Tautulli, Audiobookshelf, and the BookLore family all left it empty, so their items never got a poster in the default template or a Media List block, even though the rendering side already supported one. Wires poster/cover art through for all four remaining adapters: Plex maps its `thumb` field to a token-bearing absolute URL; Tautulli adds the `thumb`/`art` fields its API was already returning but the client wasn't reading, resolved through its own `pms_image_proxy` command; Audiobookshelf maps `media.coverPath` to its token-bearing cover endpoint; and the BookLore-family client gains real OPDS `<link rel="...image">` parsing (preferring the full image over the thumbnail), which it had none of before. Rather than putting a source's own URL (frequently LAN-only, and often carrying that source's credentials as a query param) directly into a sent email, a new pipeline step (`apps/server/src/pipeline/embed-images.ts`) fetches each item's image server-side at send time — using the same stored, decrypted credentials the pipeline already polls that source with, via a new `SourceAdapter.fetchImageBytes()` (replacing the previously unimplemented `resolveImageUrl`) — resizes it to a thumbnail with `sharp`, and attaches it to the outgoing email as a Nodemailer CID attachment. The rendered HTML references it with `<img src="cid:...">`; a recipient's mail client never makes an outbound request of its own. This is applied uniformly to the default template and to the GrapesJS Media List block. Every step fails soft, per item: an unreachable source, a failed fetch, or an image `sharp` can't decode falls back to a small blank-pixel data URI for that one item rather than failing the whole send. Embedding only ever happens for images a Media List block's own selection (count/order/showAll/emptyFallback) actually renders — real `posterUrl`s are swapped for opaque placeholder tokens before the template renders, and only the tokens that survive into the compiled HTML get fetched, resized, and attached afterward. Otherwise a block showing 5 items out of an 80-item library would fetch, resize, and attach all 80 posters even though only 5 ever appear in the email, undermining the whole "keep message size sane" point of CID embedding. Referenced images are also fetched/resized concurrently rather than one at a time, and the "most watched" and "empty-pool fallback" item pools are fetched concurrently with each other rather than sequentially. Every adapter's image fetch (`fetchImage`/`fetchOpdsImage`) is also now bounded by a 10s `AbortSignal.timeout()` — since `resolvePosterPlaceholders` awaits every referenced item's image via `Promise.all`, one source that hangs instead of erroring would otherwise stall the whole send indefinitely rather than failing that one item's poster softly. Also replaces every adapter client's `baseUrl.replace(/\/+$/, "")` trailing-slash trim with a new shared `trimTrailingSlashes()` helper (`@latestarr/adapter-core`) — a plain linear scan instead of a regex CodeQL flagged as a polynomial-time ("catastrophic backtracking") pattern on uncontrolled input. Also, from the same feedback: - **TV episode titles**: a `tv_episode` item's prominent title was just the bare episode name (e.g. "Winter Is Coming"), with the series name buried in the subtitle — it now leads with the series title, with "SxxExx - Episode Name" as the subtitle, for both Plex and Tautulli. Rendered items also now show a release date alongside the added date when the source provides one. - **Content-kind labeling**: BookLore-family items are now labeled "Ebook", "Comic", or "Book" (derived from the OPDS acquisition link's MIME type), and Audiobookshelf items "Audiobook" or "Podcast", surfaced as a small badge next to the title in both the default template and the Media List block — without widening the shared `MediaKind` enum for it. - **Smarter Media List blocks**: a new "Random order" trait picks random items from the matching pool instead of always the first N; a new "Show all items in the period" trait removes the count cap entirely; and a new "When nothing matches this period" trait offers a random-items-instead fallback (sampled from an all-time pool, only fetched when a block actually needs it) or a plain link back to the source, instead of silently rendering an empty section.
+### New
+
+- Newsletters show posters and covers from every source. Before, only RomM's games had them, which was the most common feedback on 0.6.0. ([#107](https://github.com/jshields-ca/LatestArr/pull/107))
+
+  Images are fetched by LatestArr and attached to the email. Recipients' mail apps never contact your servers, and your sources' addresses and credentials never appear in an email.
+
+- Saving and errors are confirmed the same way on every page, with a short pop-up message. ([#108](https://github.com/jshields-ca/LatestArr/pull/108))
+
+### Improved
+
+- A design refresh, from 0.6.0 feedback. ([#108](https://github.com/jshields-ca/LatestArr/pull/108))
+
+  - **Type:** Plus Jakarta Sans for text, and the Newsreader serif for each page's title.
+  - **Hierarchy:** section labels are small capitals, so they stand apart from bold text.
+  - **Colour:** a restrained violet accent.
+  - **Depth:** a frosted-glass look on dialogs, menus and pop-ups.
+
+- The header holds your account and the project links. ([#106](https://github.com/jshields-ca/LatestArr/pull/106))
+
+  - **Account:** your name, email, **Edit profile** and **Sign out** moved from the cramped sidebar into the header, so your email no longer gets cut off.
+  - **Star:** opens a short note on why starring helps, instead of jumping straight to GitHub.
+
+### Fixed
+
+- TV episodes lead with the series name, with "S01E01 - Episode name" underneath, for Plex and Tautulli. Before, the series name was buried below the episode's own title. ([#107](https://github.com/jshields-ca/LatestArr/pull/107))
+
+<details>
+<summary>Technical details</summary>
+
+- **Posters:**
+  - Plex reads `thumb`;
+  - Tautulli reads `thumb` and `art` through its `pms_image_proxy`;
+  - Audiobookshelf reads `media.coverPath`;
+  - the BookLore-family adapter parses OPDS image links.
+- **Embedding:** at send time, `pipeline/embed-images.ts` fetches each image with the source's stored credentials (`SourceAdapter.fetchImageBytes`), resizes it with `sharp`, and attaches it as a CID image. Only images that make it into the rendered email are fetched.
+- **Toasts:** built on Radix Toast.
+
+</details>
 
 ## [0.6.0] - 2026-09-16
 
-- Dashboard polish from testing feedback: recent sends now show which newsletter, item/recipient counts, and outcome per entry (reusing the same Send History status logic as the Newsletters page) instead of just a status badge and timestamp; the setup checklist collapses to a small "Setup complete" summary once every required step is done, expandable again to double-check anything, instead of either vanishing or staying full-size forever; the stat tiles (Sources/Recipients/SMTP Profiles/Newsletters) now use per-tile accent-colored icon chips, a hover lift, and a secondary metric where one is meaningful (open sources needing attention, recipient group count, active newsletters); the checklist and Recent sends cards sit side by side on wide screens instead of stacking narrow and leaving the right side of the page empty; and the destructive/warning/success Badge text colors were adjusted to clear WCAG AA contrast against their tinted backgrounds in both themes.
-- Add regression test coverage in `renderMjmlTemplate` for a bug found while verifying the template editor's new preset blocks (apps/web): a `<table>` placed directly under `<mj-column>` (rather than wrapped in `<mj-raw>`) gets silently dropped by MJML's compiler under "soft" validation, with no thrown error. No production server behavior changes — the fix itself is in `apps/web`'s block library, which is what emits this markup.
-- Expand the template editor's block library beyond the previous three generic blocks (Header, Footer, Media List) so it's actually discoverable: six new "content-kind" preset blocks (Movies, TV episodes, TV seasons, Books, Audiobooks, Games) let a user drag in a ready-to-go section for a specific *arr media kind instead of dragging the generic Media List and then hunting for its Content type trait afterward — each preset is just the existing Media List component with that trait pre-set, not a second implementation. Also add two standard newsletter-builder primitives the library was missing entirely: a Divider (`mj-divider`) and a Spacer (`mj-spacer`). The block panel is now organized under "Layout" (Header, Footer, Divider, Spacer) and "Content" (Media List and its six presets) category headers instead of one flat, unlabeled list. Also fixes a real bug surfaced while verifying the new preset blocks against the actual MJML compile pipeline (not just the editor canvas): the Media List component's exported `<table>` markup sat directly under `<mj-column>` with no `<mj-raw>` wrapper, so MJML's compiler silently dropped it (no thrown error under "soft" validation) — meaning the *existing*, already-shipped Media List block rendered its section as empty in a real compiled/sent newsletter despite looking correct in the editor. This affects every content type, not just the new presets, and is fixed alongside them since it shares the same `toHTML()` code.
-- Fix a real send-failure bug: a custom template saved from the builder before it's ever had an initial design loaded exports a bare MJML fragment (no `<mjml><mj-body>` root element). `renderMjmlTemplate` now wraps such a fragment before compiling instead of letting `mjml2html` reject it outright — previously this would fail the entire send rather than falling back to best-effort rendering, the same way a malformed template already does.
-- Newsletter admin fixes from design review and a real send-now test run: newsletter cards now show a human-readable schedule ("Weekly on Monday at 8:00 AM") instead of the raw cron string for schedules the Simple picker can express; the Add newsletter dialog defaults Timezone to the browser's own zone instead of always UTC, and pre-selects the SMTP profile when there's exactly one; the Add/Edit newsletter dialogs group their Schedule and Delivery fields into labeled sections instead of one flat list; a "Send now" that completes with nothing actually sent (no linked source or recipient group) is now visually distinguished from a real send in Send History and on the Dashboard; a genuine send failure (e.g. an unreachable source) now returns a specific, structured error instead of a bare "Internal Server Error", shown inline the moment the send fails; and Send History now refreshes automatically right after a "Send now" click resolves instead of requiring a page reload.
-- Add a proper "Page not found" screen (with a link back to the Dashboard) for unknown routes, replacing the blank content area you'd get from mistyping a URL like `/smtp-profiles` instead of `/smtp`. Also fix the first-admin signup form only flagging the Password field when submitted empty — Name and Email now get the same red-border-and-inline-message treatment when they're missing too.
-- Replace the native `<select>` dropdown with a custom-rendered one built on `@radix-ui/react-select`. Every other primitive in the app (Button, Dialog, Switch, Input) is already fully themed, but the browser's own OS dropdown chrome still showed through whenever a Select was opened — bright white on Linux/Windows, breaking out of the app's dark, all-custom aesthetic. The dropdown popover now matches the app's dialogs (same border/shadow/radius/animation language) in both light and dark mode. `Select`'s props are unchanged for every existing call site.
-- Restyle the Send History list on the newsletter card so each send-run reads as a distinct, scannable row instead of plain wrapped text: a status icon (matched to the existing badge colors), the timestamp and outcome badge on one line, item/recipient counts and any error message below, all inside a bordered row. Failed and partially-failed sends get a red left accent and tinted background so problems stand out without reading every row. No changes to what data is fetched or when it refreshes.
-- Redesign the sidebar's bottom "about" area (version, GitHub links, author, license, site) as a compact bordered mini-card instead of stacked plain text. The version now shows as a small badge, and the "Jeremy Shields · GPLv3 · scootr.ca" attribution moves behind a keyboard-accessible Info popover (built on Radix Popover) so the footer reads as one deliberate row rather than an afterthought, in both the desktop sidebar and the mobile nav sheet.
-- Simplify the SMTP profile Add/Edit dialog's port and encryption copy. Based on direct user testing feedback, the two-sentence paragraph explaining STARTTLS vs. implicit TLS under the "Use implicit TLS" toggle assumed email-server knowledge most self-hosters don't have. It's replaced with a "Port & encryption" section containing a compact, always-visible reference (587 = STARTTLS, 465 = implicit TLS, 25/2525 = usually unencrypted) and a one-line hint under the toggle, both wired up with `aria-describedby` for accessibility. The toggle's behavior (including auto-defaulting on for port 465) is unchanged.
-- Sources page polish from testing feedback: each source kind now shows its service's own logo (Tautulli, Plex, BookLore, BookOrbit, Grimmory, Audiobookshelf, and RomM) next to its kind label in the sources list and in the Add/Edit dialog's Source type picker, bundled locally rather than hotlinked; and the OPDS username/password fields for the BookLore-family sources (BookLore, BookOrbit, Grimmory) now have a plain-language hint explaining that OPDS is just the login for that app's own web reader, not a separate API key.
-- Fix five usability bugs in the template editor: GrapesJS's default panel buttons (Open Blocks, Settings, Layers, etc.) rendered as blank squares because their built-in icons depend on Font Awesome, which this app never loads; the editor's selection/active-state accent showed GrapesJS's own stock orange (from the grapesjs-mjml plugin's custom theme) instead of the app's Bloom pink; clicking the Media List block's preview card selected an inner generic child instead of the block itself, hiding its real Content type/Sort/Number of items traits behind an unlabeled "select parent" step; the Move up/down toolbar buttons rendered as thin unicode arrows next to GrapesJS's bold icons and silently no-opped at the top/bottom of a list with no feedback; and the editor had no unsaved-changes protection at all, so a refresh or the page's own Back button silently discarded in-progress work.
-- Fix the "default layout" (no custom template picked) newsletter render falling back to a stale, pre-poster hardcoded template with no images and no MJML compilation. It now renders through the same MJML pipeline as a custom GrapesJS template, so a default-layout send gets the same poster + metadata cards, responsive layout, and Outlook/MSO compatibility.
-- Consolidate the admin CRUD pages (Sources, Recipients & Groups, SMTP Profiles, Newsletters, Templates) onto a shared `ListRow` component instead of five hand-rolled row layouts that had drifted apart in spacing, hover treatment, and how metadata badges sat next to a row's name. Every row now uses the same leading-icon/primary/secondary/actions shape and the same responsive header layout (stacked on mobile, side-by-side from `sm:` up), so moving between pages no longer shows subtly different row heights or gaps. Also dedupes the identical `ConfirmDelete` inline prompt that Recipients and Templates each defined on their own into a shared `ConfirmDeleteButton`. No page's behavior, click targets, or `aria-label`s changed — this is a visual/structural consolidation only. Also gives Recipient Groups an Edit dialog (previously groups could only be added and deleted, so fixing a typo in a group's name meant losing its members by recreating it). It mirrors Recipients' own Edit dialog and reuses the `PATCH /recipient-groups/:id` server route that already existed for it.
+### New
+
+- More building blocks in the template builder. ([#89](https://github.com/jshields-ca/LatestArr/pull/89))
+
+  - **Presets:** ready-made sections for Movies, TV episodes, TV seasons, Books, Audiobooks and Games.
+  - **Spacing:** a **Divider** and a **Spacer**.
+  - **Organisation:** blocks are grouped under **Layout** and **Content**.
+
+- Edit a recipient group's name, without deleting it and losing its members. ([#93](https://github.com/jshields-ca/LatestArr/pull/93))
+- A **Page not found** screen, with a link back to the dashboard, instead of an empty page. ([#80](https://github.com/jshields-ca/LatestArr/pull/80))
+
+### Improved
+
+- **Newsletters:** ([#83](https://github.com/jshields-ca/LatestArr/pull/83))
+  - **Readable schedules:** "Weekly on Monday at 8:00 AM" instead of a cron expression.
+  - **Better defaults:** a new newsletter starts in your browser's timezone, with your SMTP profile picked when you only have one.
+  - **Grouped fields:** the dialog groups its fields into **Schedule** and **Delivery**.
+- **Send history** is easy to scan: one row per send, with a status icon, counts and any error, and failures highlighted in red. It also refreshes straight after **Send now**. ([#83](https://github.com/jshields-ca/LatestArr/pull/83), [#87](https://github.com/jshields-ca/LatestArr/pull/87))
+- **Dashboard:** ([#88](https://github.com/jshields-ca/LatestArr/pull/88))
+  - **Recent sends:** each shows its newsletter, counts and result.
+  - **Checklist:** collapses to "Setup complete" once you're set up.
+  - **Stats:** clearer tiles.
+  - **Contrast:** status badges meet WCAG AA in both themes.
+- **Sources:** each type shows its own logo, and BookLore-family sources explain their OPDS sign-in. ([#91](https://github.com/jshields-ca/LatestArr/pull/91))
+- **SMTP:** simpler port and encryption help: 587 is STARTTLS, 465 is implicit TLS, and 25 or 2525 is usually unencrypted. ([#86](https://github.com/jshields-ca/LatestArr/pull/86))
+- **Look and feel:**
+  - dropdowns match the app's theme instead of showing the browser's own menu ([#85](https://github.com/jshields-ca/LatestArr/pull/85));
+  - lists look the same on every page ([#93](https://github.com/jshields-ca/LatestArr/pull/93));
+  - the sidebar's project links are a compact card ([#90](https://github.com/jshields-ca/LatestArr/pull/90)).
+
+### Fixed
+
+- **Default layout:** newsletters without a template rendered through an old, imageless layout. They now use the same layout as templates, with posters and details. ([#81](https://github.com/jshields-ca/LatestArr/pull/81))
+- **Media List block:** it looked right in the builder, but its section came out empty in sent emails. ([#89](https://github.com/jshields-ca/LatestArr/pull/89))
+- **Unfinished templates:** a template saved before it had any design failed the whole send. It now renders as well as it can. ([#92](https://github.com/jshields-ca/LatestArr/pull/92))
+- **Send now:** a failure shows a specific error instead of "Internal Server Error", and a send that reached nobody is shown differently from a real send. ([#83](https://github.com/jshields-ca/LatestArr/pull/83))
+- **Template builder:** five fixes. ([#84](https://github.com/jshields-ca/LatestArr/pull/84))
+  - panel buttons showed as blank squares;
+  - the editor used the wrong accent colour;
+  - clicking a Media List selected the wrong part of it;
+  - **Move up** and **Move down** didn't say when they couldn't move;
+  - leaving the page lost unsaved changes without asking.
+- **First-run setup** flags a missing name or email, not just a missing password. ([#80](https://github.com/jshields-ca/LatestArr/pull/80))
+
+<details>
+<summary>Technical details</summary>
+
+- **Media List:** its exported `<table>` sat directly under `<mj-column>`, which MJML silently drops. It's now wrapped in `<mj-raw>`, with a regression test in `renderMjmlTemplate`.
+- **Fragments:** a bare MJML fragment is wrapped in `<mjml><mj-body>` before compiling.
+- **Lists:** pages share a `ListRow` component and a `ConfirmDeleteButton`.
+
+</details>
 
 ## [0.5.0] - 2026-09-15
 
-- Give the Media List builder block real poster/cover-art and metadata (runtime, page count, audiobook duration, platform, rating), expand its content-type picker to all six adapter media kinds (movies, TV episodes, TV seasons, books, audiobooks, games), and add real, non-drag Move up/down buttons to every component's toolbar in the template editor.
-- Add a simple Daily/Weekly/Monthly schedule picker (with a raw-cron "Advanced" fallback) and a timezone selector to the newsletter Add/Edit dialogs, plus a new Edit dialog so a newsletter's schedule, lookback window, subject template, and SMTP profile can be changed after creation without recreating it.
-- Give each source kind a distinct icon on the Sources page and show its friendly label (e.g. "BookOrbit") instead of the raw adapter id (e.g. "bookorbit").
+### New
+
+- Pick a schedule without cron: **Daily**, **Weekly** or **Monthly**, with a time and a timezone. A raw cron expression is still there under **Advanced**. ([#75](https://github.com/jshields-ca/LatestArr/pull/75))
+- Edit a newsletter after creating it: its schedule, lookback window, subject and SMTP profile. Before, changing any of them meant recreating the newsletter. ([#75](https://github.com/jshields-ca/LatestArr/pull/75))
+
+### Improved
+
+- The template builder's Media List block shows posters and details. ([#76](https://github.com/jshields-ca/LatestArr/pull/76))
+
+  - **Details:** runtime, page count, audiobook length, platform and rating.
+  - **Content types:** all six (movies, TV episodes, TV seasons, books, audiobooks and games).
+  - **Reordering:** every block gets **Move up** and **Move down** buttons, so you don't have to drag.
+
+- Each source type has its own icon on the Sources page, with its proper name ("BookOrbit", not "bookorbit"). ([#77](https://github.com/jshields-ca/LatestArr/pull/77))
 
 ## [0.4.6] - 2026-09-15
 
-- Add a way to edit your own display name and change your password from the admin UI — previously there was no way to do either without direct database access. A new "Edit profile" button next to the sidebar's user info opens a dialog for both; changing the password requires the current password, and accounts that sign in via SSO (no local password) get a clear error if they try.
+### New
+
+- Change your own name and password from **Edit profile**, next to your name in the sidebar. Before, neither could be changed without editing the database. Changing your password asks for the current one, and SSO-only accounts are told they have no password to change. ([#73](https://github.com/jshields-ca/LatestArr/pull/73))
 
 ## [0.4.5] - 2026-09-15
 
-- Polish the sidebar's project links: the "view on GitHub" link now uses an actual GitHub mark instead of a generic folder icon, and the star link is a filled, coloured star instead of an outline in the same muted grey as everything else. The scootr.ca globe icon is replaced with a plain attribution line below ("Jeremy Shields · GPLv3 · scootr.ca"), which also corrects an earlier draft that had mislabeled the project's license as AGPL — LatestArr is GPLv3.
+### Improved
+
+- Tidier project links in the sidebar: a real GitHub logo, a filled star for starring the repo, and an attribution line underneath. The attribution also corrects an earlier draft that called the license AGPL; LatestArr is GPLv3. ([#71](https://github.com/jshields-ca/LatestArr/pull/71))
 
 ## [0.4.4] - 2026-09-15
 
-- Add the ability to edit an existing Recipient, SMTP Profile, or Source connection instead of having to delete and re-create it to fix a typo or rotate a credential. Recipients gain email editing (previously only display name and active/inactive were editable). Sources gain a `PATCH /api/sources/:id` endpoint (previously the only mutations were create/delete/test). Credential fields on Sources and the username/password on SMTP Profiles are never pre-filled (they're not returned decrypted) — leave them blank to keep the stored value, or fill in every credential field for that source kind to replace them all at once.
+### New
+
+- Edit recipients, SMTP profiles and sources, instead of deleting and recreating them to fix a typo or change a password. ([#69](https://github.com/jshields-ca/LatestArr/pull/69))
+
+  - **Recipients:** their email address can now be changed too, not just their name.
+  - **Credentials:** saved passwords, tokens and API keys are never shown. Leave them blank to keep them, or enter new ones to replace them.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Adds `PATCH /api/sources/:id`. A source's credentials are replaced only as a complete set for its kind.
+
+  </details>
 
 ## [0.4.3] - 2026-09-15
 
-- Fix SMTP connections silently failing with an OpenSSL "wrong version number" error on providers like Dreamhost. The "Use TLS" toggle defaulted on regardless of port, which makes the mailer attempt implicit TLS (wrapping the socket in TLS immediately) — but port 587 (the form's own default) is a STARTTLS port, which expects a plain connection that upgrades to TLS after the initial handshake, not implicit TLS. Sending an implicit-TLS handshake to a STARTTLS-only port fails immediately. The toggle (relabeled "Use implicit TLS (port 465)") now defaults based on the port entered and only overrides that guess once changed manually, and the mailer now sets `requireTLS` when not using implicit TLS so a STARTTLS upgrade failure surfaces as a clear error instead of silently falling back to an unencrypted connection. Also fix the Docker container/project name inheriting whatever directory `docker-compose.yml` happens to live in (e.g. `test-latestarr-latestarr-1`) — `docker-compose.yml` now pins its own project and container name to `latestarr` regardless of the checkout's folder name.
+### Fixed
+
+- Sending through port 587 works with providers like DreamHost, instead of failing with an OpenSSL "wrong version number" error. ([#67](https://github.com/jshields-ca/LatestArr/pull/67))
+
+  The TLS switch, now labelled **Use implicit TLS (port 465)**, follows the port you enter unless you change it. Port 587 upgrades to TLS after connecting (STARTTLS), and a failed upgrade is now an error instead of quietly sending unencrypted.
+
+  <details>
+  <summary>Technical details</summary>
+
+  The switch defaulted on whatever the port, which made the mailer attempt implicit TLS on a STARTTLS port. The mailer now sets `requireTLS` whenever implicit TLS is off.
+
+  </details>
+
+- The Docker container is always named `latestarr`, whatever folder `docker-compose.yml` is in. Before, a checkout in `test-latestarr/` made a container called `test-latestarr-latestarr-1`. ([#67](https://github.com/jshields-ca/LatestArr/pull/67))
 
 ## [0.4.2] - 2026-09-15
 
-- Fix login silently failing (redirects to the dashboard, then immediately shows "Not authenticated", every time, even right after refresh) when accessing the app directly over plain HTTP without a reverse proxy in front — again, exactly the documented default Getting Started flow. The session cookie's `Secure` flag was set based on `NODE_ENV === "production"`, but the Docker image always sets `NODE_ENV=production` regardless of whether TLS is actually in front of the app, so `Secure` was forced on unconditionally; browsers silently refuse to store a `Secure` cookie over a plain HTTP connection, so the cookie set by `/api/auth/login` was simply never kept. `Secure` is now based on the actual request protocol instead, which is `http` unless a reverse proxy is explicitly trusted via the new `TRUST_PROXY=true` env var and forwards `X-Forwarded-Proto: https` (documented in `docs/self-hosting.md`'s reverse-proxy section, which already described this as the intended mechanism).
+### New
+
+- **`TRUST_PROXY=true`** for running behind a reverse proxy that handles HTTPS, so the session cookie is marked secure. ([#65](https://github.com/jshields-ca/LatestArr/pull/65))
+
+### Fixed
+
+- Signing in works when LatestArr is opened over plain HTTP, with no reverse proxy, as in the quick start. Before, sign-in looked like it worked, then immediately showed "Not authenticated". ([#65](https://github.com/jshields-ca/LatestArr/pull/65))
+
+  <details>
+  <summary>Technical details</summary>
+
+  The cookie's `Secure` flag followed `NODE_ENV=production`, which the Docker image always sets, so browsers refused the cookie over plain HTTP. It now follows the request's actual protocol, which is only `https` when a trusted proxy says so with `X-Forwarded-Proto`.
+
+  </details>
 
 ## [0.4.1] - 2026-09-15
 
-- Fix the admin UI failing to load entirely (blank page) when accessed directly over plain HTTP without a reverse proxy in front. `@fastify/helmet`'s Content-Security-Policy defaults silently include `upgrade-insecure-requests`, which tells the browser to rewrite every `http://` subresource request (the JS bundle, CSS, favicon) to `https://` before sending it — independent of any browser "HTTPS-Only Mode" setting, and unaffected by exceptions or private browsing. Since LatestArr has no TLS listener of its own (TLS is expected to come from a reverse proxy), those upgraded requests failed outright and the app never rendered. The directive is now explicitly removed from the CSP.
+### Fixed
+
+- The web app loads when opened over plain HTTP, with no reverse proxy. Before, it showed a blank page. ([#63](https://github.com/jshields-ca/LatestArr/pull/63))
+
+  <details>
+  <summary>Technical details</summary>
+
+  The default Content Security Policy from `@fastify/helmet` includes `upgrade-insecure-requests`, so browsers rewrote every script and stylesheet request to `https://`, which LatestArr doesn't serve. The directive is now removed.
+
+  </details>
 
 ## [0.4.0] - 2026-09-15
 
-- Make the GrapesJS template builder keyboard-operable. Previously the block panel, layer manager, and every other builder panel button were unreachable by Tab (GrapesJS renders them as plain `<span>`s with no tabindex), and blocks could only be added by dragging — a keyboard-only user had no way to open the builder's panels or add a block to a newsletter layout at all. Panel buttons and blocks are now focusable and Enter/Space-activatable, and every block gets a non-drag "click to add" fallback (appends to the end of the canvas), matching what GrapesJS's own docs recommend for this exact gap.
-- Publish a container image to `ghcr.io/jshields-ca/latestarr` on every tagged release (`:latest` and `:vX.Y.Z`), so self-hosters can `docker compose pull` instead of always building from source. `docker-compose.yml` now references that image, falling back to building from `docker/Dockerfile` when no matching image exists locally.
-- Catch up newsletters whose scheduled send was missed while the process was down. On boot, the scheduler now checks each enabled newsletter's last actual send (or creation time, if it's never sent) against its cron schedule, and runs it once if a scheduled fire was missed — previously a missed occurrence during downtime just silently never happened.
-- Add security headers (`@fastify/helmet`, with a CSP tuned for the GrapesJS builder and Google Fonts), rate limiting (`@fastify/rate-limit`, generous global default plus a strict 10/minute cap on login and bootstrap), and CSRF protection via a same-origin check on every mutating request.
-- Add an unauthenticated `GET /api/version` endpoint, and show the running version plus links to the GitHub repo (view + star) and the author's site in the admin sidebar. Also make the docker-compose host port configurable via a `PORT` env var, for anyone whose default `3000` collides with another running service.
-- Validate every request body with zod (sources, recipients, recipient groups, SMTP profiles, newsletters, templates, auth) instead of ad-hoc `if (!field)` checks. Malformed types (a string where a number is expected, an object where an array is expected) are now rejected with a 400 instead of reaching the database layer.
+### New
+
+- A published container image, `ghcr.io/jshields-ca/latestarr`, for every release (`:latest` and `:vX.Y.Z`), so you can `docker compose pull` instead of building from source. ([#62](https://github.com/jshields-ca/LatestArr/pull/62))
+- Missed sends catch up. If LatestArr was down when a newsletter was due, it sends once when it starts again. Before, that issue was silently skipped. ([#58](https://github.com/jshields-ca/LatestArr/pull/58))
+- The running version shows in the sidebar, with links to the project on GitHub. **`PORT`** sets the host port, for when 3000 is taken. ([#61](https://github.com/jshields-ca/LatestArr/pull/61))
+
+### Improved
+
+- Security for internet-facing installs: security headers and a Content Security Policy, a sign-in limit of 10 attempts a minute, and protection against cross-site requests. ([#55](https://github.com/jshields-ca/LatestArr/pull/55))
+- Every request is checked before it's used, so malformed input is refused with a clear error instead of reaching the database. ([#57](https://github.com/jshields-ca/LatestArr/pull/57))
+- The template builder works by keyboard. Its panels and blocks can be reached with Tab and used with Enter or Space, and blocks can be added without dragging. ([#59](https://github.com/jshields-ca/LatestArr/pull/59))
+
+<details>
+<summary>Technical details</summary>
+
+- **Security:** `@fastify/helmet` with a CSP tuned for the builder and Google Fonts; `@fastify/rate-limit` with a generous global default and 10 a minute on sign-in and first-run setup; a same-origin check on every request that changes something.
+- **Validation:** zod schemas for every request body, returning 400 for wrong types.
+- **Catch-up:** on start, each enabled newsletter's last send (or creation time) is compared with its schedule.
+- **Version:** `GET /api/version`, which needs no sign-in.
+
+</details>
 
 ## [0.3.0] - 2026-09-14
 
-- Replace the placeholder dashboard with a real setup checklist (connect a source, add recipients/a group, configure SMTP, optionally build a template, create a newsletter), live stats, and recent send history once setup is complete. Added a `docker-compose.yml` and `.env.example` so self-hosters have an actual quick start instead of a bare Dockerfile.
+### New
+
+- The dashboard is a setup checklist: connect a source, add recipients and a group, set up SMTP, optionally build a template, and create a newsletter. Once you're set up, it shows live stats and recent sends. ([#53](https://github.com/jshields-ca/LatestArr/pull/53))
+- A `docker-compose.yml` and `.env.example` for a quick start, instead of a bare Dockerfile. ([#53](https://github.com/jshields-ca/LatestArr/pull/53))
 
 ## [0.2.0] - 2026-09-14
 
-- Wire `jest-axe` into the test suite and add automated accessibility checks against every admin page's list, empty, and dialog states, plus Login, Setup, and Dashboard. This caught a real, app-wide issue: `CardTitle` rendered as `<h3>` while every page places it directly under its own `<h1>` with no `<h2>` in between, skipping a heading level. Fixed by rendering `CardTitle` as `<h2>`, which is correct everywhere it's used (a page nesting it under its own `<h2>` section heading just ends up with sibling `<h2>`s, which is still valid).
-- Add an Audiobookshelf adapter (`@latestarr/adapter-audiobookshelf`) for connecting audiobook/podcast libraries — authenticates with a bearer token against Audiobookshelf's documented REST API, listing libraries and their recently-added items. Unlike Tautulli/Plex/BookLore, Audiobookshelf has no cross-library "recent items" endpoint, so when no specific libraries are selected the adapter discovers all libraries first and queries each one.
-- Rebrand from the original teal/cyan accent to "Bloom," a rose accent chosen to stand apart from the blue/teal/purple already common across the self-hosted media ecosystem (and from Plex's own orange). Along with it: - The light theme's neutrals move from stark white to a warm, rose-tinted scale, with a softer tinted shadow replacing the previous flat `shadow-sm` on every card, and a hover lift + shadow on primary buttons. - Status badges gain an opt-in `dot` prop (a small pulsing indicator, respecting `prefers-reduced-motion`) — used on the Sources screen's "Connected" status, the one genuinely live indicator in the app. - The logo mark changes from a double-chevron to an envelope with a spark, reading as "a newsletter just arrived" rather than a generic up-trend glyph. - The "LatestArr" wordmark specifically now renders in Newsreader, a serif built for reading/publication contexts, while every other heading and all body/UI text stays on the default sans stack.
-- Add a BookLore-family adapter (`@latestarr/adapter-booklore-family`) covering BookLore and its compatible forks BookOrbit and Grimmory. These expose their library through OPDS (a standardized Atom-based catalog format, HTTP Basic Auth) rather than a stable internal REST API, so this adapter parses OPDS feeds directly. Since all three forks share the same OPDS surface, this ships as a single adapter factory rather than three near-duplicate implementations — `bookloreAdapter`, `bookOrbitAdapter`, and `grimmoryAdapter` differ only in their `kind` identifier.
-- Add the Tailwind v4 + Radix + shadcn-style design system foundation for the admin WebUI: dark-mode-first theme with a teal/cyan brand accent and light-mode toggle, an original logo/favicon, base components (Button, Card, Switch, Input, Label, Separator, Sheet), a reusable settings-row pattern for clear control/label relationships, and a responsive app shell (sidebar nav on desktop, hamburger drawer on mobile) replacing the placeholder UI.
-- Fix the release workflow's second crash: `changeset version` auto-formats every `CHANGELOG.md` it touches with the project's own Prettier config (`.prettierrc.cjs` exists at the repo root) by shelling out to `pnpm exec prettier`, but `prettier` was never actually installed as a dependency — only its config file existed. Added `prettier` as a root devDependency so that auto-format step, and the config file that's been sitting unused, actually works.
-- Fix the release workflow's first real run, which crashed immediately: `changesets/action` unconditionally reads each bumped package's own `CHANGELOG.md` to build the "Version Packages" PR description, but the previous PR disabled per-package changelog generation entirely (`"changelog": false`), so that file never existed and the action threw `ENOENT`. Reverted to Changesets' default per-package changelog generation — those files are internal bookkeeping the action needs, not something a self-hoster needs to read. `scripts/write-changelog.mjs` still writes the single consolidated root `CHANGELOG.md` entry the actual GitHub Release pulls its notes from; nothing about the human-facing changelog changes.
-- Add the admin WebUI's authentication flow: a first-run setup screen to create the initial admin account, a login page (local credentials, plus a "Continue with SSO" option when OIDC is configured), session-aware route protection that redirects unauthenticated visitors to sign in, and a logout control. Adds a small `GET /auth/providers` endpoint so the frontend can detect whether OIDC is enabled and whether the initial admin account has been created yet.
-- Add the drag-and-drop newsletter builder: a GrapesJS-based editor (`/templates/:id/edit`, code-split so its ~700kB isn't shipped to every page) with a curated MJML block set plus a custom block library — Header, Footer, and a dynamic Media List block. Media List is the one genuinely dynamic block: a user configures it entirely through three Traits (Content type, Sort, Count) with no HTML/CSS knowledge required, and it exports as a `{{#mediaList ...}}` Handlebars block helper that the server's render pipeline resolves against real item data at send time — including a "most watched" sort backed by the Tautulli `fetchPopularItems` capability added in an earlier release. The Template API now accepts `compiledMjml` on create/update so the builder's export can be persisted alongside the reusable `designJson` project data.
-- Add an MJML render pipeline: newsletters linked to a template now render via that template's compiled MJML (substituting real item data through the same Handlebars data-binding layer as the built-in starter template, then compiling to safe, Outlook/Gmail-friendly HTML with `mjml`), falling back to the hardcoded starter template when no custom template is linked or it has no compiled MJML yet.
-- Add the Newsletters admin screen: create newsletters, toggle enabled, link/unlink sources and recipient groups, trigger a manual send, and view send history — the last of the four Phase 3 admin CRUD screens.
-- Add a direct Plex adapter (`@latestarr/adapter-plex`) as an alternative to Tautulli for users who don't run a separate Tautulli instance — connect straight to a Plex Media Server using its own token-based API (`X-Plex-Token`), listing libraries and recently-added movies/TV episodes/seasons the same way the Tautulli adapter does.
-- Add the Recipients admin screen: manage recipients (add, toggle active/inactive, delete) and recipient groups (add, delete, and manage membership by adding/removing existing recipients), wired to the existing /recipients and /recipient-groups API.
-- Fix a real bug in `.changeset/config.json`: every workspace package is `private: true` (this app isn't published to npm), and Changesets' default `privatePackages.version: false` silently skips versioning any private package — meaning every changeset merged since Phase 3 has bumped nothing, and `pnpm version-packages` has been a silent no-op the entire time despite reporting success. Fixed by setting `privatePackages.version: true`. Also adds the missing release automation: `.github/workflows/release.yml` opens/updates a "Version Packages" PR whenever changesets are pending on `main` (via `changesets/action`), and cuts a git tag + GitHub Release (with notes pulled from `CHANGELOG.md`) on the push that merges it — this app has no npm package to publish, so "release" means a tag and a GitHub Release, not `npm publish`. Changesets' own per-package changelog generation is disabled (`"changelog": false`) in favor of `scripts/write-changelog.mjs`, which writes one consolidated root `CHANGELOG.md` entry instead of scattering a `CHANGELOG.md` across every internal workspace package — this is a single self-hosted app, not a set of independently-consumed libraries.
-- Add a RomM adapter (`@latestarr/adapter-romm`) for connecting game ROM libraries — authenticates with a RomM Client API Token (bearer auth) against its documented REST API, listing platforms as libraries and recently-added ROMs. Unlike Audiobookshelf, RomM's rom-listing endpoint accepts a repeatable `platform_ids` filter directly, so a multi-library fetch is a single request rather than a per-library loop.
-- Serve the built admin WebUI directly from apps/server in production, so the Docker image is usable end-to-end instead of API-only. Every backend route now lives under `/api` so it can never collide with a client-side route of the same name (e.g. `/sources` the admin page vs. `/sources` the endpoint) now that both are served from one origin.
-- Add the SMTP profiles admin screen: add a profile, test its connection, send a test email, and delete it, wired to the existing /smtp-profiles API.
-- The Sources admin screen no longer hardcodes "Tautulli" as the only connectable source type. It now fetches the list of registered adapter kinds from a new `GET /sources/kinds` endpoint and lets users pick any of them (Tautulli, Plex, BookLore, BookOrbit, Grimmory, Audiobookshelf, RomM), showing the right credential fields (API key, token, or OPDS username/password) for whichever kind is selected.
-- Add the Sources admin screen: list connections with their status, add a new Tautulli source, test a connection, and delete a source — the first of the Phase 3 admin CRUD screens.
-- Add an optional `fetchPopularItems` capability to the `SourceAdapter` contract for ranking items by watch activity ("most watched this week") instead of recency, and implement it for Tautulli via `get_home_stats`. This lays the data groundwork for the newsletter builder's "Most Watched" sort option.
-- Add the Template CRUD API (create/list/get/update/delete), persisting the drag-and-drop builder's design JSON — a prerequisite for the upcoming GrapesJS builder, which will save to this endpoint.
-- Add a Templates admin screen (list, create, delete) backed by the existing Template CRUD API. Each template shows whether it's been through the drag-and-drop builder yet ("Designed" vs "Not yet designed") — the builder itself, and editing a template's design, lands in a later PR.
-- Wire newsletters to templates: the Newsletters admin screen now has a Template picker (set at creation, or changed/unset on an existing newsletter) with a direct link into the GrapesJS builder for the linked template. The Newsletter CRUD API accepts `templateId` on create and update (including explicit `null` to unlink). This completes the newsletter builder feature end-to-end — a newsletter can now actually use a custom-designed template for its sends.
+### New
+
+- **A web app for LatestArr.** Before, everything was done through its API. ([#18](https://github.com/jshields-ca/LatestArr/pull/18), [#19](https://github.com/jshields-ca/LatestArr/pull/19), [#24](https://github.com/jshields-ca/LatestArr/pull/24))
+
+  - **Sign-in:** a first-run setup screen to create the admin account, and a sign-in page with **Continue with SSO** when OIDC is set up.
+  - **Layout:** a sidebar on desktop and a menu on phones, in dark or light mode.
+  - **One container:** the Docker image serves the web app and the API together.
+
+- **Pages for everything,** each wired to the existing API:
+  - **Sources:** connect, test and delete sources, with the right credential fields for each type. ([#20](https://github.com/jshields-ca/LatestArr/pull/20), [#36](https://github.com/jshields-ca/LatestArr/pull/36))
+  - **Recipients:** add people, switch them on or off, and manage groups. ([#21](https://github.com/jshields-ca/LatestArr/pull/21))
+  - **SMTP Profiles:** add a profile, test the connection, and send a test email. ([#22](https://github.com/jshields-ca/LatestArr/pull/22))
+  - **Newsletters:** create, enable, link sources and groups, **Send now**, and view send history. ([#23](https://github.com/jshields-ca/LatestArr/pull/23))
+
+- **Four more sources:**
+  - **Plex**, directly, without Tautulli ([#32](https://github.com/jshields-ca/LatestArr/pull/32));
+  - **BookLore, BookOrbit and Grimmory**, through their OPDS catalogs ([#33](https://github.com/jshields-ca/LatestArr/pull/33));
+  - **Audiobookshelf** ([#34](https://github.com/jshields-ca/LatestArr/pull/34));
+  - **RomM** ([#35](https://github.com/jshields-ca/LatestArr/pull/35)).
+
+- **Templates and a drag-and-drop builder** for designing newsletters. ([#25](https://github.com/jshields-ca/LatestArr/pull/25), [#27](https://github.com/jshields-ca/LatestArr/pull/27), [#28](https://github.com/jshields-ca/LatestArr/pull/28), [#29](https://github.com/jshields-ca/LatestArr/pull/29), [#30](https://github.com/jshields-ca/LatestArr/pull/30))
+
+  - **The Media List block** fills itself from your sources: choose a content type, a sort and a count.
+  - **Most watched:** a sort option, from Tautulli's play counts. ([#26](https://github.com/jshields-ca/LatestArr/pull/26))
+  - **Email-ready:** templates are built into email-safe HTML that works in Outlook and Gmail.
+
+  Each newsletter picks a template, or uses the built-in one. (The builder was later replaced by the design editor.)
+
+### Improved
+
+- **A new look, "Bloom":** ([#37](https://github.com/jshields-ca/LatestArr/pull/37))
+  - **Colour:** a rose accent, chosen to stand apart from the blues and purples common in self-hosted media apps;
+  - **Light mode:** warmer neutrals;
+  - **Logo:** an envelope with a spark;
+  - **Wordmark:** a serif.
+- **Accessibility checks** on every page of the web app, which found and fixed a heading-order problem across the app. ([#31](https://github.com/jshields-ca/LatestArr/pull/31))
+
+<details>
+<summary>Technical details</summary>
+
+- **Web app:** Tailwind v4 with Radix components. Every API route moved under `/api`, so page and API paths can't collide.
+- **Sources:** `GET /sources/kinds` lists the registered source types.
+- **Adapters:**
+  - the BookLore-family adapter is one factory for all three apps, since they share the same OPDS feed;
+  - Audiobookshelf has no cross-library "recent" endpoint, so it reads each library;
+  - RomM filters by platform in one request.
+- **Templates:** the Template API stores the builder's design JSON and compiled MJML. Newsletters render through MJML and Handlebars, with the hardcoded starter template as the fallback.
+- **Accessibility:** `jest-axe` tests cover every page's list, empty and dialog states. `CardTitle` became an `<h2>`.
+
+</details>
+
+<details>
+<summary>Behind the scenes</summary>
+
+- **Release automation:** a "Version Packages" PR, and a tag and GitHub Release on merge. ([#38](https://github.com/jshields-ca/LatestArr/pull/38))
+- **Versioning fix:** Changesets had been skipping every private package. ([#38](https://github.com/jshields-ca/LatestArr/pull/38))
+- **First-run fixes:** two crashes on the release workflow's first run. ([#42](https://github.com/jshields-ca/LatestArr/pull/42), [#43](https://github.com/jshields-ca/LatestArr/pull/43))
+
+</details>
 
 ## [0.1.0] - 2026-09-13
 
