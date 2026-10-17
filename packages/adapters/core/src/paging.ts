@@ -28,6 +28,9 @@ export interface ReadNewestOptions<T> {
   since: Date;
   /** A fixed number of items instead of paging back to `since`. */
   limit?: number;
+  /** Called when reading stopped at MAX_RECENT_ITEMS with newer items
+   *  possibly left unread. Not called for an explicit `limit`. */
+  onCapReached?: () => void;
 }
 
 /**
@@ -43,6 +46,7 @@ export async function readNewest<T>(options: ReadNewestOptions<T>): Promise<T[]>
   const items: T[] = [];
   const seen = new Set<string>();
   let offset = 0;
+  let finished = false;
 
   while (items.length < max) {
     let page: T[];
@@ -50,6 +54,7 @@ export async function readNewest<T>(options: ReadNewestOptions<T>): Promise<T[]>
       page = await options.fetchPage(offset, pageSize);
     } catch (err) {
       if (items.length === 0) throw err;
+      finished = true;
       break;
     }
     const fresh = page.filter((item) => !seen.has(options.key(item)));
@@ -58,7 +63,10 @@ export async function readNewest<T>(options: ReadNewestOptions<T>): Promise<T[]>
       items.push(item);
     }
     offset += pageSize;
-    if (fresh.length === 0 || page.length < pageSize) break;
+    if (fresh.length === 0 || page.length < pageSize) {
+      finished = true;
+      break;
+    }
     // Pages are newest first, so once a page reaches past `since`, the rest
     // are older still. The oldest in the page decides, in case a source
     // sorts within a page by something else (BookLore's OPDS sort order).
@@ -66,7 +74,11 @@ export async function readNewest<T>(options: ReadNewestOptions<T>): Promise<T[]>
       const added = options.addedAt(item);
       return added !== undefined && added < options.since;
     });
-    if (reachedOlder) break;
+    if (reachedOlder) {
+      finished = true;
+      break;
+    }
   }
+  if (!finished && options.limit === undefined) options.onCapReached?.();
   return items.slice(0, max);
 }

@@ -175,6 +175,7 @@ function createAdapter(flavor: ServerFlavor): SourceAdapter {
           key: (item) => item.Id,
           since: params.since,
           limit: params.limit,
+          onCapReached: params.onCapReached,
         });
         for (const item of items) {
           const kind = ITEM_KIND[item.Type];

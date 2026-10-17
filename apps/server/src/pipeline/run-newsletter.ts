@@ -176,15 +176,21 @@ async function fetchRecentItemsFromSources(
       publicUrl: source.publicUrl ?? undefined,
       credentials,
     };
+    // Set by the adapter when it stopped at its safety cap, so the warning
+    // only appears when items may really have been missed.
+    let capReached = false;
     const sourceItems = await fetchFromSource(log, source, () =>
       adapter.fetchRecentItems(config, {
         since,
         mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
         libraryIds: link.libraryFilter ?? undefined,
+        onCapReached: () => {
+          capReached = true;
+        },
       }),
     );
     log.debug({ sourceId: source.id, count: sourceItems.length }, `Fetched ${sourceItems.length} items from "${source.name}"`);
-    if (sourceItems.length >= MAX_RECENT_ITEMS) {
+    if (capReached) {
       log.warn(
         { sourceId: source.id, count: sourceItems.length },
         `"${source.name}" may have more new items than LatestArr read: it reads up to ${MAX_RECENT_ITEMS} per source (per library for Audiobookshelf) each time`,

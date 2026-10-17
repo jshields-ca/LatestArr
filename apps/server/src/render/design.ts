@@ -86,7 +86,7 @@ export const designSettingsSchema = z.object({
       // Several new episodes of one series share a row.
       groupEpisodes: z.boolean().default(true),
       order: z.array(z.enum(DESIGN_KINDS)).default([...DESIGN_KINDS]),
-      limit: z.number().int().min(1).max(50).nullable().default(null),
+      limit: z.number().int().min(1).max(100).nullable().default(null),
       // What an empty section (or, ungrouped, an empty issue) shows: nothing,
       // a "nothing new" line, a link to browse the library (grouped only),
       // or a few random picks from the whole library.

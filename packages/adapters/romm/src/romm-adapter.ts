@@ -68,6 +68,7 @@ export const rommAdapter: SourceAdapter = {
       key: (rom) => String(rom.id),
       since: params.since,
       limit: params.limit,
+      onCapReached: params.onCapReached,
     });
     return roms.map((rom) => mapRom(rom, webUrl)).filter((item) => item.addedAt >= params.since);
   },

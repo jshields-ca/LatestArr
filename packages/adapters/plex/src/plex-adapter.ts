@@ -167,6 +167,7 @@ export const plexAdapter: SourceAdapter = {
         key: (item) => item.ratingKey,
         since: params.since,
         limit: params.limit,
+        onCapReached: params.onCapReached,
       });
       for (const item of items) {
         const kind = mapMediaType(item.type);

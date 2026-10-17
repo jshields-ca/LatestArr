@@ -36,6 +36,21 @@ describe("readNewest", () => {
     expect(fetchPage).toHaveBeenCalledTimes(MAX_RECENT_ITEMS / RECENT_PAGE_SIZE);
   });
 
+  it("says when it stopped at the cap, and only then", async () => {
+    const capped = vi.fn();
+    const busy = source(MAX_RECENT_ITEMS + 500);
+    await readNewest({ fetchPage: busy.fetchPage, addedAt: (i) => i.added, key: (i) => i.id, since: hoursAgo(100_000), onCapReached: capped });
+    expect(capped).toHaveBeenCalledTimes(1);
+
+    const quiet = vi.fn();
+    const small = source(MAX_RECENT_ITEMS - 50);
+    await readNewest({ fetchPage: small.fetchPage, addedAt: (i) => i.added, key: (i) => i.id, since: hoursAgo(100_000), onCapReached: quiet });
+    const exact = source(MAX_RECENT_ITEMS + 500);
+    await readNewest({ fetchPage: exact.fetchPage, addedAt: (i) => i.added, key: (i) => i.id, since: hoursAgo(500), onCapReached: quiet });
+    await readNewest({ fetchPage: exact.fetchPage, addedAt: (i) => i.added, key: (i) => i.id, since: hoursAgo(100_000), limit: 25, onCapReached: quiet });
+    expect(quiet).not.toHaveBeenCalled();
+  });
+
   it("reads a fixed number when given a limit", async () => {
     const { fetchPage } = source(500);
     expect(await read(fetchPage, hoursAgo(100_000), 25)).toHaveLength(25);

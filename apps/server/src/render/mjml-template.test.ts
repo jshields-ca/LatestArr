@@ -631,6 +631,15 @@ describe("the summary, grouping, and section helpers", () => {
     expect(await rows([{ ...episode(1), externalUrl: "ep-1" }, { ...episode(2), externalUrl: "ep-2" }])).toEqual(["ep-1|ep-1;ep-2;"]);
   });
 
+  it("never lists more than 100, even with no count or showAll", async () => {
+    const many = Array.from({ length: 150 }, (_, n) => item({ id: `m${n}`, title: `Film ${n}` }));
+    const rows = async (hash: string) =>
+      [...(await render(`{{#mediaList ${hash}}}<mj-text>@@{{title}}@@</mj-text>{{/mediaList}}`, many)).matchAll(/@@/g)].length / 2;
+    expect(await rows("")).toBe(100);
+    expect(await rows('showAll="true"')).toBe(100);
+    expect(await rows('count="7"')).toBe(7);
+  });
+
   it("folds several episodes of one series into one row, keeping the order and listing up to five", async () => {
     const items = [
       episode(1),

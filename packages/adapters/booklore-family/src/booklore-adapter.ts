@@ -181,6 +181,7 @@ export function createBookloreFamilyAdapter(kind: string): SourceAdapter {
         key: (entry) => String(entry.id),
         since: params.since,
         limit: params.limit,
+        onCapReached: params.onCapReached,
       });
 
       const webUrl = resolveWebUrl(config);
