@@ -363,7 +363,7 @@ describe("fetchRecentItems", () => {
 
       const items = await plexAdapter.fetchRecentItems({ ...config, publicUrl: "https://app.plex.tv" }, { since: new Date(0) });
 
-      const link = (key: string) => `https://app.plex.tv/desktop/#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F${key}`;
+      const link = (key: string) => `https://app.plex.tv/desktop#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F${key}`;
       expect(items[0]).toMatchObject({ externalUrl: link("42"), seasonUrl: link("41"), seriesUrl: link("40") });
     });
 

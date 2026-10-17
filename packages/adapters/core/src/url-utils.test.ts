@@ -115,17 +115,17 @@ describe("withOrigin", () => {
 });
 
 describe("plexWebAppUrl", () => {
-  it("uses /web/index.html on a Plex server, and /desktop/ on app.plex.tv", () => {
+  it("uses /web/index.html on a Plex server, and /desktop (no slash, like Tautulli) on app.plex.tv", () => {
     expect(plexWebAppUrl("https://plex.example.com/")).toBe("https://plex.example.com/web/index.html");
-    expect(plexWebAppUrl("https://app.plex.tv")).toBe("https://app.plex.tv/desktop/");
-    expect(plexWebAppUrl("https://APP.plex.tv/desktop")).toBe("https://app.plex.tv/desktop/");
+    expect(plexWebAppUrl("https://app.plex.tv")).toBe("https://app.plex.tv/desktop");
+    expect(plexWebAppUrl("https://APP.plex.tv/desktop")).toBe("https://app.plex.tv/desktop");
   });
 });
 
 describe("buildPlexWebDeepLink", () => {
-  it("links app.plex.tv items through /desktop/, keeping the item route", () => {
+  it("links app.plex.tv items as /desktop#!/..., the form that survives Plex's profile picker", () => {
     expect(buildPlexWebDeepLink("https://app.plex.tv", "abc123", "456")).toBe(
-      "https://app.plex.tv/desktop/#!/server/abc123/details?key=%2Flibrary%2Fmetadata%2F456",
+      "https://app.plex.tv/desktop#!/server/abc123/details?key=%2Flibrary%2Fmetadata%2F456",
     );
   });
 

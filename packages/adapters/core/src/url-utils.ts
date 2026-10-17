@@ -98,10 +98,11 @@ export function withOrigin(url: string, origin: string): string {
 
 /**
  * Where the Plex web app lives for a recipient-facing address: a Plex
- * server serves it at /web/index.html, but Plex's hosted app.plex.tv serves
- * it at /desktop/ and redirects /web/index.html there. Linking to
- * /desktop/ directly keeps an item's #! route, which some browsers (notably
- * those built into email apps) drop across that redirect.
+ * server serves it at /web/index.html, and Plex's hosted app.plex.tv at
+ * /desktop. For app.plex.tv this is "/desktop" with no trailing slash, the
+ * form Tautulli's newsletters use: tested in #353, `/desktop#!/...` keeps
+ * the item through Plex's sign-in and profile picker, while both
+ * `/desktop/#!/...` and `/web/index.html#!/...` land on the home page.
  */
 export function plexWebAppUrl(webUrl: string): string {
   let host: string | undefined;
@@ -110,7 +111,7 @@ export function plexWebAppUrl(webUrl: string): string {
   } catch {
     host = undefined;
   }
-  if (host === "app.plex.tv") return "https://app.plex.tv/desktop/";
+  if (host === "app.plex.tv") return "https://app.plex.tv/desktop";
   return `${trimTrailingSlashes(webUrl)}/web/index.html`;
 }
 
