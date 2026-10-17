@@ -1,5 +1,31 @@
 # @latestarr/server
 
+## 0.12.6
+
+### Patch Changes
+
+- [#379](https://github.com/jshields-ca/LatestArr/pull/379) [`340b9da`](https://github.com/jshields-ca/LatestArr/commit/340b9da02be200a00776074cc0fb5dec8b04fbee) - **Fixed:** A Media List's **Show a few from the library** fallback lists at most 100 items, like the list itself.
+
+  A design written in code could set any number for it. Designs built from options were never affected.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `mediaList`'s `emptyFallback="random"` slice is capped at `MAX_SHOWN_ITEMS`, as [#372](https://github.com/jshields-ca/LatestArr/issues/372) did for the main selection. Found by the latestarr.app session.
+
+  </details>
+
+- Updated dependencies []:
+  - @latestarr/adapter-audiobookshelf@0.12.6
+  - @latestarr/adapter-booklore-family@0.12.6
+  - @latestarr/adapter-core@0.12.6
+  - @latestarr/adapter-jellyfin@0.12.6
+  - @latestarr/adapter-plex@0.12.6
+  - @latestarr/adapter-romm@0.12.6
+  - @latestarr/adapter-tautulli@0.12.6
+  - @latestarr/crypto@0.12.6
+  - @latestarr/db@0.12.6
+
 ## 0.12.5
 
 ### Patch Changes
