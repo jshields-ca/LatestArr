@@ -1,4 +1,4 @@
-import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
+import { IMAGE_REQUEST_TIMEOUT_MS, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS, trimTrailingSlashes } from "@latestarr/adapter-core";
 
 export interface PlexLibrary {
   key: string;
@@ -58,14 +58,6 @@ export function buildImageUrl(baseUrl: string, token: string, imagePath: string)
   return buildUrl(baseUrl, imagePath, token).toString();
 }
 
-// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
-// awaits every referenced item's image via Promise.all, so a source that's
-// gone unreachable in a way that just hangs (rather than erroring — no
-// RST, no timeout of its own) would otherwise never let that Promise.all
-// settle, stalling the entire send indefinitely instead of failing this
-// one item's poster softly.
-const IMAGE_FETCH_TIMEOUT_MS = 10_000;
-
 /**
  * Fetches a Plex thumb/art image's raw bytes for CID embedding. `imageUrl`
  * is expected to be one buildImageUrl already produced (so the token is
@@ -79,7 +71,7 @@ export async function fetchImage(
   try {
     const response = await fetch(imageUrl, {
       headers: { Accept: "image/*" },
-      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(IMAGE_REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";

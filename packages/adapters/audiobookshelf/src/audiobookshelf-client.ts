@@ -3,7 +3,7 @@
 // (`Authorization: Bearer <token>`, or a `?token=` query param for GET
 // requests — we use the header form here).
 
-import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
+import { IMAGE_REQUEST_TIMEOUT_MS, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS, trimTrailingSlashes } from "@latestarr/adapter-core";
 
 export interface AudiobookshelfLibrary {
   id: string;
@@ -85,14 +85,6 @@ export function buildItemWebUrl(webUrl: string, itemId: string): string {
   return `${trimTrailingSlashes(webUrl)}/item/${itemId}`;
 }
 
-// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
-// awaits every referenced item's image via Promise.all, so a source that's
-// gone unreachable in a way that just hangs (rather than erroring — no
-// RST, no timeout of its own) would otherwise never let that Promise.all
-// settle, stalling the entire send indefinitely instead of failing this
-// one item's poster softly.
-const IMAGE_FETCH_TIMEOUT_MS = 10_000;
-
 /**
  * Fetches a library item's cover image bytes for CID embedding. `imageUrl`
  * is expected to be one buildCoverUrl already produced (so the token is
@@ -104,7 +96,7 @@ export async function fetchImage(
   imageUrl: string,
 ): Promise<{ data: Uint8Array; contentType: string } | null> {
   try {
-    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
+    const response = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_REQUEST_TIMEOUT_MS) });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";
     const data = await readBytesCapped(response);

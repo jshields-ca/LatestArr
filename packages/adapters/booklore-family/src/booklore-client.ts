@@ -1,4 +1,4 @@
-import { trimTrailingSlashes, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS } from "@latestarr/adapter-core";
+import { IMAGE_REQUEST_TIMEOUT_MS, readBytesCapped, SOURCE_REQUEST_TIMEOUT_MS, trimTrailingSlashes } from "@latestarr/adapter-core";
 import { XMLParser } from "fast-xml-parser";
 
 // BookLore (and its compatible forks BookOrbit and Grimmory) expose their
@@ -234,14 +234,6 @@ export async function getLibraries(
   return fetchOpdsFeed(baseUrl, "/api/v1/opds/libraries", username, password);
 }
 
-// resolvePosterPlaceholders (apps/server/src/pipeline/embed-images.ts)
-// awaits every referenced item's image via Promise.all, so a source that's
-// gone unreachable in a way that just hangs (rather than erroring — no
-// RST, no timeout of its own) would otherwise never let that Promise.all
-// settle, stalling the entire send indefinitely instead of failing this
-// one item's poster softly.
-const IMAGE_FETCH_TIMEOUT_MS = 10_000;
-
 /**
  * Fetches an OPDS cover image's raw bytes, authenticated with the same
  * Basic Auth credentials as every other OPDS request this client makes —
@@ -261,7 +253,7 @@ export async function fetchOpdsImage(
     const response = await fetch(imageUrl, {
       // A cover the feed links on another host gets no credentials.
       headers: sameOrigin(imageUrl, baseUrl) ? { Authorization: buildAuthHeader(username, password) } : {},
-      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(IMAGE_REQUEST_TIMEOUT_MS),
     });
     if (!response.ok) return null;
     const contentType = response.headers.get("content-type") ?? "image/jpeg";

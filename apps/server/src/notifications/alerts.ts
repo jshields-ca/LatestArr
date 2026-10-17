@@ -166,7 +166,7 @@ async function deliver(
       if (!config.webhook.url) throw new Error("No webhook URL is set");
       const response = await fetch(config.webhook.url, {
         ...webhookRequest(config.webhook.format, message, alert, event),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
       });
       if (!response.ok) throw new Error(`The webhook responded with HTTP ${response.status}`);
       results.push({ destination: "webhook", ok: true });
@@ -186,6 +186,9 @@ function escapeHtml(text: string): string {
 // source can't flood the channel on every retry. In memory only: a restart
 // allows one more alert, which is fine.
 const RATE_LIMIT_MS = 60 * 60 * 1000;
+
+/** How long a webhook may take to answer, so a slow endpoint can't hold up a send. */
+const WEBHOOK_TIMEOUT_MS = 10_000;
 const lastAlertAt = new Map<string, number>();
 
 export function resetAlertRateLimit(): void {

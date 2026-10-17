@@ -23,7 +23,8 @@ import {
   type TautulliRecentlyAddedItem,
 } from "./tautulli-client.js";
 
-const DEFAULT_FETCH_COUNT = 100;
+// How many items "most watched" ranks from Tautulli's home stats.
+const POPULAR_FETCH_COUNT = 100;
 
 // get_home_stats has no per-media-kind stat for "tv_season" — Tautulli
 // groups all TV watch stats (episode or season plays alike) under "top_tv".
@@ -294,7 +295,7 @@ export const tautulliAdapter: SourceAdapter = {
     params: FetchPopularItemsParams,
   ): Promise<NewItem[]> {
     const apiKey = config.credentials.apiKey ?? "";
-    const limit = params.limit ?? DEFAULT_FETCH_COUNT;
+    const limit = params.limit ?? POPULAR_FETCH_COUNT;
     const timeRangeDays = Math.max(
       1,
       Math.ceil((Date.now() - params.since.getTime()) / (24 * 60 * 60 * 1000)),
