@@ -18,9 +18,12 @@ They go on the domain of the SMTP profile's **From email**. That's not the domai
 
 ## Choosing an SMTP provider
 
-LatestArr works with any standard SMTP server. Add it on the **SMTP Profiles** page.
+LatestArr works with any standard SMTP server. Add it on the **SMTP Profiles** page. Sending only goes out from LatestArr, so none of these need LatestArr to be reachable from the internet.
 
-- **A transactional email provider** (Mailgun, Postmark, SendGrid, Amazon SES, Brevo and others) is the easiest. When you verify your domain, they show the SPF and DKIM records to add, and they sign every message from then on. Use the SMTP credentials they give you, not your account login.
+- **A transactional email provider** (Resend, Mailgun, Postmark, SendGrid, Amazon SES, Brevo and others) is the easiest. When you verify your domain, they show the SPF and DKIM records to add, and they sign every message from then on. Use the SMTP credentials they give you, not your account login. For example, [Resend](https://resend.com/docs/send-with-smtp):
+  - **Host** `smtp.resend.com`, **port** 465 with **Use implicit TLS (port 465)** on (or 587 with it off);
+  - **username** `resend`, and an API key from Resend as the **password**;
+  - a **From email** on a domain you've verified in Resend.
 - **Gmail or Google Workspace** works with an [app password](https://support.google.com/accounts/answer/185833) for a small household list. Google signs mail for `smtp.gmail.com` itself, but free Gmail's limit of 500 messages a day rules it out for larger lists.
 - **Your own mail server** gives full control and full responsibility: you set up SPF, DKIM and DMARC yourself, and build your server's reputation. That's hardest for a small weekly digest, because reputation comes from steady volume.
 
