@@ -1,5 +1,55 @@
 # @latestarr/server
 
+## 0.12.6
+
+### Patch Changes
+
+- [#382](https://github.com/jshields-ca/LatestArr/pull/382) [`4465456`](https://github.com/jshields-ca/LatestArr/commit/446545651d97817c076aa80f5d12c6783e2f68cc) - **Fixed:** A design switched to code can go back to its options, with **Back to options** in the design editor.
+
+  Before, **Edit as code** was one-way. The design returns to the options it had when it switched, keeping its intro, footer note and buttons; changes made to the code are dropped, and a confirmation says so first. A design that started as code, from the old template builder, gets the default options.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Adds `POST /api/templates/:id/convert-to-options` (editor role, listed in `security.test.ts`), which sets `mode: "design"` and clears `compiledMjml`. A design keeps its `settings` while in code mode, so nothing else needs restoring. Reported in [#381](https://github.com/jshields-ca/LatestArr/issues/381).
+
+  </details>
+
+- [#379](https://github.com/jshields-ca/LatestArr/pull/379) [`340b9da`](https://github.com/jshields-ca/LatestArr/commit/340b9da02be200a00776074cc0fb5dec8b04fbee) - **Fixed:** A Media List's **Show a few from the library** fallback lists at most 100 items, like the list itself.
+
+  A design written in code could set any number for it. Designs built from options were never affected.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `mediaList`'s `emptyFallback="random"` slice is capped at `MAX_SHOWN_ITEMS`, as [#372](https://github.com/jshields-ca/LatestArr/issues/372) did for the main selection. Found by the latestarr.app session.
+
+  </details>
+
+- [#386](https://github.com/jshields-ca/LatestArr/pull/386) [`9283eb3`](https://github.com/jshields-ca/LatestArr/commit/9283eb3df4477f9225802981852f4dfa555ce4aa) - **Fixed:** The image is built on Node.js 24.22.1, which no longer trusts the eight compromised eMudhra certificates.
+
+  Those certificates had keys weak enough to work out, so someone with them could make a fake HTTPS certificate for any site. LatestArr uses Node's built-in list of trusted certificates when it connects to your media servers, your email server, single sign-on and poster images. On 0.12.5 and earlier, someone on the network between LatestArr and one of those could have impersonated it. Updating to 0.12.6 closes that.
+
+  Also updates markdown-it to 15.0.3, which fixes two ways crafted Markdown could make it slow. LatestArr's intro and footer notes don't switch on either feature involved, so this is a precaution.
+
+  <details>
+  <summary>Technical details</summary>
+
+  No code change for the certificates: `docker/Dockerfile` builds `FROM node:24-alpine`, which now resolves to 24.22.1 (Node's 2026-10-21 security release: it rejects chains containing the eMudhra intermediates' keys and updates the bundled roots to NSS 3.131.1). LatestArr doesn't set `NODE_EXTRA_CA_CERTS`, `--use-system-ca` or `rejectUnauthorized`, so Node's bundled store is the one in use. markdown-it 15.0.3 ([#385](https://github.com/jshields-ca/LatestArr/issues/385)) fixes GHSA advisories for quadratic-time reference definitions and inline HTML; `render/notes.ts` uses the `zero` preset without `reference`, and with `html: false`.
+
+  </details>
+
+- Updated dependencies []:
+  - @latestarr/adapter-audiobookshelf@0.12.6
+  - @latestarr/adapter-booklore-family@0.12.6
+  - @latestarr/adapter-core@0.12.6
+  - @latestarr/adapter-jellyfin@0.12.6
+  - @latestarr/adapter-plex@0.12.6
+  - @latestarr/adapter-romm@0.12.6
+  - @latestarr/adapter-tautulli@0.12.6
+  - @latestarr/crypto@0.12.6
+  - @latestarr/db@0.12.6
+
 ## 0.12.5
 
 ### Patch Changes

@@ -11,6 +11,45 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.12.6] - 2026-10-22
+
+### Fixed
+
+- A design switched to code can go back to its options, with **Back to options** in the design editor. ([#382](https://github.com/jshields-ca/LatestArr/pull/382))
+
+  Before, **Edit as code** was one-way. The design returns to the options it had when it switched, keeping its intro, footer note and buttons; changes made to the code are dropped, and a confirmation says so first. A design that started as code, from the old template builder, gets the default options.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Adds `POST /api/templates/:id/convert-to-options` (editor role, listed in `security.test.ts`), which sets `mode: "design"` and clears `compiledMjml`. A design keeps its `settings` while in code mode, so nothing else needs restoring. Reported in #381.
+
+  </details>
+
+- A Media List's **Show a few from the library** fallback lists at most 100 items, like the list itself. ([#379](https://github.com/jshields-ca/LatestArr/pull/379))
+
+  A design written in code could set any number for it. Designs built from options were never affected.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `mediaList`'s `emptyFallback="random"` slice is capped at `MAX_SHOWN_ITEMS`, as #372 did for the main selection. Found by the latestarr.app session.
+
+  </details>
+
+- The image is built on Node.js 24.22.1, which no longer trusts the eight compromised eMudhra certificates. ([#386](https://github.com/jshields-ca/LatestArr/pull/386))
+
+  Those certificates had keys weak enough to work out, so someone with them could make a fake HTTPS certificate for any site. LatestArr uses Node's built-in list of trusted certificates when it connects to your media servers, your email server, single sign-on and poster images. On 0.12.5 and earlier, someone on the network between LatestArr and one of those could have impersonated it. Updating to 0.12.6 closes that.
+
+  Also updates markdown-it to 15.0.3, which fixes two ways crafted Markdown could make it slow. LatestArr's intro and footer notes don't switch on either feature involved, so this is a precaution.
+
+  <details>
+  <summary>Technical details</summary>
+
+  No code change for the certificates: `docker/Dockerfile` builds `FROM node:24-alpine`, which now resolves to 24.22.1 (Node's 2026-10-21 security release: it rejects chains containing the eMudhra intermediates' keys and updates the bundled roots to NSS 3.131.1). LatestArr doesn't set `NODE_EXTRA_CA_CERTS`, `--use-system-ca` or `rejectUnauthorized`, so Node's bundled store is the one in use. markdown-it 15.0.3 (#385) fixes GHSA advisories for quadratic-time reference definitions and inline HTML; `render/notes.ts` uses the `zero` preset without `reference`, and with `html: false`.
+
+  </details>
+
 ## [0.12.5] - 2026-10-17
 
 ### Fixed
