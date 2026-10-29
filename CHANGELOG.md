@@ -11,6 +11,86 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.12.7] - 2026-10-29
+
+### Improved
+
+- Settings in `.env` can have a `LATESTARR_` prefix, so one `.env` can serve a whole stack. ([#410](https://github.com/jshields-ca/LatestArr/pull/410))
+
+  With the provided `docker-compose.yml`, any setting can be written as `LATESTARR_ENCRYPTION_KEY`, `LATESTARR_PORT`, `LATESTARR_TZ` and so on. The prefixed name wins over the plain one, so LatestArr can't pick up another app's `PORT` or `TZ` from a shared `.env`. The plain names still work as before, so nothing needs changing. **`BACKUP_PATH`** set in `.env` now reaches the container too. Before, it had to go straight into the compose file.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `docker-compose.yml` uses Compose's nested defaults, e.g. `${LATESTARR_ENCRYPTION_KEY:-${ENCRYPTION_KEY:-}}`. Inside the container the names are unchanged, and the server reads them as before: there's no new way for it to find the encryption key. CI runs `docker compose config` to check plain, prefixed and default values. Fixes #399.
+
+  </details>
+
+### Fixed
+
+- The design editor makes clear which buttons each colour and style changes. ([#406](https://github.com/jshields-ca/LatestArr/pull/406))
+
+  - **Where to watch** says its buttons have their own style, outlined at first, and that the Browse link follows it. The **Style** under **Your buttons** only changes buttons you add.
+  - **Button text** says "Not used: every button is outlined" when it has no effect, because an outlined button uses Button colour for its text and border.
+  - The colour note ends with the fix most people want: set the Where to watch Style to **Filled**.
+
+  Nothing about how emails look has changed.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `AccentColours` takes an `unused` map shown in place of a colour's value. Button text counts as used when your buttons are filled, or the Where to watch style is filled (it also styles the Browse link). Fixes #394.
+
+  </details>
+
+- Two hints in the app now say the right thing. ([#404](https://github.com/jshields-ca/LatestArr/pull/404))
+
+  - **Public URL for Plex and Tautulli** suggests `https://app.plex.tv` first. It works for anyone you share your server with, and needs no domain of your own. It used to say to use your Plex server's address.
+  - **A dark design** now says Light and Dark previews look the same, because email apps in dark mode leave a dark design as it is. It used to say to switch the preview to Dark to check it, as if something should change.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `PublicUrlHint` (`sources-page.tsx`) has Plex and Tautulli wording. The design editor's dark-mode note uses a new `isDarkBackground` in `lib/colour.ts`, the same weighting as the server's `isDarkDesign`. Fixes #396 and #397.
+
+  </details>
+
+- A From name with special characters can no longer change the address an email is sent from. Security updates for nodemailer and other dependencies are included too. ([#414](https://github.com/jshields-ca/LatestArr/pull/414))
+
+  - **From name:** LatestArr built the From header as one piece of text, "Name <address>", which the email library then had to read apart. A name containing angle brackets, like `Flix <other@example.com>`, made emails come from that other address. The name and address are now passed separately, so any name is kept as just a name. This covered newsletters, test emails, password reset emails and alerts. Only editors and admins can set a From name.
+  - **Dependencies:** nodemailer 10.1.7 fixes three ways crafted addresses could be misread. It also updates `undici` and `fast-uri`, which come in through other libraries, to clear their security advisories.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `fromHeader(name, address)` in `mailer/send.ts` returns `{ name, address }` (or the address alone with no name), used by `loadSender`, password reset, the SMTP test email and alerts. `from-header.test.ts` builds real messages with Nodemailer's stream transport and checks that names with commas, quotes, brackets and semicolons leave one From address. Dependencies: #389 (nodemailer 10.1.0 to 10.1.7 and nine dev and patch updates), #413 (undici 6.29.1, 7.30.1 and 8.12.3, and fast-uri 3.1.9 and 4.2.3).
+
+  </details>
+
+- You can type a hex colour like `181818` in the design editor. ([#407](https://github.com/jshields-ca/LatestArr/pull/407))
+
+  Each colour now has a box under its name for the hex value, as well as the swatch. Some systems' colour pickers, including Windows', have no hex field, so there was no way to enter an exact colour. Six digits, with or without the `#`, apply as you type. A short form like `#181` applies when you leave the box. Anything that isn't a colour is marked and ignored.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `ColourField` gets a text input alongside `<input type="color">`, using `parseHexColour` from `lib/colour.ts`. The server still validates every colour with `hexColor` in the design schema. Fixes #395.
+
+  </details>
+
+- You can import a source's users from the Recipients page, and they're listed by name. ([#409](https://github.com/jshields-ca/LatestArr/pull/409))
+
+  - **From a source** next to **Import** on the Recipients page lists your connected sources that can share their users (Plex, Tautulli, Jellyfin, Emby, Audiobookshelf and RomM). With none connected, it points to the Sources page. Before, this was only on each source's row on the Sources page, which was easy to miss after the setup checklist sent you to Recipients.
+  - The list of users is sorted by name instead of the order the source gives.
+  - For Tautulli, a person's Plex username is used when Tautulli's display name is just their email, so the list and the imported recipients show names, not emails.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `ImportSourceUsersDialog` moves to `components/import-source-users-dialog.tsx`. It loads the groups itself when it opens, so the Sources page no longer loads them. `ImportFromSourceButton` filters `listSources()` by `KINDS_WITH_USER_IMPORT` and refreshes the page's lists after an import. The Tautulli adapter's `listUsers` picks the first of `friendly_name` and `username` that isn't an email. Fixes #398.
+
+  </details>
+
 ## [0.12.6] - 2026-10-22
 
 ### Fixed

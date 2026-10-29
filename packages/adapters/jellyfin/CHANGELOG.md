@@ -1,5 +1,12 @@
 # @latestarr/adapter-jellyfin
 
+## 0.12.7
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @latestarr/adapter-core@0.12.7
+
 ## 0.12.6
 
 ### Patch Changes
