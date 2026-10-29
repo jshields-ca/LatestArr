@@ -20,11 +20,14 @@ export function loadOidcConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Oid
     return null;
   }
 
+  // docker-compose.yml passes every OIDC_* setting through, so one left
+  // blank in .env arrives as "" rather than unset (#416). Blank means the
+  // default: no secret (a public client), and the standard scopes.
   return {
     issuer,
     clientId,
-    clientSecret: env.OIDC_CLIENT_SECRET,
+    clientSecret: env.OIDC_CLIENT_SECRET || undefined,
     redirectUri,
-    scopes: env.OIDC_SCOPES ?? "openid profile email",
+    scopes: env.OIDC_SCOPES?.trim() || "openid profile email",
   };
 }
