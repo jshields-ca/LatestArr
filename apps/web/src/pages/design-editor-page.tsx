@@ -257,10 +257,13 @@ const BUTTON_COLOURS: { key: AdvancedColour; label: string }[] = [
 function AccentColours({
   colours,
   colors,
+  unused = {},
   onChange,
 }: {
   colours: { key: AdvancedColour; label: string }[];
   colors: DesignSettings["colors"];
+  // Why a colour has no effect in this design, shown in place of its value.
+  unused?: Partial<Record<AdvancedColour, string>>;
   onChange: (key: AdvancedColour, value: string | null) => void;
 }) {
   return (
@@ -273,7 +276,7 @@ function AccentColours({
               id={`design-color-${key}`}
               label={label}
               value={effectiveColour(colors, key)}
-              note={own ? undefined : key === "buttonText" ? "White" : "Follows the accent"}
+              note={unused[key] ?? (own ? undefined : key === "buttonText" ? "White" : "Follows the accent")}
               onChange={(value) => onChange(key, value)}
             />
             {own ? (
@@ -632,6 +635,10 @@ export function DesignEditorPage() {
   const content = settings.content;
   const setContent = (change: Partial<DesignContent>) => update((c) => ({ ...c, content: { ...c.content, ...change } }));
   const ownButtons = content.ctas.filter(isCompleteCta).length;
+  // Outlined buttons ignore Button text (#394). The Where to watch style
+  // also covers the Browse link, so it counts even with those buttons off.
+  const anyFilledButton =
+    (ownButtons > 0 && settings.buttons.style === "filled") || settings.buttons.sourceStyle === "filled";
   const sourceButtonPlacement =
     content.sourceButtons.placement === "sections" && !settings.sections.groupByType ? "end" : content.sourceButtons.placement;
 
@@ -706,7 +713,7 @@ export function DesignEditorPage() {
           <Group title="Where to watch">
             <SettingRow
               label="Where to watch buttons"
-              description="A button for each linked source with a public URL, like Watch on Plex or Play on RomM."
+              description="A button for each linked source with a public URL, like Watch on Plex or Play on RomM. They have their own style, outlined at first, which the Browse link for a section with nothing new also follows."
               htmlFor="design-source-buttons"
               className="py-1"
               control={
@@ -755,9 +762,15 @@ export function DesignEditorPage() {
                 onChange={(size) => update((c) => ({ ...c, buttons: { ...c.buttons, size } }))}
               />
             </div>
-            <AccentColours colours={BUTTON_COLOURS} colors={settings.colors} onChange={setAccentColour} />
+            <AccentColours
+              colours={BUTTON_COLOURS}
+              colors={settings.colors}
+              unused={anyFilledButton ? {} : { buttonText: "Not used: every button is outlined" }}
+              onChange={setAccentColour}
+            />
             <p className="text-xs text-muted-foreground">
-              Filled buttons use both colours. Outlined buttons use Button colour for their text and border.
+              Filled buttons use both colours. Outlined buttons use Button colour for their text and border, and
+              ignore Button text. To fill the Where to watch buttons, set their Style to Filled.
             </p>
             <ContrastNotes settings={settings} buttons />
           </Group>

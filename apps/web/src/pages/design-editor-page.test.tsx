@@ -241,6 +241,8 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     renderEditor();
     await screen.findByTitle("Design preview");
     expect(screen.getAllByText("Follows the accent")).toHaveLength(4);
+    // #394: every button starts outlined, so Button text has no effect yet.
+    expect(screen.getByText("Not used: every button is outlined")).toBeInTheDocument();
 
     fireEvent.input(screen.getByLabelText("Button colour"), { target: { value: "#ffff00" } });
     await waitFor(() => expect(previewBodies.at(-1)?.settings.colors.buttonBackground).toBe("#ffff00"));
@@ -262,6 +264,7 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     selectOption(screen.getByLabelText("Where to watch buttons style"), "Filled");
     await waitFor(() => expect(previewBodies.at(-1)?.settings.buttons.sourceStyle).toBe("filled"));
     expect(screen.getByRole("status")).toHaveTextContent("Button text on the button colour");
+    expect(screen.queryByText("Not used: every button is outlined")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Button colour: use the accent" }));
     await waitFor(() => expect(previewBodies.at(-1)?.settings.colors.buttonBackground).toBeNull());
