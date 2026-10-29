@@ -3,7 +3,7 @@ import { type Db, settings, smtpProfiles } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { Logger } from "../logger.js";
 import { smtpCredentialsFor } from "../mailer/credentials.js";
-import { sendEmail } from "../mailer/send.js";
+import { fromHeader, sendEmail } from "../mailer/send.js";
 import { getEncryptionKey } from "../secrets.js";
 
 export const WEBHOOK_FORMATS = ["discord", "slack", "ntfy", "apprise", "json"] as const;
@@ -149,7 +149,7 @@ async function deliver(
       if (!profile) throw new Error("The SMTP profile chosen for alerts no longer exists");
       if (!config.email.to) throw new Error("No alert email address is set");
       await sendEmail(smtpCredentialsFor(profile), {
-        from: `${profile.defaultFromName} <${profile.defaultFromEmail}>`,
+        from: fromHeader(profile.defaultFromName, profile.defaultFromEmail),
         to: config.email.to,
         subject: message.title,
         html: `<p>${escapeHtml(message.body).replace(/\n/g, "<br>")}</p>`,

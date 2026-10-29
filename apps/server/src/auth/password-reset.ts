@@ -3,7 +3,7 @@ import { type Db, passwordResetTokens, settings, smtpProfiles, users } from "@la
 import { and, eq, gt } from "drizzle-orm";
 import type { Logger } from "../logger.js";
 import { smtpCredentialsFor } from "../mailer/credentials.js";
-import { sendEmail } from "../mailer/send.js";
+import { fromHeader, sendEmail } from "../mailer/send.js";
 
 // "Forgot password?" links: random, single-use, stored only as a hash, and
 // short-lived. Asking again replaces any earlier link, and an account gets
@@ -148,7 +148,7 @@ export async function sendResetEmail(
 <p>If that wasn't you, ignore this email. Your password stays the same.</p>`;
   try {
     await sendEmail(smtpCredentialsFor(profile), {
-      from: `${profile.defaultFromName} <${profile.defaultFromEmail}>`,
+      from: fromHeader(profile.defaultFromName, profile.defaultFromEmail),
       to: user.email,
       subject: "Reset your LatestArr password",
       html,

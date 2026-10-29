@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { loadSystemMail, saveSystemMail } from "../../auth/password-reset.js";
 import { smtpCredentialsFor } from "../../mailer/credentials.js";
-import { sendEmail, verifySmtpConnection } from "../../mailer/send.js";
+import { fromHeader, sendEmail, verifySmtpConnection } from "../../mailer/send.js";
 import { getEncryptionKey } from "../../secrets.js";
 import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
@@ -178,7 +178,7 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
 
         try {
           const result = await sendEmail(smtpCredentialsFor(profile), {
-            from: `${profile.defaultFromName} <${profile.defaultFromEmail}>`,
+            from: fromHeader(profile.defaultFromName, profile.defaultFromEmail),
             to,
             subject: "LatestArr test email",
             html: "<p>This is a test email from LatestArr.</p>",
