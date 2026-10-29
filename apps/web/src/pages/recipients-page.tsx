@@ -23,6 +23,7 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { ImportRecipientsDialog, UndoLastImport } from "@/components/import-recipients-dialog";
+import { ImportFromSourceButton } from "@/components/import-source-users-dialog";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
   ApiError,
@@ -644,6 +645,12 @@ function RecipientsSection({
                 ]);
                 createdGroups.forEach(groupSync.groupCreated);
                 if (membershipsAdded > 0) groupSync.membershipChanged();
+                setImportVersion((v) => v + 1);
+              }}
+            />
+            <ImportFromSourceButton
+              onImported={() => {
+                groupSync.reload();
                 setImportVersion((v) => v + 1);
               }}
             />

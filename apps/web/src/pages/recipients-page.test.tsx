@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecipientsPage } from "./recipients-page";
@@ -51,6 +52,70 @@ describe("RecipientsPage", () => {
 
     expect(await screen.findByText("No recipients yet")).toBeInTheDocument();
     expect(await screen.findByText("No groups yet")).toBeInTheDocument();
+  });
+
+  // #398: the setup checklist sends people here after connecting a source.
+  it("imports a source's users from the Recipients page", async () => {
+    const user = userEvent.setup();
+    const recipients: unknown[] = [];
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [...recipients] }));
+      if (url === "/api/recipient-groups" && !init?.method) return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/sources")
+        return Promise.resolve(
+          jsonResponse(200, {
+            sources: [
+              { id: "s1", name: "Home Tautulli", kind: "tautulli" },
+              { id: "s2", name: "Books", kind: "booklore" },
+            ],
+          }),
+        );
+      if (url === "/api/sources/s1/users")
+        return Promise.resolve(
+          jsonResponse(200, { users: [{ externalId: "1", username: "Alice", email: "alice@example.com" }] }),
+        );
+      if (url === "/api/recipients/import") {
+        recipients.push(alice);
+        return Promise.resolve(jsonResponse(201, { created: recipients, skipped: [] }));
+      }
+      if (url === "/api/recipient-groups" && init?.method === "POST")
+        return Promise.resolve(jsonResponse(201, { group: { id: "g1", name: "Home Tautulli", description: null } }));
+      if (url === "/api/recipient-groups/g1/members") return Promise.resolve(jsonResponse(204, undefined));
+      return Promise.resolve(jsonResponse(404, { error: "Not found" }));
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("No recipients yet");
+    await user.click(await screen.findByRole("button", { name: "From a source" }));
+    // Only sources that can list users are offered.
+    expect(screen.queryByRole("button", { name: "Import users from Books" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Import users from Home Tautulli" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Import users from Home Tautulli" });
+    await within(dialog).findByText("alice@example.com");
+    await user.click(within(dialog).getByRole("button", { name: /Import 1 recipient/ }));
+    await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1\s*recipient/));
+    // The page reloads its lists, so the new recipient shows.
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+    expect(await screen.findByText("Alice")).toBeInTheDocument();
+  });
+
+  it("points to the Sources page when no source can import users", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/sources") return Promise.resolve(jsonResponse(200, { sources: [] }));
+      return Promise.resolve(jsonResponse(404, { error: "Not found" }));
+    });
+
+    render(
+      <MemoryRouter>
+        <RecipientsPage />
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "From a source" }));
+    expect(screen.getByRole("link", { name: "Sources" })).toHaveAttribute("href", "/sources");
   });
 
   it("lists recipients and toggles active state", async () => {

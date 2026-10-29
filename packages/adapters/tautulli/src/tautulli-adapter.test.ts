@@ -86,6 +86,9 @@ describe("listUsers", () => {
             { user_id: 0, username: "Local" },
             { user_id: 1, username: "alice123", friendly_name: "Alice", email: "alice@example.com" },
             { user_id: 2, username: "bob" },
+            // Tautulli often fills friendly_name with the email (#398).
+            { user_id: 3, username: "carol_c", friendly_name: "carol@example.com", email: "carol@example.com" },
+            { user_id: 4, username: "dave@example.com", friendly_name: "dave@example.com" },
           ],
         },
       }),
@@ -95,6 +98,8 @@ describe("listUsers", () => {
     expect(users).toEqual([
       { externalId: "1", username: "Alice", email: "alice@example.com" },
       { externalId: "2", username: "bob", email: undefined },
+      { externalId: "3", username: "carol_c", email: "carol@example.com" },
+      { externalId: "4", username: "dave@example.com", email: undefined },
     ]);
   });
 });

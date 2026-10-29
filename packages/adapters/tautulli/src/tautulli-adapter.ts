@@ -73,6 +73,14 @@ function mapLibraryType(sectionType: string): MediaKind {
 // to the subtitle. Only applied when Tautulli actually gives a
 // grandparent_title (episode entries do; movies/other kinds don't), so a
 // kind this doesn't apply to falls through to the caller's own default.
+// A person's name for the recipient list (#398). Tautulli often fills
+// friendly_name with the account's email when no name was set, so the
+// Plex username wins over an email; an email is the last resort.
+function displayName(friendlyName: string | undefined, username: string): string {
+  const looksLikeEmail = (value: string) => value.includes("@");
+  return [friendlyName, username].find((name) => name && !looksLikeEmail(name)) || friendlyName || username;
+}
+
 function buildEpisodeTitle(item: TautulliRecentlyAddedItem): string {
   return item.grandparent_title ?? item.title;
 }
@@ -190,7 +198,7 @@ export const tautulliAdapter: SourceAdapter = {
       .filter((user) => user.user_id !== 0)
       .map((user) => ({
         externalId: String(user.user_id),
-        username: user.friendly_name || user.username,
+        username: displayName(user.friendly_name, user.username),
         email: user.email || undefined,
       }));
   },

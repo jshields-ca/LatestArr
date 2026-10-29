@@ -23,14 +23,12 @@ function jsonResponse(status: number, body: unknown) {
 
 const ALL_KINDS = ["tautulli", "plex", "jellyfin", "emby", "booklore", "bookorbit", "grimmory", "audiobookshelf", "romm"];
 
-// SourcesPage fetches the sources list, the available adapter kinds, and
-// the recipient groups list (for ImportSourceUsersDialog's "reuse an
-// existing group" check) in parallel on mount, so every render in these
-// tests needs all three queued.
+// SourcesPage fetches the sources list and the available adapter kinds
+// in parallel on mount, so every render in these tests needs both queued.
+// The import dialog loads its users, then the groups, when it opens.
 function mockLoad(sourcesBody: unknown, kinds: string[] = ALL_KINDS) {
   fetchMock.mockResolvedValueOnce(jsonResponse(200, sourcesBody));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { kinds }));
-  fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
 }
 
 // Finds a POST/PATCH call by URL instead of a fixed array index, so an
@@ -459,12 +457,13 @@ describe("ImportSourceUsersDialog", () => {
       Promise.resolve(
         jsonResponse(200, {
           users: [
-            { externalId: "1", username: "alice", email: "alice@example.com" },
             { externalId: "2", username: "bob" },
+            { externalId: "1", username: "alice", email: "alice@example.com" },
           ],
         }),
       ),
     );
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
 
     render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
@@ -472,6 +471,10 @@ describe("ImportSourceUsersDialog", () => {
     await user.click(screen.getByRole("button", { name: "Import users" }));
     const dialog = await screen.findByRole("dialog");
     await within(dialog).findByText("alice@example.com");
+    // Listed by name, whatever order the source gives (#398).
+    const names = within(dialog).getAllByRole("checkbox").map((box) => box.closest("li")?.textContent ?? "");
+    expect(names[0]).toMatch(/^alice/);
+    expect(names[1]).toMatch(/^bob/);
 
     const aliceCheckbox = within(dialog).getByRole("checkbox", { name: /alice/ });
     const bobCheckbox = within(dialog).getByRole("checkbox", { name: /bob/ });
@@ -534,6 +537,7 @@ describe("ImportSourceUsersDialog", () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(200, { users: [{ externalId: "1", username: "alice", email: "alice@example.com" }] }),
     );
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
 
     render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
