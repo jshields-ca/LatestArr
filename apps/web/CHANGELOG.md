@@ -1,5 +1,60 @@
 # @latestarr/web
 
+## 0.12.7
+
+### Patch Changes
+
+- [#406](https://github.com/jshields-ca/LatestArr/pull/406) [`6ebd324`](https://github.com/jshields-ca/LatestArr/commit/6ebd32425f5a92fc07dcc4d00b782f1bca0d6081) - **Fixed:** The design editor makes clear which buttons each colour and style changes.
+
+  - **Where to watch** says its buttons have their own style, outlined at first, and that the Browse link follows it. The **Style** under **Your buttons** only changes buttons you add.
+  - **Button text** says "Not used: every button is outlined" when it has no effect, because an outlined button uses Button colour for its text and border.
+  - The colour note ends with the fix most people want: set the Where to watch Style to **Filled**.
+
+  Nothing about how emails look has changed.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `AccentColours` takes an `unused` map shown in place of a colour's value. Button text counts as used when your buttons are filled, or the Where to watch style is filled (it also styles the Browse link). Fixes [#394](https://github.com/jshields-ca/LatestArr/issues/394).
+
+  </details>
+
+- [#404](https://github.com/jshields-ca/LatestArr/pull/404) [`1919984`](https://github.com/jshields-ca/LatestArr/commit/19199842cce3752a32a7ef406fff1d5741680add) - **Fixed:** Two hints in the app now say the right thing.
+
+  - **Public URL for Plex and Tautulli** suggests `https://app.plex.tv` first. It works for anyone you share your server with, and needs no domain of your own. It used to say to use your Plex server's address.
+  - **A dark design** now says Light and Dark previews look the same, because email apps in dark mode leave a dark design as it is. It used to say to switch the preview to Dark to check it, as if something should change.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `PublicUrlHint` (`sources-page.tsx`) has Plex and Tautulli wording. The design editor's dark-mode note uses a new `isDarkBackground` in `lib/colour.ts`, the same weighting as the server's `isDarkDesign`. Fixes [#396](https://github.com/jshields-ca/LatestArr/issues/396) and [#397](https://github.com/jshields-ca/LatestArr/issues/397).
+
+  </details>
+
+- [#407](https://github.com/jshields-ca/LatestArr/pull/407) [`b1aeb72`](https://github.com/jshields-ca/LatestArr/commit/b1aeb72cc7111c5572531c6ebd85b83ace1ea26f) - **Fixed:** You can type a hex colour like `181818` in the design editor.
+
+  Each colour now has a box under its name for the hex value, as well as the swatch. Some systems' colour pickers, including Windows', have no hex field, so there was no way to enter an exact colour. Six digits, with or without the `#`, apply as you type. A short form like `[#181](https://github.com/jshields-ca/LatestArr/issues/181)` applies when you leave the box. Anything that isn't a colour is marked and ignored.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `ColourField` gets a text input alongside `<input type="color">`, using `parseHexColour` from `lib/colour.ts`. The server still validates every colour with `hexColor` in the design schema. Fixes [#395](https://github.com/jshields-ca/LatestArr/issues/395).
+
+  </details>
+
+- [#409](https://github.com/jshields-ca/LatestArr/pull/409) [`e925d76`](https://github.com/jshields-ca/LatestArr/commit/e925d76d34da1905bb2c34825674322ebcdf078d) - **Fixed:** You can import a source's users from the Recipients page, and they're listed by name.
+
+  - **From a source** next to **Import** on the Recipients page lists your connected sources that can share their users (Plex, Tautulli, Jellyfin, Emby, Audiobookshelf and RomM). With none connected, it points to the Sources page. Before, this was only on each source's row on the Sources page, which was easy to miss after the setup checklist sent you to Recipients.
+  - The list of users is sorted by name instead of the order the source gives.
+  - For Tautulli, a person's Plex username is used when Tautulli's display name is just their email, so the list and the imported recipients show names, not emails.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `ImportSourceUsersDialog` moves to `components/import-source-users-dialog.tsx`. It loads the groups itself when it opens, so the Sources page no longer loads them. `ImportFromSourceButton` filters `listSources()` by `KINDS_WITH_USER_IMPORT` and refreshes the page's lists after an import. The Tautulli adapter's `listUsers` picks the first of `friendly_name` and `username` that isn't an email. Fixes [#398](https://github.com/jshields-ca/LatestArr/issues/398).
+
+  </details>
+
 ## 0.12.6
 
 ### Patch Changes

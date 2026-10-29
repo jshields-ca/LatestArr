@@ -1,5 +1,43 @@
 # @latestarr/server
 
+## 0.12.7
+
+### Patch Changes
+
+- [#414](https://github.com/jshields-ca/LatestArr/pull/414) [`70b1c81`](https://github.com/jshields-ca/LatestArr/commit/70b1c811964d6110331b71a1ed85c16edcbaccbc) - **Fixed:** A From name with special characters can no longer change the address an email is sent from. Security updates for nodemailer and other dependencies are included too.
+
+  - **From name:** LatestArr built the From header as one piece of text, "Name <address>", which the email library then had to read apart. A name containing angle brackets, like `Flix <other@example.com>`, made emails come from that other address. The name and address are now passed separately, so any name is kept as just a name. This covered newsletters, test emails, password reset emails and alerts. Only editors and admins can set a From name.
+  - **Dependencies:** nodemailer 10.1.7 fixes three ways crafted addresses could be misread. It also updates `undici` and `fast-uri`, which come in through other libraries, to clear their security advisories.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `fromHeader(name, address)` in `mailer/send.ts` returns `{ name, address }` (or the address alone with no name), used by `loadSender`, password reset, the SMTP test email and alerts. `from-header.test.ts` builds real messages with Nodemailer's stream transport and checks that names with commas, quotes, brackets and semicolons leave one From address. Dependencies: [#389](https://github.com/jshields-ca/LatestArr/issues/389) (nodemailer 10.1.0 to 10.1.7 and nine dev and patch updates), [#413](https://github.com/jshields-ca/LatestArr/issues/413) (undici 6.29.1, 7.30.1 and 8.12.3, and fast-uri 3.1.9 and 4.2.3).
+
+  </details>
+
+- [#410](https://github.com/jshields-ca/LatestArr/pull/410) [`47807f7`](https://github.com/jshields-ca/LatestArr/commit/47807f7a8f4e12eaee4faf4c53be6a6e619ecee6) - **Improved:** Settings in `.env` can have a `LATESTARR_` prefix, so one `.env` can serve a whole stack.
+
+  With the provided `docker-compose.yml`, any setting can be written as `LATESTARR_ENCRYPTION_KEY`, `LATESTARR_PORT`, `LATESTARR_TZ` and so on. The prefixed name wins over the plain one, so LatestArr can't pick up another app's `PORT` or `TZ` from a shared `.env`. The plain names still work as before, so nothing needs changing. **`BACKUP_PATH`** set in `.env` now reaches the container too. Before, it had to go straight into the compose file.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `docker-compose.yml` uses Compose's nested defaults, e.g. `${LATESTARR_ENCRYPTION_KEY:-${ENCRYPTION_KEY:-}}`. Inside the container the names are unchanged, and the server reads them as before: there's no new way for it to find the encryption key. CI runs `docker compose config` to check plain, prefixed and default values. Fixes [#399](https://github.com/jshields-ca/LatestArr/issues/399).
+
+  </details>
+
+- Updated dependencies [[`e925d76`](https://github.com/jshields-ca/LatestArr/commit/e925d76d34da1905bb2c34825674322ebcdf078d)]:
+  - @latestarr/adapter-tautulli@0.12.7
+  - @latestarr/adapter-audiobookshelf@0.12.7
+  - @latestarr/adapter-booklore-family@0.12.7
+  - @latestarr/adapter-core@0.12.7
+  - @latestarr/adapter-jellyfin@0.12.7
+  - @latestarr/adapter-plex@0.12.7
+  - @latestarr/adapter-romm@0.12.7
+  - @latestarr/crypto@0.12.7
+  - @latestarr/db@0.12.7
+
 ## 0.12.6
 
 ### Patch Changes
