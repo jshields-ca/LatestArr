@@ -150,6 +150,16 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     window.localStorage.removeItem("latestarr:email-preview-scheme");
   });
 
+  it("says a dark design looks the same in the Light and Dark previews", async () => {
+    renderEditor();
+    await screen.findByTitle("Design preview");
+    expect(screen.getByText(/Switch the preview to Dark to check it/)).toBeInTheDocument();
+
+    fireEvent.input(screen.getByLabelText("Background"), { target: { value: "#181818" } });
+    expect(await screen.findByText(/This design is already dark/)).toBeInTheDocument();
+    expect(screen.queryByText(/Switch the preview to Dark to check it/)).not.toBeInTheDocument();
+  });
+
   it("re-previews after a change, marks it unsaved, and saves settings and name together", async () => {
     const user = userEvent.setup();
     renderEditor();

@@ -156,7 +156,11 @@ describe("SourcesPage", { timeout: 30_000 }, () => {
 
     expect(publicUrl()).toHaveAccessibleDescription(/item links use the Base URL/);
     selectOption(within(dialog).getByLabelText("Source type"), "Tautulli");
-    expect(publicUrl()).toHaveAccessibleDescription(/Leave it blank and items have no links/);
+    expect(publicUrl()).toHaveAccessibleDescription(/Use https:\/\/app\.plex\.tv/);
+    expect(publicUrl()).toHaveAccessibleDescription(/left blank, items have no links/);
+    selectOption(within(dialog).getByLabelText("Source type"), "Plex");
+    expect(publicUrl()).toHaveAccessibleDescription(/Use https:\/\/app\.plex\.tv/);
+    expect(publicUrl()).toHaveAccessibleDescription(/item links use the Base URL/);
   });
 
   it("adds a new source with an optional publicUrl", async () => {

@@ -28,6 +28,14 @@ export function contrastRatio(a: string, b: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+// Matches the server's isDarkDesign (render/design.ts), which uses this
+// simple weighting rather than contrast luminance: a dark background is
+// left as it is in dark mode, so the preview looks the same either way.
+export function isDarkBackground(hex: string): boolean {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b <= 0.5;
+}
+
 /** WCAG AA for normal-size text. */
 export const MIN_CONTRAST = 4.5;
 

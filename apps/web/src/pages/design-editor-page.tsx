@@ -28,7 +28,7 @@ import {
   type Newsletter,
   type Template,
 } from "@/lib/api";
-import { type AdvancedColour, contrastWarnings, effectiveColour, MIN_CONTRAST } from "@/lib/colour";
+import { type AdvancedColour, contrastWarnings, effectiveColour, isDarkBackground, MIN_CONTRAST } from "@/lib/colour";
 import {
   type DesignButtons,
   type DesignContent,
@@ -892,8 +892,9 @@ export function DesignEditorPage() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Email apps in dark mode show a dark version worked out from these colours, with Text as the
-                background and Background as the text. Switch the preview to Dark to check it.
+                {isDarkBackground(settings.colors.background)
+                  ? "This design is already dark, so email apps in dark mode show it as it is. Light and Dark previews look the same."
+                  : "Email apps in dark mode show a dark version worked out from these colours, with Text as the background and Background as the text. Switch the preview to Dark to check it."}
               </p>
               <details className="rounded-md border border-border px-3 py-2" open={customTextColours > 0}>
                 <summary className="cursor-pointer text-sm font-medium">
