@@ -16,18 +16,24 @@ services:
       # Change the host side (left of the colon) via PORT in .env if 3000
       # collides with something else already running — the app inside the
       # container always listens on 3000, so nothing else needs to change.
-      - "${PORT:-3000}:3000"
+      - "${LATESTARR_PORT:-${PORT:-3000}}:3000"
+    # Each setting can also be given with a LATESTARR_ prefix in .env (e.g.
+    # LATESTARR_ENCRYPTION_KEY), which wins over the plain name. That's for
+    # one .env shared by a whole stack, where names like PORT or TZ may
+    # belong to another app (#399). Inside the container the names stay
+    # plain, and only what's listed here is passed in.
     environment:
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
-      TRUST_PROXY: ${TRUST_PROXY:-}
-      LOG_LEVEL: ${LOG_LEVEL:-}
-      TZ: ${TZ:-}
-      OIDC_ISSUER: ${OIDC_ISSUER:-}
-      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
-      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
-      OIDC_SCOPES: ${OIDC_SCOPES:-}
+      ENCRYPTION_KEY: ${LATESTARR_ENCRYPTION_KEY:-${ENCRYPTION_KEY:-}}
+      WEB_ORIGIN: ${LATESTARR_WEB_ORIGIN:-${WEB_ORIGIN:-http://localhost:3000}}
+      TRUST_PROXY: ${LATESTARR_TRUST_PROXY:-${TRUST_PROXY:-}}
+      LOG_LEVEL: ${LATESTARR_LOG_LEVEL:-${LOG_LEVEL:-}}
+      TZ: ${LATESTARR_TZ:-${TZ:-}}
+      BACKUP_PATH: ${LATESTARR_BACKUP_PATH:-${BACKUP_PATH:-}}
+      OIDC_ISSUER: ${LATESTARR_OIDC_ISSUER:-${OIDC_ISSUER:-}}
+      OIDC_CLIENT_ID: ${LATESTARR_OIDC_CLIENT_ID:-${OIDC_CLIENT_ID:-}}
+      OIDC_CLIENT_SECRET: ${LATESTARR_OIDC_CLIENT_SECRET:-${OIDC_CLIENT_SECRET:-}}
+      OIDC_REDIRECT_URI: ${LATESTARR_OIDC_REDIRECT_URI:-${OIDC_REDIRECT_URI:-}}
+      OIDC_SCOPES: ${LATESTARR_OIDC_SCOPES:-${OIDC_SCOPES:-}}
     volumes:
       # Named volume, not a bind mount, so a fresh checkout never
       # accidentally starts from someone else's committed ./data.

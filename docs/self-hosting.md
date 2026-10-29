@@ -41,6 +41,8 @@ Everything else is optional. These are the settings most installs touch:
 
 [`.env.example`](../.env.example) documents every variable.
 
+**One `.env` for a whole stack?** Write any of these with a `LATESTARR_` prefix instead, such as `LATESTARR_ENCRYPTION_KEY` or `LATESTARR_PORT`, so they can't clash with another app's `PORT` or `TZ`. The prefixed name wins when both are set. This works with the provided `docker-compose.yml`. Inside the container, and with `docker run -e` or Portainer's **environment**, the names stay as listed.
+
 ## 3. Start the container
 
 ```bash
