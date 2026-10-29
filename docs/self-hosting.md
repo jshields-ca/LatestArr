@@ -109,7 +109,7 @@ The dashboard's setup checklist then walks through the same pages you'll use day
 5. **Create a newsletter.** Choose:
    - its schedule, a simple one (**Repeats**) or a cron expression, and a timezone;
    - how many days back to look for new items (**Lookback**). LatestArr reads everything added in that window, up to 1,000 items per source (per library for Audiobookshelf), and logs a warning if a source reaches that;
-   - its sources and recipient groups;
+   - its sources and recipient groups. Link **one source per library**: LatestArr doesn't yet spot the same item coming from two sources, so Plex and Tautulli for the same server (or Plex and Jellyfin reading the same files) list each new item twice. Tautulli adds **Most watched**; Plex reads the server directly. Either gives the same new items;
    - optionally, a design and a [subject](#subject-variables).
 
    **Preview** shows the next issue and can **Send test** to one address. **Send now** sends to everyone straight away.
