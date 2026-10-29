@@ -160,6 +160,34 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     expect(screen.queryByText(/Switch the preview to Dark to check it/)).not.toBeInTheDocument();
   });
 
+  it("takes a typed hex colour, applying it only once it's complete", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+    const hex = screen.getByLabelText("Background hex value");
+    expect(hex).toHaveValue("#ffffff");
+
+    await user.clear(hex);
+    await user.type(hex, "1818");
+    expect(hex).toBeInvalid();
+    expect(screen.getByLabelText("Background")).toHaveValue("#ffffff");
+    await user.type(hex, "18");
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.colors.background).toBe("#181818"));
+    expect(screen.getByLabelText("Background")).toHaveValue("#181818");
+
+    // A short form applies on leaving the box.
+    await user.clear(hex);
+    await user.type(hex, "#abc");
+    expect(screen.getByLabelText("Background")).toHaveValue("#181818");
+    await user.tab();
+    expect(screen.getByLabelText("Background")).toHaveValue("#aabbcc");
+    expect(hex).toHaveValue("#aabbcc");
+
+    // The picker's value shows in the box too.
+    fireEvent.input(screen.getByLabelText("Accent"), { target: { value: "#00bcd4" } });
+    expect(screen.getByLabelText("Accent hex value")).toHaveValue("#00bcd4");
+  });
+
   it("re-previews after a change, marks it unsaved, and saves settings and name together", async () => {
     const user = userEvent.setup();
     renderEditor();

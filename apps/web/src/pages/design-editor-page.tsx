@@ -28,7 +28,7 @@ import {
   type Newsletter,
   type Template,
 } from "@/lib/api";
-import { type AdvancedColour, contrastWarnings, effectiveColour, isDarkBackground, MIN_CONTRAST } from "@/lib/colour";
+import { type AdvancedColour, contrastWarnings, effectiveColour, isDarkBackground, MIN_CONTRAST, parseHexColour } from "@/lib/colour";
 import {
   type DesignButtons,
   type DesignContent,
@@ -223,10 +223,18 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-// A colour picker with its name and value.
+// A colour picker with its name, plus a box to type the hex value (#395):
+// some system pickers, like Windows', have no hex field. Six digits apply as
+// they're typed; a short form like #181 only on leaving the box, since it's
+// also the start of a longer one. Until then the last good colour stays.
 function ColourField({ id, label, value, note, onChange }: { id: string; label: string; value: string; note?: string; onChange: (value: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  // A change from the picker (or a reset) replaces what's typed, unless
+  // it's the colour typed.
+  useEffect(() => setDraft((typed) => (parseHexColour(typed) === value ? typed : value)), [value]);
+  const invalid = parseHexColour(draft) === null;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <input
         id={id}
         type="color"
@@ -234,9 +242,27 @@ function ColourField({ id, label, value, note, onChange }: { id: string; label: 
         onChange={(e) => onChange(e.target.value)}
         className="size-9 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1"
       />
-      <div className="flex min-w-0 flex-col">
+      <div className="flex min-w-0 flex-col gap-1">
         <Label htmlFor={id}>{label}</Label>
-        <span className={cn("text-xs text-muted-foreground", !note && "font-mono")}>{note ?? value}</span>
+        <Input
+          aria-label={`${label} hex value`}
+          aria-invalid={invalid || undefined}
+          value={draft}
+          spellCheck={false}
+          maxLength={7}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            const colour = /^#?[0-9a-f]{6}$/i.test(e.target.value.trim()) ? parseHexColour(e.target.value) : null;
+            if (colour && colour !== value) onChange(colour);
+          }}
+          onBlur={() => {
+            const colour = parseHexColour(draft);
+            if (colour && colour !== value) onChange(colour);
+            setDraft(colour ?? value);
+          }}
+          className="h-7 w-24 font-mono text-xs"
+        />
+        {note ? <span className="text-xs text-muted-foreground">{note}</span> : null}
       </div>
     </div>
   );

@@ -36,6 +36,14 @@ export function isDarkBackground(hex: string): boolean {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b <= 0.5;
 }
 
+/** "#181818", "181818" or "#181" as "#181818"; null when it isn't a colour. */
+export function parseHexColour(text: string): string | null {
+  const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(text.trim());
+  if (!match) return null;
+  const digits = match[1]!.toLowerCase();
+  return `#${digits.length === 3 ? [...digits].map((d) => d + d).join("") : digits}`;
+}
+
 /** WCAG AA for normal-size text. */
 export const MIN_CONTRAST = 4.5;
 

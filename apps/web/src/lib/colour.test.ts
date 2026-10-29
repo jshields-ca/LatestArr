@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contrastRatio, contrastWarnings, effectiveColour, isDarkBackground, mix } from "./colour";
+import { contrastRatio, contrastWarnings, effectiveColour, isDarkBackground, mix, parseHexColour } from "./colour";
 import { DEFAULT_DESIGN_SETTINGS, type DesignSettings } from "./design";
 
 function settings(overrides: Partial<DesignSettings["colors"]>, buttons?: Partial<DesignSettings["buttons"]>): DesignSettings {
@@ -22,6 +22,13 @@ describe("colour helpers", () => {
     expect(isDarkBackground("#181818")).toBe(true);
     expect(isDarkBackground("#ffffff")).toBe(false);
     expect(isDarkBackground("#00bcd4")).toBe(false);
+    });
+
+  it("reads typed hex colours with or without the #, in short or long form", () => {
+    expect(parseHexColour("#181818")).toBe("#181818");
+    expect(parseHexColour(" 00BCD4 ")).toBe("#00bcd4");
+    expect(parseHexColour("#abc")).toBe("#aabbcc");
+    for (const bad of ["", "#18181", "1818189", "red", "#gggggg", "rgb(0,0,0)"]) expect(parseHexColour(bad)).toBeNull();
   });
 
   it("follows the accent for unset advanced colours, as the server does", () => {
