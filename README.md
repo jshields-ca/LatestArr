@@ -2,6 +2,7 @@
 
 [![Version](https://img.shields.io/github/package-json/v/jshields-ca/latestarr?label=version)](https://github.com/jshields-ca/latestarr/releases)
 [![CI](https://github.com/jshields-ca/latestarr/actions/workflows/ci.yml/badge.svg)](https://github.com/jshields-ca/latestarr/actions/workflows/ci.yml)
+[![Docker pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Fjshields-ca%2FLatestArr%2Flatestarr&query=downloadCount&label=docker%20pulls&logo=docker&logoColor=white&color=2496ed)](https://github.com/jshields-ca/LatestArr/pkgs/container/latestarr)
 [![Docs](https://img.shields.io/badge/docs-latestarr.app-c31d4c)](https://www.latestarr.app/docs)
 [![Discussions](https://img.shields.io/github/discussions/jshields-ca/latestarr?label=discussions)](https://github.com/jshields-ca/LatestArr/discussions)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
