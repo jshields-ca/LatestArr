@@ -107,6 +107,19 @@ jobs:
           cache-from: type=gha,scope=ci-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=ci-${{ matrix.arch }}
 
+      - name: Check docker-compose.yml settings
+        run: |
+          # Plain names work, and a LATESTARR_ prefix wins over them (#399).
+          # An empty env file keeps any .env in the checkout out of it.
+          check() { docker compose --env-file /dev/null config --format json | jq -r "$1"; }
+          [ "$(ENCRYPTION_KEY=plain PORT=4000 check '.services.latestarr.environment.ENCRYPTION_KEY')" = "plain" ]
+          [ "$(ENCRYPTION_KEY=plain LATESTARR_ENCRYPTION_KEY=prefixed check '.services.latestarr.environment.ENCRYPTION_KEY')" = "prefixed" ]
+          [ "$(PORT=4000 check '.services.latestarr.ports[0].published')" = "4000" ]
+          [ "$(PORT=4000 LATESTARR_PORT=5000 check '.services.latestarr.ports[0].published')" = "5000" ]
+          [ "$(check '.services.latestarr.ports[0].published')" = "3000" ]
+          [ "$(TZ=Europe/London LATESTARR_TZ=America/Winnipeg check '.services.latestarr.environment.TZ')" = "America/Winnipeg" ]
+          echo "Compose settings resolve as documented"
+
       - name: Smoke test the built image
         run: |
           # A data volume left owned by root, as an older image (which ran as
