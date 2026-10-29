@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contrastRatio, contrastWarnings, effectiveColour, mix } from "./colour";
+import { contrastRatio, contrastWarnings, effectiveColour, isDarkBackground, mix } from "./colour";
 import { DEFAULT_DESIGN_SETTINGS, type DesignSettings } from "./design";
 
 function settings(overrides: Partial<DesignSettings["colors"]>, buttons?: Partial<DesignSettings["buttons"]>): DesignSettings {
@@ -16,6 +16,12 @@ describe("colour helpers", () => {
     expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
     expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 0);
     expect(contrastRatio("#777777", "#ffffff")).toBeCloseTo(4.48, 1);
+  });
+
+  it("calls a background dark the way the server's dark-mode handling does", () => {
+    expect(isDarkBackground("#181818")).toBe(true);
+    expect(isDarkBackground("#ffffff")).toBe(false);
+    expect(isDarkBackground("#00bcd4")).toBe(false);
   });
 
   it("follows the accent for unset advanced colours, as the server does", () => {

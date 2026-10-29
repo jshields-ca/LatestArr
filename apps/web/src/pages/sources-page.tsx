@@ -257,13 +257,18 @@ function BaseUrlHint({ id }: { id: string }) {
 // Tautulli's Base URL is its own API host, never a page for recipients, so
 // its adapter makes no item links at all without a Public URL (see
 // tautulli-adapter.ts); every other source falls back to the Base URL.
+// For Plex and Tautulli, app.plex.tv works for everyone the server is
+// shared with (#364), so it's suggested first (#397).
 function PublicUrlHint({ id, kind }: { id: string; kind: string }) {
+  const plexApp = "Use https://app.plex.tv, which works for anyone you share your server with, or your Plex server's own address.";
   return (
     <p id={id} className="text-xs text-muted-foreground">
       Where your recipients go when they click an item or a Where to watch button (like Watch on Plex).{" "}
       {kind === "tautulli"
-        ? "Set it to your Plex server's address, since Tautulli's isn't one recipients can use. Leave it blank and items have no links, and there's no Where to watch button."
-        : "Leave it blank and item links use the Base URL, with no Where to watch button."}
+        ? `${plexApp} Tautulli's address isn't one recipients can use, so left blank, items have no links and there's no Where to watch button.`
+        : kind === "plex"
+          ? `${plexApp} Left blank, item links use the Base URL, with no Where to watch button.`
+          : "Leave it blank and item links use the Base URL, with no Where to watch button."}
     </p>
   );
 }
