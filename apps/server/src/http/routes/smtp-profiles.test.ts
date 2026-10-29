@@ -174,7 +174,7 @@ describe("smtp profile lifecycle", () => {
     );
     expect(response.json()).toEqual({ ok: true, messageId: "msg-1" });
     expect(mockSendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ from: "LatestArr <noreply@example.com>", to: "someone@example.com" }),
+      expect.objectContaining({ from: { name: "LatestArr", address: "noreply@example.com" }, to: "someone@example.com" }),
     );
   });
 });

@@ -23,7 +23,7 @@ import {
 } from "@latestarr/db";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { smtpCredentialsFor } from "../mailer/credentials.js";
-import { sendEmail, type EmailAttachment, type SmtpCredentials } from "../mailer/send.js";
+import { fromHeader, sendEmail, type EmailAttachment, type SendEmailInput, type SmtpCredentials } from "../mailer/send.js";
 import {
   preparePosterPlaceholders,
   resolvePosterPlaceholders,
@@ -483,7 +483,7 @@ export async function loadNewsletter(db: Db, newsletterId: string): Promise<News
 
 interface Sender {
   credentials: SmtpCredentials;
-  from: string;
+  from: SendEmailInput["from"];
 }
 
 export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender> {
@@ -500,7 +500,7 @@ export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender
 
   const fromName = newsletter.senderIdentity?.fromName ?? smtpProfile.defaultFromName;
   const fromEmail = newsletter.senderIdentity?.fromEmail ?? smtpProfile.defaultFromEmail;
-  return { credentials: smtpCredentialsFor(smtpProfile), from: `${fromName} <${fromEmail}>` };
+  return { credentials: smtpCredentialsFor(smtpProfile), from: fromHeader(fromName, fromEmail) };
 }
 
 // The subject for this issue, with its {variables} filled in (#267).

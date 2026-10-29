@@ -289,7 +289,7 @@ describe("POST /newsletters/:id/send-now", () => {
     expect(mockSendMail).toHaveBeenCalledTimes(1);
     const sentMessage = mockSendMail.mock.calls[0]![0];
     expect(sentMessage.to).toBe("person@example.com");
-    expect(sentMessage.from).toBe("LatestArr <noreply@example.com>");
+    expect(sentMessage.from).toEqual({ name: "LatestArr", address: "noreply@example.com" });
     expect(sentMessage.html).toContain("Some Movie");
     // A plain-text part goes with the HTML, without image alt text.
     expect(sentMessage.text).toContain("Some Movie");

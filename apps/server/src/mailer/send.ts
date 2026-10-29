@@ -22,8 +22,22 @@ export interface EmailAttachment {
   contentType: string;
 }
 
+// A From header given as its parts, so Nodemailer never parses a name
+// someone typed into LatestArr: as one string, a comma would split it into
+// two addresses, and quotes or angle brackets could change which address
+// it names. Nodemailer quotes the name itself.
+export interface MailAddress {
+  name: string;
+  address: string;
+}
+
+export function fromHeader(name: string | null | undefined, address: string): MailAddress | string {
+  const trimmed = name?.trim();
+  return trimmed ? { name: trimmed, address } : address;
+}
+
 export interface SendEmailInput {
-  from: string;
+  from: MailAddress | string;
   to: string;
   subject: string;
   html: string;
