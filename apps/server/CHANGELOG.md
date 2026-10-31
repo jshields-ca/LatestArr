@@ -1,5 +1,51 @@
 # @latestarr/server
 
+## 0.12.8
+
+### Patch Changes
+
+- [#420](https://github.com/jshields-ca/LatestArr/pull/420) [`e9cb9fd`](https://github.com/jshields-ca/LatestArr/commit/e9cb9fd56d5386de7baeb0b97eb8b7d3943ea5bf) - **Improved:** Updated the scheduler library that runs newsletter and backup schedules to croner 11.
+
+  Schedules work as before. One small difference: a schedule set between 2:00 and 2:59 AM now runs at 3:00 AM on the night clocks spring forward, rather than as late as the skipped hour was long (3:30 AM for 2:30 AM).
+
+  <details>
+  <summary>Technical details</summary>
+
+  croner 10.0.1 → 11.0.0 ([#420](https://github.com/jshields-ca/LatestArr/issues/420)). Its breaking changes are in `startAt`, `dayOffset`, `previousRun()` and daylight-saving handling. LatestArr uses none of the first three. `nextRun(since)` is still strictly after `since`, which the missed-send catch-up on startup relies on (checked against 11.0.0).
+
+  </details>
+
+- [#419](https://github.com/jshields-ca/LatestArr/pull/419) [`11a1c28`](https://github.com/jshields-ca/LatestArr/commit/11a1c283eb755a424a3a8eed3e61aac6cc5af78d) - **Improved:** Updated nine dependencies, including Nodemailer and the web server's file serving and cookie libraries.
+
+  <details>
+  <summary>Technical details</summary>
+
+  From [#419](https://github.com/jshields-ca/LatestArr/issues/419): nodemailer 10.1.7 → 10.2.1, @fastify/static 10.1.6 → 10.1.8 (serves files with `#` or `?` in their names), @fastify/cookie 11.1.3 → 11.1.5, react-router-dom 7.18.5, lucide-react 1.62.0, vite 8.3.5, read-excel-file 9.3.13, typescript-eslint 8.72.1 and @types/mjml 5.4.2. No code changes. The From-header test (`from-header.test.ts`) still passes on the new Nodemailer.
+
+  </details>
+
+- [#417](https://github.com/jshields-ca/LatestArr/pull/417) [`3621e5a`](https://github.com/jshields-ca/LatestArr/commit/3621e5ad8d9c47e65f5a9b4ab92cf93052baf7d0) - **Fixed:** SSO sign-in works when `OIDC_SCOPES` is left blank, as `.env.example` shows.
+
+  With the provided `docker-compose.yml`, a blank `OIDC_SCOPES` reached LatestArr as an empty value rather than a missing one. LatestArr then asked your SSO provider for no scopes, so providers refused the sign-in or sent no ID token. A blank value now means the default, `openid profile email`. A blank `OIDC_CLIENT_SECRET` likewise now means no secret, as it should for public clients. If you set `OIDC_SCOPES=openid profile email` to work around this, you can leave it set.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `loadOidcConfigFromEnv` reads them with `||` instead of `??`: `OIDC_SCOPES?.trim() || "openid profile email"` and `OIDC_CLIENT_SECRET || undefined`. Compose passes each `OIDC_*` setting with an empty default, so these were always set. A new `oidc-config.test.ts` covers missing, blank and set values. Found by the latestarr.app session. Fixes [#416](https://github.com/jshields-ca/LatestArr/issues/416).
+
+  </details>
+
+- Updated dependencies []:
+  - @latestarr/adapter-audiobookshelf@0.12.8
+  - @latestarr/adapter-booklore-family@0.12.8
+  - @latestarr/adapter-core@0.12.8
+  - @latestarr/adapter-jellyfin@0.12.8
+  - @latestarr/adapter-plex@0.12.8
+  - @latestarr/adapter-romm@0.12.8
+  - @latestarr/adapter-tautulli@0.12.8
+  - @latestarr/crypto@0.12.8
+  - @latestarr/db@0.12.8
+
 ## 0.12.7
 
 ### Patch Changes
