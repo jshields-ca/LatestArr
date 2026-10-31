@@ -11,6 +11,43 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.12.8] - 2026-10-31
+
+### Improved
+
+- Updated the scheduler library that runs newsletter and backup schedules to croner 11. ([#420](https://github.com/jshields-ca/LatestArr/pull/420))
+
+  Schedules work as before. One small difference: a schedule set between 2:00 and 2:59 AM now runs at 3:00 AM on the night clocks spring forward, rather than as late as the skipped hour was long (3:30 AM for 2:30 AM).
+
+  <details>
+  <summary>Technical details</summary>
+
+  croner 10.0.1 → 11.0.0 (#420). Its breaking changes are in `startAt`, `dayOffset`, `previousRun()` and daylight-saving handling. LatestArr uses none of the first three. `nextRun(since)` is still strictly after `since`, which the missed-send catch-up on startup relies on (checked against 11.0.0).
+
+  </details>
+
+- Updated nine dependencies, including Nodemailer and the web server's file serving and cookie libraries. ([#419](https://github.com/jshields-ca/LatestArr/pull/419))
+
+  <details>
+  <summary>Technical details</summary>
+
+  From #419: nodemailer 10.1.7 → 10.2.1, @fastify/static 10.1.6 → 10.1.8 (serves files with `#` or `?` in their names), @fastify/cookie 11.1.3 → 11.1.5, react-router-dom 7.18.5, lucide-react 1.62.0, vite 8.3.5, read-excel-file 9.3.13, typescript-eslint 8.72.1 and @types/mjml 5.4.2. No code changes. The From-header test (`from-header.test.ts`) still passes on the new Nodemailer.
+
+  </details>
+
+### Fixed
+
+- SSO sign-in works when `OIDC_SCOPES` is left blank, as `.env.example` shows. ([#417](https://github.com/jshields-ca/LatestArr/pull/417))
+
+  With the provided `docker-compose.yml`, a blank `OIDC_SCOPES` reached LatestArr as an empty value rather than a missing one. LatestArr then asked your SSO provider for no scopes, so providers refused the sign-in or sent no ID token. A blank value now means the default, `openid profile email`. A blank `OIDC_CLIENT_SECRET` likewise now means no secret, as it should for public clients. If you set `OIDC_SCOPES=openid profile email` to work around this, you can leave it set.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `loadOidcConfigFromEnv` reads them with `||` instead of `??`: `OIDC_SCOPES?.trim() || "openid profile email"` and `OIDC_CLIENT_SECRET || undefined`. Compose passes each `OIDC_*` setting with an empty default, so these were always set. A new `oidc-config.test.ts` covers missing, blank and set values. Found by the latestarr.app session. Fixes #416.
+
+  </details>
+
 ## [0.12.7] - 2026-10-29
 
 ### Improved
