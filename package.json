@@ -29,7 +29,9 @@
       "sharp"
     ],
     "overrides": {
-      "esbuild": "^0.25.0"
+      "esbuild": "^0.25.0",
+      "glob@13": "^14.0.2",
+      "minimatch@10": "^11.0.1"
     }
   }
 }
