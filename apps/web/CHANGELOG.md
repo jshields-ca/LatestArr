@@ -1,5 +1,18 @@
 # @latestarr/web
 
+## 0.12.8
+
+### Patch Changes
+
+- [#419](https://github.com/jshields-ca/LatestArr/pull/419) [`11a1c28`](https://github.com/jshields-ca/LatestArr/commit/11a1c283eb755a424a3a8eed3e61aac6cc5af78d) - **Improved:** Updated nine dependencies, including Nodemailer and the web server's file serving and cookie libraries.
+
+  <details>
+  <summary>Technical details</summary>
+
+  From [#419](https://github.com/jshields-ca/LatestArr/issues/419): nodemailer 10.1.7 → 10.2.1, @fastify/static 10.1.6 → 10.1.8 (serves files with `#` or `?` in their names), @fastify/cookie 11.1.3 → 11.1.5, react-router-dom 7.18.5, lucide-react 1.62.0, vite 8.3.5, read-excel-file 9.3.13, typescript-eslint 8.72.1 and @types/mjml 5.4.2. No code changes. The From-header test (`from-header.test.ts`) still passes on the new Nodemailer.
+
+  </details>
+
 ## 0.12.7
 
 ### Patch Changes

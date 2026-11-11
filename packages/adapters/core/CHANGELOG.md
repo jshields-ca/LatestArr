@@ -1,5 +1,9 @@
 # @latestarr/adapter-core
 
+## 0.12.8
+
+No changes in this release.
+
 ## 0.12.7
 
 No changes in this release.
