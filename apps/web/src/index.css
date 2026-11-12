@@ -176,6 +176,51 @@
 }
 
 @layer utilities {
+  /* The stamp on the signed-out screens sits at a slight tilt, as if stuck
+   * on by hand. On sign-in and setup it presses onto the page once as the
+   * page opens (.stamp-press), and the postmark follows it (.postmark-in).
+   * Neither loops, and both are skipped for reduced motion, leaving the
+   * resting tilt. `transform` (not Tailwind's `rotate`) so the keyframes
+   * and the resting state are the same property. */
+  .stamp-tilt {
+    transform: rotate(-5deg);
+    transform-origin: 50% 60%;
+  }
+  .stamp-press {
+    animation: stamp-press 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  }
+  .postmark-in {
+    animation: postmark-in 0.35s ease-out 0.5s both;
+  }
+  @keyframes stamp-press {
+    0% {
+      transform: scale(1.5) rotate(-14deg);
+      opacity: 0;
+    }
+    55% {
+      transform: scale(0.94) rotate(-5deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1) rotate(-5deg);
+      opacity: 1;
+    }
+  }
+  @keyframes postmark-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stamp-press,
+    .postmark-in {
+      animation: none;
+    }
+  }
+
   /* The airmail stripe: rose and blue dashes, like an envelope's edge. */
   .airmail-stripe {
     height: 3px;

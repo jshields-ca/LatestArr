@@ -4,9 +4,8 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
-import { Logo } from "@/components/logo";
+import { AuthCard } from "@/components/auth-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, bootstrap, getAuthProviders } from "@/lib/api";
@@ -75,101 +74,95 @@ export function SetupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <Logo iconClassName="size-8" textClassName="text-xl" />
-          <CardTitle className="sr-only">Create the admin account</CardTitle>
-          <CardDescription>
-            Welcome to LatestArr — create the first admin account to get started.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="displayName">Name</Label>
-              <Input
-                id="displayName"
-                autoComplete="name"
-                required
-                value={displayName}
-                onChange={(e) => {
-                  setDisplayName(e.target.value);
-                  if (fieldErrors.displayName) setFieldErrors((prev) => ({ ...prev, displayName: undefined }));
-                }}
-                disabled={submitting}
-                aria-invalid={fieldErrors.displayName ? true : undefined}
-                aria-describedby={fieldErrors.displayName ? "displayName-error" : undefined}
-              />
-              {fieldErrors.displayName ? (
-                <p id="displayName-error" role="alert" className="text-xs text-destructive">
-                  {fieldErrors.displayName}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
-                }}
-                disabled={submitting}
-                aria-invalid={fieldErrors.email ? true : undefined}
-                aria-describedby={fieldErrors.email ? "email-error" : undefined}
-              />
-              {fieldErrors.email ? (
-                <p id="email-error" role="alert" className="text-xs text-destructive">
-                  {fieldErrors.email}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={MIN_PASSWORD_LENGTH}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
-                }}
-                disabled={submitting}
-                aria-invalid={fieldErrors.password ? true : undefined}
-                aria-describedby={fieldErrors.password ? "password-error" : "password-hint"}
-              />
-              {fieldErrors.password ? (
-                <p id="password-error" role="alert" className="text-xs text-destructive">
-                  {fieldErrors.password}
-                </p>
-              ) : (
-                <p id="password-hint" className="text-xs text-muted-foreground">
-                  At least {MIN_PASSWORD_LENGTH} characters.
-                </p>
-              )}
-            </div>
+    <AuthCard
+      title="Create the admin account"
+      titleHidden
+      animate
+      description="Welcome to LatestArr — create the first admin account to get started."
+    >
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="displayName">Name</Label>
+          <Input
+            id="displayName"
+            autoComplete="name"
+            required
+            value={displayName}
+            onChange={(e) => {
+              setDisplayName(e.target.value);
+              if (fieldErrors.displayName) setFieldErrors((prev) => ({ ...prev, displayName: undefined }));
+            }}
+            disabled={submitting}
+            aria-invalid={fieldErrors.displayName ? true : undefined}
+            aria-describedby={fieldErrors.displayName ? "displayName-error" : undefined}
+          />
+          {fieldErrors.displayName ? (
+            <p id="displayName-error" role="alert" className="text-xs text-destructive">
+              {fieldErrors.displayName}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            disabled={submitting}
+            aria-invalid={fieldErrors.email ? true : undefined}
+            aria-describedby={fieldErrors.email ? "email-error" : undefined}
+          />
+          {fieldErrors.email ? (
+            <p id="email-error" role="alert" className="text-xs text-destructive">
+              {fieldErrors.email}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            disabled={submitting}
+            aria-invalid={fieldErrors.password ? true : undefined}
+            aria-describedby={fieldErrors.password ? "password-error" : "password-hint"}
+          />
+          {fieldErrors.password ? (
+            <p id="password-error" role="alert" className="text-xs text-destructive">
+              {fieldErrors.password}
+            </p>
+          ) : (
+            <p id="password-hint" className="text-xs text-muted-foreground">
+              At least {MIN_PASSWORD_LENGTH} characters.
+            </p>
+          )}
+        </div>
 
-            {error ? (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            ) : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
 
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              Create account
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? <Loader2 className="animate-spin" /> : null}
+          Create account
+        </Button>
+      </form>
+    </AuthCard>
   );
 }

@@ -4,9 +4,8 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
-import { Logo } from "@/components/logo";
+import { AuthCard } from "@/components/auth-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -77,90 +76,86 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <Logo iconClassName="size-8" textClassName="text-xl" />
-          <CardTitle className="sr-only">Sign in</CardTitle>
-          <CardDescription>Sign in to manage your newsletters.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {ssoError ? (
-            <p role="alert" className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
-              {ssoError}
-            </p>
-          ) : null}
-          <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-baseline justify-between gap-2">
-                <Label htmlFor="password">Password</Label>
-                {resetByEmail ? (
-                  <Link to="/forgot-password" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
-                    Forgot password?
-                  </Link>
-                ) : null}
-              </div>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-
-            {error ? (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
+    <AuthCard
+      title="Sign in"
+      titleHidden
+      animate
+      description="Sign in to manage your newsletters."
+    >
+      {ssoError ? (
+        <p role="alert" className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm">
+          {ssoError}
+        </p>
+      ) : null}
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={submitting}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <Label htmlFor="password">Password</Label>
+            {resetByEmail ? (
+              <Link to="/forgot-password" className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+                Forgot password?
+              </Link>
             ) : null}
+          </div>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={submitting}
+          />
+        </div>
 
-            <Button type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin" /> : null}
-              Sign in
-            </Button>
-          </form>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
 
-          {oidcAvailable ? (
-            <>
-              <div className="my-4 flex items-center gap-3">
-                <Separator className="flex-1" />
-                <span className="text-xs uppercase text-muted-foreground">or</span>
-                <Separator className="flex-1" />
-              </div>
-              <Button variant="outline" className="w-full" asChild>
-                <a href="/api/auth/oidc/login">Continue with SSO</a>
-              </Button>
-            </>
-          ) : null}
+        <Button type="submit" disabled={submitting}>
+          {submitting ? <Loader2 className="animate-spin" /> : null}
+          Sign in
+        </Button>
+      </form>
 
-          {/* Without email resets, say where to go instead of leaving
-              someone stuck. */}
-          {!checkingProviders && !resetByEmail ? (
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Forgot your password? Ask another admin to reset it, or see{" "}
-              <a href={RECOVERY_DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-                what to do if you&apos;re locked out
-              </a>
-              .
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-    </div>
+      {oidcAvailable ? (
+        <>
+          <div className="my-4 flex items-center gap-3">
+            <Separator className="flex-1" />
+            <span className="text-xs uppercase text-muted-foreground">or</span>
+            <Separator className="flex-1" />
+          </div>
+          <Button variant="outline" className="w-full" asChild>
+            <a href="/api/auth/oidc/login">Continue with SSO</a>
+          </Button>
+        </>
+      ) : null}
+
+      {/* Without email resets, say where to go instead of leaving
+          someone stuck. */}
+      {!checkingProviders && !resetByEmail ? (
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Forgot your password? Ask another admin to reset it, or see{" "}
+          <a href={RECOVERY_DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+            what to do if you&apos;re locked out
+          </a>
+          .
+        </p>
+      ) : null}
+    </AuthCard>
   );
 }
