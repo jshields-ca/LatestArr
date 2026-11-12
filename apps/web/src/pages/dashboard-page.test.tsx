@@ -79,8 +79,8 @@ const exampleSendRun = {
 
 // Every required step is done: one source, one recipient in one group, one
 // SMTP profile, one newsletter (template stays optional/empty).
-function mockCompleteLoad() {
-  fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources: [{ id: "s1", status: "ok" }] }));
+function mockCompleteLoad(sources: { id: string; status: string }[] = [{ id: "s1", status: "ok" }]) {
+  fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [{ id: "r1" }] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [{ id: "g1" }] }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [{ id: "smtp1" }] }));
@@ -155,6 +155,32 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Sent")).toBeInTheDocument();
     expect(screen.getByText(/4 items/)).toBeInTheDocument();
     expect(screen.getByText(/2 recipients/)).toBeInTheDocument();
+  });
+
+  // #332: an untested source isn't a connected one.
+  it("says All connected only when every source has passed a test", async () => {
+    mockCompleteLoad();
+    const first = renderDashboard();
+    expect(await screen.findByText("All connected")).toBeInTheDocument();
+    first.unmount();
+
+    mockCompleteLoad([
+      { id: "s1", status: "ok" },
+      { id: "s2", status: "unconfigured" },
+      { id: "s3", status: "unconfigured" },
+    ]);
+    const second = renderDashboard();
+    expect(await screen.findByText("2 not yet tested")).toBeInTheDocument();
+    expect(screen.queryByText("All connected")).not.toBeInTheDocument();
+    second.unmount();
+
+    // A failing source matters more than an untested one.
+    mockCompleteLoad([
+      { id: "s1", status: "error" },
+      { id: "s2", status: "unconfigured" },
+    ]);
+    renderDashboard();
+    expect(await screen.findByText("1 needs attention")).toBeInTheDocument();
   });
 
   it("re-expands the completed checklist on request, and can collapse it again", async () => {

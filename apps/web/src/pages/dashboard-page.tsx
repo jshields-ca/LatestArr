@@ -324,6 +324,15 @@ export function DashboardPage() {
   const showFullChecklist = !requiredDone || checklistExpanded;
 
   const sourcesWithErrors = sources?.filter((s) => s.status === "error").length ?? 0;
+  // "unconfigured" is a source nobody has tested yet (the Sources page's
+  // "Not yet tested"), which isn't the same as connected.
+  const sourcesUntested = sources?.filter((s) => s.status === "unconfigured").length ?? 0;
+  const sourcesSummary =
+    sourcesWithErrors > 0
+      ? `${sourcesWithErrors} need${sourcesWithErrors === 1 ? "s" : ""} attention`
+      : sourcesUntested > 0
+        ? `${sourcesUntested} not yet tested`
+        : "All connected";
   const enabledNewsletters = newsletters?.filter((n) => n.isEnabled).length ?? 0;
 
   // A single card that's a true accordion (one header, conditionally
@@ -407,7 +416,7 @@ export function DashboardPage() {
           <StatCard
             label="Sources"
             value={sources?.length ?? 0}
-            secondary={sourcesWithErrors > 0 ? `${sourcesWithErrors} need attention` : "All connected"}
+            secondary={sources?.length ? sourcesSummary : undefined}
             href="/sources"
             icon={Server}
           />

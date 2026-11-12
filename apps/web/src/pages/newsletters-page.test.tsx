@@ -378,11 +378,14 @@ describe("NewslettersPage", () => {
     // The Enabled switch stays on the collapsed row, unrelated to the
     // Details/History tabs — no need to expand the newsletter first.
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { newsletter: { ...weeklyDigest, isEnabled: false } }));
+    // Its label says the state it's in (#332).
+    expect(screen.getByRole("switch", { name: "Scheduled" })).toBeChecked();
     await user.click(screen.getByRole("switch"));
 
     const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
     expect(init.method).toBe("PATCH");
     expect(JSON.parse(init.body as string)).toEqual({ isEnabled: false });
+    expect(await screen.findByRole("switch", { name: "Paused" })).not.toBeChecked();
   });
 
   it(

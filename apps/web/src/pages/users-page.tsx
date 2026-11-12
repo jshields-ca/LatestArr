@@ -29,6 +29,7 @@ import {
   updateUser,
   type ManagedUser,
 } from "@/lib/api";
+import { formatDate } from "@/lib/dates";
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type Role } from "@/lib/roles";
 
 const MIN_PASSWORD_LENGTH = 12;
@@ -39,7 +40,7 @@ function errorMessage(err: unknown, fallback: string): string {
 
 function lastSignIn(user: ManagedUser): string {
   if (!user.lastLoginAt) return "Never signed in";
-  return `Last signed in ${new Date(user.lastLoginAt).toLocaleDateString(undefined, { dateStyle: "medium" })}`;
+  return `Last signed in ${formatDate(user.lastLoginAt)}`;
 }
 
 function isRole(value: string): value is Role {
