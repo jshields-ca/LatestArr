@@ -36,7 +36,7 @@ export interface ListRowProps {
 
 /**
  * The shared shape behind every admin list page's rows (Sources,
- * Recipients & Groups, SMTP Profiles, Newsletters, Templates): a leading
+ * Recipients & Groups, Email servers, Newsletters, Templates): a leading
  * icon, a primary name with inline badges, secondary metadata, and a
  * trailing actions cluster, in a Card. Expandable rows (Newsletters,
  * Groups) additionally wrap the leading/primary/secondary cluster in a
@@ -99,7 +99,7 @@ export interface ConfirmDeleteButtonProps {
  * Cancel" prompt rather than opening a separate dialog — the pattern
  * Recipients and Templates already shared verbatim before this file existed.
  * Rows whose confirm state also needs to hide *other* trailing actions
- * (Sources' and SMTP Profiles' "Test connection", for example) manage that
+ * (Sources' and Email servers' "Test connection", for example) manage that
  * boolean themselves instead of using this component, since it owns its own
  * confirming state.
  */

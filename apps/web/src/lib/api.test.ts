@@ -445,11 +445,11 @@ describe("newsletters", () => {
 
   it("propagates a misconfigured-newsletter error from send-now", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(400, { error: "Newsletter has no SMTP profile configured" }),
+      jsonResponse(400, { error: "Newsletter has no email server configured" }),
     );
     await expect(sendNewsletterNow("n1")).rejects.toMatchObject({
       status: 400,
-      message: "Newsletter has no SMTP profile configured",
+      message: "Newsletter has no email server configured",
     });
   });
 

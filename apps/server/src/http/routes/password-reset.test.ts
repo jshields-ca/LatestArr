@@ -207,7 +207,7 @@ describe("password reset by email", () => {
     expect((await confirmReset(token, "my-brand-new-password")).statusCode).toBe(400);
   });
 
-  it("turns system email off when its SMTP profile is deleted", async () => {
+  it("turns system email off when its email server is deleted", async () => {
     const { smtpProfileId } = await turnOnSystemMail();
     await as(admin, { method: "DELETE", url: `/api/smtp-profiles/${smtpProfileId}` });
     const after = await as(admin, { method: "GET", url: "/api/settings/system-mail" });

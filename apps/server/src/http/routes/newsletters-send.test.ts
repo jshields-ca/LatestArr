@@ -218,7 +218,7 @@ describe("POST /newsletters/:id/send-now", () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it("400s when the newsletter has no SMTP profile configured", async () => {
+  it("400s when the newsletter has no email server configured", async () => {
     const newsletterId = await createNewsletter();
     const response = await app.inject(
       authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }),
@@ -642,7 +642,7 @@ describe("activity logging", () => {
 
     for (const message of [
       'Added tautulli source "Tautulli"',
-      'Added SMTP profile "Primary"',
+      'Added email server "Primary"',
       'Created group "Household"',
       "Added recipient person@example.com",
       'Added person@example.com to group "Household"',
@@ -708,7 +708,7 @@ describe("activity logging", () => {
     const newsletterId = await createNewsletter();
     await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
 
-    const [entry] = logsMatching('Didn\'t send newsletter "Weekly Digest": Newsletter has no SMTP profile configured');
+    const [entry] = logsMatching('Didn\'t send newsletter "Weekly Digest": Newsletter has no email server configured');
     expect(entry?.level).toBe(40);
     expect(getRecentLogs(500).filter((e) => e.level >= 50)).toHaveLength(0);
   });
@@ -796,7 +796,7 @@ describe("preview and test send", () => {
     expect(await db.select().from(sendRuns)).toHaveLength(0);
   });
 
-  it("previews without an SMTP profile, but 502s with a readable reason when a source is unreachable", async () => {
+  it("previews without an email server, but 502s with a readable reason when a source is unreachable", async () => {
     const newsletterId = await linkedNewsletter(false);
     mockFetch.mockRejectedValue(new TypeError("fetch failed"));
 
@@ -828,7 +828,7 @@ describe("preview and test send", () => {
     expect(entry).toMatchObject({ level: 30, trigger: "test", user: "admin@example.com" });
   });
 
-  it("rejects a test send with no SMTP profile or an invalid address", async () => {
+  it("rejects a test send with no email server or an invalid address", async () => {
     const withoutSmtp = await linkedNewsletter(false);
     const noSmtp = await app.inject(
       authed({ method: "POST", url: `/api/newsletters/${withoutSmtp}/send-test`, payload: { to: "me@example.com" } }),

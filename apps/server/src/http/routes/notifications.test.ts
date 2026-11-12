@@ -252,14 +252,14 @@ describe("failure alerts from sends", () => {
     expect(webhookCalls).toHaveLength(0);
   });
 
-  it("alerts when a scheduled newsletter can't send because its SMTP profile is missing", async () => {
+  it("alerts when a scheduled newsletter can't send because its email server is missing", async () => {
     await saveSettings(webhookSettings);
     const newsletterId = await newsletterWithRecipients(["person@example.com"], { smtp: false });
 
     await expect(runNewsletter(db, newsletterId, { trigger: "catch-up" })).rejects.toThrow();
 
     expect(webhookCalls).toHaveLength(1);
-    expect(JSON.parse(webhookCalls[0]!.init.body as string).content).toContain("Newsletter has no SMTP profile configured");
+    expect(JSON.parse(webhookCalls[0]!.init.body as string).content).toContain("Newsletter has no email server configured");
   });
 
   it("alerts on a partial send when that option is on, and stays quiet when it's off", async () => {

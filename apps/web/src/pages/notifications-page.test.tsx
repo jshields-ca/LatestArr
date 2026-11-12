@@ -81,7 +81,7 @@ describe("NotificationsPage", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/notifications", expect.objectContaining({ method: "PUT" })));
     const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
     const body = JSON.parse(init.body as string);
-    // The only SMTP profile is picked automatically.
+    // The only email server is picked automatically.
     expect(body.email).toEqual({ enabled: true, smtpProfileId: "smtp1", to: "me@example.com" });
     expect(body.webhook).toEqual({ enabled: true, format: "discord" });
   });

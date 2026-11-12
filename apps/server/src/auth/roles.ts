@@ -5,7 +5,7 @@
 //   see recipients' email addresses or change anything.
 // - editor: also manages newsletters (including sending), designs,
 //   recipients, and groups.
-// - admin: also manages sources, SMTP profiles, notifications, users, and
+// - admin: also manages sources, email servers, notifications, users, and
 //   the logs.
 //
 // Each route group declares the role it needs to read and to change

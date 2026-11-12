@@ -451,7 +451,7 @@ export async function runNewsletter(
     } else {
       log.error({ err, sendRunId: context.sendRunId }, `Newsletter ${label} failed to send: ${describeSendFailure(err)}`);
     }
-    // A misconfigured newsletter (e.g. its SMTP profile was deleted) would
+    // A misconfigured newsletter (e.g. its email server was deleted) would
     // otherwise silently never send on schedule, so it alerts too; an
     // overlapping run or a deleted newsletter doesn't.
     const alertWorthy = !refused || err instanceof NewsletterMisconfiguredError;
@@ -488,14 +488,14 @@ interface Sender {
 
 export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender> {
   if (!newsletter.smtpProfileId) {
-    throw new NewsletterMisconfiguredError("Newsletter has no SMTP profile configured");
+    throw new NewsletterMisconfiguredError("Newsletter has no email server configured");
   }
   const [smtpProfile] = await db
     .select()
     .from(smtpProfiles)
     .where(eq(smtpProfiles.id, newsletter.smtpProfileId));
   if (!smtpProfile) {
-    throw new NewsletterMisconfiguredError("Configured SMTP profile no longer exists");
+    throw new NewsletterMisconfiguredError("Configured email server no longer exists");
   }
 
   const fromName = newsletter.senderIdentity?.fromName ?? smtpProfile.defaultFromName;

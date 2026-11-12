@@ -139,7 +139,7 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
       onCreated(smtpProfile);
       setOpen(false);
       reset();
-      toast({ variant: "success", title: "SMTP profile added", description: smtpProfile.name });
+      toast({ variant: "success", title: "Email server added", description: smtpProfile.name });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -158,12 +158,12 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
       <DialogTrigger asChild>
         <Button>
           <Plus />
-          Add SMTP profile
+          Add email server
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add an SMTP profile</DialogTitle>
+          <DialogTitle>Add an email server</DialogTitle>
           <DialogDescription>Used to send newsletters and test emails.</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
@@ -179,7 +179,7 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="smtp-host">Host</Label>
+            <Label htmlFor="smtp-host">SMTP host</Label>
             <Input
               id="smtp-host"
               placeholder="smtp.example.com"
@@ -192,7 +192,7 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
           <div className="flex flex-col gap-3 rounded-md border border-border p-3">
             <SubsectionHeading>Port &amp; encryption</SubsectionHeading>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="smtp-port">Port</Label>
+              <Label htmlFor="smtp-port">SMTP port</Label>
               <Input
                 id="smtp-port"
                 type="number"
@@ -279,7 +279,7 @@ function AddSmtpProfileDialog({ onCreated }: { onCreated: (profile: SmtpProfile)
           <DialogFooter>
             <Button type="submit" disabled={submitting}>
               {submitting ? <Loader2 className="animate-spin" /> : null}
-              Add SMTP profile
+              Add email server
             </Button>
           </DialogFooter>
         </form>
@@ -348,7 +348,7 @@ function EditSmtpProfileDialog({
       });
       onSaved(smtpProfile);
       setOpen(false);
-      toast({ variant: "success", title: "SMTP profile updated" });
+      toast({ variant: "success", title: "Email server updated" });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -375,7 +375,7 @@ function EditSmtpProfileDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit SMTP profile</DialogTitle>
+          <DialogTitle>Edit email server</DialogTitle>
           <DialogDescription>Used to send newsletters and test emails.</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={handleSubmit} ref={saveShortcutRef} noValidate>
@@ -406,7 +406,7 @@ function EditSmtpProfileDialog({
 
             <TabsContent value="connection">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="edit-smtp-host">Host</Label>
+                <Label htmlFor="edit-smtp-host">SMTP host</Label>
                 <Input
                   id="edit-smtp-host"
                   required
@@ -418,7 +418,7 @@ function EditSmtpProfileDialog({
               <div className="flex flex-col gap-3 rounded-md border border-border p-3">
                 <SubsectionHeading>Port &amp; encryption</SubsectionHeading>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="edit-smtp-port">Port</Label>
+                  <Label htmlFor="edit-smtp-port">SMTP port</Label>
                   <Input
                     id="edit-smtp-port"
                     type="number"
@@ -618,13 +618,13 @@ function SmtpProfileRow({
     try {
       await deleteSmtpProfile(profile.id);
       onDeleted(profile.id);
-      toast({ variant: "success", title: "SMTP profile deleted", description: profile.name });
+      toast({ variant: "success", title: "Email server deleted", description: profile.name });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to delete.";
       setDeleting(false);
       setConfirmingDelete(false);
       setTestResult(message);
-      toast({ variant: "destructive", title: "Failed to delete SMTP profile", description: message });
+      toast({ variant: "destructive", title: "Failed to delete email server", description: message });
     }
   }
 
@@ -652,7 +652,7 @@ function SmtpProfileRow({
       actions={
         confirmingDelete ? (
           <>
-            <span className="text-sm text-muted-foreground">Delete this profile?</span>
+            <span className="text-sm text-muted-foreground">Delete this email server?</span>
             <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
               {deleting ? <Loader2 className="animate-spin" /> : null}
               Confirm
@@ -695,7 +695,7 @@ function resetLinksStatus(settings: SystemMailSettings): string {
   }
   switch (settings.resetLinks.reason) {
     case "no_system_mail":
-      return "Choose a profile to let people reset a forgotten password with an emailed link.";
+      return "Choose an email server to let people reset a forgotten password with an emailed link.";
     case "no_web_origin":
       return "Reset links are off: set WEB_ORIGIN to the address people use to reach LatestArr, then restart it.";
     case "origin_mismatch":
@@ -735,13 +735,13 @@ function SystemEmailCard({ profiles }: { profiles: SmtpProfile[] }) {
         <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <div className="flex flex-col gap-1">
           <CardTitle className="text-base">System email</CardTitle>
-          <CardDescription>The profile LatestArr uses for its own email, like password reset links.</CardDescription>
+          <CardDescription>The email server LatestArr uses for its own email, like password reset links.</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Label htmlFor="system-mail-profile" className="sr-only">
-            System email profile
+            System email server
           </Label>
           <Select
             id="system-mail-profile"
@@ -781,14 +781,14 @@ export function SmtpProfilesPage() {
   useEffect(() => {
     listSmtpProfiles()
       .then(({ smtpProfiles: loaded }) => setProfiles(loaded))
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load SMTP profiles."));
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load email servers."));
   }, []);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Email servers"
-        description="The SMTP servers LatestArr sends newsletters through. Each one is saved as a profile."
+        description="The email servers (SMTP) LatestArr sends newsletters through."
         actions={
           profiles ? (
             <AddSmtpProfileDialog onCreated={(profile) => setProfiles((prev) => [...(prev ?? []), profile])} />
@@ -805,12 +805,12 @@ export function SmtpProfilesPage() {
       {profiles === null && !loadError ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
-          Loading SMTP profiles...
+          Loading email servers...
         </div>
       ) : null}
 
       {profiles && profiles.length === 0 ? (
-        <EmptyState title="No SMTP profiles yet" description="Add one to be able to send newsletters." />
+        <EmptyState title="No email servers yet" description="Add one to be able to send newsletters." />
       ) : null}
 
       {profiles && profiles.length > 0 ? <SystemEmailCard profiles={profiles} /> : null}

@@ -14,7 +14,7 @@ export interface PageHeaderProps {
 
 /**
  * The `<h1>` + description every admin page (Dashboard, Sources,
- * Recipients, SMTP Profiles, Newsletters, Templates) renders at its top —
+ * Recipients, Email servers, Newsletters, Templates) renders at its top —
  * pulled into one component so the page-title tier of the type hierarchy
  * can't drift between pages the way the old copy-pasted
  * `text-2xl font-semibold tracking-tight` markup already had (see

@@ -143,7 +143,7 @@ describe("NewslettersPage", () => {
   });
 
   // The Add newsletter dialog mounts several real Radix Selects (Repeats,
-  // Timezone, SMTP profile) even though this test never opens one — on a
+  // Timezone, email server) even though this test never opens one — on a
   // busy CI runner just mounting them was enough to blow past the 5s
   // default, so this gets an explicit timeout too.
   it(
@@ -320,7 +320,7 @@ describe("NewslettersPage", () => {
     dtfSpy.mockRestore();
   });
 
-  it("auto-selects the sole SMTP profile in the Add newsletter dialog", async () => {
+  it("auto-selects the sole email server in the Add newsletter dialog", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes({ "/api/smtp-profiles": jsonResponse(200, { smtpProfiles: [primarySmtpProfile] }) }));
     renderPage();
@@ -328,10 +328,10 @@ describe("NewslettersPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add newsletter" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("SMTP profile")).toHaveTextContent("Primary");
+    expect(within(dialog).getByLabelText("Email server")).toHaveTextContent("Primary");
   });
 
-  it("leaves the SMTP profile unselected in the Add newsletter dialog when there are no profiles yet", async () => {
+  it("leaves the email server unselected in the Add newsletter dialog when there are no profiles yet", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes());
     renderPage();
@@ -339,10 +339,10 @@ describe("NewslettersPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add newsletter" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("SMTP profile")).toHaveValue("");
+    expect(within(dialog).getByLabelText("Email server")).toHaveValue("");
   });
 
-  it("leaves the SMTP profile unselected in the Add newsletter dialog when there are multiple profiles", async () => {
+  it("leaves the email server unselected in the Add newsletter dialog when there are multiple profiles", async () => {
     const user = userEvent.setup();
     mockRoutes(
       baseRoutes({
@@ -354,7 +354,7 @@ describe("NewslettersPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Add newsletter" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByLabelText("SMTP profile")).toHaveValue("");
+    expect(within(dialog).getByLabelText("Email server")).toHaveValue("");
   });
 
   it("groups delivery fields under a labeled section in the Add newsletter dialog", async () => {
@@ -470,11 +470,11 @@ describe("NewslettersPage", () => {
     await screen.findByLabelText("Name");
 
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(400, { error: "Newsletter has no SMTP profile configured" }),
+      jsonResponse(400, { error: "Newsletter has no email server configured" }),
     );
     await user.click(screen.getByRole("button", { name: "Send now" }));
 
-    expect(await screen.findByText("Newsletter has no SMTP profile configured")).toBeInTheDocument();
+    expect(await screen.findByText("Newsletter has no email server configured")).toBeInTheDocument();
   });
 
   it("shows a specific send-now failure message inline immediately, not a generic Internal Server Error", async () => {

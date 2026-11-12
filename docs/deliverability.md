@@ -14,11 +14,11 @@ LatestArr sends scheduled mail from an address you choose, through an SMTP serve
 - **DKIM** signs each message, so the receiver can check it came from a server holding your domain's key and wasn't changed on the way. Your SMTP provider or server does the signing, not LatestArr.
 - **DMARC** is another DNS TXT record. It tells receivers what to do when SPF or DKIM fails (nothing, quarantine or reject) and where to send reports. It's what makes SPF and DKIM count.
 
-They go on the domain of the SMTP profile's **From email**. That's not the domain LatestArr runs on, and not your provider's own domain.
+They go on the domain of the email server's **From email**. That's not the domain LatestArr runs on, and not your provider's own domain.
 
 ## Choosing an SMTP provider
 
-LatestArr works with any standard SMTP server. Add it on the **SMTP Profiles** page. Sending only goes out from LatestArr, so none of these need LatestArr to be reachable from the internet.
+LatestArr works with any standard SMTP server. Add it on the **Email servers** page. Sending only goes out from LatestArr, so none of these need LatestArr to be reachable from the internet.
 
 - **A transactional email provider** (Resend, Mailgun, Postmark, SendGrid, Amazon SES, Brevo and others) is the easiest. When you verify your domain, they show the SPF and DKIM records to add, and they sign every message from then on. Use the SMTP credentials they give you, not your account login. For example, [Resend](https://resend.com/docs/send-with-smtp):
   - **Host** `smtp.resend.com`, **port** 465 with **Use implicit TLS (port 465)** on (or 587 with it off);
@@ -29,7 +29,7 @@ LatestArr works with any standard SMTP server. Add it on the **SMTP Profiles** p
 
 ## Checking it works
 
-After adding the DNS records, use **Send test email** on the SMTP profile. Open the message's headers (often called "Show original") and look for `spf=pass` and `dkim=pass`. [mail-tester.com](https://www.mail-tester.com/) gives a fuller score.
+After adding the DNS records, use **Send test email** on the email server. Open the message's headers (often called "Show original") and look for `spf=pass` and `dkim=pass`. [mail-tester.com](https://www.mail-tester.com/) gives a fuller score.
 
 ### If DKIM shows `temperror` or `fail`
 
@@ -41,7 +41,7 @@ The message's `DKIM-Signature` header names the selector (`s=`) and domain (`d=`
 
 ## What LatestArr does for you
 
-- **From name** and **From email** on the SMTP profile become each message's `From`. Use an address on the domain you've authenticated.
+- **From name** and **From email** on the email server become each message's `From`. Use an address on the domain you've authenticated.
 - **One message per recipient,** never one message to the whole list, which spam filters also distrust.
 - **A plain-text version** goes with every HTML email. HTML-only mail scores worse with spam filters.
 

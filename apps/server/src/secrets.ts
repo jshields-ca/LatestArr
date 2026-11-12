@@ -22,7 +22,7 @@ export function encryptionKeyProblem(env: NodeJS.ProcessEnv = process.env): stri
   if (bytes !== KEY_BYTES) {
     return (
       `ENCRYPTION_KEY must decode to ${KEY_BYTES} bytes, but this one decodes to ${bytes}. ${GENERATE_HINT} ` +
-      "If you've already saved sources or SMTP profiles, restore the key they were saved with instead, or they can't be read."
+      "If you've already saved sources or email servers, restore the key they were saved with instead, or they can't be read."
     );
   }
   return null;

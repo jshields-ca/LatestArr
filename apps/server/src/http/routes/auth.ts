@@ -108,7 +108,7 @@ export function registerAuthRoutes(
       if (!("origin" in link)) {
         const why =
           link.unavailable === "no_system_mail"
-            ? "no SMTP profile is chosen for system email"
+            ? "no email server is chosen for system email"
             : `WEB_ORIGIN (${process.env.WEB_ORIGIN ?? "not set"}) doesn't match the address it was asked from (${request.host}), so the link would be broken`;
         request.log.warn({ ip: request.ip }, `Didn't send a password reset link for ${email}: ${why}`);
         return reply.code(202).send(RESET_REQUESTED);

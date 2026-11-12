@@ -74,7 +74,7 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
         })
         .returning();
 
-      request.log.info({ smtpProfileId: profile!.id, host, port }, `Added SMTP profile "${name}"`);
+      request.log.info({ smtpProfileId: profile!.id, host, port }, `Added email server "${name}"`);
       return reply.code(201).send({ smtpProfile: sanitize(profile!) });
     });
 
@@ -121,7 +121,7 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
       }
       request.log.info(
         { smtpProfileId: profile.id, fields: changedFields(body) },
-        `Updated SMTP profile "${profile.name}"`,
+        `Updated email server "${profile.name}"`,
       );
       return reply.send({ smtpProfile: sanitize(profile) });
     });
@@ -129,10 +129,10 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
     scope.delete<{ Params: IdParams }>("/smtp-profiles/:id", async (request, reply) => {
       const [deleted] = await db.delete(smtpProfiles).where(eq(smtpProfiles.id, request.params.id)).returning();
       if (deleted) {
-        request.log.info({ smtpProfileId: deleted.id }, `Deleted SMTP profile "${deleted.name}"`);
+        request.log.info({ smtpProfileId: deleted.id }, `Deleted email server "${deleted.name}"`);
         if (loadSystemMail(db).smtpProfileId === deleted.id) {
           saveSystemMail(db, { smtpProfileId: null });
-          request.log.warn(`System email is off: its SMTP profile "${deleted.name}" was deleted`);
+          request.log.warn(`System email is off: its email server "${deleted.name}" was deleted`);
         }
       }
       return reply.code(204).send();
@@ -149,13 +149,13 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
 
       try {
         await verifySmtpConnection(smtpCredentialsFor(profile));
-        request.log.info({ smtpProfileId: profile.id }, `Connection test passed for SMTP profile "${profile.name}"`);
+        request.log.info({ smtpProfileId: profile.id }, `Connection test passed for email server "${profile.name}"`);
         return reply.send({ ok: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         request.log.warn(
           { err, smtpProfileId: profile.id },
-          `Connection test failed for SMTP profile "${profile.name}": ${message}`,
+          `Connection test failed for email server "${profile.name}": ${message}`,
         );
         return reply.send({ ok: false, message });
       }
@@ -186,14 +186,14 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
           });
           request.log.info(
             { smtpProfileId: profile.id, messageId: result.messageId },
-            `Sent a test email to ${to} using SMTP profile "${profile.name}"`,
+            `Sent a test email to ${to} using email server "${profile.name}"`,
           );
           return reply.send({ ok: true, messageId: result.messageId });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
           request.log.warn(
             { err, smtpProfileId: profile.id },
-            `Couldn't send a test email to ${to} using SMTP profile "${profile.name}": ${message}`,
+            `Couldn't send a test email to ${to} using email server "${profile.name}": ${message}`,
           );
           return reply.send({ ok: false, message });
         }

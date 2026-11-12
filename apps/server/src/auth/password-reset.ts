@@ -58,8 +58,8 @@ export function clearResetTokens(db: Db, userId: string): void {
   db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId)).run();
 }
 
-// The SMTP profile LatestArr uses for its own email (reset links), chosen on
-// the SMTP Profiles page. Kept in the settings table.
+// The email server LatestArr uses for its own email (reset links), chosen on
+// the Email servers page. Kept in the settings table.
 const SYSTEM_MAIL_KEY = "systemMail";
 
 export interface SystemMailSettings {
@@ -156,7 +156,7 @@ export async function sendResetEmail(
     });
     log.info({ userId: user.id }, `Sent a password reset link to ${user.email}`);
   } catch (err) {
-    log.error({ err, userId: user.id }, `Couldn't send a password reset link to ${user.email} using SMTP profile "${profile.name}"`);
+    log.error({ err, userId: user.id }, `Couldn't send a password reset link to ${user.email} using email server "${profile.name}"`);
   }
 }
 

@@ -94,7 +94,7 @@ function AddNewsletterDialog({
 
   // Called on every open *and* close so the dialog always starts from a
   // clean slate: the browser's own timezone (not a hardcoded "UTC"), and
-  // the sole SMTP profile pre-selected when there's exactly one — with 0 or
+  // the sole email server pre-selected when there's exactly one — with 0 or
   // 2+ profiles it still starts unselected, since there's no unambiguous
   // choice to make for the user.
   function reset() {
@@ -206,7 +206,7 @@ function AddNewsletterDialog({
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="newsletter-smtp">SMTP profile</Label>
+                <Label htmlFor="newsletter-smtp">Email server</Label>
                 <Select
                   id="newsletter-smtp"
                   value={smtpProfileId}
@@ -727,7 +727,7 @@ function NewsletterDetailsForm({
               ) : null}
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${idPrefix}-smtp`}>SMTP profile</Label>
+              <Label htmlFor={`${idPrefix}-smtp`}>Email server</Label>
               <Select
                 id={`${idPrefix}-smtp`}
                 value={smtpProfileId}
@@ -1243,7 +1243,7 @@ export function NewslettersPage() {
       .catch(() => {
         // Surfaced via each newsletter's own "Sources" section if it matters there.
       });
-    // Only editors and admins can pick groups and SMTP profiles.
+    // Only editors and admins can pick groups and email servers.
     if (canEdit) {
       listGroups()
         .then(({ groups }) => setAllGroups(groups))
