@@ -119,6 +119,10 @@ export async function buildApp(
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'"],
+        // The app's own fonts are bundled. Google Fonts stays allowed for
+        // one thing: the design editor previews an email inside this page,
+        // and a design in the Ubuntu font loads it from there, as the email
+        // itself does for recipients.
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:"],
