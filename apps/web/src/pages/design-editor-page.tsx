@@ -47,6 +47,7 @@ import {
   withDesignDefaults,
 } from "@/lib/design";
 import { EMAIL_FONT_OPTIONS } from "@/lib/email-fonts";
+import { usePageTitle } from "@/lib/page-title";
 import { confirmDiscard, useSaveShortcut, useUnsavedChanges } from "@/lib/unsaved-changes";
 import { confirmAction } from "@/components/confirm-dialog";
 import { cn } from "@/lib/utils";
@@ -463,6 +464,7 @@ export function DesignEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [name, setName] = useState("");
+  usePageTitle(name ? `${name} · Designs` : "Designs");
   const [settings, setSettings] = useState<DesignSettings | null>(null);
   // A code design renders from `code`; `settings` then only supplies its
   // intro, footer note, and buttons.
@@ -809,6 +811,9 @@ export function DesignEditorPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* The name field stands in for a visible title, so the heading is
+          for screen readers. */}
+      <h1 className="sr-only">Edit design</h1>
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="icon" aria-label="Back to designs" onClick={() => void handleBack()}>
           <ArrowLeft />

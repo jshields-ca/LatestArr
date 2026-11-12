@@ -786,8 +786,8 @@ export function SmtpProfilesPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="SMTP Profiles"
-        description="Configure outgoing mail servers used to send newsletters."
+        title="Email servers"
+        description="The SMTP servers LatestArr sends newsletters through. Each one is saved as a profile."
         actions={
           profiles ? (
             <AddSmtpProfileDialog onCreated={(profile) => setProfiles((prev) => [...(prev ?? []), profile])} />

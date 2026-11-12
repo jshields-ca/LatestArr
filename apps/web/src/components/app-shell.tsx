@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { BookOpen, Bug, Globe, Heart, LogOut, Menu, MessagesSquare, Pencil, Scale, Sparkles, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent, MouseEvent, ReactNode } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { ChevronDown, LogOut, Menu, Pencil, Sparkles, Star } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { Logo } from "@/components/logo";
@@ -14,7 +14,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import { ApiError, getAuthProviders, getVersion, startSsoLink, unlinkSso, updateCurrentUser } from "@/lib/api";
-import { navItems } from "@/lib/nav-items";
+import { navGroups, navItems } from "@/lib/nav-items";
 import { ssoMessage, takeSsoOutcome } from "@/lib/sso";
 import { hasRole, ROLE_LABELS } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -90,15 +89,11 @@ function StarPopoverContent() {
 }
 
 /**
- * The version badge, GitHub view link, and Star popover as one deliberate
- * cluster, sitting right next to the Logo at the top of both surfaces —
- * the desktop header and, unchanged, the mobile nav sheet — so the two
- * read as one design rather than two different treatments. The "About"
- * info popover this card used to also hold (author, license, site) has
- * moved out to a real page footer (see `AppFooter` below) instead of
- * living behind an icon here.
+ * The running version with the Docs, GitHub and Star links, at the foot of
+ * the sidebar and of the phone menu (#332). It's about the project, not
+ * the page, so it sits below the navigation and out of the header.
  */
-function ProjectInfoCard() {
+function SidebarFoot() {
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,7 +103,7 @@ function ProjectInfoCard() {
         if (!cancelled) setVersion(version);
       })
       .catch(() => {
-        // Non-critical — the header just shows no version rather than an error.
+        // Non-critical — the foot just shows no version rather than an error.
       });
     return () => {
       cancelled = true;
@@ -116,13 +111,21 @@ function ProjectInfoCard() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/60 px-2.5 py-1.5">
-      <div className="min-w-0">
+    <div className="flex items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+      <div className="flex min-w-0 items-center gap-3">
         {version ? (
-          <Badge variant="tertiary" className="font-mono text-xs tracking-tight">
+          <span className="font-mono tracking-tight" title="The version of LatestArr that's running">
             v{version}
-          </Badge>
+          </span>
         ) : null}
+        <a
+          href={DOCS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="-my-1 rounded-sm py-1 underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Docs
+        </a>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
         <a
@@ -156,61 +159,58 @@ function ProjectInfoCard() {
 }
 
 /**
- * The real page footer: links to the website, docs, discussions, issue
- * tracker, and license, and the same credit line as latestarr.app, visible
- * at the bottom of every page. Rendered once per page, inside
- * `AppShell` below — not duplicated per-surface the way `ProjectInfoCard`
- * is, since there's only one page footer regardless of viewport width.
+ * The page footer, one line: the credit (the same one as latestarr.app's)
+ * and the project's links. Docs and GitHub are in the sidebar's foot.
  */
 function AppFooter() {
   const links = [
-    { href: SITE_URL, icon: Globe, label: "LatestArr.app" },
-    { href: DOCS_URL, icon: BookOpen, label: "Docs" },
-    { href: DISCUSSIONS_URL, icon: MessagesSquare, label: "Discussions" },
+    { href: SITE_URL, label: "LatestArr.app" },
+    { href: DISCUSSIONS_URL, label: "Discussions" },
     // A link, never a prompt (#266).
-    { href: SPONSOR_URL, icon: Heart, label: "Sponsor" },
-    { href: `${REPO_URL}/issues`, icon: Bug, label: "Report an issue" },
-    { href: LICENSE_URL, icon: Scale, label: "GPLv3 license" },
+    { href: SPONSOR_URL, label: "Sponsor" },
+    { href: `${REPO_URL}/issues`, label: "Report an issue" },
+    { href: LICENSE_URL, label: "GPLv3 license" },
   ];
   return (
     <footer className="border-t border-border">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
-        <div className="flex flex-col gap-2">
-          <nav aria-label="LatestArr project links" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            {links.map(({ href, icon: Icon, label }) => (
-              <a
-                key={label}
-                href={href}
-                target="_blank"
-                rel="noreferrer"
-                className={cn(footerLinkClassName, "flex items-center gap-1.5")}
-              >
-                <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 text-xs text-muted-foreground md:px-6">
+        {/* The project belongs to its contributors, with the maintainer
+            credited as its lead. Underlined, so the link doesn't rely on
+            colour alone to stand out from the sentence. */}
+        <p>
+          © 2026 LatestArr contributors · Led by{" "}
+          <a
+            href={MAINTAINER_URL}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(footerLinkClassName, "underline underline-offset-2")}
+          >
+            Jeremy Shields
+          </a>
+        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <nav aria-label="LatestArr project links" className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {links.map(({ href, label }) => (
+              // py-1 makes each link 24px tall to tap.
+              <a key={label} href={href} target="_blank" rel="noreferrer" className={cn(footerLinkClassName, "py-1")}>
                 {label}
               </a>
             ))}
           </nav>
-          {/* Matches latestarr.app: the project belongs to its contributors,
-              with the maintainer credited as its lead. */}
-          <p className="text-xs text-muted-foreground">
-            © 2026 LatestArr contributors · Led by{" "}
-            <a href={MAINTAINER_URL} target="_blank" rel="noreferrer" className={footerLinkClassName}>
-              Jeremy Shields
-            </a>
-          </p>
+          <Badge variant="tertiary" className="w-fit">
+            <Sparkles className="size-3" aria-hidden="true" />
+            In Active Development
+          </Badge>
         </div>
-        <Badge variant="tertiary" className="w-fit">
-          <Sparkles className="size-3" aria-hidden="true" />
-          In Active Development
-        </Badge>
       </div>
     </footer>
   );
 }
 
-function EditProfileDialog() {
+// Opened from the account menu (header) or the phone menu, so they hold
+// its open state: a dialog inside the menu's popover would close with it.
+function EditProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { user, refresh } = useAuth();
-  const [open, setOpen] = useState(false);
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -219,9 +219,11 @@ function EditProfileDialog() {
   const [ssoAvailable, setSsoAvailable] = useState(false);
   const [ssoBusy, setSsoBusy] = useState(false);
 
-  function openWithCurrentValues(next: boolean) {
-    setOpen(next);
-    if (next) {
+  // Each opening starts from the current values. Only the moment it opens
+  // counts: a refreshed user while it's open mustn't wipe what's typed.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpen.current) {
       getAuthProviders()
         .then((providers) => setSsoAvailable(providers.oidc))
         .catch(() => setSsoAvailable(false));
@@ -230,7 +232,8 @@ function EditProfileDialog() {
       setNewPassword("");
       setError(null);
     }
-  }
+    wasOpen.current = open;
+  });
 
   // Linking goes to the identity provider and back (#317).
   async function handleLinkSso() {
@@ -280,7 +283,7 @@ function EditProfileDialog() {
         newPassword: newPassword || undefined,
       });
       await refresh();
-      setOpen(false);
+      onOpenChange(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -292,12 +295,7 @@ function EditProfileDialog() {
   useUnsavedChanges(open && dirty);
 
   return (
-    <Dialog open={open} onOpenChange={guardClose(dirty, openWithCurrentValues)}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Edit profile" title="Edit profile">
-          <Pencil />
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={guardClose(dirty, onOpenChange)}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
@@ -382,104 +380,168 @@ function EditProfileDialog() {
 }
 
 /**
- * Name + email + account actions, shared between the desktop header and the
- * mobile nav sheet. The email gets its own `title` so the full address is
- * always available on hover/focus even where its column truncates.
+ * Name, email and account actions at the foot of the phone menu. The email
+ * gets its own `title` so the full address is available where it truncates.
  */
 function UserSummary() {
   const { user, logout } = useAuth();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <div className="flex min-w-0 items-center justify-between gap-2">
       <div className="min-w-0">
-        <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+        <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-foreground">
           <span className="truncate" title={user?.displayName || undefined}>
             {user?.displayName}
           </span>
-          {/* Editors and viewers see their role, so missing pages and
-              buttons make sense. */}
-          {user && user.role !== "admin" ? (
-            <Badge variant="neutral" className="shrink-0 px-1.5 py-0 text-[0.6875rem]" title={`You have ${ROLE_LABELS[user.role].toLowerCase()} access`}>
-              {ROLE_LABELS[user.role]}
-            </Badge>
-          ) : null}
+          <RoleBadge />
         </p>
         <p className="truncate text-xs text-muted-foreground" title={user?.email || undefined}>
           {user?.email}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <EditProfileDialog />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => void logout()}
-          aria-label="Log out"
-          title="Log out"
-        >
+        <Button variant="ghost" size="icon" onClick={() => setProfileOpen(true)} aria-label="Edit profile" title="Edit profile">
+          <Pencil />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => void logout()} aria-label="Sign out" title="Sign out">
           <LogOut />
         </Button>
       </div>
+      <EditProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
     </div>
   );
 }
 
-// navItems (lib/nav-items.ts) is a flat list with no grouping concept —
-// deliberately not carved into invented sections here, since there's no
-// natural "these belong together" split in the current six items. If a
-// real grouping emerges as the nav grows, add a `group` field there and
-// section this list by it.
+// Editors and viewers see their role, so missing pages and buttons make sense.
+function RoleBadge() {
+  const { user } = useAuth();
+  if (!user || user.role === "admin") return null;
+  return (
+    <Badge variant="neutral" className="shrink-0 px-1.5 py-0 text-[0.6875rem]" title={`You have ${ROLE_LABELS[user.role].toLowerCase()} access`}>
+      {ROLE_LABELS[user.role]}
+    </Badge>
+  );
+}
+
+/**
+ * The header's account menu (#332): the name opens a small menu with the
+ * email, Edit profile and Sign out, each with its label, in place of a row
+ * of bare icons where Sign out sat one slip from the theme switch.
+ */
+function AccountMenu() {
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  return (
+    <>
+      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" className="max-w-64 gap-2 px-2.5" aria-label={`${user?.displayName ?? "Account"}, account menu`}>
+            <span className="truncate">{user?.displayName}</span>
+            <RoleBadge />
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="flex w-64 flex-col gap-1 p-2">
+          <div className="px-2 py-1.5">
+            <p className="truncate text-sm font-medium">{user?.displayName}</p>
+            <p className="truncate text-xs text-muted-foreground" title={user?.email || undefined}>
+              {user?.email}
+            </p>
+          </div>
+          <div className="my-1 h-px bg-border" aria-hidden="true" />
+          <Button
+            variant="ghost"
+            className="justify-start"
+            onClick={() => {
+              setMenuOpen(false);
+              setProfileOpen(true);
+            }}
+          >
+            <Pencil />
+            Edit profile
+          </Button>
+          <Button variant="ghost" className="justify-start" onClick={() => void logout()}>
+            <LogOut />
+            Sign out
+          </Button>
+        </PopoverContent>
+      </Popover>
+      <EditProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
+    </>
+  );
+}
+
+// Follows an in-app link straight away, or asks first when there are
+// unsaved changes and follows it only if they're discarded.
+function useGuardedLink() {
+  const navigate = useNavigate();
+  return (event: MouseEvent<HTMLAnchorElement>, to: string, after?: () => void) => {
+    if (!hasUnsavedChanges()) {
+      after?.();
+      return;
+    }
+    event.preventDefault();
+    void askToDiscard().then((discard) => {
+      if (!discard) return;
+      navigate(to);
+      after?.();
+    });
+  };
+}
+
+// Dashboard, then the sections from lib/nav-items.ts. A section with
+// nothing in it for this person's role isn't shown.
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const followLink = useGuardedLink();
   // Pages someone can't use aren't listed (the server refuses them anyway).
   const items = navItems.filter((item) => hasRole(user?.role, item.minRole));
+  const sections = [undefined, ...navGroups]
+    .map((group) => ({ group, items: items.filter((item) => item.group === group) }))
+    .filter((section) => section.items.length > 0);
   return (
     <nav className="flex flex-col gap-1" aria-label="Main navigation">
-      {items.map(({ to, label, icon: Icon }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === "/"}
-          onClick={(event) => {
-            if (!hasUnsavedChanges()) {
-              onNavigate?.();
-              return;
-            }
-            // Ask first, and follow the link only if they discard.
-            event.preventDefault();
-            void askToDiscard().then((discard) => {
-              if (!discard) return;
-              navigate(to);
-              onNavigate?.();
-            });
-          }}
-          className={({ isActive }) =>
-            cn(
-              "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              isActive
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              {/* Left-edge accent bar — on top of the existing background
-                  tint, not instead of it, so the active item reads clearly
-                  even for anyone who has trouble distinguishing the tint
-                  from the hover state. */}
-              {isActive ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary"
-                />
-              ) : null}
-              <Icon className="size-4" aria-hidden="true" />
-              {label}
-            </>
-          )}
-        </NavLink>
+      {sections.map(({ group, items: sectionItems }) => (
+        <div key={group ?? "top"} role={group ? "group" : undefined} aria-label={group} className="flex flex-col gap-1">
+          {group ? (
+            <p aria-hidden="true" className="px-3 pb-0.5 pt-4 text-[0.6875rem] font-semibold uppercase tracking-wider text-[var(--sidebar-muted)]">
+              {group}
+            </p>
+          ) : null}
+          {sectionItems.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === "/"}
+              onClick={(event) => followLink(event, to, onNavigate)}
+              className={({ isActive }) =>
+                cn(
+                  "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isActive
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {/* Left-edge accent bar — on top of the existing background
+                      tint, not instead of it, so the active item reads clearly
+                      even for anyone who has trouble distinguishing the tint
+                      from the hover state. */}
+                  {isActive ? (
+                    <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary" />
+                  ) : null}
+                  <Icon className="size-4" aria-hidden="true" />
+                  {label}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
       ))}
     </nav>
   );
@@ -487,6 +549,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const followLink = useGuardedLink();
 
   // Back from linking SSO in the profile (#317).
   useEffect(() => {
@@ -501,6 +564,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      {/* First in the tab order and shown only once focused, so keyboard
+          users don't tab through the header and menu on every page. */}
+      <a
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        Skip to content
+      </a>
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
         <div className="flex h-14 w-full items-center gap-3 px-4 md:px-6">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
@@ -516,30 +591,29 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Logo variant="paper" />
                 </SheetTitle>
               </SheetHeader>
-              {/* Version/GitHub/Star cluster lives right under the logo,
-                  matching the desktop header's placement, rather than down
-                  in the footer with the account summary. */}
-              <ProjectInfoCard />
               <NavList onNavigate={() => setMobileNavOpen(false)} />
-              <div className="mt-auto border-t border-border pt-3">
-                <UserSummary />
+              <div className="mt-auto flex flex-col gap-3">
+                <SidebarFoot />
+                <div className="border-t border-border pt-3">
+                  <UserSummary />
+                </div>
               </div>
             </SheetContent>
           </Sheet>
 
-          <Logo />
+          <Link
+            to="/"
+            onClick={(event) => followLink(event, "/")}
+            aria-label="LatestArr, go to the dashboard"
+            className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <Logo />
+          </Link>
 
-          {/* Desktop-only: the project cluster and account summary now live
-              here instead of the sidebar footer, since the header has the
-              width to give the email room and let everything breathe. On
-              mobile they stay in the nav sheet above. */}
-          <div className="ml-auto flex items-center gap-2 md:gap-3">
-            <div className="hidden items-center gap-3 md:flex">
-              <ProjectInfoCard />
-              <div className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
-              <div className="w-52 lg:w-64">
-                <UserSummary />
-              </div>
+          {/* On phones the account lives at the foot of the menu above. */}
+          <div className="ml-auto flex items-center gap-1 md:gap-2">
+            <div className="hidden md:block">
+              <AccountMenu />
             </div>
             <ThemeToggle />
           </div>
@@ -558,13 +632,19 @@ export function AppShell({ children }: { children: ReactNode }) {
             runs the full height of the row; the list inside it sticks
             under the header and its stripe. */}
         <aside className="surface-navy hidden w-60 shrink-0 border-r border-border md:block">
-          <div className="sticky top-[calc(3.5rem+3px)] p-4">
+          <div className="sticky top-[calc(3.5rem+3px)] flex h-[calc(100dvh-3.5rem-3px)] flex-col gap-4 overflow-y-auto p-4">
             <NavList />
+            <div className="mt-auto">
+              <SidebarFoot />
+            </div>
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">{children}</main>
+          {/* Focusable so "Skip to content" has somewhere to land. */}
+          <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 p-4 focus:outline-none md:p-6">
+            {children}
+          </main>
           <AppFooter />
         </div>
       </div>
