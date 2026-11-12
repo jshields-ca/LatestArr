@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SaveActions } from "@/components/ui/save-actions";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -809,12 +810,7 @@ export function SmtpProfilesPage() {
       ) : null}
 
       {profiles && profiles.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No SMTP profiles yet</CardTitle>
-            <CardDescription>Add one to be able to send newsletters.</CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState title="No SMTP profiles yet" description="Add one to be able to send newsletters." />
       ) : null}
 
       {profiles && profiles.length > 0 ? <SystemEmailCard profiles={profiles} /> : null}

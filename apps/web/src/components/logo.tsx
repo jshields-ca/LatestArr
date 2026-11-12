@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 
 // "auto" follows the theme: the paper stamp in the dark theme, the rose one
 // in the light theme. Name one where the background doesn't follow the theme.
-type LogoVariant = "auto" | keyof typeof LOGO_COLOURS;
+// "muted" is a greyed stamp with no edge, for empty pages.
+type LogoVariant = "auto" | "muted" | keyof typeof LOGO_COLOURS;
 
 interface LogoMarkProps extends SVGAttributes<SVGSVGElement> {
   size?: number;
@@ -61,7 +62,13 @@ export function LogoMark({ size = 32, variant = "auto", className, ...props }: L
           <rect x="0" y={y + face - 1} width="64" height={64 - y - face + 1} />
         </clipPath>
       </defs>
-      {variant === "auto" ? (
+      {variant === "muted" ? (
+        // Drawn in the muted text colour, so it greys with either theme.
+        <g className="fill-muted-foreground">
+          <rect width="64" height="64" opacity="0.22" mask={`url(#${id}-stamp)`} />
+          <path d={LOGO_L_PATH} opacity="0.5" />
+        </g>
+      ) : variant === "auto" ? (
         <>
           {layer(LOGO_COLOURS.rose, "dark:hidden")}
           {layer(LOGO_COLOURS.paper, "hidden dark:block")}
