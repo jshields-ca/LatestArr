@@ -43,12 +43,7 @@ const MAINTAINER_URL = "https://www.jeremyshields.ca";
 const iconLinkClassName =
   "-m-1.5 p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
 
-// The footer's project links get the tertiary informational-blue
-// treatment instead of plain muted-foreground (see the "Tertiary" note in
-// index.css) — they're secondary, non-navigational links (website, docs,
-// discussions, issue tracker, license), a good fit for tertiary's "calm, informational"
-// role, and a deliberately different color from the header's GitHub icon
-// link above so the two clusters stay visually distinct.
+// Links are airmail blue, the app's second colour (see index.css).
 const footerLinkClassName =
   "text-tertiary transition-colors hover:text-tertiary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm";
 
@@ -121,12 +116,7 @@ function ProjectInfoCard() {
   }, []);
 
   return (
-    // Tertiary-tinted glass surface (see the "Tertiary" note in index.css):
-    // a low-opacity tertiary background, a thin tertiary-tinted border, and
-    // backdrop-blur so it reads as a frosted chip floating in the sticky,
-    // blurred header rather than a flat gray box — a deliberate accent for
-    // this one cluster, not applied to cards generally.
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-tertiary/25 bg-tertiary/10 px-2.5 py-1.5 backdrop-blur-sm">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/60 px-2.5 py-1.5">
       <div className="min-w-0">
         {version ? (
           <Badge variant="tertiary" className="font-mono text-xs tracking-tight">
@@ -183,13 +173,8 @@ function AppFooter() {
     { href: LICENSE_URL, icon: Scale, label: "GPLv3 license" },
   ];
   return (
-    // A faint tertiary tint on the footer's own background (on top of the
-    // existing top border) ties it to the header's tertiary-glass
-    // ProjectInfoCard without competing with the rose primary used
-    // elsewhere on the page — the footer is a secondary-info surface, not
-    // a primary action area.
-    <footer className="border-t border-tertiary/15 bg-tertiary/[0.03]">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
+    <footer className="border-t border-border">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
         <div className="flex flex-col gap-2">
           <nav aria-label="LatestArr project links" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             {links.map(({ href, icon: Icon, label }) => (
@@ -471,7 +456,7 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
           }}
           className={({ isActive }) =>
             cn(
-              "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200",
+              "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isActive
                 ? "bg-accent text-accent-foreground"
                 : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
@@ -516,18 +501,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-4 md:px-6">
+      <header className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        <div className="flex h-14 w-full items-center gap-3 px-4 md:px-6">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu">
                 <Menu />
               </Button>
             </SheetTrigger>
-            <SheetContent>
+            {/* The phone menu is the sidebar, so it's navy too. */}
+            <SheetContent className="surface-navy">
               <SheetHeader>
                 <SheetTitle>
-                  <Logo />
+                  <Logo variant="paper" />
                 </SheetTitle>
               </SheetHeader>
               {/* Version/GitHub/Star cluster lives right under the logo,
@@ -558,34 +544,30 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ThemeToggle />
           </div>
         </div>
+        {/* The airmail stripe is the header's bottom edge on every page. */}
+        <div className="airmail-stripe" aria-hidden="true" />
       </header>
 
-      {/*
-       * `flex-1` here (with no explicit viewport-relative height on
-       * `aside` below — it used to be `h-[calc(100vh-3.5rem)]`) is what
-       * pins `AppFooter` to the bottom of the viewport on short-content
-       * pages instead of leaving it stranded mid-page above a stretch of
-       * empty background. The earlier bug that made a past version of
-       * this row drop `flex-1` wasn't caused by flex-grow itself — it was
-       * `aside`'s explicit `calc(100vh-3.5rem)` height ignoring the
-       * footer's own height, forcing the row alone to viewport height and
-       * pushing total page height past 100vh (header + full-viewport row
-       * + footer), which forced a scroll past dead space just to reach
-       * it. Leaving `aside` with no explicit height avoids that: `flex-1`
-       * only grows this row to fill whatever space the header and footer
-       * actually leave inside the root's `min-h-screen`, and `aside`'s
-       * default flex `align-items: stretch` still makes its border-right
-       * divider span the full row height either way.
-       */}
-      <div className="mx-auto flex w-full max-w-7xl flex-1">
-        <aside className="sticky top-14 hidden w-60 shrink-0 flex-col border-r border-border p-4 md:flex">
-          <NavList />
+      {/* `flex-1` grows this row to fill what the header leaves inside the
+          root's `min-h-screen`, which keeps the footer at the bottom of the
+          viewport on short pages. Nothing in the row has a viewport-based
+          height: an earlier `calc(100vh-3.5rem)` on the sidebar pushed
+          the page past 100vh. */}
+      <div className="flex w-full flex-1">
+        {/* Navy in both themes (see .surface-navy in index.css). The column
+            runs the full height of the row; the list inside it sticks
+            under the header and its stripe. */}
+        <aside className="surface-navy hidden w-60 shrink-0 border-r border-border md:block">
+          <div className="sticky top-[calc(3.5rem+3px)] p-4">
+            <NavList />
+          </div>
         </aside>
 
-        <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="mx-auto w-full max-w-6xl flex-1 p-4 md:p-6">{children}</main>
+          <AppFooter />
+        </div>
       </div>
-
-      <AppFooter />
     </div>
   );
 }
