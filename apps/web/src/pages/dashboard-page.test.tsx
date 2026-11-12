@@ -142,7 +142,7 @@ describe("DashboardPage", () => {
     // Stat tiles.
     expect(screen.getByText("Sources")).toBeInTheDocument();
     expect(screen.getByText("Recipients")).toBeInTheDocument();
-    expect(screen.getByText("SMTP Profiles")).toBeInTheDocument();
+    expect(screen.getByText("Email servers")).toBeInTheDocument();
     expect(screen.getByText("Newsletters")).toBeInTheDocument();
 
     // The checklist sits above the stat tiles as its own full-width row,

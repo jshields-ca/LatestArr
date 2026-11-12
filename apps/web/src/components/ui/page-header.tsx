@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { usePageTitle } from "@/lib/page-title";
 import { cn } from "@/lib/utils";
 
 export interface PageHeaderProps {
@@ -25,6 +26,8 @@ export interface PageHeaderProps {
  * which is where a serif starts to fight body text for attention).
  */
 export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
+  // The browser tab is named after the page too.
+  usePageTitle(typeof title === "string" ? title : undefined);
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
       <div className="min-w-0">

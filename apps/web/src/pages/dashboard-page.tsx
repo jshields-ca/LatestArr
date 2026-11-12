@@ -421,7 +421,7 @@ export function DashboardPage() {
             />
           ) : null}
           {isAdmin ? (
-            <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" icon={Mail} />
+            <StatCard label="Email servers" value={smtpProfiles?.length ?? 0} href="/smtp" icon={Mail} />
           ) : null}
           {!isAdmin ? (
             <StatCard
