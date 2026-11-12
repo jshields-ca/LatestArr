@@ -9,19 +9,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Three families, one request: Newsreader is the brand/display face —
-         the "LatestArr" wordmark (components/logo.tsx) and, at large
-         sizes, each page's own <h1> (components/ui/page-header.tsx).
-         Plus Jakarta Sans is the UI/body face everywhere else, replacing
-         the unstyled system-font stack the app shipped with — see
-         --font-sans in index.css. JetBrains Mono is the code/log face
-         (--font-mono), used by the Logs page's console view. -->
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:opsz,wght@72,500;72,600;72,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-    />
+    <!-- The fonts ship inside the app (see main.tsx), so nothing here is
+         fetched from another site. -->
     <title>LatestArr</title>
   </head>
   <body>
