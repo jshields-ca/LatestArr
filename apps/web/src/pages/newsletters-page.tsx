@@ -1087,7 +1087,10 @@ function NewsletterCard({
               onCheckedChange={(checked) => void handleToggleEnabled(checked)}
               disabled={toggling || !canEdit}
             />
-            Enabled
+            {/* Says the state, like Recipients' Active and Inactive (and not
+                "On", which is also the schedule's day field). Paused
+                stops scheduled sends only; Send now still works. */}
+            {newsletter.isEnabled ? "Scheduled" : "Paused"}
           </label>
           <NewsletterPreviewDialog newsletter={newsletter} />
           {!canEdit ? null : (

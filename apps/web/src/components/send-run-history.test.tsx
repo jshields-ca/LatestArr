@@ -111,6 +111,11 @@ describe("Send to the rest", () => {
 
   it("notes when it was last sent to the rest", () => {
     render(<SendRunHistoryList runs={[{ ...run, restSentAt: "2026-10-08T10:00:00.000Z" }]} error={null} />);
-    expect(screen.getByText(/^Sent to the rest /)).toBeInTheDocument();
+    const note = screen.getByText(/^Sent to the rest/);
+    // The time is written the app's one way, with the exact moment on hover.
+    const time = note.querySelector("time")!;
+    expect(time).toHaveAttribute("datetime", "2026-10-08T10:00:00.000Z");
+    expect(time.getAttribute("title")).toMatch(/2026/);
+    expect(time.textContent).not.toMatch(/:dd:dd/);
   });
 });

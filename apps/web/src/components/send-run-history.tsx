@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, Clock, ExternalLink, Loader2, Send, TriangleAlert, XCircle } from "lucide-react";
 
 import { useHasRole } from "@/components/auth-provider";
+import { DateTime } from "@/components/date-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -359,7 +360,7 @@ export function SendRunHistoryList({
                     <span className="truncate text-sm font-medium">{run.newsletterName}</span>
                   ) : null}
                   <span className={cn("text-sm", run.newsletterName ? "text-muted-foreground" : "font-medium")}>
-                    {run.startedAt ? new Date(run.startedAt).toLocaleString() : "Not started"}
+                    {run.startedAt ? <DateTime value={run.startedAt} /> : "Not started"}
                   </span>
                   <Badge variant={variant}>{sendRunBadgeLabel(run)}</Badge>
                 </div>
@@ -373,7 +374,7 @@ export function SendRunHistoryList({
                 ) : null}
                 {run.restSentAt ? (
                   <span className="text-sm text-muted-foreground">
-                    Sent to the rest {new Date(run.restSentAt).toLocaleString()}
+                    Sent to the rest <DateTime value={run.restSentAt} />
                   </span>
                 ) : null}
               </div>

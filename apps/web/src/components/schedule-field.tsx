@@ -45,7 +45,7 @@ export function ScheduleField({
           type="button"
           onClick={() => onModeChange(mode === "simple" ? "advanced" : "simple")}
           disabled={disabled}
-          className="text-xs text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
+          className="-my-1 py-1 text-xs text-muted-foreground underline-offset-2 hover:underline disabled:opacity-50"
         >
           {mode === "simple" ? "Use a custom cron expression" : "Use a simple schedule"}
         </button>

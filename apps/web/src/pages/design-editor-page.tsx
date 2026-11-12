@@ -941,7 +941,7 @@ export function DesignEditorPage() {
                   : "Email apps in dark mode show a dark version worked out from these colours, with Text as the background and Background as the text. Switch the preview to Dark to check it."}
               </p>
               <details className="rounded-md border border-border px-3 py-2" open={customTextColours > 0}>
-                <summary className="cursor-pointer text-sm font-medium">
+                <summary className="cursor-pointer py-0.5 text-sm font-medium">
                   More colours{customTextColours > 0 ? ` (${customTextColours} set)` : ""}
                 </summary>
                 <p className="mb-3 mt-2 text-xs text-muted-foreground">
