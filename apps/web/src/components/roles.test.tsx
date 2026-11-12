@@ -84,7 +84,9 @@ describe("roles in the web app", () => {
     const links = within(nav)
       .getAllByRole("link")
       .map((link) => link.textContent);
-    expect(links).toEqual(["Dashboard", "Sources", "Newsletters", "Designs"]);
+    expect(links).toEqual(["Dashboard", "Newsletters", "Designs", "Sources"]);
+    // A section with nothing in it for this role isn't shown.
+    expect(within(nav).queryByRole("group", { name: "System" })).toBeNull();
     expect(screen.getAllByTitle("You have viewer access").length).toBeGreaterThan(0);
   });
 
@@ -94,10 +96,10 @@ describe("roles in the web app", () => {
     await within(nav).findByRole("link", { name: "Dashboard" });
     expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Dashboard",
-      "Sources",
-      "Recipients",
       "Newsletters",
       "Designs",
+      "Recipients",
+      "Sources",
     ]);
     unmount();
 

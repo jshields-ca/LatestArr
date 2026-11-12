@@ -87,7 +87,6 @@ describe("AppShell", () => {
     expect(screen.queryByRole("button", { name: "About LatestArr" })).not.toBeInTheDocument();
     const footer = within(screen.getByRole("navigation", { name: "LatestArr project links" }));
     expect(footer.getByRole("link", { name: /LatestArr.app/ })).toHaveAttribute("href", "https://www.latestarr.app");
-    expect(footer.getByRole("link", { name: /Docs/ })).toHaveAttribute("href", "https://www.latestarr.app/docs");
     expect(footer.getByRole("link", { name: /Discussions/ })).toHaveAttribute(
       "href",
       "https://github.com/jshields-ca/LatestArr/discussions",
@@ -106,6 +105,61 @@ describe("AppShell", () => {
     expect(screen.getByText("In Active Development")).toBeInTheDocument();
   });
 
+  // #332: Docs and the version sit at the sidebar's foot, out of the header.
+  it("links to the docs from the sidebar's foot", async () => {
+    renderShell();
+    const docs = await screen.findByRole("link", { name: "Docs" });
+    expect(docs).toHaveAttribute("href", "https://www.latestarr.app/docs");
+    expect(within(screen.getByRole("navigation", { name: "LatestArr project links" })).queryByRole("link", { name: "Docs" })).toBeNull();
+  });
+
+  it("groups the menu into Send, Connect and System, under Dashboard", async () => {
+    renderShell();
+    const nav = await screen.findByRole("navigation", { name: "Main navigation" });
+    await within(nav).findByRole("link", { name: "Dashboard" });
+    const linksIn = (group: string) =>
+      within(within(nav).getByRole("group", { name: group }))
+        .getAllByRole("link")
+        .map((link) => link.textContent);
+    expect(linksIn("Send")).toEqual(["Newsletters", "Designs", "Recipients"]);
+    expect(linksIn("Connect")).toEqual(["Sources", "Email servers"]);
+    expect(linksIn("System")).toEqual(["Notifications", "Users", "Backups", "Logs"]);
+    expect(within(nav).getAllByRole("link")[0]).toHaveTextContent("Dashboard");
+  });
+
+  it("starts with a Skip to content link that moves focus to the page", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await screen.findByRole("link", { name: "View on GitHub" });
+
+    await user.tab();
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+    expect(skip).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
+  it("makes the logo a link to the dashboard", async () => {
+    renderShell();
+    expect(await screen.findByRole("link", { name: "LatestArr, go to the dashboard" })).toHaveAttribute("href", "/");
+  });
+
+  it("signs out from the account menu", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await user.click(await screen.findByRole("button", { name: "Admin, account menu" }));
+    const routes = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/auth/logout" && init?.method === "POST") return Promise.resolve(jsonResponse(204, null));
+      return routes(url, init);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url, init]) => url === "/api/auth/logout" && (init as RequestInit)?.method === "POST")).toBe(true),
+    );
+  });
+
   it("credits the contributors, with the maintainer as project lead", async () => {
     renderShell();
     await screen.findByRole("link", { name: "View on GitHub" });
@@ -122,7 +176,9 @@ describe("AppShell", () => {
   });
 
   it("gives the account email a title attribute so the full address is available if it truncates", async () => {
+    const user = userEvent.setup();
     renderShell();
+    await user.click(await screen.findByRole("button", { name: "Admin, account menu" }));
     const email = await screen.findByText("admin@example.com");
     expect(email).toHaveAttribute("title", "admin@example.com");
   });
@@ -132,6 +188,7 @@ describe("AppShell", () => {
     renderShell();
     await screen.findByText("Admin");
 
+    await user.click(screen.getByRole("button", { name: "Admin, account menu" }));
     await user.click(screen.getByRole("button", { name: "Edit profile" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText("Display name")).toHaveValue("Admin");
@@ -156,7 +213,7 @@ describe("AppShell", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(await screen.findByText("New Name")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "New Name, account menu" })).toBeInTheDocument();
   });
 
   it("rejects a password change in the dialog when only one of the two password fields is filled", async () => {
@@ -164,6 +221,7 @@ describe("AppShell", () => {
     renderShell();
     await screen.findByText("Admin");
 
+    await user.click(screen.getByRole("button", { name: "Admin, account menu" }));
     await user.click(screen.getByRole("button", { name: "Edit profile" }));
     const dialog = await screen.findByRole("dialog");
     await user.type(within(dialog).getByLabelText("New password"), "a-new-password");
@@ -187,6 +245,7 @@ describe("AppShell", () => {
       return routes(url, init);
     });
 
+    await user.click(screen.getByRole("button", { name: "Admin, account menu" }));
     await user.click(screen.getByRole("button", { name: "Edit profile" }));
     const dialog = await screen.findByRole("dialog");
     await user.click(await within(dialog).findByRole("button", { name: "Link SSO" }));

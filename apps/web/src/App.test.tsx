@@ -53,7 +53,7 @@ describe("App routing", () => {
     renderApp("/smtp-profiles");
 
     // The app shell (sidebar nav) still renders around the not-found content.
-    expect(await screen.findByRole("link", { name: "SMTP Profiles" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Email servers" })).toBeInTheDocument();
 
     expect(screen.getByText("Page not found")).toBeInTheDocument();
     const backLink = screen.getByRole("link", { name: "Back to Dashboard" });
