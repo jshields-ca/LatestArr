@@ -18,7 +18,6 @@ import {
 import { useHasRole } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SaveActions } from "@/components/ui/save-actions";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
@@ -789,16 +789,10 @@ export function SourcesPage() {
       ) : null}
 
       {sources && sources.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No sources yet</CardTitle>
-            <CardDescription>
-              {isAdmin
-                ? "Add a source to start pulling in recently-added content."
-                : "An admin needs to add a source before newsletters have anything to send."}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          title="No sources yet"
+          description={isAdmin ? "Add a source to start pulling in recently-added content." : "An admin needs to add a source before newsletters have anything to send."}
+        />
       ) : null}
 
       {sources && sources.length > 0 ? (

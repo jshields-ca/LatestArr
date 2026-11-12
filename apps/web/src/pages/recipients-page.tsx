@@ -4,7 +4,6 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Plus, Search, X } fro
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
@@ -18,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SaveActions } from "@/components/ui/save-actions";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -674,12 +674,7 @@ function RecipientsSection({
       ) : null}
 
       {recipients && recipients.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No recipients yet</CardTitle>
-            <CardDescription>Add a recipient to start building a distribution list.</CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState title="No recipients yet" description="Add a recipient to start building a distribution list." />
       ) : null}
 
       {recipients && recipients.length > 0 ? (
@@ -1178,12 +1173,7 @@ function GroupsSection({
       ) : null}
 
       {groups && groups.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No groups yet</CardTitle>
-            <CardDescription>Groups are what a newsletter actually sends to — add one to get started.</CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState title="No groups yet" description="Groups are what a newsletter actually sends to — add one to get started." />
       ) : null}
 
       {groups && groups.length > 0 ? (

@@ -12,7 +12,6 @@ import { SourceLogo } from "@/components/source-logo";
 import { SubjectField } from "@/components/subject-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SaveActions } from "@/components/ui/save-actions";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { SubsectionHeading } from "@/components/ui/subsection-heading";
@@ -1294,12 +1294,10 @@ export function NewslettersPage() {
       ) : null}
 
       {newsletters && newsletters.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No newsletters yet</CardTitle>
-            <CardDescription>{canEdit ? "Add one to start sending digests on a schedule." : "None have been set up yet."}</CardDescription>
-          </CardHeader>
-        </Card>
+        <EmptyState
+          title="No newsletters yet"
+          description={canEdit ? "Add one to start sending digests on a schedule." : "None have been set up yet."}
+        />
       ) : null}
 
       {newsletters && newsletters.length > 0 ? (
