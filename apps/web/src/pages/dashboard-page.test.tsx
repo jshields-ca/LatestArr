@@ -78,7 +78,7 @@ const exampleSendRun = {
 };
 
 // Every required step is done: one source, one recipient in one group, one
-// SMTP profile, one newsletter (template stays optional/empty).
+// email server, one newsletter (template stays optional/empty).
 function mockCompleteLoad(sources: { id: string; status: string }[] = [{ id: "s1", status: "ok" }]) {
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { sources }));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [{ id: "r1" }] }));

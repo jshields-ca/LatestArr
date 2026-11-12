@@ -153,7 +153,7 @@ describe("missed-schedule catch-up", () => {
       now: () => new Date("2024-01-02T00:00:00Z"),
     });
 
-    // No SMTP profile configured, so the catch-up run fails the same way
+    // No email server configured, so the catch-up run fails the same way
     // the "scheduled callback" test's normal fire does — onError being
     // called at all is what proves runNewsletter actually executed.
     expect(onError).toHaveBeenCalledTimes(1);
@@ -203,7 +203,7 @@ describe("missed-schedule catch-up", () => {
 
 describe("scheduled callback", () => {
   it("invokes runNewsletter and swallows a failure via onError", async () => {
-    // No SMTP profile configured, so runNewsletter rejects with
+    // No email server configured, so runNewsletter rejects with
     // NewsletterMisconfiguredError — this is exactly the case a scheduled
     // (not manually triggered) run must not let crash the process.
     const newsletter = await createNewsletter();
@@ -215,7 +215,7 @@ describe("scheduled callback", () => {
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0]![0]).toBe(newsletter.id);
-    expect((onError.mock.calls[0]![1] as Error).message).toContain("SMTP profile");
+    expect((onError.mock.calls[0]![1] as Error).message).toContain("email server");
   });
 });
 

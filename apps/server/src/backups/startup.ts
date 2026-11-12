@@ -88,7 +88,7 @@ export function recordRunVersion(db: Db, version: string): void {
 /**
  * Checks ENCRYPTION_KEY can read what's saved, by decrypting one saved
  * credential. A restored backup with a different install's key would
- * otherwise fail later, one source or SMTP profile at a time.
+ * otherwise fail later, one source or email server at a time.
  */
 export function encryptionKeyMismatch(db: Db, key: string): boolean {
   const source = db
@@ -117,6 +117,6 @@ export function warnOnKeyMismatch(db: Db, key: string, log: Logger): void {
   log.error(
     "ENCRYPTION_KEY can't read the credentials saved in this database, so sources and SMTP can't connect. " +
       "If you restored a backup from another install, set ENCRYPTION_KEY to that install's key and restart. " +
-      "Otherwise, enter the sources' and SMTP profiles' credentials again.",
+      "Otherwise, enter the sources' and email servers' credentials again.",
   );
 }

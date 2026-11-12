@@ -280,8 +280,8 @@ export function DashboardPage() {
     },
     {
       key: "smtp",
-      label: "Configure SMTP",
-      description: "Add the mail server LatestArr should send through.",
+      label: "Add an email server",
+      description: "The SMTP server LatestArr should send through.",
       href: "/smtp",
       done: (smtpProfiles?.length ?? 0) > 0,
     },

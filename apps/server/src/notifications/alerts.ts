@@ -146,7 +146,7 @@ async function deliver(
       const [profile] = config.email.smtpProfileId
         ? await db.select().from(smtpProfiles).where(eq(smtpProfiles.id, config.email.smtpProfileId))
         : [];
-      if (!profile) throw new Error("The SMTP profile chosen for alerts no longer exists");
+      if (!profile) throw new Error("The email server chosen for alerts no longer exists");
       if (!config.email.to) throw new Error("No alert email address is set");
       await sendEmail(smtpCredentialsFor(profile), {
         from: fromHeader(profile.defaultFromName, profile.defaultFromEmail),

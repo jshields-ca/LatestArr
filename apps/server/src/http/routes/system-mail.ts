@@ -10,7 +10,7 @@ const systemMailSchema = z.object({
   smtpProfileId: z.string().min(1).nullable(),
 });
 
-// The SMTP profile LatestArr sends its own email through (password reset
+// The email server LatestArr sends its own email through (password reset
 // links). Admins only.
 export function registerSystemMailRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
@@ -40,13 +40,13 @@ export function registerSystemMailRoutes(app: FastifyInstance, db: Db): void {
           .select({ name: smtpProfiles.name })
           .from(smtpProfiles)
           .where(eq(smtpProfiles.id, body.smtpProfileId));
-        if (!profile) return reply.code(400).send({ error: "That SMTP profile doesn't exist" });
+        if (!profile) return reply.code(400).send({ error: "That email server doesn't exist" });
         profileName = profile.name;
       }
       saveSystemMail(db, { smtpProfileId: body.smtpProfileId });
       request.log.info(
         { smtpProfileId: body.smtpProfileId },
-        profileName ? `System email now uses SMTP profile "${profileName}"` : "Turned off system email",
+        profileName ? `System email now uses email server "${profileName}"` : "Turned off system email",
       );
       return reply.send(view(request.host));
     });

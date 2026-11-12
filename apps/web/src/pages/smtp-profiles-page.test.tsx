@@ -39,7 +39,7 @@ describe("SmtpProfilesPage", () => {
   it("renders the empty state", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
     render(<SmtpProfilesPage />);
-    expect(await screen.findByText("No SMTP profiles yet")).toBeInTheDocument();
+    expect(await screen.findByText("No email servers yet")).toBeInTheDocument();
   });
 
   it("lists existing profiles", async () => {
@@ -91,8 +91,8 @@ describe("SmtpProfilesPage", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByLabelText("Name")).toHaveValue("Primary");
     // Connection is the default tab.
-    expect(within(dialog).getByLabelText("Host")).toHaveValue("smtp.example.com");
-    expect(within(dialog).getByLabelText("Port")).toHaveValue(587);
+    expect(within(dialog).getByLabelText("SMTP host")).toHaveValue("smtp.example.com");
+    expect(within(dialog).getByLabelText("SMTP port")).toHaveValue(587);
 
     // hasAuth: true on the fixture — username/password stay blank (never
     // returned decrypted) with a "leave blank to keep current" label.
@@ -119,20 +119,20 @@ describe("SmtpProfilesPage", () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
     render(<SmtpProfilesPage />);
-    await screen.findByText("No SMTP profiles yet");
+    await screen.findByText("No email servers yet");
 
-    await user.click(screen.getByRole("button", { name: "Add SMTP profile" }));
+    await user.click(screen.getByRole("button", { name: "Add email server" }));
     const dialog = await screen.findByRole("dialog");
 
     await user.type(within(dialog).getByLabelText("Name"), "Primary");
-    await user.type(within(dialog).getByLabelText("Host"), "smtp.example.com");
-    await user.clear(within(dialog).getByLabelText("Port"));
-    await user.type(within(dialog).getByLabelText("Port"), "587");
+    await user.type(within(dialog).getByLabelText("SMTP host"), "smtp.example.com");
+    await user.clear(within(dialog).getByLabelText("SMTP port"));
+    await user.type(within(dialog).getByLabelText("SMTP port"), "587");
     await user.type(within(dialog).getByLabelText("From name"), "LatestArr");
     await user.type(within(dialog).getByLabelText("From email"), "digest@example.com");
 
     fetchMock.mockResolvedValueOnce(jsonResponse(201, { smtpProfile: exampleProfile }));
-    await user.click(within(dialog).getByRole("button", { name: "Add SMTP profile" }));
+    await user.click(within(dialog).getByRole("button", { name: "Add email server" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText("Primary")).toBeInTheDocument();
@@ -156,20 +156,20 @@ describe("SmtpProfilesPage", () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
     render(<SmtpProfilesPage />);
-    await screen.findByText("No SMTP profiles yet");
+    await screen.findByText("No email servers yet");
 
-    await user.click(screen.getByRole("button", { name: "Add SMTP profile" }));
+    await user.click(screen.getByRole("button", { name: "Add email server" }));
     const dialog = await screen.findByRole("dialog");
 
     const secureToggle = within(dialog).getByLabelText("Use implicit TLS (port 465)");
     expect(secureToggle).not.toBeChecked();
 
-    await user.clear(within(dialog).getByLabelText("Port"));
-    await user.type(within(dialog).getByLabelText("Port"), "465");
+    await user.clear(within(dialog).getByLabelText("SMTP port"));
+    await user.type(within(dialog).getByLabelText("SMTP port"), "465");
     expect(secureToggle).toBeChecked();
 
-    await user.clear(within(dialog).getByLabelText("Port"));
-    await user.type(within(dialog).getByLabelText("Port"), "587");
+    await user.clear(within(dialog).getByLabelText("SMTP port"));
+    await user.type(within(dialog).getByLabelText("SMTP port"), "587");
     expect(secureToggle).not.toBeChecked();
   });
 
@@ -177,17 +177,17 @@ describe("SmtpProfilesPage", () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
     render(<SmtpProfilesPage />);
-    await screen.findByText("No SMTP profiles yet");
+    await screen.findByText("No email servers yet");
 
-    await user.click(screen.getByRole("button", { name: "Add SMTP profile" }));
+    await user.click(screen.getByRole("button", { name: "Add email server" }));
     const dialog = await screen.findByRole("dialog");
 
     const secureToggle = within(dialog).getByLabelText("Use implicit TLS (port 465)");
     await user.click(secureToggle);
     expect(secureToggle).toBeChecked();
 
-    await user.clear(within(dialog).getByLabelText("Port"));
-    await user.type(within(dialog).getByLabelText("Port"), "587");
+    await user.clear(within(dialog).getByLabelText("SMTP port"));
+    await user.type(within(dialog).getByLabelText("SMTP port"), "587");
     expect(secureToggle).toBeChecked();
   });
 
@@ -234,13 +234,13 @@ describe("SmtpProfilesPage", () => {
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => expect(screen.queryByText("Primary")).not.toBeInTheDocument());
-    expect(screen.getByText("No SMTP profiles yet")).toBeInTheDocument();
+    expect(screen.getByText("No email servers yet")).toBeInTheDocument();
   });
 
   it("has no accessibility violations in the empty state", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
     const { container } = render(<SmtpProfilesPage />);
-    await screen.findByText("No SMTP profiles yet");
+    await screen.findByText("No email servers yet");
 
     expect(await axe(container)).toHaveNoViolations();
   });
@@ -257,9 +257,9 @@ describe("SmtpProfilesPage", () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { smtpProfiles: [] }));
     render(<SmtpProfilesPage />);
-    await screen.findByText("No SMTP profiles yet");
+    await screen.findByText("No email servers yet");
 
-    await user.click(screen.getByRole("button", { name: "Add SMTP profile" }));
+    await user.click(screen.getByRole("button", { name: "Add email server" }));
     await screen.findByRole("dialog");
 
     expect(await axe(document.body)).toHaveNoViolations();
@@ -291,8 +291,8 @@ describe("System email", () => {
       },
     });
     render(<SmtpProfilesPage />);
-    expect(await screen.findByText(/Choose a profile to let people reset/)).toBeInTheDocument();
-    selectOption(screen.getByLabelText("System email profile"), "Primary");
+    expect(await screen.findByText(/Choose an email server to let people reset/)).toBeInTheDocument();
+    selectOption(screen.getByLabelText("System email server"), "Primary");
     await waitFor(() => expect(saved).toEqual([{ smtpProfileId: "s1" }]));
     expect(await screen.findByText(/WEB_ORIGIN is http:\/\/localhost:3000/)).toBeInTheDocument();
   });

@@ -109,7 +109,7 @@ export async function runCli(db: Db, args: string[], io: CliIo, paths?: CliPaths
     if (!checked.keyMatches && !rest.includes("--ignore-key-mismatch")) {
       io.err("");
       io.err("Not restored. Set ENCRYPTION_KEY to the key of the install this backup came from, restart, and try again.");
-      io.err("Or add --ignore-key-mismatch to restore it anyway, then enter every source's and SMTP profile's credentials again.");
+      io.err("Or add --ignore-key-mismatch to restore it anyway, then enter every source's and email server's credentials again.");
       return 1;
     }
     await stageRestore(checked, paths.databasePath);

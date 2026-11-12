@@ -92,7 +92,7 @@ export function NotificationsPage() {
     };
   }
 
-  // Seeded suggestions (your email, the only SMTP profile) count as part
+  // Seeded suggestions (your email, the only email server) count as part
   // of the starting point, so opening the page doesn't show unsaved changes.
   const { dirty, markSaved } = useSavedSnapshot(currentInput(), saved !== null);
   useUnsavedChanges(dirty);
@@ -162,7 +162,7 @@ export function NotificationsPage() {
             <CardContent className="max-w-2xl divide-y divide-border py-0">
               <SettingRow
                 label="A scheduled send fails"
-                description="Including a newsletter that can't send at all, e.g. its SMTP profile was deleted."
+                description="Including a newsletter that can't send at all, e.g. its email server was deleted."
                 htmlFor="alert-on-failure"
                 control={<Switch id="alert-on-failure" checked={onFailure} onCheckedChange={setOnFailure} />}
               />
@@ -206,7 +206,7 @@ export function NotificationsPage() {
                     onChange={(e) => setSmtpProfileId(e.target.value)}
                     disabled={!emailEnabled}
                   >
-                    <option value="">Choose an SMTP profile</option>
+                    <option value="">Choose an email server</option>
                     {smtpProfiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>
                         {profile.name}

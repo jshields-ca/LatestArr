@@ -106,7 +106,7 @@ The dashboard's setup checklist then walks through the same pages you'll use day
    - **Public URL** (optional): where recipients go when they click an item or a Where to watch button. Left blank, item links use the Base URL and there's no Where to watch button. **Tautulli** is the exception: its address isn't one recipients can use, so without a Public URL its items have no links. For Plex and Tautulli, `https://app.plex.tv` works for anyone you share your server with; no domain of your own is needed.
    - **BookLore, BookOrbit and Grimmory** use an OPDS account, not your normal sign-in. Create one in the app's settings, under OPDS. Audio-only items (e.g. BookOrbit audiobooks) show as audiobooks.
 2. **Add recipients and a group.** Add people one at a time, import your source's users, or [import a list](#importing-recipients). A newsletter sends to groups, not to individual people.
-3. **Configure SMTP.** Add an SMTP profile and use **Send test email**. Set **From name** and **From email** as described in [Deliverability](deliverability.md).
+3. **Add an email server.** On the **Email servers** page, add your SMTP server and use **Send test email**. Set **From name** and **From email** as described in [Deliverability](deliverability.md).
 4. **Choose a design** (optional). Duplicate the built-in **Default** and change it with a live preview, or use **Edit as code** for hand-written MJML (**Back to options** returns to the options it had, dropping code changes). Newsletters use Default until you choose another. **Most items per section** limits how many items each section shows; left blank, a section shows up to 100.
 5. **Create a newsletter.** Choose:
    - its schedule, a simple one (**Repeats**) or a cron expression, and a timezone;
@@ -217,7 +217,7 @@ LatestArr works with any standard OIDC provider, using PKCE. It's been used with
 Password sign-in stays available alongside SSO.
 
 - **Letting someone in with SSO:** add them on the **Users** page with the email their provider uses, and leave the password blank. Their first SSO sign-in links to that account if the provider marks the email as verified (`email_verified`). SSO never creates accounts by itself.
-- **Linking an existing account:** sign in with your password, open your profile (the pencil by your name) and choose **Link SSO**. This works whatever email the provider has, verified or not. **Unlink SSO** is there too, for accounts that also have a password.
+- **Linking an existing account:** sign in with your password, select your name in the header, choose **Edit profile**, then **Link SSO**. This works whatever email the provider has, verified or not. **Unlink SSO** is there too, for accounts that also have a password.
 - **Signing in from another address,** such as the LAN IP: your provider always returns you to `OIDC_REDIRECT_URI`, so **Continue with SSO** first moves you to that address, and you're signed in there.
 - **If SSO doesn't sign you in,** the sign-in page says why, and the Logs page has the detail, for example an unverified email, or no account with that email.
 
@@ -229,7 +229,7 @@ The **Users** page lists everyone who can sign in, with their role. Only admins 
 | --- | --- |
 | **Viewer** | See newsletters, designs, previews, send history (without recipients' addresses), and which sources are connected. Can't change anything. |
 | **Editor** | Everything a viewer can, plus create, edit and delete newsletters and designs, send newsletters and tests, and manage recipients and groups. |
-| **Admin** | Everything, including sources, SMTP profiles, notifications, users, backups and logs. |
+| **Admin** | Everything, including sources, email servers, notifications, users, backups and logs. |
 
 Pages and buttons a role can't use are hidden, and the server refuses those requests too. On the Users page you can:
 
@@ -239,7 +239,7 @@ Pages and buttons a role can't use are hidden, and the server refuses those requ
 - **Deactivate** someone to sign them out and block sign-in, or **reactivate** them later.
 - **Delete** a user. Designs they made are kept.
 
-You can't deactivate, delete or change the role of your own account, and the last active admin can't be removed. Change your own name or password with the pencil button in the header.
+You can't deactivate, delete or change the role of your own account, and the last active admin can't be removed. Change your own name or password from **Edit profile**, under your name in the header.
 
 ## Locked out?
 
@@ -247,8 +247,8 @@ Forgotten your password? From the easiest fix to the last resort:
 
 1. **Ask another admin** to use **Reset password** on the **Users** page. You get a temporary password and choose your own at your next sign-in.
 2. **Use "Forgot password?"** on the sign-in page. It emails a link that works once, for 30 minutes. It only appears when:
-   - an admin has chosen a **System email** profile on the **SMTP Profiles** page;
-   - `WEB_ORIGIN` matches the address you use. If it doesn't, the links would be broken, and the SMTP Profiles page says so.
+   - an admin has chosen a **System email** server on the **Email servers** page;
+   - `WEB_ORIGIN` matches the address you use. If it doesn't, the links would be broken, and the Email servers page says so.
 
    The page gives the same answer whether or not the email has an account, and sends an account at most one email every couple of minutes.
 3. **Run the recovery command on the server.** It works without email. Running commands on the host already means you control the install, so that's the proof of ownership.
@@ -284,7 +284,7 @@ The **Notifications** page can alert you when:
 - a scheduled send only reaches some recipients;
 - a backup fails, scheduled or manual.
 
-All three are on by default, but nothing is sent until you turn on a destination: email through one of your SMTP profiles, a webhook (Discord, Slack, ntfy, Apprise or generic JSON), or both. **Send test alert** checks them before you rely on them.
+All three are on by default, but nothing is sent until you turn on a destination: email through one of your email servers, a webhook (Discord, Slack, ntfy, Apprise or generic JSON), or both. **Send test alert** checks them before you rely on them.
 
 - **Send now doesn't alert,** since you see its result yourself.
 - **At most one alert an hour** per newsletter, and one an hour for backups.

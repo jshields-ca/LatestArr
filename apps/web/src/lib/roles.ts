@@ -4,7 +4,7 @@
 // - viewer: reads newsletters, designs, send history, and previews.
 // - editor: also manages newsletters (including sending), designs,
 //   recipients, and groups.
-// - admin: also manages sources, SMTP profiles, notifications, users, and
+// - admin: also manages sources, email servers, notifications, users, and
 //   the logs.
 
 export const ROLES = ["viewer", "editor", "admin"] as const;
@@ -25,5 +25,5 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
   viewer: "Sees newsletters, designs, and send history. Can't change anything.",
   editor: "Also manages newsletters, designs, and recipients, and can send.",
-  admin: "Full access, including sources, SMTP, notifications, users, and logs.",
+  admin: "Full access, including sources, email servers, notifications, users, and logs.",
 };

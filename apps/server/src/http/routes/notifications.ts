@@ -31,7 +31,7 @@ const settingsSchema = z
     }),
   })
   .refine((value) => !value.email.enabled || (value.email.smtpProfileId && value.email.to), {
-    message: "Choose an SMTP profile and an email address for email alerts",
+    message: "Choose an email server and an email address for email alerts",
   });
 
 type SettingsBody = z.infer<typeof settingsSchema>;
