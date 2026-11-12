@@ -98,32 +98,13 @@ function ChecklistRow({ item }: { item: ChecklistItem }) {
   );
 }
 
-// Shared accent palette for every icon chip on this page — the four stat
-// tiles, the checklist header, and the Recent sends header — so "an icon in
-// a colored circle" reads as one consistent pattern across the dashboard
-// instead of each card inventing its own icon treatment (a bare Lucide
-// icon here, a filled circle there). Text/icon shades are picked (not the
-// raw 500-weight swatch) so each clears WCAG AA/non-text contrast against
-// its own tinted chip background in both themes — same approach as the
-// Badge variants elsewhere in the app.
+// Every icon chip on this page — the stat tiles, the checklist header and
+// the Recent sends header — is one pattern: a rose icon on a neutral
+// circle. Colour is kept for meaning (#332), so only the checklist's
+// "done" chip is green.
 const CARD_ICON_ACCENTS = {
-  primary: "bg-primary/15 text-primary",
-  sky: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
-  violet: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
-  amber: "bg-amber-500/15 text-amber-800 dark:text-amber-400",
+  neutral: "bg-muted text-primary",
   emerald: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  // Matches the Recent sends card's own tertiary-glass tint (see its
-  // `className` below) rather than one of the stat-tile hues, so the icon
-  // chip reads as part of that card's existing accent instead of a fifth
-  // unrelated color.
-  tertiary: "bg-tertiary/15 text-tertiary",
-} as const;
-
-const STAT_GLOWS = {
-  primary: "group-hover:border-primary/40",
-  sky: "group-hover:border-sky-500/40",
-  violet: "group-hover:border-violet-500/40",
-  amber: "group-hover:border-amber-500/40",
 } as const;
 
 function CardIconChip({
@@ -156,30 +137,23 @@ function StatCard({
   secondary,
   href,
   icon,
-  accent,
 }: {
   label: string;
   value: number;
   secondary?: string;
   href: string;
   icon: LucideIcon;
-  accent: keyof typeof STAT_GLOWS;
 }) {
   return (
     <Link to={href} className="group block">
-      <Card
-        className={cn(
-          "h-full transition-all hover:-translate-y-0.5 hover:shadow-elevated",
-          STAT_GLOWS[accent],
-        )}
-      >
+      <Card className="h-full transition-all hover:-translate-y-0.5 hover:shadow-elevated group-hover:border-primary/40">
         <CardContent className="flex items-center gap-4 p-4">
-          <CardIconChip icon={icon} accent={accent} size="size-11" iconSize="size-5" />
+          <CardIconChip icon={icon} accent="neutral" size="size-11" iconSize="size-5" />
           <div className="min-w-0">
             <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
             <p className="truncate text-sm text-muted-foreground">{label}</p>
             {secondary ? (
-              <p className="truncate text-xs text-muted-foreground/80">{secondary}</p>
+              <p className="truncate text-xs text-muted-foreground">{secondary}</p>
             ) : null}
           </div>
         </CardContent>
@@ -378,7 +352,7 @@ export function DashboardPage() {
               `requiredDone` alone. */}
           <CardIconChip
             icon={requiredDone && !showFullChecklist ? CheckCircle2 : ListChecks}
-            accent={requiredDone && !showFullChecklist ? "emerald" : "primary"}
+            accent={requiredDone && !showFullChecklist ? "emerald" : "neutral"}
           />
           <CardTitle>
             {!requiredDone ? "Getting started" : showFullChecklist ? "Setup checklist" : "Setup complete"}
@@ -436,7 +410,6 @@ export function DashboardPage() {
             secondary={sourcesWithErrors > 0 ? `${sourcesWithErrors} need attention` : "All connected"}
             href="/sources"
             icon={Server}
-            accent="sky"
           />
           {canEdit ? (
             <StatCard
@@ -445,11 +418,10 @@ export function DashboardPage() {
               secondary={`${groups?.length ?? 0} group${groups?.length === 1 ? "" : "s"}`}
               href="/recipients"
               icon={Users}
-              accent="violet"
             />
           ) : null}
           {isAdmin ? (
-            <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" icon={Mail} accent="amber" />
+            <StatCard label="SMTP Profiles" value={smtpProfiles?.length ?? 0} href="/smtp" icon={Mail} />
           ) : null}
           {!isAdmin ? (
             <StatCard
@@ -458,7 +430,6 @@ export function DashboardPage() {
               secondary="Including Default"
               href="/designs"
               icon={Palette}
-              accent="amber"
             />
           ) : null}
 
@@ -468,22 +439,14 @@ export function DashboardPage() {
             secondary={`${enabledNewsletters} active`}
             href="/newsletters"
             icon={Send}
-            accent="primary"
           />
         </div>
       ) : null}
 
       {requiredDone ? (
-        // A tertiary-tinted glass surface (see the "Tertiary" note in
-        // index.css) — a deliberate accent for this secondary-info panel
-        // (recent activity, not an action) so it reads as distinct from
-        // the checklist card above and the rose-primary stat tiles,
-        // without competing with either. Its own icon chip picks up the
-        // same tertiary hue (see CARD_ICON_ACCENTS.tertiary above) so the
-        // header reads as one accent rather than an unrelated color.
-        <Card className="border-tertiary/20 bg-tertiary/[0.04] backdrop-blur-sm">
+        <Card>
           <CardHeader className="flex flex-row items-center gap-3 space-y-0">
-            <CardIconChip icon={Send} accent="tertiary" />
+            <CardIconChip icon={Send} accent="neutral" />
             <CardTitle>Recent sends</CardTitle>
           </CardHeader>
           <CardContent>
