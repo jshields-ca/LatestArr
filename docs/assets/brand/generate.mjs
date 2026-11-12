@@ -1,7 +1,8 @@
-// LatestArr's icon: the lifted postage stamp (R4 from the #269 exploration,
-// archived under the archive/icon-exploration tag), final pass. This script is the
-// single source of truth for every icon file: it writes the SVGs here, the
-// web UI's favicon, and the PNG sizes (rendered with sharp from apps/server).
+// LatestArr's mark: a postage stamp with an L (chosen in #269; the tile it
+// used to sit on was dropped in #332). This script is the single source of
+// truth for every brand file: it writes the SVGs here, the web UI's favicon
+// and app icons, the geometry the in-app logo draws from, and the PNG sizes
+// (rendered with sharp from apps/server).
 // Run: node docs/assets/brand/generate.mjs
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -14,119 +15,132 @@ const require = createRequire(join(ROOT, "apps", "server", "package.json"));
 const sharp = require("sharp");
 
 export const COLOURS = {
-  rose: "#c31d4c", // the UI accent; the primary tile
-  roseLight: "#ef5d86", // the stamp's shadow on rose
-  ink: "#0e1425", // the dark tile
-  blush: "#fbf1f4", // the light tile
-  blushBorder: "#ecd3dc",
-  shadowOnBlush: "#f2a3b9",
+  rose: "#c31d4c", // the UI accent; the stamp on light backgrounds, the L on dark
+  roseEdge: "#e2456f", // the edge under the paper stamp
+  roseDeep: "#7d1231", // the edge under the rose stamp
+  navy: "#14213d", // the app icon's tile
   white: "#ffffff",
 };
 
-// Geometry, on a 64 grid. The stamp face is 40 wide at x=12, y=10, so at
-// 32px (half scale) its edges land on whole pixels. The shadow drops 3
-// straight down and is clipped to below the stamp, so it never shows
-// through the side perforations. The L is centred on the face and nudged
-// 0.8 right and 0.6 up, because an L's weight sits at its bottom-left.
-const FACE = { x: 12, y: 10, size: 40 };
-const SHADOW_DROP = 3;
-const HOLE_R = 2.4;
-const STEM = 9;
+// Geometry, on a 64 grid. The stamp face is 52 wide at x=6, y=4, so at 32px
+// (half scale) its edges land on whole pixels. The edge drops 4 straight
+// down and is clipped to below the stamp, so it never shows through the
+// side perforations. The L is centred on the face and nudged right and up,
+// because an L's weight sits at its bottom-left.
+const FACE = { x: 6, y: 4, size: 52 };
+const EDGE_DROP = 4;
+const STEM = 11.7;
 const L_W = FACE.size * 0.5;
 const L_H = FACE.size * 0.57;
-const NUDGE = [0.8, -0.6];
+const NUDGE = [1.04, -0.78];
+
+// Two drawings of the perforations: seven gaps a side, and five larger ones
+// for sizes under 24px, where seven turn to noise.
+const PERFORATIONS = {
+  regular: { gaps: 7, radius: 2.6 },
+  small: { gaps: 5, radius: 3.5 },
+};
 
 // Every perforation's centre. Corners come up twice (once per edge), so
 // each hole is kept once.
-function holeCentres() {
+function holeCentres(gaps) {
   const { x, y, size } = FACE;
-  const n = Math.round(size / 7);
-  const step = size / n;
+  const step = size / gaps;
   const out = [];
-  for (let i = 0; i <= n; i++) {
+  for (let i = 0; i <= gaps; i++) {
     const p = +(i * step).toFixed(3);
     out.push([x + p, y], [x + p, y + size], [x, y + p], [x + size, y + p]);
   }
   return [...new Map(out.map(([hx, hy]) => [`${hx},${hy}`, [+hx.toFixed(3), +hy.toFixed(3)]])).values()];
 }
 
-function holes() {
-  return holeCentres().map(([hx, hy]) => `<circle cx="${hx}" cy="${hy}" r="${HOLE_R}"/>`).join("");
-}
-
 const cx = FACE.x + FACE.size / 2;
 const cy = FACE.y + FACE.size / 2;
 const lx = +(cx - L_W / 2 + NUDGE[0]).toFixed(2);
 const ly = +(cy - L_H / 2 + NUDGE[1]).toFixed(2);
-const L_PATH = `M${lx} ${ly}h${STEM}v${+(L_H - STEM).toFixed(2)}h${L_W - STEM}v${STEM}h${-L_W}Z`;
+const L_PATH = `M${lx} ${ly}h${STEM}v${+(L_H - STEM).toFixed(2)}h${+(L_W - STEM).toFixed(2)}v${STEM}h${-L_W}Z`;
 
 /**
- * The stamp. `paper` is the stamp, `shadow` its shadow, and `ink` the L.
- * With no ink, the L is cut out instead, so a one-colour mark shows the
+ * The stamp. `paper` is the stamp, `edge` the strip below it, and `ink` the
+ * L. With no ink, the L is cut out instead, so a one-colour mark shows the
  * background through it.
  */
-export function stamp({ paper, shadow, ink }, id = "s") {
+export function stamp({ paper, edge, ink }, { id = "s", drawing = "regular" } = {}) {
+  const { gaps, radius } = PERFORATIONS[drawing];
   const faceRect = `<rect x="${FACE.x}" y="${FACE.y}" width="${FACE.size}" height="${FACE.size}" fill="#fff"/>`;
-  const holeGroup = `<g fill="#000">${holes()}</g>`;
+  const holeGroup = `<g fill="#000">${holeCentres(gaps)
+    .map(([hx, hy]) => `<circle cx="${hx}" cy="${hy}" r="${radius}"/>`)
+    .join("")}</g>`;
   return `<defs>
     <mask id="${id}-face" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">${faceRect}${holeGroup}${ink ? "" : `<path d="${L_PATH}" fill="#000"/>`}</mask>
-    <mask id="${id}-shadow" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">${faceRect}${holeGroup}</mask>
+    <mask id="${id}-edge" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">${faceRect}${holeGroup}</mask>
     <clipPath id="${id}-below"><rect x="0" y="${FACE.y + FACE.size - 1}" width="64" height="${64 - FACE.y - FACE.size + 1}"/></clipPath>
   </defs>
-  <g clip-path="url(#${id}-below)"><g transform="translate(0 ${SHADOW_DROP})"><rect width="64" height="64" fill="${shadow}" mask="url(#${id}-shadow)"/></g></g>
+  <g clip-path="url(#${id}-below)"><g transform="translate(0 ${EDGE_DROP})"><rect width="64" height="64" fill="${edge}" mask="url(#${id}-edge)"/></g></g>
   <rect width="64" height="64" fill="${paper}" mask="url(#${id}-face)"/>
   ${ink ? `<path d="${L_PATH}" fill="${ink}"/>` : ""}`;
 }
 
 const svg = (body, label = "LatestArr") =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="${label}">${body}</svg>\n`;
-const tile = (fill, stroke) =>
-  stroke
-    ? `<rect x="0.5" y="0.5" width="63" height="63" rx="18" fill="${fill}" stroke="${stroke}"/>`
-    : `<rect width="64" height="64" rx="18" fill="${fill}"/>`;
+// The stamp at `scale`, centred on the 64 grid.
+const centred = (body, scale) => `<g transform="translate(${+(32 * (1 - scale)).toFixed(2)} ${+(32 * (1 - scale)).toFixed(2)}) scale(${scale})">${body}</g>`;
 
 const C = COLOURS;
+const ROSE_STAMP = { paper: C.rose, edge: C.roseDeep, ink: C.white };
+const PAPER_STAMP = { paper: C.white, edge: C.roseEdge, ink: C.rose };
+
 export const icons = {
-  // App icons (a tile with the stamp).
-  "icon.svg": svg(tile(C.rose) + stamp({ paper: C.white, shadow: C.roseLight, ink: C.rose })),
-  "icon-dark.svg": svg(tile(C.ink) + stamp({ paper: C.white, shadow: C.rose, ink: C.rose })),
-  "icon-light.svg": svg(tile(C.blush, C.blushBorder) + stamp({ paper: C.rose, shadow: C.shadowOnBlush, ink: C.white })),
-  // The bare mark, for use on a page (no tile).
-  "mark.svg": svg(stamp({ paper: C.rose, shadow: C.roseLight, ink: C.white })),
-  "mark-on-dark.svg": svg(stamp({ paper: C.white, shadow: C.rose, ink: C.rose })),
-  "mark-mono.svg": svg(stamp({ paper: "#000000", shadow: "#00000055" })),
+  // The mark: rose on light backgrounds, paper on dark ones.
+  "mark.svg": svg(stamp(ROSE_STAMP)),
+  "mark-on-dark.svg": svg(stamp(PAPER_STAMP)),
+  "mark-small.svg": svg(stamp(ROSE_STAMP, { drawing: "small" })),
+  "mark-small-on-dark.svg": svg(stamp(PAPER_STAMP, { drawing: "small" })),
+  "mark-mono.svg": svg(stamp({ paper: "#000000", edge: "#00000055" })),
+  // The app icon: phones need a filled square behind an icon, so the tile
+  // survives here only.
+  "icon.svg": svg(`<rect width="64" height="64" rx="15" fill="${C.navy}"/>` + centred(stamp(PAPER_STAMP), 0.7)),
 };
 
 // A full-bleed square for Android's maskable icons: the stamp inside the
 // central 80% safe zone.
-const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${C.rose}"/><g transform="translate(6.4 6.4) scale(0.8)">${stamp({ paper: C.white, shadow: C.roseLight, ink: C.rose }, "mk")}</g></svg>\n`;
+const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${C.navy}"/>${centred(stamp(PAPER_STAMP, { id: "mk" }), 0.6)}</svg>\n`;
 
 async function main() {
   for (const [name, content] of Object.entries(icons)) writeFileSync(join(HERE, name), content);
   writeFileSync(join(HERE, "icon-maskable.svg"), maskable);
 
   // The web UI draws the mark inline (LogoMark) from the same geometry.
+  const holes = (drawing) => JSON.stringify(holeCentres(PERFORATIONS[drawing].gaps));
   writeFileSync(
     join(ROOT, "apps", "web", "src", "components", "logo-geometry.ts"),
     [
       "// Generated by docs/assets/brand/generate.mjs; edit that script, not this file.",
       "// The LatestArr stamp on a 64x64 grid. See docs/assets/brand/brand.md.",
       `export const LOGO_FACE = ${JSON.stringify(FACE)} as const;`,
-      `export const LOGO_SHADOW_DROP = ${SHADOW_DROP};`,
-      `export const LOGO_HOLE_R = ${HOLE_R};`,
-      `export const LOGO_HOLES: readonly (readonly [number, number])[] = ${JSON.stringify(holeCentres())};`,
+      `export const LOGO_EDGE_DROP = ${EDGE_DROP};`,
       `export const LOGO_L_PATH = "${L_PATH}";`,
-      `export const LOGO_COLOURS = { tile: "${C.rose}", paper: "${C.white}", shadow: "${C.roseLight}", ink: "${C.rose}" } as const;`,
+      "// Seven perforation gaps a side, and five larger ones for sizes under 24px.",
+      `export const LOGO_PERFORATIONS = {`,
+      `  regular: { radius: ${PERFORATIONS.regular.radius}, holes: ${holes("regular")} },`,
+      `  small: { radius: ${PERFORATIONS.small.radius}, holes: ${holes("small")} },`,
+      `} as const satisfies Record<string, { radius: number; holes: readonly (readonly [number, number])[] }>;`,
+      "// The paper stamp is for dark backgrounds, the rose stamp for light ones.",
+      `export const LOGO_COLOURS = {`,
+      `  paper: { paper: "${PAPER_STAMP.paper}", edge: "${PAPER_STAMP.edge}", ink: "${PAPER_STAMP.ink}" },`,
+      `  rose: { paper: "${ROSE_STAMP.paper}", edge: "${ROSE_STAMP.edge}", ink: "${ROSE_STAMP.ink}" },`,
+      `} as const;`,
       "",
     ].join("\n"),
   );
 
-  // The web UI serves these from apps/web/public.
+  // The web UI serves these from apps/web/public. A browser tab can be light
+  // or dark, so the favicon is the rose stamp, in the small drawing.
   const pub = join(ROOT, "apps", "web", "public");
-  writeFileSync(join(pub, "favicon.svg"), icons["icon.svg"]);
+  writeFileSync(join(pub, "favicon.svg"), icons["mark-small.svg"]);
   const png = async (source, size, file, density = 72) =>
     sharp(Buffer.from(source), { density: Math.max(density, (size / 64) * 72 * 4) }).resize(size, size).png().toFile(file);
-  await png(icons["icon.svg"], 32, join(pub, "favicon-32.png"));
+  await png(icons["mark-small.svg"], 32, join(pub, "favicon-32.png"));
   await png(icons["icon.svg"], 180, join(pub, "apple-touch-icon.png"));
   await png(icons["icon.svg"], 192, join(pub, "icon-192.png"));
   await png(icons["icon.svg"], 512, join(pub, "icon-512.png"));
@@ -135,11 +149,12 @@ async function main() {
   const pngDir = join(HERE, "png");
   mkdirSync(pngDir, { recursive: true });
   for (const size of [16, 32, 64, 128, 256, 512, 1024]) {
-    for (const name of ["icon", "icon-dark", "icon-light"]) {
-      await png(icons[`${name}.svg`], size, join(pngDir, `${name}-${size}.png`));
-    }
+    await png(icons["icon.svg"], size, join(pngDir, `icon-${size}.png`));
+    const drawing = size < 24 ? "mark-small" : "mark";
+    await png(icons[`${drawing}.svg`], size, join(pngDir, `mark-${size}.png`));
+    await png(icons[`${drawing}-on-dark.svg`], size, join(pngDir, `mark-on-dark-${size}.png`));
   }
-  console.log("Wrote the icon set to docs/assets/brand and apps/web/public");
+  console.log("Wrote the brand files to docs/assets/brand and apps/web/public");
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await main();

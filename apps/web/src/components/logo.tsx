@@ -1,30 +1,43 @@
 import { useId, type SVGAttributes } from "react";
 
-import {
-  LOGO_COLOURS,
-  LOGO_FACE,
-  LOGO_HOLE_R,
-  LOGO_HOLES,
-  LOGO_L_PATH,
-  LOGO_SHADOW_DROP,
-} from "@/components/logo-geometry";
+import { LOGO_COLOURS, LOGO_EDGE_DROP, LOGO_FACE, LOGO_L_PATH, LOGO_PERFORATIONS } from "@/components/logo-geometry";
 import { cn } from "@/lib/utils";
+
+// "auto" follows the theme: the paper stamp in the dark theme, the rose one
+// in the light theme. Name one where the background doesn't follow the theme.
+type LogoVariant = "auto" | keyof typeof LOGO_COLOURS;
 
 interface LogoMarkProps extends SVGAttributes<SVGSVGElement> {
   size?: number;
+  variant?: LogoVariant;
 }
 
 /**
- * The LatestArr mark: a postage stamp with an L, lifted off a rose tile.
- * "Delivered to your inbox" without the stock envelope. The geometry comes
- * from docs/assets/brand/generate.mjs (via logo-geometry.ts), the same
- * source as the favicon and brand files. IDs are per instance because the
- * header can render the mark twice.
+ * The LatestArr mark: a postage stamp with an L. "Delivered to your inbox"
+ * without the stock envelope. The geometry comes from
+ * docs/assets/brand/generate.mjs (via logo-geometry.ts), the same source as
+ * the favicon and brand files. IDs are per instance because a page can
+ * render the mark twice.
  */
-export function LogoMark({ size = 32, className, ...props }: LogoMarkProps) {
+export function LogoMark({ size = 32, variant = "auto", className, ...props }: LogoMarkProps) {
   const id = useId().replace(/:/g, "");
   const { x, y, size: face } = LOGO_FACE;
-  const holes = LOGO_HOLES.map(([cx, cy]) => <circle key={`${cx},${cy}`} cx={cx} cy={cy} r={LOGO_HOLE_R} />);
+  const { radius, holes } = LOGO_PERFORATIONS[size < 24 ? "small" : "regular"];
+  const layer = (colours: (typeof LOGO_COLOURS)[keyof typeof LOGO_COLOURS], layerClassName?: string) => (
+    <g className={layerClassName}>
+      <g clipPath={`url(#${id}-below)`}>
+        <rect
+          width="64"
+          height="64"
+          fill={colours.edge}
+          mask={`url(#${id}-stamp)`}
+          transform={`translate(0 ${LOGO_EDGE_DROP})`}
+        />
+      </g>
+      <rect width="64" height="64" fill={colours.paper} mask={`url(#${id}-stamp)`} />
+      <path d={LOGO_L_PATH} fill={colours.ink} />
+    </g>
+  );
   return (
     <svg
       viewBox="0 0 64 64"
@@ -38,24 +51,24 @@ export function LogoMark({ size = 32, className, ...props }: LogoMarkProps) {
       <defs>
         <mask id={`${id}-stamp`} maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
           <rect x={x} y={y} width={face} height={face} fill="#fff" />
-          <g fill="#000">{holes}</g>
+          <g fill="#000">
+            {holes.map(([cx, cy]) => (
+              <circle key={`${cx},${cy}`} cx={cx} cy={cy} r={radius} />
+            ))}
+          </g>
         </mask>
         <clipPath id={`${id}-below`}>
           <rect x="0" y={y + face - 1} width="64" height={64 - y - face + 1} />
         </clipPath>
       </defs>
-      <rect width="64" height="64" rx="18" fill={LOGO_COLOURS.tile} />
-      <g clipPath={`url(#${id}-below)`}>
-        <rect
-          width="64"
-          height="64"
-          fill={LOGO_COLOURS.shadow}
-          mask={`url(#${id}-stamp)`}
-          transform={`translate(0 ${LOGO_SHADOW_DROP})`}
-        />
-      </g>
-      <rect width="64" height="64" fill={LOGO_COLOURS.paper} mask={`url(#${id}-stamp)`} />
-      <path d={LOGO_L_PATH} fill={LOGO_COLOURS.ink} />
+      {variant === "auto" ? (
+        <>
+          {layer(LOGO_COLOURS.rose, "dark:hidden")}
+          {layer(LOGO_COLOURS.paper, "hidden dark:block")}
+        </>
+      ) : (
+        layer(LOGO_COLOURS[variant])
+      )}
     </svg>
   );
 }
@@ -64,12 +77,13 @@ interface LogoProps {
   className?: string;
   iconClassName?: string;
   textClassName?: string;
+  variant?: LogoVariant;
 }
 
-export function Logo({ className, iconClassName, textClassName }: LogoProps) {
+export function Logo({ className, iconClassName, textClassName, variant }: LogoProps) {
   return (
     <span className={cn("flex items-center gap-2", className)}>
-      <LogoMark className={iconClassName} />
+      <LogoMark className={iconClassName} variant={variant} />
       {/* Plain foreground text, not a rose gradient — production feedback
        * was that the gradient/clip-text treatment read as too "loud" next
        * to the mark itself, and that the wordmark should match how the
