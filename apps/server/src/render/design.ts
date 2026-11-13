@@ -136,6 +136,16 @@ export const designSettingsSchema = z.object({
         .default([]),
       // Where those buttons go: above or below the intro, or at the end.
       ctaPlacement: z.enum(["beforeIntro", "afterIntro", "end"]).default("afterIntro"),
+      // A highlighted notice (#402): a title and a short Markdown note, as
+      // Info, Warning or Alert. Shown when either has text.
+      notice: z
+        .object({
+          type: z.enum(["info", "warning", "alert"]).default("info"),
+          title: z.string().trim().max(100).default(""),
+          body: z.string().trim().max(1000).default(""),
+          placement: z.enum(["afterIntro", "beforeFooter"]).default("afterIntro"),
+        })
+        .prefault({}),
       // "Watch on Plex"-style buttons for linked sources with a public URL:
       // near the top, under each section (grouped designs), or after the items.
       sourceButtons: z
@@ -175,11 +185,12 @@ export function parseDesignSettings(value: unknown): DesignSettings {
 // A design's words, as the template variables every design (and code
 // template) reads.
 export function designContentVariables(settings: DesignSettings) {
-  const { intro, footerNote, ctas } = settings.content;
+  const { intro, footerNote, ctas, notice } = settings.content;
   return {
     introText: intro || undefined,
     footerNote: footerNote || undefined,
     ctas,
+    notice: notice.title || notice.body ? { type: notice.type, title: notice.title, body: notice.body } : undefined,
     noteLinkColor: settings.colors.link ?? settings.colors.accent,
     wording: buildWording(settings.wording.sectionNames, settings.wording.dateOrder),
   };
@@ -292,6 +303,40 @@ function darkPaletteFor(p: Palette): Palette {
   };
 }
 
+// A notice's colours (#402): a bar and an icon in the type's colour on a
+// tint of it, like a status email. Fixed rather than taken from the palette,
+// so a warning reads as one whatever the design's accent. Each clears 4.5:1
+// on its tint. The icon's glyph is #fffffe, not #ffffff, so dark mode can
+// recolour it without touching a button's white text.
+type NoticeType = DesignSettings["content"]["notice"]["type"];
+const NOTICE_COLOURS: Record<NoticeType, { light: [string, string]; dark: [string, string]; glyph: string }> = {
+  info: { light: ["#1f55b8", "#e8eefa"], dark: ["#7fb0ff", "#18233a"], glyph: "i" },
+  warning: { light: ["#a15c00", "#fbf0dc"], dark: ["#f2b45c", "#33261a"], glyph: "!" },
+  alert: { light: ["#b3261e", "#fbe5e3"], dark: ["#ff8a80", "#3a1d1d"], glyph: "×" },
+};
+const NOTICE_GLYPH = "#fffffe";
+
+function noticeMarkup(type: NoticeType, p: Palette, font: string): string {
+  const { light, glyph } = NOTICE_COLOURS[type];
+  const [colour, tint] = light;
+  return [
+    `    {{#if notice}}`,
+    `    <mj-section padding="4px 0 8px">`,
+    `      <mj-column>`,
+    `        <mj-text padding="0 25px">`,
+    `          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;"><tr><td style="background:${tint};border-left:4px solid ${colour};border-radius:4px;padding:10px 14px;">`,
+    `            <table role="presentation" cellpadding="0" cellspacing="0"><tr>`,
+    `              <td valign="top" style="padding:1px 10px 0 0;" aria-hidden="true"><div style="width:18px;height:18px;line-height:18px;border-radius:9px;background:${colour};color:${NOTICE_GLYPH};font-family:Arial,sans-serif;font-size:12px;font-weight:700;text-align:center;">${glyph}</div></td>`,
+    `              <td style="font-family:${font};font-size:14px;line-height:1.45;color:${p.text};">{{#if notice.title}}<div style="font-weight:700;color:${p.text};">{{notice.title}}</div>{{/if}}{{#if notice.body}}<div style="color:${p.text};">{{notice.body}}</div>{{/if}}</td>`,
+    `            </tr></table>`,
+    `          </td></tr></table>`,
+    `        </mj-text>`,
+    `      </mj-column>`,
+    `    </mj-section>`,
+    `    {{/if}}`,
+  ].join("\n");
+}
+
 // Email clients honour dark mode in different ways: Apple Mail and others
 // apply prefers-color-scheme styles, Outlook.com marks the page with
 // data-ogsc/data-ogsb, and some (Thunderbird's dark toggle, Gmail's apps)
@@ -299,7 +344,7 @@ function darkPaletteFor(p: Palette): Palette {
 // This declares support and swaps each of the design's inline colours for
 // its dark counterpart, matched by value, so no element needs its own
 // class. A design that is already dark is left as it is.
-function darkModeHead(p: Palette, withDarkLogo = false): string {
+function darkModeHead(p: Palette, withDarkLogo = false, notice?: NoticeType): string {
   const declare = `<mj-raw><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></mj-raw>`;
   if (!isLight(p.background)) return `
     ${declare}`;
@@ -335,6 +380,16 @@ function darkModeHead(p: Palette, withDarkLogo = false): string {
   }
   if (p.labelBorder !== p.badgeBorder) {
     rules.push([[`[style*="solid ${p.labelBorder}"]`], `border-color:${d.labelBorder} !important;`, false]);
+  }
+  // A notice's tint, bar, icon and glyph (#402).
+  if (notice) {
+    const { light, dark } = NOTICE_COLOURS[notice];
+    rules.push(
+      [[`[style*="background:${light[1]}"]`], `background:${dark[1]} !important;`, true],
+      [[`[style*="solid ${light[0]}"]`], `border-color:${dark[0]} !important;`, false],
+      [[`[style*="background:${light[0]}"]`], `background:${dark[0]} !important;`, true],
+      [[`[style*="color:${NOTICE_GLYPH}"]`], `color:${d.background} !important;`, false],
+    );
   }
   const css = (outlook: boolean) =>
     rules
@@ -718,7 +773,11 @@ export function buildDesignMjml(settings: DesignSettings, options: { darkModeMar
   const font = EMAIL_FONTS[settings.font].stack;
   const css = sanitizeCss(settings.customCss).trim();
   const customCss = css ? `\n    <mj-style inline="inline">${css}</mj-style>` : "";
-  const darkMode = options.darkModeMarker ? `\n    ${DARK_MODE_MARKER}` : darkModeHead(p, hasDarkLogo(settings));
+  const { notice } = settings.content;
+  const noticeType = notice.title || notice.body ? notice.type : undefined;
+  const darkMode = options.darkModeMarker
+    ? `\n    ${DARK_MODE_MARKER}`
+    : darkModeHead(p, hasDarkLogo(settings), noticeType);
   const head = `\n  <mj-head>${darkMode}${customCss}\n  </mj-head>`;
 
   // Without a lookback window (a code path only tests use) there's no date
@@ -809,8 +868,8 @@ ${button(p, font, "secondary", settings.buttons)}
 <mjml>${head}
   <mj-body background-color="${p.page}">
     <mj-section padding="12px 0"><mj-column><mj-spacer height="8px" /></mj-column></mj-section>
-    <mj-wrapper background-color="${p.background}" border-top="4px solid ${p.accent}" border-radius="14px" padding="12px 0 16px">${header}${sourcePlacement === "top" ? allSourceButtons : ""}
-${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? allSourceButtons : ""}
+    <mj-wrapper background-color="${p.background}" border-top="4px solid ${p.accent}" border-radius="14px" padding="12px 0 16px">${header}${noticeType && notice.placement === "afterIntro" ? `\n${noticeMarkup(noticeType, p, font)}` : ""}${sourcePlacement === "top" ? allSourceButtons : ""}
+${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? allSourceButtons : ""}${noticeType && notice.placement === "beforeFooter" ? `\n${noticeMarkup(noticeType, p, font)}` : ""}
     {{#if footerNote}}
     <mj-section padding="8px 0 0">
       <mj-column>

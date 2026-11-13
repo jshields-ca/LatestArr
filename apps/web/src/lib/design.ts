@@ -46,6 +46,19 @@ export interface DesignLogo {
 export const LOGO_MIN_WIDTH = 40;
 export const LOGO_MAX_WIDTH = 550;
 
+// A highlighted notice (#402). Shown when it has a title or text.
+export type DesignNoticeType = "info" | "warning" | "alert";
+export interface DesignNotice {
+  type: DesignNoticeType;
+  title: string;
+  // Markdown, like the intro.
+  body: string;
+  placement: "afterIntro" | "beforeFooter";
+}
+/** Mirror the server's limits. */
+export const MAX_NOTICE_TITLE_LENGTH = 100;
+export const MAX_NOTICE_BODY_LENGTH = 1000;
+
 export interface DesignContent {
   // Markdown: bold, italic, links, and lists.
   intro: string;
@@ -56,6 +69,7 @@ export interface DesignContent {
   ctaPlacement: DesignCtaPlacement;
   // "Watch on Plex"-style buttons for linked sources with a public URL.
   sourceButtons: { enabled: boolean; placement: DesignSourceButtonPlacement };
+  notice: DesignNotice;
 }
 
 // Section names and date order (#390). Mirrors apps/server/src/render/wording.ts.
@@ -169,6 +183,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     ctas: [],
     ctaPlacement: "afterIntro",
     sourceButtons: { enabled: true, placement: "end" },
+    notice: { type: "info", title: "", body: "", placement: "afterIntro" },
   },
   wording: {
     dateOrder: "monthFirst",
@@ -197,6 +212,7 @@ export function withDesignDefaults(settings: Partial<DesignSettings> | null | un
       ...DEFAULT_DESIGN_SETTINGS.content,
       ...value.content,
       sourceButtons: { ...DEFAULT_DESIGN_SETTINGS.content.sourceButtons, ...value.content?.sourceButtons },
+      notice: { ...DEFAULT_DESIGN_SETTINGS.content.notice, ...value.content?.notice },
     },
     wording: {
       ...DEFAULT_DESIGN_SETTINGS.wording,
