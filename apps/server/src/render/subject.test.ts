@@ -1,6 +1,7 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import { describe, expect, it } from "vitest";
 import { renderSubject, unknownSubjectVariables } from "./subject.js";
+import { buildWording } from "./wording.js";
 
 const item = (kind: NewItem["kind"], n: number): NewItem => ({
   id: `${kind}-${n}`,
@@ -24,6 +25,19 @@ describe("renderSubject", () => {
     expect(
       renderSubject("{newsletter} | {date} | {shortDate} | {period} | {month} {year} | {count} new ({counts})", context),
     ).toBe("Weekly Digest | September 29, 2026 | Sep 29 | Sep 22 – 29, 2026 | September 2026 | 4 new (3 episodes, 1 movie)");
+  });
+
+  // #390: the subject follows the design's date order and section names.
+  it("puts the day first, and uses the design's names in counts, when the design says so", () => {
+    const wording = buildWording({ movie: { plural: "Films", singular: "Film" } }, "dayFirst");
+    expect(renderSubject("{date} | {shortDate} | {period} | {counts}", { ...context, wording })).toBe(
+      "29 September 2026 | 29 Sep | 22 – 29 Sep 2026 | 3 episodes, 1 film",
+    );
+    // Across a month, and across a year.
+    const early = { ...context, wording, generatedAt: new Date("2026-10-03T16:00:00Z") };
+    expect(renderSubject("{period}", early)).toBe("26 Sep – 3 Oct 2026");
+    const newYear = { ...context, wording, generatedAt: new Date("2027-01-03T16:00:00Z") };
+    expect(renderSubject("{period}", newYear)).toBe("27 Dec 2026 – 3 Jan 2027");
   });
 
   it("uses the newsletter's timezone for dates", () => {

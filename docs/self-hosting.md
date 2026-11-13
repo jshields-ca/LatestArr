@@ -160,6 +160,8 @@ A subject can include these variables, filled in on each send in the newsletter'
 | `{count}` | 12 (new items) |
 | `{counts}` | 8 movies, 4 episodes |
 
+Dates and counts follow the design's **Wording** options: with the day first, `{date}` is 29 September 2026 and `{period}` 22 – 29 Sep 2026, and a section renamed Films counts "8 films".
+
 For example, `{count} new from {period}`. **Insert a variable** adds one, and the line under the field previews the next subject. A misspelled variable is refused when you save. A blank subject uses the newsletter's name.
 
 ## Running behind a reverse proxy

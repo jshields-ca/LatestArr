@@ -450,6 +450,44 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
+  // #390: "Films" for "Movies", and the day before the month.
+  it("renames a section and puts the day first, or does both at once for UK English", async () => {
+    const user = userEvent.setup();
+    const { container } = renderEditor();
+    await screen.findByTitle("Design preview");
+
+    await user.click(screen.getByText("Wording"));
+    const name = screen.getByRole("textbox", { name: "Name for Movies" });
+    expect(name).toHaveAttribute("placeholder", "Movies");
+    await user.type(name, "Films");
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.wording.sectionNames.movie).toEqual({ plural: "Films", singular: "" }),
+    );
+    // With a name and nothing for one, it's worked out.
+    expect(screen.getByRole("textbox", { name: "Name for one of Movies" })).toHaveAttribute(
+      "placeholder",
+      "Worked out from the name",
+    );
+    // TV is counted in episodes, so it has no "for one".
+    expect(screen.queryByRole("textbox", { name: "Name for one of TV" })).not.toBeInTheDocument();
+
+    selectOption(screen.getByLabelText("Dates"), "29 September 2026");
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.wording.dateOrder).toBe("dayFirst"));
+    expect(screen.getByText("29 September 2026, 1 renamed")).toBeInTheDocument();
+
+    await user.clear(name);
+    selectOption(screen.getByLabelText("Dates"), "September 29, 2026");
+    await user.click(screen.getByRole("button", { name: "Use UK English" }));
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.wording).toMatchObject({
+        dateOrder: "dayFirst",
+        sectionNames: { movie: { plural: "Films", singular: "Film" } },
+      }),
+    );
+    expect(screen.getByRole("button", { name: "Use UK English" })).toBeDisabled();
+    expect(await axe(container, { iframes: false })).toHaveNoViolations();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = renderEditor();
     await screen.findByTitle("Design preview");

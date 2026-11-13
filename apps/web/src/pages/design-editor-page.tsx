@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Eye, Loader2, Plus, Save, SlidersHorizontal, X } from "lucide-react";
 
 import { DesignCodeReference } from "@/components/design-code-reference";
+import { DesignWordingFields, wordingSummary } from "@/components/design-wording-fields";
 import { DesignLogoFields } from "@/components/design-logo-fields";
 import { EmailPreviewFrame, PreviewSchemeToggle, usePreviewScheme } from "@/components/email-preview-frame";
 import { useHasRole } from "@/components/auth-provider";
@@ -746,6 +747,14 @@ export function DesignEditorPage() {
     </Section>
   );
 
+  // In both modes: a code design gets the names as {{sectionNames.movie.heading}},
+  // and the date order applies to its dates as it does to a design's.
+  const wordingSection = (
+    <Section title="Wording" summary={wordingSummary(settings.wording)}>
+      <DesignWordingFields wording={settings.wording} onChange={(wording) => update((c) => ({ ...c, wording }))} />
+    </Section>
+  );
+
   const textSection = (
     <Section title="Text" summary={listOrNone([content.intro.trim() && "Intro", content.footerNote.trim() && "Footer note"])} defaultOpen>
       <NoteField
@@ -984,6 +993,8 @@ export function DesignEditorPage() {
             {textSection}
 
             {buttonsSection}
+
+            {wordingSection}
 
             <Section title="Variables and helpers">
               <DesignCodeReference />
@@ -1230,6 +1241,8 @@ export function DesignEditorPage() {
                 </div>
               ) : null}
             </Section>
+
+            {wordingSection}
 
             <Section title="Custom CSS" summary={settings.customCss.trim() ? "Added" : "None"}>
               <Label htmlFor="design-css">CSS applied to the email</Label>

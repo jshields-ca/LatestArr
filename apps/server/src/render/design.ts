@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EMAIL_FONTS, type EmailFont } from "./email-fonts.js";
+import { buildWording, SECTION_NAME_KEYS, type SectionNameKey } from "./wording.js";
 
 // The most items a section (or the whole list) shows: the default with no
 // "Most items per section" set, and that setting's maximum, so the two can't
@@ -23,6 +24,15 @@ const httpUrl = z.url({ protocol: /^https?$/ }).max(2000);
 // A logo's width in the email, in px. The card's content is about 550 px wide.
 export const LOGO_MIN_WIDTH = 40;
 export const LOGO_MAX_WIDTH = 550;
+
+// A section's own name (#390). Free text that ends up in the email, so
+// it's escaped there like any other value; blank keeps the default.
+const sectionName = z
+  .object({
+    plural: z.string().trim().max(40).default(""),
+    singular: z.string().trim().max(40).default(""),
+  })
+  .prefault({});
 
 // Every field has a default, so a design saved by an older version (or a
 // partial one) still parses, and new options can be added later without a
@@ -132,6 +142,18 @@ export const designSettingsSchema = z.object({
         .prefault({}),
     })
     .prefault({}),
+  // Section names and date order (#390).
+  wording: z
+    .object({
+      dateOrder: z.enum(["monthFirst", "dayFirst"]).default("monthFirst"),
+      sectionNames: z
+        .object(Object.fromEntries(SECTION_NAME_KEYS.map((key) => [key, sectionName])) as Record<
+          SectionNameKey,
+          typeof sectionName
+        >)
+        .prefault({}),
+    })
+    .prefault({}),
   customCss: z.string().max(10_000).default(""),
 });
 
@@ -155,6 +177,7 @@ export function designContentVariables(settings: DesignSettings) {
     footerNote: footerNote || undefined,
     ctas,
     noteLinkColor: settings.colors.link ?? settings.colors.accent,
+    wording: buildWording(settings.wording.sectionNames, settings.wording.dateOrder),
   };
 }
 
@@ -474,7 +497,7 @@ function button(p: Palette, font: string, kind: "primary" | "secondary", look: B
 // style (#292). Sections that already end with "Watch on Plex"-style source
 // buttons skip it, since those go to the same library.
 function libraryLinkWhenEmpty(
-  section: { browse: string },
+  section: { name: SectionNameKey },
   contentType: string,
   perSection: boolean,
   p: Palette,
@@ -482,7 +505,7 @@ function libraryLinkWhenEmpty(
   buttons: ButtonLook,
 ): string {
   const link = [
-    `        {{#libraryLinkFor contentType="${contentType}" label="Browse ${section.browse}"}}`,
+    `        {{#libraryLinkFor contentType="${contentType}" label=sectionNames.${section.name}.browse}}`,
     button(p, font, "secondary", buttons),
     `        {{/libraryLinkFor}}`,
   ].join("\n");
@@ -499,12 +522,14 @@ function emptyMessage(p: Palette, font: string): string {
 }
 
 // Each section of a grouped newsletter: episodes and seasons share "TV".
-const SECTIONS: { kinds: DesignKind[]; heading: string; browse: string }[] = [
-  { kinds: ["movie"], heading: "Movies", browse: "movies" },
-  { kinds: ["tv_episode", "tv_season"], heading: "TV", browse: "TV" },
-  { kinds: ["book"], heading: "Books", browse: "books" },
-  { kinds: ["audiobook"], heading: "Audiobooks", browse: "audiobooks" },
-  { kinds: ["game"], heading: "Games", browse: "games" },
+// Each section's heading and "Browse ..." label come from the design's
+// wording (wording.ts), as {{sectionNames.<name>.heading}} and .browse.
+const SECTIONS: { kinds: DesignKind[]; name: SectionNameKey }[] = [
+  { kinds: ["movie"], name: "movie" },
+  { kinds: ["tv_episode", "tv_season"], name: "tv" },
+  { kinds: ["book"], name: "book" },
+  { kinds: ["audiobook"], name: "audiobook" },
+  { kinds: ["game"], name: "game" },
 ];
 
 // Sections in the design's chosen order: each sits where its first kind is.
@@ -580,7 +605,7 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
     const body = [
       `    <mj-section padding="8px 0 4px">`,
       `      <mj-column>`,
-      heading(section.heading, p, font),
+      heading(`{{sectionNames.${section.name}.heading}}`, p, font),
       `        <mj-raw>`,
       `        ${wrapSectionItems(settings, `{{#mediaList ${hash}}}\n${card}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { DesignDateOrder } from "@/lib/design";
 import { MAX_SUBJECT_LENGTH, previewSubject, SUBJECT_VARIABLES, subjectProblem } from "@/lib/subject";
 
 // A newsletter's subject line, with {variables} filled in on each send
@@ -18,6 +19,7 @@ export function SubjectField({
   newsletterName,
   timeZone,
   lookbackDays,
+  dateOrder,
 }: {
   id: string;
   value: string;
@@ -26,10 +28,12 @@ export function SubjectField({
   newsletterName: string;
   timeZone: string;
   lookbackDays: number;
+  /** The newsletter's design's date order (#390). */
+  dateOrder?: DesignDateOrder;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const problem = subjectProblem(value);
-  const preview = problem ? null : previewSubject(value, { name: newsletterName, timeZone, lookbackDays });
+  const preview = problem ? null : previewSubject(value, { name: newsletterName, timeZone, lookbackDays, dateOrder });
 
   function insert(name: string) {
     const field = input.current;

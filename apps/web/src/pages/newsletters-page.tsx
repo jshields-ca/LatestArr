@@ -60,6 +60,7 @@ import {
   type SourceConnection,
   type Template,
 } from "@/lib/api";
+import type { DesignDateOrder } from "@/lib/design";
 import {
   DEFAULT_SIMPLE_SCHEDULE,
   describeScheduleParts,
@@ -248,6 +249,7 @@ function AddNewsletterDialog({
             newsletterName={name}
             timeZone={timezone}
             lookbackDays={Number(lookbackDays)}
+            dateOrder={templates.find((t) => t.id === templateId)?.settings?.wording?.dateOrder}
           />
 
           {error ? (
@@ -623,10 +625,13 @@ function DesignPicker({
 function NewsletterDetailsForm({
   newsletter,
   smtpProfiles,
+  dateOrder,
   onSaved,
 }: {
   newsletter: Newsletter;
   smtpProfiles: SmtpProfile[];
+  /** Its design's date order, for the subject preview (#390). */
+  dateOrder?: DesignDateOrder;
   onSaved: (newsletter: Newsletter) => void;
 }) {
   const [name, setName] = useState(newsletter.name);
@@ -764,6 +769,7 @@ function NewsletterDetailsForm({
             newsletterName={name}
             timeZone={timezone}
             lookbackDays={Number(lookbackDays)}
+            dateOrder={dateOrder}
           />
           <div className="flex items-start gap-3">
             <Switch
@@ -1168,7 +1174,12 @@ function NewsletterCard({
                   </p>
                 ) : null}
                 <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
-                  <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
+                  <NewsletterDetailsForm
+                    newsletter={newsletter}
+                    smtpProfiles={smtpProfiles}
+                    dateOrder={allTemplates.find((t) => t.id === newsletter.templateId)?.settings?.wording?.dateOrder}
+                    onSaved={onChanged}
+                  />
 
                   <div
                     role="group"
