@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { KeyRound, Loader2, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { KeyRound, Loader2, Pencil, Plus, Send } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ListRow } from "@/components/list-row";
+import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
   Dialog,
   DialogContent,
@@ -589,8 +589,6 @@ function SmtpProfileRow({
 }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   async function handleTest() {
     setTesting(true);
@@ -614,15 +612,12 @@ function SmtpProfileRow({
   }
 
   async function handleDelete() {
-    setDeleting(true);
     try {
       await deleteSmtpProfile(profile.id);
       onDeleted(profile.id);
       toast({ variant: "success", title: "Email server deleted", description: profile.name });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to delete.";
-      setDeleting(false);
-      setConfirmingDelete(false);
       setTestResult(message);
       toast({ variant: "destructive", title: "Failed to delete email server", description: message });
     }
@@ -650,41 +645,24 @@ function SmtpProfileRow({
         </>
       }
       actions={
-        confirmingDelete ? (
-          <>
-            <span className="text-sm text-muted-foreground">Delete this email server?</span>
-            <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
-              {deleting ? <Loader2 className="animate-spin" /> : null}
-              Confirm
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button variant="outline" size="sm" onClick={() => void handleTest()} disabled={testing}>
-              {testing ? <Loader2 className="animate-spin" /> : null}
-              Test connection
-            </Button>
-            <EditSmtpProfileDialog profile={profile} onSaved={onChanged} />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Delete ${profile.name}`}
-              onClick={() => setConfirmingDelete(true)}
-            >
-              <Trash2 />
-            </Button>
-          </>
-        )
+        <>
+          <Button variant="outline" size="sm" onClick={() => void handleTest()} disabled={testing}>
+            {testing ? <Loader2 className="animate-spin" /> : null}
+            Test connection
+          </Button>
+          <EditSmtpProfileDialog profile={profile} onSaved={onChanged} />
+          <ConfirmDeleteButton
+            label={`Delete ${profile.name}`}
+            noun="email server"
+            consequence="Newsletters that send through it can't send until you choose another for them."
+            onConfirm={handleDelete}
+          />
+        </>
       }
     >
-      {!confirmingDelete ? (
-        <div className="border-t border-border pt-3">
-          <SendTestEmailControl profileId={profile.id} />
-        </div>
-      ) : null}
+      <div className="border-t border-border pt-3">
+        <SendTestEmailControl profileId={profile.id} />
+      </div>
     </ListRow>
   );
 }

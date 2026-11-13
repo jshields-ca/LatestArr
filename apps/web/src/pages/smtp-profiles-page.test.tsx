@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -229,9 +230,10 @@ describe("SmtpProfilesPage", () => {
     render(<SmtpProfilesPage />);
     await screen.findByText("Primary");
 
+    render(<ConfirmHost />);
     await user.click(screen.getByRole("button", { name: "Delete Primary" }));
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(await screen.findByRole("button", { name: "Delete email server" }));
 
     await waitFor(() => expect(screen.queryByText("Primary")).not.toBeInTheDocument());
     expect(screen.getByText("No email servers yet")).toBeInTheDocument();

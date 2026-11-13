@@ -619,9 +619,10 @@ describe("RecipientsPage", () => {
     render(<RecipientsPage />);
     await screen.findByText("Everyone");
 
+    render(<ConfirmHost />);
     await user.click(screen.getByRole("button", { name: "Delete Everyone" }));
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(await screen.findByRole("button", { name: "Delete group" }));
 
     await waitFor(() => expect(screen.queryByText("Everyone")).not.toBeInTheDocument());
   });

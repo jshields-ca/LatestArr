@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -115,8 +116,9 @@ describe("DesignsPage", () => {
     renderPage();
     expect(await screen.findByText("Used by Weekly Digest")).toBeInTheDocument();
 
+    render(<ConfirmHost />);
     await user.click(screen.getByRole("button", { name: "Delete Plex dark" }));
-    expect(screen.getByText("Delete? Its newsletter will use Default.")).toBeInTheDocument();
+    expect(await screen.findByRole("alertdialog", { name: "Delete Plex dark?" })).toHaveTextContent("Its newsletter will use Default.");
   });
 
   it("has no accessibility violations", async () => {

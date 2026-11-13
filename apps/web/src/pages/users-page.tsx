@@ -368,7 +368,12 @@ export function UsersPage() {
                         {busy === user.id ? <Loader2 className="animate-spin" /> : user.isActive ? <UserX /> : <UserCheck />}
                         {user.isActive ? "Deactivate" : "Reactivate"}
                       </Button>
-                      <ConfirmDeleteButton label={`Delete ${user.displayName}`} onConfirm={() => remove(user)} />
+                      <ConfirmDeleteButton
+                        label={`Delete ${user.displayName}`}
+                        noun="user"
+                        consequence="They'll be signed out and won't be able to sign in again."
+                        onConfirm={() => remove(user)}
+                      />
                     </>
                   )
                 }

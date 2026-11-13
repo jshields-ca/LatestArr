@@ -503,6 +503,8 @@ function RecipientTableRow({
           <EditRecipientDialog recipient={recipient} onSaved={onChanged} />
           <ConfirmDeleteButton
             label={`Delete ${recipient.email}`}
+            noun="recipient"
+            consequence="They'll be removed from their groups and won't get any more newsletters."
             onConfirm={() =>
               deleteRecipient(recipient.id)
                 .then(() => {
@@ -1115,6 +1117,8 @@ function GroupCard({
           <EditGroupDialog group={group} onSaved={onChanged} />
           <ConfirmDeleteButton
             label={`Delete ${group.name}`}
+            noun="group"
+            consequence="The people in it aren't deleted. Newsletters that send to this group will stop reaching them through it."
             onConfirm={() =>
               deleteGroup(group.id)
                 .then(() => {

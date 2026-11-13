@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Check, Eye, Loader2, Pencil, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
+import { Check, Eye, Loader2, Pencil, Plus, RefreshCw, Send, X } from "lucide-react";
 
 import { useHasRole, useOptionalAuth } from "@/components/auth-provider";
 import { EmailPreviewFrame, PreviewSchemeToggle, usePreviewScheme } from "@/components/email-preview-frame";
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
-import { ListRow } from "@/components/list-row";
+import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import { SendRunHistoryList } from "@/components/send-run-history";
 import { SourceLogo } from "@/components/source-logo";
 import { SubjectField } from "@/components/subject-field";
@@ -963,8 +963,6 @@ function NewsletterCard({
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [sendRuns, setSendRuns] = useState<SendRun[] | null>(null);
   const [sendRunsError, setSendRunsError] = useState<string | null>(null);
 
@@ -1028,15 +1026,12 @@ function NewsletterCard({
   }
 
   async function handleDelete() {
-    setDeleting(true);
     try {
       await deleteNewsletter(newsletter.id);
       onDeleted(newsletter.id);
       toast({ variant: "success", title: "Newsletter deleted", description: newsletter.name });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to delete.";
-      setDeleting(false);
-      setConfirmingDelete(false);
       setSendResult(message);
       toast({ variant: "destructive", title: "Failed to delete newsletter", description: message });
     }
@@ -1107,27 +1102,12 @@ function NewsletterCard({
                 {sending ? <Loader2 className="animate-spin" /> : <Send />}
                 Send now
               </Button>
-              {confirmingDelete ? (
-                <>
-                  <span className="text-sm text-muted-foreground">Delete?</span>
-                  <Button variant="destructive" size="sm" onClick={() => void handleDelete()} disabled={deleting}>
-                    {deleting ? <Loader2 className="animate-spin" /> : null}
-                    Confirm
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Delete ${newsletter.name}`}
-                  onClick={() => setConfirmingDelete(true)}
-                >
-                  <Trash2 />
-                </Button>
-              )}
+              <ConfirmDeleteButton
+                label={`Delete ${newsletter.name}`}
+                noun="newsletter"
+                consequence="Its schedule and send history are deleted with it."
+                onConfirm={handleDelete}
+              />
             </>
           )}
         </>

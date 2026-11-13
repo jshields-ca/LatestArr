@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -149,8 +150,9 @@ describe("BackupsPage", () => {
     render(<BackupsPage />);
     await screen.findByText("Before upgrade");
     const row = screen.getByText("Before upgrade").closest("li") as HTMLElement;
+    render(<ConfirmHost />);
     await user.click(within(row).getByRole("button", { name: /^Delete the backup/ }));
-    await user.click(within(row).getByRole("button", { name: /Confirm|Delete/ }));
+    await user.click(await screen.findByRole("button", { name: "Delete backup" }));
     await waitFor(() => expect(screen.queryByText("Before upgrade")).not.toBeInTheDocument());
   });
 });

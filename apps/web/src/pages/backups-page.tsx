@@ -186,6 +186,7 @@ function BackupRow({ backup, onDeleted }: { backup: BackupFile; onDeleted: (file
         </Button>
         <ConfirmDeleteButton
           label={`Delete the backup from ${when}`}
+          noun="backup"
           onConfirm={() =>
             deleteBackup(backup.filename)
               .then(() => {

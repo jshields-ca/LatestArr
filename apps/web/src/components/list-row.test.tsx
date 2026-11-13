@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { describe, expect, it, vi } from "vitest";
 
+import { ConfirmHost } from "./confirm-dialog";
 import { ConfirmDeleteButton, ListRow } from "./list-row";
 
 describe("ListRow", () => {
@@ -93,41 +94,67 @@ describe("ListRow", () => {
 });
 
 describe("ConfirmDeleteButton", () => {
-  it("shows a Confirm/Cancel prompt after the delete icon is clicked, and Cancel dismisses it without confirming", async () => {
-    const user = userEvent.setup();
-    const onConfirm = vi.fn().mockResolvedValue(undefined);
+  function renderButton(props: Partial<Parameters<typeof ConfirmDeleteButton>[0]> = {}) {
+    const onConfirm = props.onConfirm ?? vi.fn().mockResolvedValue(undefined);
+    render(
+      <>
+        <ConfirmDeleteButton label="Delete Alice" noun="recipient" {...props} onConfirm={onConfirm} />
+        <ConfirmHost />
+      </>,
+    );
+    return onConfirm;
+  }
 
-    render(<ConfirmDeleteButton label="Delete Alice" onConfirm={onConfirm} />);
+  it("asks in a dialog that names the thing, and Cancel leaves it alone", async () => {
+    const user = userEvent.setup();
+    const onConfirm = renderButton();
 
     await user.click(screen.getByRole("button", { name: "Delete Alice" }));
-    expect(screen.getByText("Delete?")).toBeInTheDocument();
+    const dialog = await screen.findByRole("alertdialog", { name: "Delete Alice?" });
+    // With nothing else to say, it says the delete is final.
+    expect(dialog).toHaveTextContent("This can't be undone.");
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByText("Delete?")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete Alice" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Delete Alice" })).toBeEnabled();
     expect(onConfirm).not.toHaveBeenCalled();
+    // Keyboard users are put back where they were.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete Alice" })).toHaveFocus());
   });
 
-  it("calls onConfirm and disables the buttons while the delete is in flight", async () => {
+  it("says what goes with it, and its confirm button names the action", async () => {
+    const user = userEvent.setup();
+    const onConfirm = renderButton({ label: "Delete Home Plex", noun: "source", consequence: "Newsletters that use it will stop including its items." });
+
+    await user.click(screen.getByRole("button", { name: "Delete Home Plex" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Delete Home Plex?" });
+    expect(dialog).toHaveTextContent("Newsletters that use it will stop including its items.");
+    expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete source" }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  });
+
+  it("deletes once confirmed, and is disabled while the delete is in flight", async () => {
     const user = userEvent.setup();
     let resolveDelete!: () => void;
-    const onConfirm = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveDelete = resolve;
-        }),
-    );
-
-    render(<ConfirmDeleteButton label="Delete Alice" onConfirm={onConfirm} />);
+    const onConfirm = renderButton({
+      onConfirm: vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveDelete = resolve;
+          }),
+      ),
+    });
 
     await user.click(screen.getByRole("button", { name: "Delete Alice" }));
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(await screen.findByRole("button", { name: "Delete recipient" }));
 
-    expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "Confirm" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Delete Alice" })).toBeDisabled();
 
     resolveDelete();
-    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+    // Still on screen only when the delete failed, so it's usable again.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete Alice" })).toBeEnabled());
   });
 });
