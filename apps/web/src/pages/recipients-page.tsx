@@ -964,7 +964,7 @@ function RecipientsSection({
     <section className="flex flex-col gap-4">
       {/* Both rows wrap: on a phone the three buttons don't fit beside the
           heading, and an unwrapped row pushed the whole page sideways. */}
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:min-h-9">
         <h2 className="text-lg font-semibold">Recipients</h2>
         {recipients ? (
           <div className="flex flex-wrap items-center gap-2">
