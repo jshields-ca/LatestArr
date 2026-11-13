@@ -599,4 +599,10 @@ describe("renderDesignSample", () => {
     expect(html).toContain("data:image/svg+xml;base64,");
     expect(html).toContain(">Audiobooks<");
   });
+
+  // #362: so the design editor can show it.
+  it("has enough books for a limit of one to show how many more", async () => {
+    const html = await renderDesignSample(design({ sections: { limit: 1 } }));
+    expect(html).toContain("+ 1 more book &rarr;");
+  });
 });
