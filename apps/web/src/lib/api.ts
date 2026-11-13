@@ -284,8 +284,30 @@ export interface RecipientGroup {
   updatedAt: string;
 }
 
-export function listRecipients(): Promise<{ recipients: Recipient[] }> {
-  return apiFetch<{ recipients: Recipient[] }>("/recipients");
+/** One person's place in one group. */
+export interface RecipientMembership {
+  recipientId: string;
+  groupId: string;
+}
+
+/** Everyone, and who is in which group. */
+export function listRecipients(): Promise<{ recipients: Recipient[]; memberships: RecipientMembership[] }> {
+  return apiFetch<{ recipients: Recipient[]; memberships?: RecipientMembership[] }>("/recipients").then(
+    ({ recipients, memberships }) => ({ recipients, memberships: memberships ?? [] }),
+  );
+}
+
+/** One change to several recipients at once (#400). */
+export type BulkRecipientChange =
+  | { action: "activate" | "deactivate" | "delete"; ids: string[] }
+  | { action: "addToGroup" | "removeFromGroup"; ids: string[]; groupId: string };
+
+/** `changed` counts only the people the change altered: someone already inactive isn't counted again. */
+export function bulkChangeRecipients(change: BulkRecipientChange): Promise<{ changed: number; requested: number }> {
+  return apiFetch<{ changed: number; requested: number }>("/recipients/bulk", {
+    method: "POST",
+    body: JSON.stringify(change),
+  });
 }
 
 export function createRecipient(input: {

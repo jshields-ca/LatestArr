@@ -5,6 +5,7 @@ import { createDb, recipientImports, runMigrations, type Db } from "@latestarr/d
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../app.js";
+import { clearLogBuffer } from "../../log-buffer.js";
 
 let dir: string;
 let db: Db;
@@ -367,6 +368,150 @@ describe("GET /recipients/:id/groups", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().groups).toHaveLength(1);
     expect(response.json().groups[0].name).toBe("Group A");
+  });
+});
+
+// #400: one change to many recipients, in one request and one log line.
+describe("POST /recipients/bulk", () => {
+  async function addRecipient(email: string): Promise<string> {
+    const response = await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email } }));
+    return response.json().recipient.id as string;
+  }
+
+  async function addGroup(name: string): Promise<string> {
+    const response = await app.inject(authed({ method: "POST", url: "/api/recipient-groups", payload: { name } }));
+    return response.json().group.id as string;
+  }
+
+  function bulk(payload: Record<string, unknown>) {
+    return app.inject(authed({ method: "POST", url: "/api/recipients/bulk", payload }));
+  }
+
+  async function listed(): Promise<{
+    recipients: { id: string; email: string; isActive: boolean }[];
+    memberships: { recipientId: string; groupId: string }[];
+  }> {
+    return (await app.inject(authed({ method: "GET", url: "/api/recipients" }))).json();
+  }
+
+  it("makes the listed recipients inactive, then active, leaving everyone else alone", async () => {
+    const a = await addRecipient("a@example.com");
+    const b = await addRecipient("b@example.com");
+    const c = await addRecipient("c@example.com");
+
+    const off = await bulk({ action: "deactivate", ids: [a, b] });
+    expect(off.statusCode).toBe(200);
+    expect(off.json()).toEqual({ changed: 2, requested: 2 });
+    const after = await listed();
+    expect(after.recipients.filter((r) => !r.isActive).map((r) => r.id).sort()).toEqual([a, b].sort());
+
+    // Only someone it changes counts: b is already inactive, c becomes so.
+    expect((await bulk({ action: "deactivate", ids: [b, c] })).json()).toEqual({ changed: 1, requested: 2 });
+
+    expect((await bulk({ action: "activate", ids: [a] })).json()).toEqual({ changed: 1, requested: 1 });
+    const final = await listed();
+    expect(final.recipients.find((r) => r.id === a)?.isActive).toBe(true);
+    expect(final.recipients.find((r) => r.id === b)?.isActive).toBe(false);
+  });
+
+  it("adds the listed recipients to a group and removes them, and the list says who's in what", async () => {
+    const a = await addRecipient("a@example.com");
+    const b = await addRecipient("b@example.com");
+    const c = await addRecipient("c@example.com");
+    const family = await addGroup("Family");
+    await app.inject(
+      authed({ method: "POST", url: `/api/recipient-groups/${family}/members`, payload: { recipientId: a } }),
+    );
+
+    // a is already in it; an id that doesn't exist is skipped, not an error.
+    const added = await bulk({ action: "addToGroup", ids: [a, b, "no-such-recipient"], groupId: family });
+    expect(added.statusCode).toBe(200);
+    expect(added.json()).toEqual({ changed: 1, requested: 3 });
+    const members = (await listed()).memberships;
+    expect(members).toHaveLength(2);
+    expect(members).toEqual(
+      expect.arrayContaining([
+        { recipientId: a, groupId: family },
+        { recipientId: b, groupId: family },
+      ]),
+    );
+
+    // c was never in it.
+    const removed = await bulk({ action: "removeFromGroup", ids: [a, c], groupId: family });
+    expect(removed.json()).toEqual({ changed: 1, requested: 2 });
+    expect((await listed()).memberships).toEqual([{ recipientId: b, groupId: family }]);
+  });
+
+  it("answers 404 for a group that doesn't exist, and changes nothing", async () => {
+    const a = await addRecipient("a@example.com");
+    const response = await bulk({ action: "addToGroup", ids: [a], groupId: "no-such-group" });
+    expect(response.statusCode).toBe(404);
+    expect((await listed()).memberships).toEqual([]);
+  });
+
+  it("deletes the listed recipients along with their group memberships", async () => {
+    const a = await addRecipient("a@example.com");
+    const b = await addRecipient("b@example.com");
+    const family = await addGroup("Family");
+    await bulk({ action: "addToGroup", ids: [a, b], groupId: family });
+
+    // The same id twice is one recipient.
+    const response = await bulk({ action: "delete", ids: [a, a] });
+    expect(response.json()).toEqual({ changed: 1, requested: 1 });
+    const after = await listed();
+    expect(after.recipients.map((r) => r.id)).toEqual([b]);
+    expect(after.memberships).toEqual([{ recipientId: b, groupId: family }]);
+  });
+
+  it("handles more recipients than fit in one statement", async () => {
+    const rows = Array.from({ length: 620 }, (_, i) => ({ email: `person${i}@example.com` }));
+    await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows } }));
+    const ids = (await listed()).recipients.map((r) => r.id);
+    expect(ids).toHaveLength(620);
+
+    expect((await bulk({ action: "deactivate", ids })).json()).toEqual({ changed: 620, requested: 620 });
+    expect((await listed()).recipients.every((r) => !r.isActive)).toBe(true);
+  });
+
+  it("records one line on the Logs page, naming who changed", async () => {
+    const a = await addRecipient("a@example.com");
+    const b = await addRecipient("b@example.com");
+    const family = await addGroup("Family");
+    // The buffer outlives a test; start from an empty one.
+    clearLogBuffer();
+    await bulk({ action: "addToGroup", ids: [a, b], groupId: family });
+    await bulk({ action: "delete", ids: [a] });
+    // Nothing changes the second time, so nothing is logged.
+    await bulk({ action: "addToGroup", ids: [b], groupId: family });
+
+    const { logs } = (await app.inject(authed({ method: "GET", url: "/api/logs" }))).json() as {
+      logs: { msg: string }[];
+    };
+    const changes = logs.map((entry) => entry.msg).filter((msg) => /recipients? /.test(msg) || /recipients?$/.test(msg));
+    expect(changes.filter((msg) => msg.includes("group"))).toEqual(['Added 2 recipients to group "Family"']);
+    expect(changes.filter((msg) => msg.startsWith("Deleted"))).toEqual(["Deleted 1 recipient"]);
+    expect(JSON.stringify(logs.find((entry) => entry.msg === "Deleted 1 recipient"))).toContain("a@example.com");
+  });
+
+  it("rejects a request it can't make sense of", async () => {
+    const a = await addRecipient("a@example.com");
+    expect((await bulk({ action: "deactivate", ids: [] })).statusCode).toBe(400);
+    expect((await bulk({ action: "promote", ids: [a] })).statusCode).toBe(400);
+    expect((await bulk({ action: "addToGroup", ids: [a] })).statusCode).toBe(400);
+    expect((await bulk({ action: "deactivate", ids: "all" })).statusCode).toBe(400);
+    expect((await bulk({ action: "deactivate", ids: Array.from({ length: 5001 }, (_, i) => `id-${i}`) })).statusCode).toBe(
+      400,
+    );
+    expect((await listed()).recipients[0]?.isActive).toBe(true);
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/recipients/bulk",
+      payload: { action: "delete", ids: ["x"] },
+    });
+    expect(response.statusCode).toBe(401);
   });
 });
 

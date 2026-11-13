@@ -134,6 +134,18 @@ On the **Recipients** page, **Import** takes a pasted list, a CSV, or an Excel f
 
 **Undo last import** is available for 24 hours, or until the next import. It removes the people and groups the import added, takes people out of groups it added them to, and restores names it changed. Anything changed since is kept, and Undo tells you what.
 
+### Changing several recipients at once
+
+The **Recipients** table shows each person's groups, and the menu beside the search box narrows the list to one group or to people in no group.
+
+Tick the box on each row you want, or the box in the table's heading for everyone on the page. With more than one page, **Select all** then takes in everyone who matches the search and group filter. The buttons that appear above the table apply to everyone ticked:
+
+- **Make active** and **Make inactive** switch them on or off. An inactive person stays in their groups but is skipped by every send.
+- **Add to group** and **Remove from group** ask which group.
+- **Delete** asks first and says how many. It can't be undone.
+
+Each is one change, recorded as one line on the **Logs** page.
+
 ### Subject variables
 
 A subject can include these variables, filled in on each send in the newsletter's timezone:

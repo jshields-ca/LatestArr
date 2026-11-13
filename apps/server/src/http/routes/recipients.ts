@@ -1,5 +1,5 @@
 import { type Db, recipientGroupMembers, recipientGroups, recipients } from "@latestarr/db";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
@@ -45,6 +45,32 @@ const bulkImportSchema = z.object({
     .max(1000),
   dryRun: z.boolean().optional(),
 });
+
+// One change to many recipients at once (#400). The web app sends the ids
+// it has selected, so "everyone matching this search" is still one request
+// and one line on the Logs page.
+const BULK_MAX_RECIPIENTS = 5000;
+const bulkIds = z.array(z.string().min(1).max(64)).min(1).max(BULK_MAX_RECIPIENTS);
+const bulkSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.enum(["activate", "deactivate", "delete"]), ids: bulkIds }),
+  z.object({ action: z.enum(["addToGroup", "removeFromGroup"]), ids: bulkIds, groupId: z.string().min(1).max(64) }),
+]);
+
+// SQLite caps the variables in one statement; ids go through in batches
+// well under it, all inside one transaction.
+const BULK_BATCH = 500;
+function batches<T>(items: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += BULK_BATCH) out.push(items.slice(i, i + BULK_BATCH));
+  return out;
+}
+
+// How many addresses a bulk change's log entry names; the rest are a count.
+const BULK_LOG_EMAILS = 25;
+
+function recipientCount(count: number): string {
+  return `${count} recipient${count === 1 ? "" : "s"}`;
+}
 
 interface IdParams {
   id: string;
@@ -106,6 +132,116 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         .send({ created, updated, unchanged: plan.unchanged, skipped: plan.skipped, createdGroups, membershipsAdded, importId });
     });
 
+    // Applies one change to every recipient listed. Ids that don't exist
+    // (deleted in another tab, say) are skipped, and so is anyone the change
+    // wouldn't alter: `changed` counts only who it did. All or nothing.
+    scope.post("/recipients/bulk", async (request, reply) => {
+      const body = parseBody(bulkSchema, request.body, reply);
+      if (!body) return reply;
+      const ids = [...new Set(body.ids)];
+
+      const result = db.transaction((tx) => {
+        let groupName: string | null = null;
+        if (body.action === "addToGroup" || body.action === "removeFromGroup") {
+          const [group] = tx.select().from(recipientGroups).where(eq(recipientGroups.id, body.groupId)).all();
+          if (!group) return null;
+          groupName = group.name;
+        }
+
+        const changedIds: string[] = [];
+        for (const batch of batches(ids)) {
+          switch (body.action) {
+            case "activate":
+            case "deactivate": {
+              const isActive = body.action === "activate";
+              const rows = tx
+                .update(recipients)
+                .set({ isActive })
+                .where(and(inArray(recipients.id, batch), eq(recipients.isActive, !isActive)))
+                .returning({ id: recipients.id })
+                .all();
+              changedIds.push(...rows.map((row) => row.id));
+              break;
+            }
+            case "addToGroup": {
+              const existing = tx
+                .select({ id: recipients.id })
+                .from(recipients)
+                .where(inArray(recipients.id, batch))
+                .all();
+              if (existing.length === 0) break;
+              const rows = tx
+                .insert(recipientGroupMembers)
+                .values(existing.map((row) => ({ recipientId: row.id, groupId: body.groupId })))
+                .onConflictDoNothing()
+                .returning({ id: recipientGroupMembers.recipientId })
+                .all();
+              changedIds.push(...rows.map((row) => row.id));
+              break;
+            }
+            case "removeFromGroup": {
+              const rows = tx
+                .delete(recipientGroupMembers)
+                .where(
+                  and(
+                    eq(recipientGroupMembers.groupId, body.groupId),
+                    inArray(recipientGroupMembers.recipientId, batch),
+                  ),
+                )
+                .returning({ id: recipientGroupMembers.recipientId })
+                .all();
+              changedIds.push(...rows.map((row) => row.id));
+              break;
+            }
+            case "delete":
+              // Named before they go: the log entry below says who.
+              break;
+          }
+        }
+
+        // Who it changed, for the log. A delete reads them first.
+        const emails: string[] = [];
+        const named = body.action === "delete" ? ids : changedIds;
+        for (const batch of batches(named.slice(0, BULK_LOG_EMAILS))) {
+          const rows = tx.select({ email: recipients.email }).from(recipients).where(inArray(recipients.id, batch)).all();
+          emails.push(...rows.map((row) => row.email));
+        }
+        if (body.action === "delete") {
+          for (const batch of batches(ids)) {
+            const rows = tx.delete(recipients).where(inArray(recipients.id, batch)).returning({ id: recipients.id }).all();
+            changedIds.push(...rows.map((row) => row.id));
+          }
+        }
+        return { changed: changedIds.length, emails, groupName };
+      });
+
+      if (!result) return reply.code(404).send({ error: "Group not found" });
+      const { changed, emails, groupName } = result;
+
+      if (changed > 0) {
+        const who = recipientCount(changed);
+        const message = {
+          activate: `Activated ${who}`,
+          deactivate: `Deactivated ${who}`,
+          delete: `Deleted ${who}`,
+          addToGroup: `Added ${who} to group "${groupName}"`,
+          removeFromGroup: `Removed ${who} from group "${groupName}"`,
+        }[body.action];
+        request.log.info(
+          {
+            action: body.action,
+            changed,
+            requested: ids.length,
+            ...("groupId" in body && { groupId: body.groupId }),
+            recipients: emails,
+            ...(changed > emails.length && { andMore: changed - emails.length }),
+          },
+          message,
+        );
+      }
+      return reply.send({ changed, requested: ids.length });
+    });
+
     // The latest import, and whether it can still be undone (#288).
     scope.get("/recipients/imports/latest", async (_request, reply) => {
       return reply.send({ import: latestImport(db) });
@@ -129,7 +265,10 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
 
     scope.get("/recipients", async (_request, reply) => {
       const rows = await db.select().from(recipients);
-      return reply.send({ recipients: rows });
+      // Who is in which group, so the table can show and filter by it
+      // without a request per person (#332).
+      const memberships = await db.select().from(recipientGroupMembers);
+      return reply.send({ recipients: rows, memberships });
     });
 
     scope.get<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {

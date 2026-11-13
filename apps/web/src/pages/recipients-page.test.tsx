@@ -242,11 +242,12 @@ describe("RecipientsPage", () => {
     });
 
     function names() {
-      // The Name cell's first line; a second, phone-only line repeats the email.
+      // The Name cell's first line; a second, phone-only line repeats the
+      // email. It's the second cell, after the row's checkbox.
       return screen
         .getAllByRole("row")
         .slice(1)
-        .map((row) => within(row).getAllByRole("cell")[0]!.querySelector("p")!.textContent);
+        .map((row) => within(row).getAllByRole("cell")[1]!.querySelector("p")!.textContent);
     }
 
     render(<RecipientsPage />);
@@ -565,7 +566,7 @@ describe("RecipientsPage", () => {
     const names = within(table)
       .getAllByRole("row")
       .slice(1)
-      .map((row) => within(row).getAllByRole("cell")[0]!.textContent);
+      .map((row) => within(row).getAllByRole("cell")[1]!.textContent);
     expect(names.map((name) => name?.split("@")[0])).toEqual([
       expect.stringMatching(/^Echo/),
       expect.stringMatching(/^éclair/),
@@ -627,6 +628,236 @@ describe("RecipientsPage", () => {
     await waitFor(() => expect(screen.queryByText("Everyone")).not.toBeInTheDocument());
   });
 
+  // #332 finding 13 and #400: the table shows and filters by group, and
+  // several people can be changed at once.
+  describe("groups in the table and changing several recipients at once", () => {
+    const bob = { ...alice, id: "r2", email: "bob@example.com", displayName: "Bob" };
+    const cara = { ...alice, id: "r3", email: "cara@example.com", displayName: "Cara" };
+    const family = { ...everyoneGroup, id: "g1", name: "Family" };
+    const friends = { ...everyoneGroup, id: "g2", name: "Friends" };
+
+    interface BulkBody {
+      action: string;
+      ids: string[];
+      groupId?: string;
+    }
+
+    // A server that remembers bulk changes, so the page's reload shows them.
+    function fakeServer(initial: {
+      recipients: (typeof alice)[];
+      groups?: (typeof everyoneGroup)[];
+      memberships?: { recipientId: string; groupId: string }[];
+    }) {
+      const state = {
+        recipients: [...initial.recipients],
+        groups: initial.groups ?? [],
+        memberships: [...(initial.memberships ?? [])],
+      };
+      const bulk: BulkBody[] = [];
+      fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (url === "/api/recipients" && method === "GET")
+          return Promise.resolve(
+            jsonResponse(200, { recipients: [...state.recipients], memberships: [...state.memberships] }),
+          );
+        if (url === "/api/recipient-groups" && method === "GET")
+          return Promise.resolve(jsonResponse(200, { groups: state.groups }));
+        if (url === "/api/recipients/bulk" && method === "POST") {
+          const body = JSON.parse(init!.body as string) as BulkBody;
+          bulk.push(body);
+          const ids = new Set(body.ids);
+          const inGroup = (id: string) =>
+            state.memberships.some((m) => m.recipientId === id && m.groupId === body.groupId);
+          let changed = 0;
+          if (body.action === "activate" || body.action === "deactivate") {
+            const isActive = body.action === "activate";
+            changed = state.recipients.filter((r) => ids.has(r.id) && r.isActive !== isActive).length;
+            state.recipients = state.recipients.map((r) => (ids.has(r.id) ? { ...r, isActive } : r));
+          } else if (body.action === "delete") {
+            changed = state.recipients.filter((r) => ids.has(r.id)).length;
+            state.recipients = state.recipients.filter((r) => !ids.has(r.id));
+          } else if (body.action === "addToGroup") {
+            const joining = body.ids.filter((id) => !inGroup(id));
+            changed = joining.length;
+            state.memberships.push(...joining.map((recipientId) => ({ recipientId, groupId: body.groupId! })));
+          } else if (body.action === "removeFromGroup") {
+            changed = body.ids.filter(inGroup).length;
+            state.memberships = state.memberships.filter((m) => !(ids.has(m.recipientId) && m.groupId === body.groupId));
+          }
+          return Promise.resolve(jsonResponse(200, { changed, requested: body.ids.length }));
+        }
+        throw new Error(`Unexpected fetch to ${method} ${url}`);
+      });
+      return { state, bulk };
+    }
+
+    const rowOf = (name: string) => screen.getByText(name).closest("tr")!;
+    const bar = () => screen.getByRole("group", { name: "Change the selected recipients" });
+
+    it("shows each person's groups and narrows the list to one group, or to nobody's", async () => {
+      fakeServer({
+        recipients: [alice, bob],
+        groups: [friends, family],
+        memberships: [
+          { recipientId: "r1", groupId: "g2" },
+          { recipientId: "r1", groupId: "g1" },
+        ],
+      });
+      render(<RecipientsPage />);
+      await screen.findByText("Alice");
+
+      // By name, whatever order they were joined in.
+      await waitFor(() =>
+        expect(
+          within(rowOf("Alice"))
+            .getAllByRole("listitem")
+            .map((item) => item.textContent),
+        ).toEqual(["Family", "Friends"]),
+      );
+      expect(rowOf("Bob")).toHaveTextContent("No groups");
+      expect(screen.getByText("2 recipients")).toBeInTheDocument();
+
+      selectOption(screen.getByLabelText("Show recipients in"), "Not in a group");
+      expect(screen.queryByText("Alice")).not.toBeInTheDocument();
+      expect(screen.getByText("Bob")).toBeInTheDocument();
+      expect(screen.getByText("1 of 2 match")).toBeInTheDocument();
+
+      selectOption(screen.getByLabelText("Show recipients in"), "Family");
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+      expect(screen.queryByText("Bob")).not.toBeInTheDocument();
+    });
+
+    it("makes the ticked recipients inactive in one request", async () => {
+      const user = userEvent.setup();
+      const { bulk } = fakeServer({ recipients: [alice, bob, cara] });
+      render(<RecipientsPage />);
+      await screen.findByText("Alice");
+
+      await user.click(screen.getByRole("checkbox", { name: "Select alice@example.com" }));
+      await user.click(screen.getByRole("checkbox", { name: "Select cara@example.com" }));
+      expect(within(bar()).getByText("2 selected")).toBeInTheDocument();
+      // The actions take the search row's place.
+      expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+
+      await user.click(within(bar()).getByRole("button", { name: "Make inactive" }));
+      await waitFor(() => expect(screen.getAllByRole("switch", { name: "Inactive" })).toHaveLength(2));
+      expect(bulk).toEqual([{ action: "deactivate", ids: ["r1", "r3"] }]);
+      expect(within(rowOf("Bob")).getByRole("switch", { name: "Active" })).toBeInTheDocument();
+      // Still ticked, ready for a second change to the same people.
+      expect(within(bar()).getByText("2 selected")).toBeInTheDocument();
+
+      await user.click(within(bar()).getByRole("button", { name: "Clear selection" }));
+      expect(screen.getByRole("searchbox")).toBeInTheDocument();
+      // Focus isn't left on a button that's gone.
+      expect(screen.getByRole("checkbox", { name: "Select everyone" })).toHaveFocus();
+    });
+
+    it("selects everyone that matches, beyond the page, and adds them to a group", async () => {
+      const user = userEvent.setup();
+      const crowd = Array.from({ length: 30 }, (_, i) => ({
+        ...alice,
+        id: `p${i}`,
+        email: `person${String(i).padStart(2, "0")}@example.com`,
+        displayName: `Person ${String(i).padStart(2, "0")}`,
+      }));
+      const { bulk } = fakeServer({ recipients: crowd, groups: [family] });
+      render(<RecipientsPage />);
+      await screen.findByText("Person 00");
+
+      const everyone = screen.getByRole("checkbox", { name: "Select everyone on this page" });
+      await user.click(screen.getByRole("checkbox", { name: "Select person03@example.com" }));
+      expect(everyone).toBePartiallyChecked();
+      await user.click(everyone);
+      expect(within(bar()).getByText("25 selected")).toBeInTheDocument();
+      await user.click(within(bar()).getByRole("button", { name: "Select all 30" }));
+      expect(within(bar()).getByText("30 selected")).toBeInTheDocument();
+
+      await user.click(within(bar()).getByRole("button", { name: "Add to group" }));
+      const dialog = await screen.findByRole("dialog", { name: "Add 30 recipients to a group" });
+      // The only group is already chosen.
+      await user.click(within(dialog).getByRole("button", { name: "Add to group" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+      expect(bulk).toHaveLength(1);
+      expect(bulk[0]).toMatchObject({ action: "addToGroup", groupId: "g1" });
+      expect(bulk[0]!.ids).toHaveLength(30);
+      await waitFor(() => expect(within(rowOf("Person 00")).getByRole("list")).toHaveTextContent("Family"));
+    }, 60000);
+
+    it("offers only the groups someone ticked is in when removing from a group", async () => {
+      const user = userEvent.setup();
+      const { bulk } = fakeServer({
+        recipients: [alice, bob],
+        groups: [family, friends],
+        memberships: [{ recipientId: "r1", groupId: "g2" }],
+      });
+      render(<RecipientsPage />);
+      await screen.findByText("Alice");
+
+      await user.click(screen.getByRole("checkbox", { name: "Select bob@example.com" }));
+      await user.click(within(bar()).getByRole("button", { name: "Remove from group" }));
+      let dialog = await screen.findByRole("dialog", { name: "Remove 1 recipient from a group" });
+      expect(within(dialog).getByText("They aren't in any groups.")).toBeInTheDocument();
+      await user.keyboard("{Escape}");
+
+      await user.click(screen.getByRole("checkbox", { name: "Select alice@example.com" }));
+      await user.click(within(bar()).getByRole("button", { name: "Remove from group" }));
+      dialog = await screen.findByRole("dialog", { name: "Remove 2 recipients from a group" });
+      // Friends is the only group either is in, so it's the one offered.
+      expect(within(dialog).getByLabelText("Group")).toHaveTextContent("Friends");
+      await user.click(within(dialog).getByRole("button", { name: "Remove from group" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+      expect(bulk).toEqual([{ action: "removeFromGroup", ids: ["r1", "r2"], groupId: "g2" }]);
+      await waitFor(() => expect(rowOf("Alice")).toHaveTextContent("No groups"));
+    }, 60000);
+
+    it("asks before deleting the ticked recipients, with how many", async () => {
+      const user = userEvent.setup();
+      const { bulk } = fakeServer({ recipients: [alice, bob, cara] });
+      render(
+        <>
+          <RecipientsPage />
+          <ConfirmHost />
+        </>,
+      );
+      await screen.findByText("Alice");
+
+      await user.click(screen.getByRole("checkbox", { name: "Select alice@example.com" }));
+      await user.click(screen.getByRole("checkbox", { name: "Select bob@example.com" }));
+      await user.click(within(bar()).getByRole("button", { name: "Delete" }));
+      let dialog = await screen.findByRole("alertdialog", { name: "Delete 2 recipients?" });
+      expect(dialog).toHaveTextContent("This can't be undone.");
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      expect(bulk).toEqual([]);
+      expect(screen.getByText("Alice")).toBeInTheDocument();
+
+      await user.click(within(bar()).getByRole("button", { name: "Delete" }));
+      dialog = await screen.findByRole("alertdialog", { name: "Delete 2 recipients?" });
+      await user.click(within(dialog).getByRole("button", { name: "Delete 2 recipients" }));
+
+      await waitFor(() => expect(screen.queryByText("Alice")).not.toBeInTheDocument());
+      expect(bulk).toEqual([{ action: "delete", ids: ["r1", "r2"] }]);
+      expect(screen.getByText("Cara")).toBeInTheDocument();
+      // Nobody is ticked any more, so the search row is back.
+      expect(screen.getByRole("searchbox")).toBeInTheDocument();
+    }, 60000);
+
+    it("has no accessibility violations with recipients ticked", async () => {
+      const user = userEvent.setup();
+      fakeServer({
+        recipients: [alice, bob],
+        groups: [family, friends],
+        memberships: [{ recipientId: "r1", groupId: "g1" }],
+      });
+      const { container } = render(<RecipientsPage />);
+      await screen.findByText("Alice");
+      await user.click(screen.getByRole("checkbox", { name: "Select alice@example.com" }));
+      expect(within(bar()).getByText("1 selected")).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
   it("has no accessibility violations with both empty states shown", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [] }));
@@ -675,9 +906,21 @@ describe("RecipientsPage", () => {
   it("reviews an import before applying it, then adds and renames recipients", async () => {
     const user = userEvent.setup();
     const existing = { id: "r1", email: "old@example.com", displayName: "Old", isActive: true };
+    const added = { id: "r2", email: "new@example.com", displayName: "New Person", isActive: true };
+    let imported = false;
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       if (url === "/api/recipients" && (!init || init.method === undefined))
-        return Promise.resolve(jsonResponse(200, { recipients: [existing] }));
+        return Promise.resolve(
+          jsonResponse(
+            200,
+            imported
+              ? {
+                  recipients: [{ ...existing, displayName: "Renamed" }, added],
+                  memberships: [{ recipientId: "r2", groupId: "g9" }],
+                }
+              : { recipients: [existing], memberships: [] },
+          ),
+        );
       if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
       if (url === "/api/recipients/import" && init?.method === "POST") {
         const body = JSON.parse(init.body as string);
@@ -694,9 +937,10 @@ describe("RecipientsPage", () => {
             }),
           );
         }
+        imported = true;
         return Promise.resolve(
           jsonResponse(201, {
-            created: [{ id: "r2", email: "new@example.com", displayName: "New Person", isActive: true }],
+            created: [added],
             updated: [{ ...existing, displayName: "Renamed" }],
             unchanged: [],
             skipped: [{ email: "bad", reason: "Invalid email address" }],
@@ -752,8 +996,10 @@ describe("RecipientsPage", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(await screen.findByText("New Person")).toBeInTheDocument();
     expect(screen.getByText("Renamed")).toBeInTheDocument();
-    // The new group appears under Groups without a reload.
-    expect(screen.getByText("Book club")).toBeInTheDocument();
+    // The new group appears under Groups without a reload, and in the
+    // table beside the person who joined it.
+    expect(screen.getByRole("button", { name: "Book club" })).toBeInTheDocument();
+    expect(within(screen.getByText("New Person").closest("tr")!).getByRole("list")).toHaveTextContent("Book club");
   });
 
   // #288 part 3: the latest import can be undone for a day.
