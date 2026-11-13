@@ -38,6 +38,9 @@ interface RenderableItem {
   detailsLine?: string;
   /** The overview cut to about two lines, at a word, with an ellipsis. */
   overviewShort?: string;
+  /** About four lines, and about six (#359). */
+  overviewMedium?: string;
+  overviewLong?: string;
   /** Set on a row standing in for several new episodes of one series
    * (mediaList's groupEpisodes): each episode's subtitle and link, up to
    * MAX_LISTED_EPISODES of them. */
@@ -163,15 +166,16 @@ function detailsLineOf(item: RenderableItem): string | undefined {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-const OVERVIEW_SHORT_LENGTH = 180;
+// Characters, cut back to a whole word: about 30, 60 and 100 words (#359).
+const OVERVIEW_LENGTHS = { short: 180, medium: 360, long: 600 } as const;
 
 // Email clients don't support line-clamp, so "about two lines" is a
 // character count, cut back to the last whole word.
-function shorten(text: string | undefined): string | undefined {
-  if (!text || text.length <= OVERVIEW_SHORT_LENGTH) return text;
-  const cut = text.slice(0, OVERVIEW_SHORT_LENGTH);
+function shorten(text: string | undefined, length: number): string | undefined {
+  if (!text || text.length <= length) return text;
+  const cut = text.slice(0, length);
   const lastSpace = cut.lastIndexOf(" ");
-  return `${(lastSpace > OVERVIEW_SHORT_LENGTH / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
+  return `${(lastSpace > length / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
 function toRenderable(item: NewItem, wording: Wording = DEFAULT_WORDING): RenderableItem {
@@ -203,7 +207,13 @@ function toRenderable(item: NewItem, wording: Wording = DEFAULT_WORDING): Render
     seasonUrl: item.seasonUrl,
     seriesUrl: item.seriesUrl,
   };
-  return { ...renderable, detailsLine: detailsLineOf(renderable), overviewShort: shorten(renderable.overview) };
+  return {
+    ...renderable,
+    detailsLine: detailsLineOf(renderable),
+    overviewShort: shorten(renderable.overview, OVERVIEW_LENGTHS.short),
+    overviewMedium: shorten(renderable.overview, OVERVIEW_LENGTHS.medium),
+    overviewLong: shorten(renderable.overview, OVERVIEW_LENGTHS.long),
+  };
 }
 
 // Fisher-Yates, used by the mediaList helper's order="random" variant and
@@ -274,6 +284,8 @@ function groupEpisodes(items: RenderableItem[]): RenderableItem[] {
       subtitle: undefined,
       overview: undefined,
       overviewShort: undefined,
+      overviewMedium: undefined,
+      overviewLong: undefined,
       detailsLine: undefined,
       releaseDateFormatted: undefined,
       episodes: series.slice(0, MAX_LISTED_EPISODES).map((episode) => ({

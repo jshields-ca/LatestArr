@@ -74,7 +74,9 @@ export function DesignCodeReference() {
           for any.
         </Entry>
         <Entry code="{{title}} {{subtitle}} {{overview}}">Name, episode or author line, and summary.</Entry>
-        <Entry code="{{overviewShort}}">The summary cut to about two lines.</Entry>
+        <Entry code="{{overviewShort}} {{overviewMedium}} {{overviewLong}}">
+          The summary cut to about 30, 60 or 100 words, at a whole word.
+        </Entry>
         <Entry code="{{contentLabel}} {{kind}}">
           Badge text (Movie, Ebook, ...) and type: movie, tv_episode, tv_season, book, audiobook, or game.
         </Entry>

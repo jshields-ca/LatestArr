@@ -270,6 +270,28 @@ describe("buildDesignMjml", () => {
     });
   });
 
+  // #359: about 30 words by default, or about 60 or 100.
+  it("shortens summaries to the design's length, at a whole word", async () => {
+    const words = Array.from({ length: 150 }, (_, i) => `word${i}`).join(" ");
+    const long = item({ title: "Long one", overview: words });
+    const shown = async (summaryLength?: string) => {
+      const html = await render(design(summaryLength ? { summaryLength } : {}), { items: [long] });
+      return html.match(/(word\d+ ?)+…/)?.[0].split(" ").length;
+    };
+    const short = await shown();
+    const medium = await shown("medium");
+    const longer = await shown("long");
+    expect(short).toBeGreaterThan(20);
+    expect(short).toBeLessThan(35);
+    expect(medium).toBeGreaterThan(45);
+    expect(medium).toBeLessThan(65);
+    expect(longer).toBeGreaterThan(80);
+    expect(longer).toBeLessThan(105);
+    // A summary that fits is shown whole, with no ellipsis.
+    const html = await render(design({ summaryLength: "long" }), { items: [item({ overview: "Short and sweet." })] });
+    expect(html).toContain("Short and sweet.<");
+  });
+
   it("says there's nothing new when no section would appear", async () => {
     const html = await render(DEFAULT_DESIGN_SETTINGS, { items: [] });
     expect(html).toContain("No new items in this period.");

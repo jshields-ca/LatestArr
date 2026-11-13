@@ -5,6 +5,7 @@
 export type DesignKind = "movie" | "tv_episode" | "tv_season" | "book" | "audiobook" | "game";
 export type DesignLayout = "cards" | "compact" | "grid";
 export type DesignEmptySection = "hide" | "message" | "link" | "random";
+export type DesignSummaryLength = "short" | "medium" | "long";
 
 export interface DesignCta {
   label: string;
@@ -101,6 +102,8 @@ export interface DesignSettings {
   buttons: DesignButtons;
   logo: DesignLogo;
   showLookbackLine: boolean;
+  /** About 30, 60 or 100 words of each summary (#359). */
+  summaryLength: DesignSummaryLength;
   layout: DesignLayout;
   show: { poster: boolean; badge: boolean; subtitle: boolean; details: boolean; overview: boolean; dates: boolean };
   sections: {
@@ -146,6 +149,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     alt: "",
   },
   showLookbackLine: true,
+  summaryLength: "short",
   layout: "cards",
   show: { poster: true, badge: true, subtitle: true, details: true, overview: true, dates: true },
   sections: {
