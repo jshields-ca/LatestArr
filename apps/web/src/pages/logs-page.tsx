@@ -57,30 +57,34 @@ function LogLine({ entry }: { entry: LogEntry }) {
   return (
     <div
       className={cn(
-        "border-l-2 border-l-transparent px-3 py-1",
+        "border-l-2 border-l-transparent px-3",
         (entry.levelLabel === "error" || entry.levelLabel === "fatal") && "border-l-destructive bg-destructive/10",
       )}
     >
       <button
         type="button"
         onClick={() => hasDetails && setExpanded((e) => !e)}
+        // Named by the line itself (time, level, message), with
+        // aria-expanded saying whether its details are showing. A separate
+        // "Show details" label hid the text from voice control.
         aria-expanded={hasDetails ? expanded : undefined}
-        aria-label={hasDetails ? (expanded ? "Hide details" : "Show details") : undefined}
+        title={hasDetails ? (expanded ? "Hide details" : "Show details") : undefined}
         disabled={!hasDetails}
         className={cn(
-          "flex w-full items-start gap-2 text-left disabled:cursor-default",
+          // py-1 here, not on the row, makes the whole 24px line the target.
+          "flex w-full items-start gap-2 py-1 text-left disabled:cursor-default",
           hasDetails && "cursor-pointer",
         )}
       >
         {hasDetails ? (
           <ChevronRight
-            className={cn("mt-0.5 size-3 shrink-0 text-zinc-600 transition-transform", expanded && "rotate-90")}
+            className={cn("mt-0.5 size-3 shrink-0 text-zinc-500 transition-transform", expanded && "rotate-90")}
             aria-hidden="true"
           />
         ) : (
           <span className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
         )}
-        <span className="shrink-0 text-zinc-500" title={formatFullTime(entry.time)}>
+        <span className="shrink-0 text-zinc-400" title={formatFullTime(entry.time)}>
           {formatClock(entry.time)}
         </span>
         <span className={cn("w-12 shrink-0 font-semibold uppercase", LEVEL_STYLES[entry.levelLabel])}>
@@ -89,7 +93,7 @@ function LogLine({ entry }: { entry: LogEntry }) {
         <span className="min-w-0 flex-1 break-words text-zinc-200">{entry.msg}</span>
       </button>
       {expanded ? (
-        <pre className="ml-9 mt-1 overflow-x-auto whitespace-pre-wrap break-words text-zinc-400">
+        <pre className="mb-1 ml-9 overflow-x-auto whitespace-pre-wrap break-words text-zinc-400">
           {JSON.stringify(details, null, 2)}
         </pre>
       ) : null}

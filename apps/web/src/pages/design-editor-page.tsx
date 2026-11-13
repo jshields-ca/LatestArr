@@ -204,7 +204,13 @@ function Section({
     <details open={defaultOpen} className="group rounded-lg border border-border bg-card">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm [&::-webkit-details-marker]:hidden">
         <span className="shrink-0 font-semibold">{title}</span>
-        {summary ? <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">{summary}</span> : <span className="flex-1" />}
+        {/* The summary says what's inside a closed section. Open, the
+            section shows that itself, so the summary steps aside. */}
+        {summary ? (
+          <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground group-open:invisible">{summary}</span>
+        ) : (
+          <span className="flex-1" />
+        )}
         <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true" />
       </summary>
       <div className="flex flex-col gap-3 border-t border-border px-4 py-3">{children}</div>
@@ -940,9 +946,11 @@ export function DesignEditorPage() {
                   ? "This design is already dark, so email apps in dark mode show it as it is. Light and Dark previews look the same."
                   : "Email apps in dark mode show a dark version worked out from these colours, with Text as the background and Background as the text. Switch the preview to Dark to check it."}
               </p>
-              <details className="rounded-md border border-border px-3 py-2" open={customTextColours > 0}>
-                <summary className="cursor-pointer py-0.5 text-sm font-medium">
-                  More colours{customTextColours > 0 ? ` (${customTextColours} set)` : ""}
+              <details className="group/more rounded-md border border-border px-3 py-2" open={customTextColours > 0}>
+                {/* The same arrow as the sections above, not the browser's own. */}
+                <summary className="flex cursor-pointer list-none items-center gap-2 py-0.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                  <span className="flex-1">More colours{customTextColours > 0 ? ` (${customTextColours} set)` : ""}</span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open/more:rotate-90" aria-hidden="true" />
                 </summary>
                 <p className="mb-3 mt-2 text-xs text-muted-foreground">
                   Type labels (Movie, Ebook, ...) and links in the intro and footer note use the accent unless you choose otherwise.

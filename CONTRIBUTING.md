@@ -59,6 +59,7 @@ If you're proposing support for a source that isn't in the README's supported-so
 - Prefer small, focused PRs over large ones; it makes review and revert both easier.
 - Commit messages: please use [Conventional Commits](https://www.conventionalcommits.org/) style (`feat:`, `fix:`, `docs:`, `chore:`, ...).
 - Accessibility: any UI change touching `apps/web` should remain fully keyboard-operable and pass the axe-core checks in CI.
+- Interface: follow [`docs/ui-guidelines.md`](docs/ui-guidelines.md) for colour, the stamp, page structure, deleting, wording and touch targets, so new screens match the rest.
 
 ### Saving
 
