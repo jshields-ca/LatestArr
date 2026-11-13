@@ -178,6 +178,13 @@ export const tautulliAdapter: SourceAdapter = {
     }
   },
 
+  // The machine identifier of the Plex server this Tautulli watches: the
+  // same value that server's own Plex source reports.
+  async getServerId(config: SourceConnectionConfig): Promise<string | undefined> {
+    const machineIdentifier = await getServerId(config.baseUrl, config.credentials.apiKey ?? "");
+    return machineIdentifier ? `plex:${machineIdentifier}` : undefined;
+  },
+
   async listLibraries(config: SourceConnectionConfig): Promise<SourceLibrary[]> {
     const libraries = await getLibraries(config.baseUrl, config.credentials.apiKey ?? "");
     return libraries.map((library) => ({

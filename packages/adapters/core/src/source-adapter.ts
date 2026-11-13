@@ -124,6 +124,14 @@ export interface SourceAdapter {
    * implement it. */
   listUsers?(config: SourceConnectionConfig): Promise<SourceUser[]>;
 
+  /** Identifies the server this source reads from, when other sources
+   * reading the same server report the same thing: a Plex server's machine
+   * identifier, which a Tautulli watching that server knows too. Two
+   * sources linked to one newsletter with the same id are reading the same
+   * library, so an item both return is listed once (#391). Optional, and
+   * undefined means "don't know": nothing is merged on a guess. */
+  getServerId?(config: SourceConnectionConfig): Promise<string | undefined>;
+
   fetchRecentItems(config: SourceConnectionConfig, params: FetchRecentItemsParams): Promise<NewItem[]>;
 
   /** Ranks by watch activity rather than recency ("most watched this

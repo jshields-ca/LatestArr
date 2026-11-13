@@ -979,3 +979,132 @@ describe("designs in the send pipeline", () => {
     expect(row?.templateId).toBeNull();
   });
 });
+
+// #391: a Plex server and the Tautulli watching it return the same new
+// items. Linked to one newsletter, each item used to be listed twice.
+describe("a Plex server and its Tautulli linked to one newsletter", () => {
+  const now = Math.floor(Date.now() / 1000);
+
+  // Answers both apps by address, as a real pair would. `plexItems` and
+  // `tautulliItems` are each app's newest items, as [rating key, title].
+  function mockPlexAndTautulli(options: {
+    plexServer: string;
+    tautulliServer: string | null;
+    plexItems: [string, string][];
+    tautulliItems: [string, string][];
+  }) {
+    mockFetch.mockImplementation((input: unknown) => {
+      const url = new URL(String(input));
+      if (url.host === "plex.local:32400") {
+        if (url.pathname === "/identity")
+          return Promise.resolve(jsonResponse({ MediaContainer: { machineIdentifier: options.plexServer } }));
+        if (url.pathname === "/library/recentlyAdded") {
+          const first = url.searchParams.get("X-Plex-Container-Start") === "0";
+          const Metadata = first
+            ? options.plexItems.map(([ratingKey, title]) => ({ ratingKey, type: "movie", title, summary: "From Plex.", addedAt: now }))
+            : [];
+          return Promise.resolve(jsonResponse({ MediaContainer: { Metadata } }));
+        }
+      }
+      if (url.host === "tautulli.local:8181") {
+        const cmd = url.searchParams.get("cmd");
+        if (cmd === "get_server_id") {
+          if (options.tautulliServer === null) return Promise.resolve(jsonResponse({}, false, 500));
+          return Promise.resolve(
+            jsonResponse({ response: { result: "success", message: null, data: { pms_identifier: options.tautulliServer } } }),
+          );
+        }
+        if (cmd === "get_recently_added") {
+          const first = url.searchParams.get("start") === "0";
+          const recently_added = first
+            ? options.tautulliItems.map(([rating_key, title]) => ({
+                rating_key,
+                title,
+                full_title: title,
+                media_type: "movie",
+                added_at: String(now),
+                summary: "From Tautulli.",
+                genres: ["Science fiction"],
+              }))
+            : [];
+          return Promise.resolve(jsonResponse({ response: { result: "success", message: null, data: { recently_added } } }));
+        }
+      }
+      return Promise.reject(new Error(`Unexpected request to ${url.host}${url.pathname}`));
+    });
+  }
+
+  async function newsletterWithBoth() {
+    const tautulliId = await createSourceConnection();
+    const plex = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/sources",
+        payload: { name: "Home Plex", kind: "plex", baseUrl: "http://plex.local:32400", credentials: { token: "tok" } },
+      }),
+    );
+    const newsletterId = await createNewsletter();
+    for (const sourceConnectionId of [tautulliId, plex.json().source.id as string]) {
+      await app.inject(
+        authed({ method: "POST", url: `/api/newsletters/${newsletterId}/sources`, payload: { sourceConnectionId } }),
+      );
+    }
+    return newsletterId;
+  }
+
+  async function previewTitles(newsletterId: string): Promise<string[]> {
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+    expect(response.statusCode).toBe(200);
+    return (response.json().items as { title: string }[]).map((item) => item.title).sort();
+  }
+
+  it("lists each item once, keeping what only one of them returned", async () => {
+    const newsletterId = await newsletterWithBoth();
+    mockPlexAndTautulli({
+      plexServer: "srv-home",
+      tautulliServer: "srv-home",
+      plexItems: [["1", "Dune"], ["2", "Heat"]],
+      tautulliItems: [["1", "Dune"], ["2", "Heat"], ["3", "Alien"]],
+    });
+
+    expect(await previewTitles(newsletterId)).toEqual(["Alien", "Dune", "Heat"]);
+  });
+
+  it("uses Plex's copy of an item both return", async () => {
+    const newsletterId = await newsletterWithBoth();
+    mockPlexAndTautulli({
+      plexServer: "srv-home",
+      tautulliServer: "srv-home",
+      plexItems: [["1", "Dune"]],
+      tautulliItems: [["1", "Dune"]],
+    });
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+    expect(response.json().html).toContain("From Plex.");
+    expect(response.json().html).not.toContain("From Tautulli.");
+  });
+
+  it("doesn't merge two different servers whose rating keys match", async () => {
+    const newsletterId = await newsletterWithBoth();
+    mockPlexAndTautulli({
+      plexServer: "srv-home",
+      tautulliServer: "srv-cabin",
+      plexItems: [["1", "Dune"]],
+      tautulliItems: [["1", "Heat"]],
+    });
+
+    expect(await previewTitles(newsletterId)).toEqual(["Dune", "Heat"]);
+  });
+
+  it("lists both copies, rather than guess, when Tautulli can't say which server it watches", async () => {
+    const newsletterId = await newsletterWithBoth();
+    mockPlexAndTautulli({
+      plexServer: "srv-home",
+      tautulliServer: null,
+      plexItems: [["1", "Dune"]],
+      tautulliItems: [["1", "Dune"]],
+    });
+
+    expect(await previewTitles(newsletterId)).toEqual(["Dune", "Dune"]);
+  });
+});

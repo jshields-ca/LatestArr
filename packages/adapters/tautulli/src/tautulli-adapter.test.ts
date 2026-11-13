@@ -52,6 +52,14 @@ describe("testConnection", () => {
   });
 });
 
+describe("getServerId", () => {
+  it("reports the machine identifier of the Plex server it watches, as that server's Plex source does", async () => {
+    mockServerId("srv-abc123");
+    await expect(tautulliAdapter.getServerId!(config)).resolves.toBe("plex:srv-abc123");
+    expect(String(mockFetch.mock.calls[0]![0])).toContain("cmd=get_server_id");
+  });
+});
+
 describe("listLibraries", () => {
   it("maps section_type to our MediaKind", async () => {
     mockFetch.mockResolvedValueOnce(

@@ -29,6 +29,7 @@ import {
   resolvePosterPlaceholders,
   type ItemImageSource,
 } from "./embed-images.js";
+import { mergeSharedServerItems, type FetchedFromSource } from "./shared-server-items.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { htmlToPlainText } from "../render/plain-text.js";
 import { buildSourceButtons, type SourceButton } from "../render/source-buttons.js";
@@ -162,12 +163,38 @@ async function fetchFromSource<T>(log: Logger, source: SourceConnectionRow, fetc
   }
 }
 
+// Which server each linked source reads, for sources that can say (Plex,
+// and the Tautulli watching it): source id to server id. Asked only when
+// two or more linked sources could overlap, so a newsletter with one such
+// source makes no extra requests. A source that can't answer is left out,
+// and its items are then never merged with another's.
+async function resolveServerIds(linkedSources: LinkedSource[], log: Logger): Promise<Map<string, string>> {
+  const serverIds = new Map<string, string>();
+  const candidates = linkedSources.filter(({ adapter }) => adapter.getServerId);
+  if (candidates.length < 2) return serverIds;
+
+  await Promise.all(
+    candidates.map(async ({ source, adapter, credentials }) => {
+      const config: SourceConnectionConfig = {
+        baseUrl: source.baseUrl,
+        publicUrl: source.publicUrl ?? undefined,
+        credentials,
+      };
+      const serverId = await adapter.getServerId!(config).catch(() => undefined);
+      if (serverId) serverIds.set(source.id, serverId);
+      else log.debug({ sourceId: source.id }, `"${source.name}" didn't say which server it reads, so its items aren't checked for repeats`);
+    }),
+  );
+  return serverIds;
+}
+
 async function fetchRecentItemsFromSources(
   linkedSources: LinkedSource[],
   since: Date,
   log: Logger,
+  serverIds: Map<string, string>,
 ): Promise<FetchedItems> {
-  const items: NewItem[] = [];
+  const fetched: FetchedFromSource[] = [];
   const sourceByItem = new Map<NewItem, ItemImageSource>();
 
   for (const { link, source, adapter, credentials } of linkedSources) {
@@ -197,7 +224,18 @@ async function fetchRecentItemsFromSources(
       );
     }
     for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
-    items.push(...sourceItems);
+    fetched.push({
+      sourceName: source.name,
+      serverId: serverIds.get(source.id),
+      readsAnotherServer: adapter.kind === "tautulli",
+      items: sourceItems,
+    });
+  }
+
+  // A Plex server and its Tautulli return the same items: list each once (#391).
+  const { items, leftOut } = mergeSharedServerItems(fetched);
+  for (const { from, keptFrom, count } of leftOut) {
+    log.debug(`Left out ${count} item(s) from "${from}" that "${keptFrom}" also returned: both read the same server`);
   }
 
   return { items, sourceByItem };
@@ -327,7 +365,8 @@ async function renderNewsletterContent(
     log.warn(`Newsletter "${newsletter.name}" has no usable sources linked, so it will have no items`);
   }
 
-  const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since, log);
+  const serverIds = await resolveServerIds(linkedSources, log);
+  const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since, log, serverIds);
   // Real posterUrls are swapped for opaque placeholder tokens *before* any
   // template rendering happens (see embed-images.ts): a section's count/
   // sort/fallback selection can pick only a few items out of the fetched
@@ -344,7 +383,9 @@ async function renderNewsletterContent(
     needsPopular ? fetchPopularItemsFromSources(linkedSources, since, log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
     // No "since" cutoff: the fallback exists for when nothing was added in
     // the lookback window, so it has to look further back than that.
-    needsFallback ? fetchRecentItemsFromSources(linkedSources, new Date(0), log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
+    needsFallback
+      ? fetchRecentItemsFromSources(linkedSources, new Date(0), log, serverIds)
+      : Promise.resolve(EMPTY_FETCHED_ITEMS),
   ]);
   const logo = await resolveLogo(db, settings, { fetchUrls: !forPreview, log });
   const popularPlaceholders = preparePosterPlaceholders(popular.items);

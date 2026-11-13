@@ -115,6 +115,13 @@ export const plexAdapter: SourceAdapter = {
     }
   },
 
+  // The server's machine identifier. A Tautulli watching this server
+  // reports the same one, which is how the two are known to overlap.
+  async getServerId(config: SourceConnectionConfig): Promise<string | undefined> {
+    const machineIdentifier = await getServerIdentity(config.baseUrl, config.credentials.token ?? "");
+    return machineIdentifier ? `plex:${machineIdentifier}` : undefined;
+  },
+
   async listLibraries(config: SourceConnectionConfig): Promise<SourceLibrary[]> {
     const libraries = await getLibraries(config.baseUrl, config.credentials.token ?? "");
     return libraries.map((library) => ({
