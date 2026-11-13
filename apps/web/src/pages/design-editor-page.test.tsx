@@ -285,6 +285,19 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     await waitFor(() => expect(previewBodies.at(-1)?.settings.sections.showMore).toBe(false));
   });
 
+  // #359: longer summaries, closer to a book's blurb.
+  it("chooses how long summaries are, and hides the choice with summaries off", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    await user.click(screen.getByText("Item details"));
+    selectOption(screen.getByLabelText("Summary length"), "About 6 lines (100 words)");
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.summaryLength).toBe("long"));
+    await user.click(screen.getByRole("switch", { name: "Summary" }));
+    expect(screen.queryByLabelText("Summary length")).not.toBeInTheDocument();
+  });
+
   it("can turn off grouping a show's episodes", async () => {
     const user = userEvent.setup();
     renderEditor();

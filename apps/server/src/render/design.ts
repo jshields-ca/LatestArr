@@ -86,6 +86,8 @@ export const designSettingsSchema = z.object({
     })
     .prefault({}),
   showLookbackLine: z.boolean().default(true),
+  // How much of each summary to show: about 30, 60 or 100 words (#359).
+  summaryLength: z.enum(["short", "medium", "long"]).default("short"),
   layout: z.enum(["cards", "compact", "grid"]).default("cards"),
   show: z
     .object({
@@ -367,6 +369,12 @@ const REPORT_ICON_DATA_URI =
 // inside an <mj-raw> (mjml silently drops bare HTML in a column). Every
 // value interpolated here comes from validated settings (hex colours, a
 // font from our own catalog), never free text.
+const SUMMARY_VARIABLES: Record<DesignSettings["summaryLength"], string> = {
+  short: "overviewShort",
+  medium: "overviewMedium",
+  long: "overviewLong",
+};
+
 function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFallbackNote: boolean): string {
   const { show } = settings;
   const fallbackNote = withFallbackNote
@@ -431,7 +439,8 @@ function itemMarkup(settings: DesignSettings, p: Palette, font: string, withFall
     lines.push(details(`          <div style="font-size:13px;font-weight:600;color:${p.accent};margin-top:3px;">{{detailsLine}}</div>`));
   }
   if (show.overview) {
-    lines.push(`          {{#if overviewShort}}<div style="font-size:14px;color:${p.text};margin-top:6px;line-height:1.45;">{{overviewShort}}</div>{{/if}}`);
+    const summary = SUMMARY_VARIABLES[settings.summaryLength];
+    lines.push(`          {{#if ${summary}}}<div style="font-size:14px;color:${p.text};margin-top:6px;line-height:1.45;">{{${summary}}}</div>{{/if}}`);
   }
   if (show.dates) {
     lines.push(`          <div style="font-size:12px;color:${p.subtle};margin-top:6px;">Added {{addedAtFormatted}}{{#if releaseDateFormatted}} · Released {{releaseDateFormatted}}{{/if}}</div>`);

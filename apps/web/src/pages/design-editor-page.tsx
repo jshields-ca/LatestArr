@@ -38,6 +38,7 @@ import {
   type DesignCtaPlacement,
   type DesignTextAlign,
   type DesignEmptySection,
+  type DesignSummaryLength,
   type DesignLayout,
   type DesignSettings,
   type DesignSourceButtonPlacement,
@@ -80,6 +81,12 @@ const DETAILS: { key: keyof DesignSettings["show"]; label: string }[] = [
   { key: "details", label: "Runtime, pages, platform, rating" },
   { key: "overview", label: "Summary" },
   { key: "dates", label: "Added and release dates" },
+];
+
+const SUMMARY_LENGTHS: { value: DesignSummaryLength; label: string }[] = [
+  { value: "short", label: "About 2 lines (30 words)" },
+  { value: "medium", label: "About 4 lines (60 words)" },
+  { value: "long", label: "About 6 lines (100 words)" },
 ];
 
 const EMPTY_OPTIONS: { value: DesignEmptySection; label: string }[] = [
@@ -1101,6 +1108,22 @@ export function DesignEditorPage() {
                   }
                 />
               ))}
+              {settings.show.overview ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="design-summary-length">Summary length</Label>
+                  <Select
+                    id="design-summary-length"
+                    value={settings.summaryLength}
+                    onChange={(e) => update((c) => ({ ...c, summaryLength: e.target.value as DesignSummaryLength }))}
+                  >
+                    {SUMMARY_LENGTHS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : null}
             </Section>
 
             <Section title="Sections" summary={sectionsSummary(settings.sections)}>
