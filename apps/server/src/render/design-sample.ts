@@ -62,6 +62,14 @@ function sampleItems(now: Date): NewItem[] {
       title: "Gardens of the North",
       subtitle: "A. Lindqvist",
       contentLabel: "Ebook",
+      // Long enough that each summary length (#359) shows a different amount.
+      overview:
+        "When her grandmother leaves her a crumbling house on a northern island, Ingrid expects to sell it by spring. " +
+        "Instead she finds a walled garden gone wild, a box of letters written in a language she can barely read, and " +
+        "neighbours who remember a version of her family she has never heard. As the light returns and the garden wakes, " +
+        "she pieces together why her grandmother left the island at nineteen and never spoke of it again, and has to " +
+        "decide whether the life she planned is still the one she wants. A quiet, generous novel about inheritance, " +
+        "late beginnings and the patience it takes to make something grow.",
       posterUrl: posterDataUri("#3b7a5b", "Book"),
       pageCount: 288,
       addedAt: new Date(now.getTime() - 3 * DAY),
