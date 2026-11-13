@@ -133,6 +133,42 @@ describe("smtp profile lifecycle", () => {
     expect(getResponse.statusCode).toBe(404);
   });
 
+  // Regression: the newsletters' foreign key has no delete rule, so this
+  // used to fail with a 500 and the email server couldn't be removed.
+  it("deletes an email server that newsletters send through, leaving them with none", async () => {
+    const inUse = await createProfile();
+    const other = await createProfile();
+    const newNewsletter = async (name: string, smtpProfileId: string) =>
+      (
+        await app.inject(
+          authed({ method: "POST", url: "/api/newsletters", payload: { name, scheduleCron: "0 8 * * 1", smtpProfileId } }),
+        )
+      ).json().newsletter.id as string;
+    const weekly = await newNewsletter("Weekly", inUse);
+    const monthly = await newNewsletter("Monthly", inUse);
+    const untouched = await newNewsletter("Other", other);
+
+    const deleteResponse = await app.inject(authed({ method: "DELETE", url: `/api/smtp-profiles/${inUse}` }));
+    expect(deleteResponse.statusCode).toBe(204);
+    expect((await app.inject(authed({ method: "GET", url: `/api/smtp-profiles/${inUse}` }))).statusCode).toBe(404);
+
+    const { newsletters } = (await app.inject(authed({ method: "GET", url: "/api/newsletters" }))).json() as {
+      newsletters: { id: string; smtpProfileId: string | null }[];
+    };
+    const serverOf = (id: string) => newsletters.find((n) => n.id === id)?.smtpProfileId;
+    // They're kept, with no email server until one is chosen.
+    expect(serverOf(weekly)).toBeNull();
+    expect(serverOf(monthly)).toBeNull();
+    expect(serverOf(untouched)).toBe(other);
+  });
+
+  it("answers 204 when the email server is already gone", async () => {
+    const id = await createProfile();
+    await app.inject(authed({ method: "DELETE", url: `/api/smtp-profiles/${id}` }));
+    const again = await app.inject(authed({ method: "DELETE", url: `/api/smtp-profiles/${id}` }));
+    expect(again.statusCode).toBe(204);
+  });
+
   it("test connection decrypts credentials and reaches nodemailer with the real password", async () => {
     const id = await createProfile();
     mockVerify.mockResolvedValueOnce(true);

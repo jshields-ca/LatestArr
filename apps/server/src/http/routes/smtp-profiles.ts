@@ -1,5 +1,5 @@
 import { encrypt } from "@latestarr/crypto";
-import { type Db, smtpProfiles } from "@latestarr/db";
+import { type Db, newsletters, smtpProfiles } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -127,9 +127,26 @@ export function registerSmtpProfileRoutes(app: FastifyInstance, db: Db): void {
     });
 
     scope.delete<{ Params: IdParams }>("/smtp-profiles/:id", async (request, reply) => {
-      const [deleted] = await db.delete(smtpProfiles).where(eq(smtpProfiles.id, request.params.id)).returning();
+      // Newsletters sending through it are left with no email server, not
+      // left blocking the delete: their foreign key has no delete rule, so
+      // deleting one in use used to fail with a 500. They can't send until
+      // one is chosen (the web app says so before confirming), and a
+      // scheduled send that fails for it raises the usual alert.
+      const { deleted, unset } = db.transaction((tx) => {
+        const unset = tx
+          .update(newsletters)
+          .set({ smtpProfileId: null, updatedAt: new Date() })
+          .where(eq(newsletters.smtpProfileId, request.params.id))
+          .returning({ name: newsletters.name })
+          .all();
+        const [deleted] = tx.delete(smtpProfiles).where(eq(smtpProfiles.id, request.params.id)).returning().all();
+        return { deleted, unset };
+      });
       if (deleted) {
-        request.log.info({ smtpProfileId: deleted.id }, `Deleted email server "${deleted.name}"`);
+        request.log.info(
+          { smtpProfileId: deleted.id, newslettersLeftWithout: unset.map((n) => n.name) },
+          `Deleted email server "${deleted.name}"${unset.length > 0 ? `; ${unset.length} newsletter(s) now have no email server` : ""}`,
+        );
         if (loadSystemMail(db).smtpProfileId === deleted.id) {
           saveSystemMail(db, { smtpProfileId: null });
           request.log.warn(`System email is off: its email server "${deleted.name}" was deleted`);
