@@ -1182,6 +1182,25 @@ export function DesignEditorPage() {
                   className="w-32"
                 />
               </div>
+              <SettingRow
+                label="Say how many more"
+                description={
+                  settings.sections.groupByType
+                    ? "A section cut short ends with a line like “+ 12 more books”, linked to the source's Public URL when it has one."
+                    : "A list cut short ends with a line like “+ 12 more”, linked to the source's Public URL when it has one."
+                }
+                htmlFor="design-show-more"
+                className="py-1"
+                control={
+                  <Switch
+                    id="design-show-more"
+                    checked={settings.sections.showMore}
+                    onCheckedChange={(checked) =>
+                      update((c) => ({ ...c, sections: { ...c.sections, showMore: checked } }))
+                    }
+                  />
+                }
+              />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="design-empty">
                   {settings.sections.groupByType ? "When a section has nothing new" : "When there's nothing new"}

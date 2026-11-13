@@ -108,6 +108,8 @@ export const designSettingsSchema = z.object({
       // a "nothing new" line, a link to browse the library (grouped only),
       // or a few random picks from the whole library.
       empty: z.enum(["hide", "message", "link", "random"]).default("message"),
+      // "+ 76 more books" under a section cut short by the limit (#362).
+      showMore: z.boolean().default(true),
       mostWatched: z
         .object({ enabled: z.boolean().default(false), count: z.number().int().min(1).max(20).default(5) })
         .prefault({}),
@@ -517,6 +519,16 @@ function libraryLinkWhenEmpty(
   ].join("\n");
 }
 
+// "+ 76 more books", under a list the limit cut short, linked to the
+// source's Public URL when it has one (#362). The hash matches the list's.
+function moreLine(hash: string, p: Palette, font: string): string {
+  return [
+    `        {{#moreFor ${hash}}}`,
+    `        <mj-text font-family="${font}" font-size="13px" color="${p.muted}" padding-top="0">{{#if url}}<a href="{{url}}" target="_blank" rel="noopener" style="color:${p.link};font-weight:600;text-decoration:none;">{{label}} &rarr;</a>{{else}}{{label}}{{/if}}</mj-text>`,
+    `        {{/moreFor}}`,
+  ].join("\n");
+}
+
 function emptyMessage(p: Palette, font: string): string {
   return `        <mj-text font-family="${font}" font-size="14px" color="${p.muted}">Nothing new this time.</mj-text>`;
 }
@@ -553,9 +565,12 @@ function ungroupedItems(settings: DesignSettings, p: Palette, font: string): str
     `        <mj-raw>`,
     `        ${wrapSectionItems(settings, `${open}\n${card}\n        ${close}`)}`,
     `        </mj-raw>`,
+    settings.sections.showMore ? moreLine(hash, p, font) : "",
     `      </mj-column>`,
     `    </mj-section>`,
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   let whenEmpty: string;
   if (empty === "random") {
@@ -602,6 +617,11 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
       .filter(Boolean)
       .join(" ");
     const card = itemMarkup(settings, p, font, empty === "random");
+    // The list's own hash, less the empty fallback, which never applies
+    // when there's more than fits.
+    const moreHash = [`contentType="${contentType}"`, `count="${limit ?? MAX_SHOWN_ITEMS}"`, groupEpisodes ? `groupEpisodes="true"` : ""]
+      .filter(Boolean)
+      .join(" ");
     const body = [
       `    <mj-section padding="8px 0 4px">`,
       `      <mj-column>`,
@@ -609,6 +629,7 @@ function groupedItems(settings: DesignSettings, p: Palette, font: string): strin
       `        <mj-raw>`,
       `        ${wrapSectionItems(settings, `{{#mediaList ${hash}}}\n${card}\n        {{/mediaList}}`)}`,
       `        </mj-raw>`,
+      settings.sections.showMore ? moreLine(moreHash, p, font) : "",
       empty === "message" ? `        {{#ifAnyItems contentType="${contentType}"}}{{else}}\n${emptyMessage(p, font)}\n        {{/ifAnyItems}}` : "",
       empty === "link" ? libraryLinkWhenEmpty(section, contentType, perSection, p, font, settings.buttons) : "",
       perSection

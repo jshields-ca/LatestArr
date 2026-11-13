@@ -221,6 +221,55 @@ describe("buildDesignMjml", () => {
     });
   });
 
+  // #362: a section cut short says how many more there are.
+  describe("+ N more", () => {
+    const books = Array.from({ length: 8 }, (_, i) => item({ kind: "book", title: `Book ${i}` }));
+    const episodes = ["Show A", "Show A", "Show B", "Show C"].map((title, i) =>
+      item({ kind: "tv_episode", title, subtitle: `E${i}`, id: `ep${i}`, externalId: `ep${i}` }),
+    );
+
+    it("ends a section the limit cut short with how many more, linked to the source's Public URL", async () => {
+      const html = await render(design({ sections: { limit: 5 } }), {
+        items: books,
+        publicLinksByContentType: { book: "https://books.example.com" },
+      });
+      expect(html).toContain("+ 3 more books &rarr;");
+      expect(html).toContain('href="https://books.example.com"');
+    });
+
+    it("shows the count without a link when the source has no Public URL", async () => {
+      const html = await render(design({ sections: { limit: 7 } }), {
+        items: books,
+        sourceLinksByContentType: { book: "http://booklore.lan:6060" },
+      });
+      expect(html).toContain("+ 1 more book");
+      expect(html).not.toContain("&rarr;");
+      expect(html).not.toContain('href="http://booklore.lan:6060"');
+    });
+
+    it("says nothing when everything fits, or when it's switched off", async () => {
+      expect(await render(design({ sections: { limit: 8 } }), { items: books })).not.toContain("more book");
+      expect(await render(design({ sections: { limit: 5, showMore: false } }), { items: books })).not.toContain("more book");
+    });
+
+    it("counts shows in a TV section whose episodes are grouped, and episodes when they aren't", async () => {
+      const grouped = await render(design({ sections: { limit: 1 } }), { items: episodes });
+      expect(grouped).toContain("+ 2 more shows");
+      const separate = await render(design({ sections: { limit: 1, groupEpisodes: false } }), { items: episodes });
+      expect(separate).toContain("+ 3 more episodes");
+    });
+
+    it("uses the design's names, and says just how many in a single mixed list", async () => {
+      const renamed = design({ sections: { limit: 5 }, wording: { sectionNames: { book: { plural: "Novels", singular: "Novel" } } } });
+      expect(await render(renamed, { ...designContentVariables(renamed), items: books })).toContain("+ 3 more novels");
+      const oneList = await render(design({ sections: { groupByType: false, limit: 2 } }), {
+        items: [...books.slice(0, 2), movie, ...books.slice(2)],
+      });
+      // The 7 left out are a film and six books.
+      expect(oneList).toContain("+ 7 more<");
+    });
+  });
+
   it("says there's nothing new when no section would appear", async () => {
     const html = await render(DEFAULT_DESIGN_SETTINGS, { items: [] });
     expect(html).toContain("No new items in this period.");

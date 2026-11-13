@@ -277,13 +277,19 @@ async function fetchPopularItemsFromSources(
 // Each content kind's linked source base URL, for a Media List block's
 // emptyFallback="link" ("nothing new — go browse the library yourself").
 // Cheap: reuses the already-resolved linkedSources, no extra source calls.
-function buildSourceLinksByContentType(linkedSources: LinkedSource[]): Record<string, string> {
+// With publicOnly, only sources with a Public URL count: for "+ 12 more"
+// (#362), which shouldn't send recipients to an address they can't reach.
+function buildSourceLinksByContentType(
+  linkedSources: LinkedSource[],
+  { publicOnly = false }: { publicOnly?: boolean } = {},
+): Record<string, string> {
   const result: Record<string, string> = {};
   for (const { link, source, adapter } of linkedSources) {
     const kinds = (link.mediaTypeFilter as MediaKind[] | undefined) ?? adapter.capabilities.supportsMediaKinds;
     // publicUrl (when set) is the address a recipient can actually reach —
     // baseUrl may be an internal/API-only host (see the source_connections
     // schema comment), so it's only the fallback here, not the default.
+    if (publicOnly && !source.publicUrl) continue;
     const href = source.publicUrl ?? source.baseUrl;
     for (const kind of kinds) {
       if (!(kind in result)) result[kind] = href;
@@ -401,6 +407,7 @@ async function renderNewsletterContent(
     popularItems: popularPlaceholders.items,
     fallbackItems: fallbackPlaceholders.items,
     sourceLinksByContentType: buildSourceLinksByContentType(linkedSources),
+    publicLinksByContentType: buildSourceLinksByContentType(linkedSources, { publicOnly: true }),
     sourceButtons: buildNewsletterSourceButtons(linkedSources),
     generatedAt,
     timeZone: newsletter.timezone,
