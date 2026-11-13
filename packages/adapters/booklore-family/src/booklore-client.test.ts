@@ -106,6 +106,39 @@ describe("getRecentEntries", () => {
   });
 });
 
+// #426: the parser used to turn number-like text into numbers.
+describe("text that looks like a number", () => {
+  it("stays exactly as the feed wrote it, in titles, ids, authors and summaries", async () => {
+    mockFetch.mockResolvedValueOnce(
+      xmlResponse(`<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/terms/">
+  <entry>
+    <title>007</title>
+    <id>0042</id>
+    <updated>2026-01-01T00:00:00Z</updated>
+    <author><name>1e5</name></author>
+    <summary>1.50</summary>
+    <dc:issued>1999</dc:issued>
+  </entry>
+  <entry>
+    <title>1984</title>
+    <id>urn:booklore:book:12</id>
+    <updated>2026-01-02T00:00:00Z</updated>
+  </entry>
+</feed>`),
+    );
+
+    const [first, second] = await getRecentEntries("http://booklore.local:6060", "user", "pass", 10);
+    expect(first!.title).toBe("007");
+    expect(first!.id).toBe("0042");
+    expect(getEntryAuthorName(first!)).toBe("1e5");
+    expect(getEntrySummaryText(first!)).toBe("1.50");
+    expect(first!["dc:issued"]).toBe("1999");
+    expect(second!.title).toBe("1984");
+    expect(typeof second!.title).toBe("string");
+  });
+});
+
 describe("getEntryImageHref", () => {
   it("prefers the full image rel over the thumbnail rel", () => {
     const entry = {

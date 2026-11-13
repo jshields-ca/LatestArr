@@ -80,11 +80,7 @@ function resolvePermalink(href: string, baseUrl: string, webUrl: string): string
 }
 
 function mapEntry(entry: OpdsEntry, baseUrl: string, webUrl: string): NewItem {
-  // See the OpdsEntry["dc:issued"] type comment: this can arrive as a
-  // number (e.g. a bare year like 2020) when the source text node is
-  // purely numeric, and `new Date(2020)` would misinterpret that as a
-  // millisecond timestamp rather than the year 2020.
-  const issued = entry["dc:issued"] !== undefined ? String(entry["dc:issued"]) : undefined;
+  const issued = entry["dc:issued"]?.trim() || undefined;
   // A bare 4-digit year (the only shape dc:issued actually appears in) is
   // parsed as UTC midnight by `new Date("2020")`, which rolls back to the
   // previous year once read back with local-time getters (getFullYear) in

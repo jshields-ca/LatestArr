@@ -116,6 +116,8 @@ describe("fetchRecentItems", () => {
       externalUrl: "http://booklore.local:6060",
     });
     expect(items[0]?.releaseDate?.getFullYear()).toBe(2020);
+    // Read as the text "2020", not the number (#426).
+    expect(typeof items[0]?.title).toBe("string");
   });
 
   describe("externalUrl", () => {
