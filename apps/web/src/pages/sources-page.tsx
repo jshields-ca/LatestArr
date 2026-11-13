@@ -11,7 +11,6 @@ import {
   Pencil,
   Plus,
   Server,
-  Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,7 +33,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { ListRow } from "@/components/list-row";
+import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import { ImportSourceUsersDialog, KINDS_WITH_USER_IMPORT } from "@/components/import-source-users-dialog";
 import { hasSourceLogo, SourceLogo } from "@/components/source-logo";
 import {
@@ -600,8 +599,6 @@ function EditSourceDialog({
 interface RowState {
   testing: boolean;
   testResult: string | null;
-  confirmingDelete: boolean;
-  deleting: boolean;
 }
 
 function SourceRow({
@@ -621,8 +618,6 @@ function SourceRow({
   const [state, setState] = useState<RowState>({
     testing: false,
     testResult: null,
-    confirmingDelete: false,
-    deleting: false,
   });
 
   async function handleTest() {
@@ -645,19 +640,13 @@ function SourceRow({
   }
 
   async function handleDelete() {
-    setState((s) => ({ ...s, deleting: true }));
     try {
       await deleteSource(source.id);
       onDeleted(source.id);
       toast({ variant: "success", title: "Source deleted", description: `${source.name} was removed.` });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to delete.";
-      setState((s) => ({
-        ...s,
-        deleting: false,
-        confirmingDelete: false,
-        testResult: message,
-      }));
+      setState((s) => ({ ...s, testResult: message }));
       toast({ variant: "destructive", title: "Failed to delete source", description: message });
     }
   }
@@ -690,28 +679,7 @@ function SourceRow({
         </>
       }
       actions={
-        !canManage ? null : state.confirmingDelete ? (
-          <>
-            <span className="text-sm text-muted-foreground">Delete this source?</span>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => void handleDelete()}
-              disabled={state.deleting}
-            >
-              {state.deleting ? <Loader2 className="animate-spin" /> : null}
-              Confirm
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setState((s) => ({ ...s, confirmingDelete: false }))}
-              disabled={state.deleting}
-            >
-              Cancel
-            </Button>
-          </>
-        ) : (
+        !canManage ? null : (
           <>
             <Button variant="outline" size="sm" onClick={() => void handleTest()} disabled={state.testing}>
               {state.testing ? <Loader2 className="animate-spin" /> : null}
@@ -721,14 +689,12 @@ function SourceRow({
               <ImportSourceUsersDialog source={source} />
             ) : null}
             <EditSourceDialog source={source} onSaved={onChanged} />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Delete ${source.name}`}
-              onClick={() => setState((s) => ({ ...s, confirmingDelete: true }))}
-            >
-              <Trash2 />
-            </Button>
+            <ConfirmDeleteButton
+              label={`Delete ${source.name}`}
+              noun="source"
+              consequence="Newsletters that use it will stop including its items."
+              onConfirm={handleDelete}
+            />
           </>
         )
       }

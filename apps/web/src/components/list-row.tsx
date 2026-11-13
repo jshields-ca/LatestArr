@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronDown, ChevronRight, Loader2, Trash2 } from "lucide-react";
 
+import { confirmAction } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -88,51 +89,45 @@ export function ListRow({ leading, primary, secondary, actions, expand, children
 }
 
 export interface ConfirmDeleteButtonProps {
+  /** The button's name, which is also the question asked: "Delete Home Plex". */
   label: string;
+  /** What kind of thing it is, for the confirm button: "source" gives "Delete source". */
+  noun: string;
+  /** What else goes or changes with it. Without one, it says the delete can't be undone. */
+  consequence?: ReactNode;
   onConfirm: () => Promise<void>;
-  /** Replaces the default "Delete?" prompt, e.g. to say what else changes. */
-  prompt?: string;
 }
 
 /**
- * A Delete icon button that swaps itself for an inline "Delete? Confirm /
- * Cancel" prompt rather than opening a separate dialog — the pattern
- * Recipients and Templates already shared verbatim before this file existed.
- * Rows whose confirm state also needs to hide *other* trailing actions
- * (Sources' and Email servers' "Test connection", for example) manage that
- * boolean themselves instead of using this component, since it owns its own
- * confirming state.
+ * The one way to delete something from a list (#332): a Delete icon button
+ * that asks in the app's confirmation dialog before doing it. The dialog
+ * names the thing ("Delete Home Plex?"), says what goes with it, and its
+ * button says what it does ("Delete source"). Cancel, Escape or a click
+ * outside leaves everything as it was and returns focus to this button.
  */
-export function ConfirmDeleteButton({ label, onConfirm, prompt = "Delete?" }: ConfirmDeleteButtonProps) {
-  const [confirming, setConfirming] = useState(false);
+export function ConfirmDeleteButton({ label, noun, consequence, onConfirm }: ConfirmDeleteButtonProps) {
   const [deleting, setDeleting] = useState(false);
 
-  if (!confirming) {
-    return (
-      <Button variant="ghost" size="icon" aria-label={label} onClick={() => setConfirming(true)}>
-        <Trash2 />
-      </Button>
-    );
+  async function handleClick() {
+    const confirmed = await confirmAction({
+      title: `${label}?`,
+      description: consequence ?? "This can't be undone.",
+      confirmLabel: `Delete ${noun}`,
+      destructive: true,
+    });
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      // Usually this row is gone by now; it's still here if the delete failed.
+      setDeleting(false);
+    }
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">{prompt}</span>
-      <Button
-        variant="destructive"
-        size="sm"
-        disabled={deleting}
-        onClick={() => {
-          setDeleting(true);
-          void onConfirm();
-        }}
-      >
-        {deleting ? <Loader2 className="animate-spin" /> : null}
-        Confirm
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={deleting}>
-        Cancel
-      </Button>
-    </div>
+    <Button variant="ghost" size="icon" aria-label={label} title={label} disabled={deleting} onClick={() => void handleClick()}>
+      {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
+    </Button>
   );
 }

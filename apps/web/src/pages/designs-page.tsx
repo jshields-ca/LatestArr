@@ -261,9 +261,10 @@ export function DesignsPage() {
                         <ConfirmDeleteButton
                           label={`Delete ${template.name}`}
                           onConfirm={() => remove(template)}
-                          prompt={
+                          noun="design"
+                          consequence={
                             usedBy.length > 0
-                              ? `Delete? ${usedBy.length === 1 ? "Its newsletter" : `Its ${usedBy.length} newsletters`} will use Default.`
+                              ? `${usedBy.length === 1 ? "Its newsletter" : `Its ${usedBy.length} newsletters`} will use Default.`
                               : undefined
                           }
                       />

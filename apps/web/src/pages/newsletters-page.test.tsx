@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { MemoryRouter } from "react-router-dom";
@@ -956,9 +957,12 @@ describe("NewslettersPage", () => {
     renderPage();
     await screen.findByText("Weekly digest");
 
+    render(<ConfirmHost />);
     await user.click(screen.getByRole("button", { name: "Delete Weekly digest" }));
+    // The dialog says what goes with it.
+    expect(await screen.findByRole("alertdialog", { name: "Delete Weekly digest?" })).toHaveTextContent("Its schedule and send history are deleted with it.");
     fetchMock.mockResolvedValueOnce({ status: 204, ok: true, json: () => Promise.resolve(undefined) });
-    await user.click(screen.getByRole("button", { name: "Confirm" }));
+    await user.click(screen.getByRole("button", { name: "Delete newsletter" }));
 
     await waitFor(() => expect(screen.queryByText("Weekly digest")).not.toBeInTheDocument());
     expect(screen.getByText("No newsletters yet")).toBeInTheDocument();
