@@ -40,6 +40,7 @@ Three typefaces, bundled with the app: Plus Jakarta Sans for the interface, News
 - **Saving** follows the one rule in [CONTRIBUTING.md](../CONTRIBUTING.md#saving). Where a panel saves by itself beside a form that doesn't, say so in the panel.
 - **Deleting** uses `ConfirmDeleteButton` with a `noun` and, where anything else changes, a `consequence`. It asks in a dialog titled with the thing ("Delete Home Plex?") whose button names the action ("Delete source"). Check the consequence against what the server and the database's cascades do.
 - **Any other question** uses `confirmAction()`, with a confirm label that names the action.
+- **Changing several rows at once** follows the Recipients table: a checkbox per row and one in the heading, and the actions take the search row's place while anything is ticked, so the list doesn't jump and the filter can't change under a selection. One request does the whole change. A change that can be reversed needs no confirmation; a delete asks with the count.
 - **Collapsible sections** open with a chevron that turns, and show a summary only while closed.
 
 ## Words

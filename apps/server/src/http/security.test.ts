@@ -121,6 +121,7 @@ const ROLE_NEEDED: Record<string, Role> = {
   "GET /api/recipients/imports/latest": "editor",
   "POST /api/recipients": "editor",
   "POST /api/recipients/import": "editor",
+  "POST /api/recipients/bulk": "editor",
   "POST /api/recipients/imports/:id/undo": "editor",
   "GET /api/recipients/:id": "editor",
   "GET /api/recipients/:id/groups": "editor",

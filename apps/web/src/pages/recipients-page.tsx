@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Plus, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,12 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { ImportRecipientsDialog, UndoLastImport } from "@/components/import-recipients-dialog";
 import { ImportFromSourceButton } from "@/components/import-source-users-dialog";
+import { confirmAction } from "@/components/confirm-dialog";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
   ApiError,
   addGroupMember,
+  bulkChangeRecipients,
   createGroup,
   createRecipient,
   deleteGroup,
@@ -39,8 +41,10 @@ import {
   removeGroupMember,
   updateGroup,
   updateRecipient,
+  type BulkRecipientChange,
   type Recipient,
   type RecipientGroup,
+  type RecipientMembership,
 } from "@/lib/api";
 import { compareText, matchesSearch } from "@/lib/text";
 import { cn } from "@/lib/utils";
@@ -55,6 +59,8 @@ interface GroupSync {
   membershipVersion: number;
   groupCreated: (group: RecipientGroup) => void;
   membershipChanged: () => void;
+  /** For a group's own member list, which has already updated itself: only the table's Groups column loads again. */
+  tableMembershipChanged: () => void;
   /** Loads recipients and groups again, e.g. after an import is undone. */
   reload: () => void;
 }
@@ -63,8 +69,18 @@ const GroupSyncContext = createContext<GroupSync>({
   membershipVersion: 0,
   groupCreated: () => {},
   membershipChanged: () => {},
+  tableMembershipChanged: () => {},
   reload: () => {},
 });
+
+// What deleting someone takes with it: their group memberships and their
+// rows in past sends' results both cascade (packages/db schema).
+const DELETE_RECIPIENT_CONSEQUENCE =
+  "They'll be removed from their groups and from the list of who past sends went to, and won't get any more newsletters.";
+
+function recipientCount(count: number): string {
+  return `${count} recipient${count === 1 ? "" : "s"}`;
+}
 
 function AddRecipientDialog({ onCreated }: { onCreated: (recipient: Recipient) => void }) {
   const [open, setOpen] = useState(false);
@@ -443,12 +459,52 @@ function EditRecipientDialog({
   );
 }
 
+// The first two groups as chips and a count of the rest, so a row stays
+// one line however many groups someone is in.
+function GroupChips({ names }: { names: string[] }) {
+  if (names.length === 0) {
+    return (
+      <>
+        <span aria-hidden="true" className="text-muted-foreground">
+          &mdash;
+        </span>
+        <span className="sr-only">No groups</span>
+      </>
+    );
+  }
+  const rest = names.slice(2);
+  return (
+    <ul className="flex min-w-0 items-center gap-1.5">
+      {names.slice(0, 2).map((name, index) => (
+        <li key={index} className="min-w-0">
+          <Badge variant="neutral" className="max-w-full">
+            <span className="truncate">{name}</span>
+          </Badge>
+        </li>
+      ))}
+      {rest.length > 0 ? (
+        <li className="shrink-0 text-xs text-muted-foreground" title={rest.join(", ")}>
+          +{rest.length}
+          <span className="sr-only"> more: {rest.join(", ")}</span>
+        </li>
+      ) : null}
+    </ul>
+  );
+}
+
 function RecipientTableRow({
   recipient,
+  groupNames,
+  selected,
+  onSelectedChange,
   onChanged,
   onDeleted,
 }: {
   recipient: Recipient;
+  /** The groups they're in, by name. */
+  groupNames: string[];
+  selected: boolean;
+  onSelectedChange: (selected: boolean) => void;
   onChanged: (recipient: Recipient) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -472,17 +528,39 @@ function RecipientTableRow({
   }
 
   return (
-    <tr className="border-b border-border last:border-0 hover:bg-accent/30">
-      <td className="max-w-0 py-2.5 pl-4 pr-4">
+    <tr className={cn("border-b border-border last:border-0 hover:bg-accent/30", selected && "bg-accent/40")}>
+      <td className="w-px py-1 pl-2 pr-1">
+        {/* The label is the tap target: 32px around a 16px box. */}
+        <label className="flex size-8 cursor-pointer items-center justify-center">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onSelectedChange(e.target.checked)}
+            aria-label={`Select ${recipient.email}`}
+            className="size-4 cursor-pointer accent-primary"
+          />
+        </label>
+      </td>
+      <td className="max-w-0 py-2.5 pr-4">
         <p className="truncate font-medium">
           {recipient.displayName || <span className="text-muted-foreground">&mdash;</span>}
         </p>
         {/* Phones don't have room for a separate Email column, so the
-            address sits under the name instead. */}
+            address sits under the name instead. Likewise the groups, until
+            the screen is wide enough for their column beside the sidebar. */}
         <p className="truncate text-xs text-muted-foreground sm:hidden">{recipient.email}</p>
+        {groupNames.length > 0 ? (
+          <p className="truncate text-xs text-muted-foreground xl:hidden">
+            <span className="sr-only">Groups: </span>
+            {groupNames.join(", ")}
+          </p>
+        ) : null}
       </td>
       <td className="hidden max-w-0 py-2.5 pr-4 sm:table-cell">
         <p className="truncate text-muted-foreground">{recipient.email}</p>
+      </td>
+      <td className="hidden max-w-0 py-2.5 pr-4 xl:table-cell">
+        <GroupChips names={groupNames} />
       </td>
       <td className="py-2.5 pr-4">
         <div className="flex items-center gap-2">
@@ -504,7 +582,7 @@ function RecipientTableRow({
           <ConfirmDeleteButton
             label={`Delete ${recipient.email}`}
             noun="recipient"
-            consequence="They'll be removed from their groups and won't get any more newsletters."
+            consequence={DELETE_RECIPIENT_CONSEQUENCE}
             onConfirm={() =>
               deleteRecipient(recipient.id)
                 .then(() => {
@@ -587,12 +665,149 @@ function SortableColumnHeader({
   );
 }
 
+// The group filter's value for "in no group at all". Group ids are UUIDs,
+// so this can't be one.
+const NO_GROUP = "none";
+
+// Asks which group, for adding the selected people to one or taking them
+// out of one. A dialog, not a menu that acts as soon as an option is
+// chosen: arrowing through a list shouldn't change anyone's groups.
+function BulkGroupDialog({
+  mode,
+  count,
+  groups,
+  disabled,
+  onConfirm,
+}: {
+  mode: "add" | "remove";
+  count: number;
+  /** The groups offered: for "remove", only those someone selected is in. */
+  groups: RecipientGroup[];
+  disabled: boolean;
+  /** Resolves true once the change is made; the dialog then closes. */
+  onConfirm: (group: RecipientGroup) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [groupId, setGroupId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const selectId = useId();
+  const adding = mode === "add";
+  const action = adding ? "Add to group" : "Remove from group";
+  const group = groups.find((g) => g.id === groupId);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!group) return;
+    setSubmitting(true);
+    try {
+      if (await onConfirm(group)) setOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // With one group to choose from, it's already chosen.
+        if (next) setGroupId(groups.length === 1 ? groups[0]!.id : "");
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button type="button" size="sm" variant="outline" disabled={disabled}>
+          {action}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {adding ? `Add ${recipientCount(count)} to a group` : `Remove ${recipientCount(count)} from a group`}
+          </DialogTitle>
+          <DialogDescription>
+            {adding
+              ? "Anyone already in the group stays in it."
+              : "They stay on the Recipients list, and in their other groups."}
+          </DialogDescription>
+        </DialogHeader>
+        {groups.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {count === 1 ? "They aren't in any groups." : "None of them are in a group."}
+          </p>
+        ) : (
+          <form className="flex flex-col gap-4" onSubmit={(e) => void handleSubmit(e)} noValidate>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={selectId}>Group</Label>
+              <Select id={selectId} value={groupId} onChange={(e) => setGroupId(e.target.value)} disabled={submitting}>
+                <option value="">Select a group...</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={!group || submitting}>
+                {submitting ? <Loader2 className="animate-spin" /> : null}
+                {action}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// What a bulk change did, for its toast. The server counts only the people
+// it changed, so the rest were already that way.
+function bulkOutcome(
+  change: BulkRecipientChange,
+  changed: number,
+  selected: number,
+  groupName: string,
+): { title: string; description?: string } {
+  const rest = selected - changed;
+  const were = rest === 1 ? "was" : "were";
+  switch (change.action) {
+    case "activate":
+    case "deactivate": {
+      const state = change.action === "activate" ? "active" : "inactive";
+      if (changed === 0) return { title: "Nothing to change", description: `Already ${state}.` };
+      return {
+        title: `${recipientCount(changed)} made ${state}`,
+        description: rest > 0 ? `${rest} already ${were}.` : undefined,
+      };
+    }
+    case "addToGroup":
+      if (changed === 0) return { title: "Nothing to change", description: `Already in ${groupName}.` };
+      return {
+        title: `Added ${recipientCount(changed)} to ${groupName}`,
+        description: rest > 0 ? `${rest} ${were} already in it.` : undefined,
+      };
+    case "removeFromGroup":
+      if (changed === 0) return { title: "Nothing to change", description: `Not in ${groupName}.` };
+      return {
+        title: `Removed ${recipientCount(changed)} from ${groupName}`,
+        description: rest > 0 ? `${rest} ${were}n't in it.` : undefined,
+      };
+    case "delete":
+      return { title: `${recipientCount(changed)} deleted` };
+  }
+}
+
 function RecipientsSection({
   recipients,
+  groups,
+  memberships,
   loadError,
   onRecipientsChange,
 }: {
   recipients: Recipient[] | null;
+  groups: RecipientGroup[];
+  memberships: RecipientMembership[];
   loadError: string | null;
   onRecipientsChange: (updater: (prev: Recipient[]) => Recipient[]) => void;
 }) {
@@ -601,9 +816,35 @@ function RecipientsSection({
   // Bumped after an import, so Undo last import looks again.
   const [importVersion, setImportVersion] = useState(0);
   const [query, setQuery] = useState("");
+  // "" for everyone, a group's id, or NO_GROUP.
+  const [groupFilterChoice, setGroupFilterChoice] = useState("");
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<RecipientSortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // Ticked rows, by id (#400). Kept across pages and sorting. The search
+  // and group filter give way to the actions while anyone is ticked, so
+  // they can't change underneath a selection and hide someone in it.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
+
+  const groupsByName = useMemo(() => [...groups].sort((a, b) => compareText(a.name, b.name)), [groups]);
+  // Each person's groups, in name order.
+  const groupsOf = useMemo(() => {
+    const byRecipient = new Map<string, RecipientGroup[]>();
+    for (const group of groupsByName) {
+      for (const membership of memberships) {
+        if (membership.groupId !== group.id) continue;
+        const theirs = byRecipient.get(membership.recipientId);
+        if (theirs) theirs.push(group);
+        else byRecipient.set(membership.recipientId, [group]);
+      }
+    }
+    return byRecipient;
+  }, [groupsByName, memberships]);
+  // A filter on a group that has since been deleted is no filter.
+  const groupFilter =
+    groupFilterChoice === NO_GROUP || groups.some((g) => g.id === groupFilterChoice) ? groupFilterChoice : "";
 
   function handleSort(key: RecipientSortKey) {
     if (key === sortKey) {
@@ -615,8 +856,14 @@ function RecipientsSection({
   }
 
   const filtered = useMemo(
-    () => (recipients ?? []).filter((r) => matchesRecipientQuery(r, query)),
-    [recipients, query],
+    () =>
+      (recipients ?? []).filter((r) => {
+        if (!matchesRecipientQuery(r, query)) return false;
+        if (groupFilter === "") return true;
+        const theirs = groupsOf.get(r.id) ?? [];
+        return groupFilter === NO_GROUP ? theirs.length === 0 : theirs.some((g) => g.id === groupFilter);
+      }),
+    [recipients, query, groupFilter, groupsOf],
   );
   const sorted = useMemo(() => {
     const dir = sortDir === "asc" ? 1 : -1;
@@ -632,6 +879,85 @@ function RecipientsSection({
   const safePage = Math.min(page, totalPages);
   const pageStart = (safePage - 1) * RECIPIENTS_PAGE_SIZE;
   const pageItems = sorted.slice(pageStart, pageStart + RECIPIENTS_PAGE_SIZE);
+
+  const narrowed = query.trim() !== "" || groupFilter !== "";
+  // Only people still in view count as selected, whatever the set holds.
+  const selectedRecipients = useMemo(() => filtered.filter((r) => selected.has(r.id)), [filtered, selected]);
+  const selectedCount = selectedRecipients.length;
+  const pageSelectedCount = pageItems.filter((r) => selected.has(r.id)).length;
+  const pageAllSelected = pageItems.length > 0 && pageSelectedCount === pageItems.length;
+  // For "Remove from group": the groups at least one selected person is in.
+  const selectedGroups = groupsByName.filter((group) =>
+    selectedRecipients.some((r) => groupsOf.get(r.id)?.some((g) => g.id === group.id)),
+  );
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = pageSelectedCount > 0 && !pageAllSelected;
+  }, [pageSelectedCount, pageAllSelected]);
+
+  // The actions take the search row's place while anyone is selected. When
+  // they go, whatever had focus among them goes too; put it on the table's
+  // own checkbox rather than leave it nowhere.
+  const hadSelection = useRef(false);
+  useEffect(() => {
+    const lostFocus = !document.activeElement || document.activeElement === document.body;
+    if (hadSelection.current && selectedCount === 0 && lostFocus) {
+      (selectAllRef.current ?? document.getElementById("main-content"))?.focus();
+    }
+    hadSelection.current = selectedCount > 0;
+  }, [selectedCount]);
+
+  function togglePageSelection() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const r of pageItems) {
+        if (pageAllSelected) next.delete(r.id);
+        else next.add(r.id);
+      }
+      return next;
+    });
+  }
+
+  function setRowSelected(id: string, isSelected: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (isSelected) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  // One request for the whole selection. True once it's done.
+  async function runBulk(change: BulkRecipientChange, groupName = ""): Promise<boolean> {
+    setBulkBusy(true);
+    try {
+      const { changed } = await bulkChangeRecipients(change);
+      toast({ variant: "success", ...bulkOutcome(change, changed, change.ids.length, groupName) });
+      if (change.action === "delete") setSelected(new Set());
+      groupSync.reload();
+      return true;
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't change the selected recipients",
+        description: err instanceof ApiError ? err.message : undefined,
+      });
+      return false;
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function deleteSelected() {
+    const ids = selectedRecipients.map((r) => r.id);
+    const confirmed = await confirmAction({
+      title: `Delete ${recipientCount(ids.length)}?`,
+      description: `${DELETE_RECIPIENT_CONSEQUENCE} This can't be undone.`,
+      confirmLabel: `Delete ${recipientCount(ids.length)}`,
+      destructive: true,
+    });
+    if (confirmed) await runBulk({ action: "delete", ids });
+  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -683,33 +1009,155 @@ function RecipientsSection({
 
       {recipients && recipients.length > 0 ? (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-            <div className="relative sm:max-w-xs sm:flex-1">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <Input
-                type="search"
-                aria-label="Search recipients by name or email"
-                placeholder="Search by name or email..."
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setPage(1);
-                }}
-                className="pl-9"
-              />
+          {/* Says the count to a screen reader as boxes are ticked; the
+              actions themselves appear above the table, out of its way. */}
+          <p className="sr-only" aria-live="polite">
+            {selectedCount > 0 ? `${selectedCount} selected` : ""}
+          </p>
+          {selectedCount > 0 ? (
+            // In the search row's place and, from laptop width up, the same
+            // height: ticking the first box doesn't push the table down
+            // from under the pointer. Narrower, the buttons wrap.
+            <div
+              role="group"
+              aria-label="Change the selected recipients"
+              className="flex min-h-9 flex-wrap items-center gap-2"
+            >
+              <p className="text-sm font-medium">{selectedCount} selected</p>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="size-8"
+                aria-label="Clear selection"
+                title="Clear selection"
+                onClick={() => setSelected(new Set())}
+              >
+                <X />
+              </Button>
+              {pageAllSelected && selectedCount < filtered.length ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="link"
+                  className="px-1 text-tertiary"
+                  onClick={() => setSelected(new Set(filtered.map((r) => r.id)))}
+                >
+                  Select all {filtered.length}
+                  {narrowed ? " that match" : ""}
+                </Button>
+              ) : null}
+              <div className="contents lg:ml-auto lg:flex lg:items-center lg:gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkBusy}
+                  onClick={() => void runBulk({ action: "activate", ids: selectedRecipients.map((r) => r.id) })}
+                >
+                  Make active
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkBusy}
+                  onClick={() => void runBulk({ action: "deactivate", ids: selectedRecipients.map((r) => r.id) })}
+                >
+                  Make inactive
+                </Button>
+                {groups.length > 0 ? (
+                  <>
+                    <BulkGroupDialog
+                      mode="add"
+                      count={selectedCount}
+                      groups={groupsByName}
+                      disabled={bulkBusy}
+                      onConfirm={(group) =>
+                        runBulk(
+                          { action: "addToGroup", ids: selectedRecipients.map((r) => r.id), groupId: group.id },
+                          group.name,
+                        )
+                      }
+                    />
+                    <BulkGroupDialog
+                      mode="remove"
+                      count={selectedCount}
+                      groups={selectedGroups}
+                      disabled={bulkBusy}
+                      onConfirm={(group) =>
+                        runBulk(
+                          { action: "removeFromGroup", ids: selectedRecipients.map((r) => r.id), groupId: group.id },
+                          group.name,
+                        )
+                      }
+                    />
+                  </>
+                ) : null}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkBusy}
+                  onClick={() => void deleteSelected()}
+                >
+                  <Trash2 />
+                  Delete
+                </Button>
+              </div>
             </div>
-            <p className="shrink-0 text-sm text-muted-foreground">
-              {query.trim()
-                ? `${filtered.length} of ${recipients.length} match`
-                : `${recipients.length} recipient${recipients.length === 1 ? "" : "s"}`}
-            </p>
-          </div>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <div className="relative sm:w-64">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  type="search"
+                  aria-label="Search recipients by name or email"
+                  placeholder="Search by name or email..."
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(1);
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              {groups.length > 0 ? (
+                <Select
+                  aria-label="Show recipients in"
+                  value={groupFilter}
+                  onChange={(e) => {
+                    setGroupFilterChoice(e.target.value);
+                    setPage(1);
+                  }}
+                  className="sm:w-48"
+                >
+                  <option value="">All groups</option>
+                  {groupsByName.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                  <option value={NO_GROUP}>Not in a group</option>
+                </Select>
+              ) : null}
+              <p className="shrink-0 text-sm text-muted-foreground sm:ml-auto">
+                {narrowed ? `${filtered.length} of ${recipients.length} match` : recipientCount(recipients.length)}
+              </p>
+            </div>
+          )}
 
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recipients match "{query.trim()}".</p>
+            <p className="text-sm text-muted-foreground">
+              {query.trim()
+                ? `No recipients match "${query.trim()}"${groupFilter ? " with this group filter" : ""}.`
+                : groupFilter === NO_GROUP
+                  ? "Everyone is in at least one group."
+                  : "Nobody is in this group yet."}
+            </p>
           ) : (
             <>
               <div className="overflow-x-auto rounded-lg border border-border">
@@ -717,13 +1165,25 @@ function RecipientsSection({
                   <caption className="sr-only">Recipients</caption>
                   <thead>
                     <tr className="border-b border-border bg-muted/30 text-xs">
+                      <th scope="col" className="w-px py-1 pl-2 pr-1">
+                        <label className="flex size-8 cursor-pointer items-center justify-center">
+                          <input
+                            ref={selectAllRef}
+                            type="checkbox"
+                            checked={pageAllSelected}
+                            onChange={togglePageSelection}
+                            aria-label={totalPages > 1 ? "Select everyone on this page" : "Select everyone"}
+                            className="size-4 cursor-pointer accent-primary"
+                          />
+                        </label>
+                      </th>
                       <SortableColumnHeader
                         label="Name"
                         sortKey="name"
                         activeSortKey={sortKey}
                         sortDir={sortDir}
                         onSort={handleSort}
-                        className="px-4 py-2.5 sm:w-2/5"
+                        className="py-2.5 pr-4 sm:w-2/5 xl:w-1/4"
                       />
                       <SortableColumnHeader
                         label="Email"
@@ -731,8 +1191,11 @@ function RecipientsSection({
                         activeSortKey={sortKey}
                         sortDir={sortDir}
                         onSort={handleSort}
-                        className="hidden w-2/5 py-2.5 sm:table-cell"
+                        className="hidden w-2/5 py-2.5 pr-4 sm:table-cell xl:w-[30%]"
                       />
+                      <th scope="col" className="hidden py-2.5 pr-4 font-medium text-muted-foreground xl:table-cell">
+                        Groups
+                      </th>
                       <SortableColumnHeader
                         label="Status"
                         sortKey="status"
@@ -751,6 +1214,9 @@ function RecipientsSection({
                       <RecipientTableRow
                         key={recipient.id}
                         recipient={recipient}
+                        groupNames={(groupsOf.get(recipient.id) ?? []).map((g) => g.name)}
+                        selected={selected.has(recipient.id)}
+                        onSelectedChange={(isSelected) => setRowSelected(recipient.id, isSelected)}
                         onChanged={(updated) =>
                           onRecipientsChange((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
                         }
@@ -969,7 +1435,7 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
   const [members, setMembers] = useState<Recipient[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const { membershipVersion } = useContext(GroupSyncContext);
+  const { membershipVersion, tableMembershipChanged } = useContext(GroupSyncContext);
 
   // Reloads when the edit panel changes anyone's groups. The current list
   // stays up while it does, and a slower earlier load can't overwrite it.
@@ -1007,6 +1473,7 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
     try {
       await addGroupMember(groupId, recipientId);
       if (added) setMembers((prev) => (prev?.some((m) => m.id === added.id) ? prev : [...(prev ?? []), added]));
+      tableMembershipChanged();
       toast({ variant: "success", title: "Member added to group", description: added?.displayName || added?.email });
     } catch (err) {
       toast({
@@ -1022,6 +1489,7 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
     try {
       await removeGroupMember(groupId, recipientId);
       setMembers((prev) => (prev ?? []).filter((m) => m.id !== recipientId));
+      tableMembershipChanged();
       toast({ variant: "success", title: "Member removed from group" });
     } catch (err) {
       toast({
@@ -1203,6 +1671,8 @@ function GroupsSection({
 
 export function RecipientsPage() {
   const [recipients, setRecipients] = useState<Recipient[] | null>(null);
+  // Who is in which group, for the table's Groups column and filter.
+  const [memberships, setMemberships] = useState<RecipientMembership[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [groups, setGroups] = useState<RecipientGroup[] | null>(null);
@@ -1210,11 +1680,29 @@ export function RecipientsPage() {
   const [membershipVersion, setMembershipVersion] = useState(0);
 
   const [loadVersion, setLoadVersion] = useState(0);
+  // Bumped when anyone's groups change, to load the table's memberships again.
+  const [tableVersion, setTableVersion] = useState(0);
+
+  // The list stays up while it loads again, and a slower earlier load
+  // can't overwrite a newer one.
+  useEffect(() => {
+    let current = true;
+    listRecipients()
+      .then(({ recipients: loaded, memberships: loadedMemberships }) => {
+        if (!current) return;
+        setRecipients(loaded);
+        setMemberships(loadedMemberships);
+        setLoadError(null);
+      })
+      .catch((err) => {
+        if (current) setLoadError(err instanceof ApiError ? err.message : "Failed to load recipients.");
+      });
+    return () => {
+      current = false;
+    };
+  }, [loadVersion, tableVersion]);
 
   useEffect(() => {
-    listRecipients()
-      .then(({ recipients: loaded }) => setRecipients(loaded))
-      .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load recipients."));
     listGroups()
       .then(({ groups: loaded }) => setGroups(loaded))
       .catch((err) => setGroupsLoadError(err instanceof ApiError ? err.message : "Failed to load groups."));
@@ -1225,7 +1713,11 @@ export function RecipientsPage() {
       membershipVersion,
       groupCreated: (group) =>
         setGroups((prev) => (prev && !prev.some((g) => g.id === group.id) ? [...prev, group] : prev)),
-      membershipChanged: () => setMembershipVersion((v) => v + 1),
+      membershipChanged: () => {
+        setMembershipVersion((v) => v + 1);
+        setTableVersion((v) => v + 1);
+      },
+      tableMembershipChanged: () => setTableVersion((v) => v + 1),
       reload: () => {
         setLoadVersion((v) => v + 1);
         setMembershipVersion((v) => v + 1);
@@ -1241,6 +1733,8 @@ export function RecipientsPage() {
 
         <RecipientsSection
           recipients={recipients}
+          groups={groups ?? []}
+          memberships={memberships}
           loadError={loadError}
           onRecipientsChange={(updater) => setRecipients((prev) => updater(prev ?? []))}
         />

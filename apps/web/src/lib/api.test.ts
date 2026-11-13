@@ -24,6 +24,7 @@ import {
   getTemplate,
   listGroups,
   listNewsletters,
+  bulkChangeRecipients,
   listRecipients,
   listSendRuns,
   listSmtpProfiles,
@@ -200,9 +201,22 @@ const exampleGroup = {
 };
 
 describe("recipients", () => {
-  it("lists recipients", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [exampleRecipient] }));
-    await expect(listRecipients()).resolves.toEqual({ recipients: [exampleRecipient] });
+  it("lists recipients, with who is in which group", async () => {
+    const memberships = [{ recipientId: "r1", groupId: "g1" }];
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [exampleRecipient], memberships }));
+    await expect(listRecipients()).resolves.toEqual({ recipients: [exampleRecipient], memberships });
+  });
+
+  it("changes several recipients in one request", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { changed: 1, requested: 2 }));
+    await expect(bulkChangeRecipients({ action: "addToGroup", ids: ["r1", "r2"], groupId: "g1" })).resolves.toEqual({
+      changed: 1,
+      requested: 2,
+    });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("/api/recipients/bulk");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ action: "addToGroup", ids: ["r1", "r2"], groupId: "g1" });
   });
 
   it("creates a recipient", async () => {
