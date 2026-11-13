@@ -204,6 +204,45 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     expect(JSON.parse(patch[1].body as string)).toMatchObject({ name: "Plex dark", settings: { layout: "grid" } });
   });
 
+  // #332: on a phone there's room for one column, so a switch chooses it.
+  // (jsdom has no screen width, so both the switch and its effect show.)
+  it("switches a narrow screen between the options and the preview, keeping each one's scroll position", async () => {
+    const user = userEvent.setup();
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const scrolledTo = (y: number) => Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+    renderEditor();
+    const frame = await screen.findByTitle("Design preview");
+
+    const optionsColumn = screen.getByText("Colours and font").closest("details")!.parentElement!;
+    const previewColumn = frame.closest("div.min-w-0")!;
+    const show = within(screen.getByRole("group", { name: "Show" }));
+    expect(show.getByRole("button", { name: "Options" })).toHaveAttribute("aria-pressed", "true");
+    // Options first: the preview waits its turn below the two-column width.
+    expect(optionsColumn).toHaveClass("flex");
+    expect(previewColumn).toHaveClass("hidden", "lg:flex");
+
+    // Halfway down the options, then over to the preview, which starts at its top.
+    scrolledTo(900);
+    await user.click(show.getByRole("button", { name: "Preview" }));
+    expect(show.getByRole("button", { name: "Preview" })).toHaveAttribute("aria-pressed", "true");
+    expect(previewColumn).toHaveClass("flex");
+    expect(optionsColumn).toHaveClass("hidden", "lg:flex");
+    await waitFor(() => expect(scrollTo).toHaveBeenLastCalledWith({ top: 0 }));
+
+    // Back to the options, at the place they were left.
+    scrolledTo(120);
+    await user.click(show.getByRole("button", { name: "Options" }));
+    expect(optionsColumn).toHaveClass("flex");
+    await waitFor(() => expect(scrollTo).toHaveBeenLastCalledWith({ top: 900 }));
+
+    // And the preview remembers where it was, too.
+    await user.click(show.getByRole("button", { name: "Preview" }));
+    await waitFor(() => expect(scrollTo).toHaveBeenLastCalledWith({ top: 120 }));
+
+    scrollTo.mockRestore();
+    scrolledTo(0);
+  });
+
   it("previews against a real newsletter when one is chosen", async () => {
     const user = userEvent.setup();
     renderEditor();

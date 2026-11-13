@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Loader2, Plus, Save, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronRight, Code, Eye, Loader2, Plus, Save, SlidersHorizontal, X } from "lucide-react";
 
 import { DesignCodeReference } from "@/components/design-code-reference";
 import { DesignLogoFields } from "@/components/design-logo-fields";
@@ -215,6 +215,38 @@ function Section({
       </summary>
       <div className="flex flex-col gap-3 border-t border-border px-4 py-3">{children}</div>
     </details>
+  );
+}
+
+type NarrowView = "options" | "preview";
+
+// Shown only below the two-column width: the editor's options and its
+// preview don't fit side by side on a phone, and stacked, the preview sat
+// under some 2,500px of options. It sticks under the app's header, so the
+// other view is always one tap away.
+function NarrowViewSwitch({ view, onChange, optionsLabel }: { view: NarrowView; onChange: (view: NarrowView) => void; optionsLabel: string }) {
+  const views: { value: NarrowView; label: string; Icon: typeof Eye }[] = [
+    { value: "options", label: optionsLabel, Icon: SlidersHorizontal },
+    { value: "preview", label: "Preview", Icon: Eye },
+  ];
+  return (
+    <div className="sticky top-[calc(3.5rem+3px)] z-10 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur lg:hidden">
+      <div role="group" aria-label="Show" className="grid grid-cols-2 gap-1 rounded-md border border-input p-0.5">
+        {views.map(({ value, label, Icon }) => (
+          <Button
+            key={value}
+            type="button"
+            size="sm"
+            variant={view === value ? "secondary" : "ghost"}
+            aria-pressed={view === value}
+            onClick={() => onChange(value)}
+          >
+            <Icon />
+            {label}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -491,6 +523,23 @@ export function DesignEditorPage() {
   const [previewing, setPreviewing] = useState(false);
   const previewRequest = useRef(0);
   const [previewScheme, setPreviewScheme] = usePreviewScheme();
+  // Below the two-column width there's room for one column at a time, so a
+  // switch at the top chooses it (#332). Each view keeps its own scroll
+  // position: checking the preview and coming back lands on the option
+  // being edited, not at the top of a long list.
+  const [narrowView, setNarrowView] = useState<NarrowView>("options");
+  const scrollByView = useRef<Record<NarrowView, number>>({ options: 0, preview: 0 });
+  const narrowViewShown = useRef(narrowView);
+  function showNarrowView(next: NarrowView) {
+    if (next === narrowView) return;
+    scrollByView.current[narrowView] = window.scrollY;
+    setNarrowView(next);
+  }
+  useEffect(() => {
+    if (narrowViewShown.current === narrowView) return;
+    narrowViewShown.current = narrowView;
+    window.scrollTo({ top: scrollByView.current[narrowView] });
+  }, [narrowView]);
 
   const dirty = settings !== null && snapshotOf(name, settings, mode, code) !== savedSnapshot;
   const ctasComplete = settings?.content.ctas.every(isCompleteCta) ?? true;
@@ -865,6 +914,8 @@ export function DesignEditorPage() {
         </p>
       ) : null}
 
+      <NarrowViewSwitch view={narrowView} onChange={showNarrowView} optionsLabel={mode === "code" ? "Code" : "Options"} />
+
       <div
         className={cn(
           "grid gap-4",
@@ -872,7 +923,7 @@ export function DesignEditorPage() {
         )}
       >
         {mode === "code" ? (
-          <fieldset disabled={!canEdit} className="flex min-w-0 flex-col gap-3">
+          <fieldset disabled={!canEdit} className={cn("min-w-0 flex-col gap-3", narrowView === "options" ? "flex" : "hidden lg:flex")}>
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Email markup (MJML)</span>
               <Suspense
@@ -928,7 +979,7 @@ export function DesignEditorPage() {
             </Section>
           </fieldset>
         ) : (
-          <fieldset disabled={!canEdit} className="flex min-w-0 flex-col gap-3">
+          <fieldset disabled={!canEdit} className={cn("min-w-0 flex-col gap-3", narrowView === "options" ? "flex" : "hidden lg:flex")}>
             <Section title="Colours and font" summary={fontLabel(settings.font)} defaultOpen>
               <div className="grid grid-cols-2 gap-3">
                 {COLORS.map(({ key, label }) => (
@@ -1187,7 +1238,14 @@ export function DesignEditorPage() {
           </fieldset>
         )}
 
-        <div className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-4 lg:self-start">
+        {/* On a wide screen it sticks just below the app's header (3.5rem
+            and its 3px stripe); `top-4` alone slid its controls under it. */}
+        <div
+          className={cn(
+            "min-w-0 flex-col gap-2 lg:sticky lg:top-[calc(3.5rem+3px+1rem)] lg:self-start",
+            narrowView === "preview" ? "flex" : "hidden lg:flex",
+          )}
+        >
           <div className="flex flex-wrap items-center gap-2">
             <Label htmlFor="design-preview-source">Preview with</Label>
             <Select
@@ -1214,7 +1272,7 @@ export function DesignEditorPage() {
             </p>
           ) : null}
           {previewHtml !== null ? (
-            <EmailPreviewFrame title="Design preview" html={previewHtml} scheme={previewScheme} className="h-[75dvh]" />
+            <EmailPreviewFrame title="Design preview" html={previewHtml} scheme={previewScheme} className="h-[70dvh] lg:h-[75dvh]" />
           ) : (
             <div className="flex h-40 items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
               Building preview...
