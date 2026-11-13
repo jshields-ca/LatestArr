@@ -30,10 +30,8 @@ export interface OpdsEntry {
   // BookOrbit puts the description here instead of <summary>, as
   // <content type="text">...</content> (or an empty <content type="text"/>).
   content?: string | { "#text"?: string };
-  // fast-xml-parser coerces a purely-numeric text node (e.g. a bare
-  // publication year like "2020") into a JS number, not a string — callers
-  // must stringify before treating this as a date string.
-  "dc:issued"?: string | number;
+  // A bare publication year ("2020") as often as a full date.
+  "dc:issued"?: string;
   // An entry typically carries several <link> elements (self, alternate,
   // acquisition, image, image/thumbnail, ...) — see getEntryImageHref and
   // getEntryFormatLabel below for what this is used for.
@@ -46,7 +44,16 @@ interface RawOpdsFeed {
   };
 }
 
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+// Text stays text (#426). By default the parser turns a text node that
+// looks like a number into one, so a book titled "007" arrived as 7 and
+// "1.50" as 1.5. Attribute values are already left as strings by default;
+// it's set here too so a parser upgrade can't change that.
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: "@_",
+  parseTagValue: false,
+  parseAttributeValue: false,
+});
 
 export function getEntryAuthorName(entry: OpdsEntry): string | undefined {
   const author = Array.isArray(entry.author) ? entry.author[0] : entry.author;
