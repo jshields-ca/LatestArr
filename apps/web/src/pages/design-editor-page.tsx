@@ -432,6 +432,18 @@ function ContrastNotes({ settings, buttons }: { settings: DesignSettings; button
 // Up to 4 {label, url} buttons. An incomplete row says what it's missing
 // and holds back Save (and is left out of the preview) until it's done.
 function CtaRows({ ctas, onChange }: { ctas: DesignCta[]; onChange: (ctas: DesignCta[]) => void }) {
+  // Moves a button (#401), and keeps focus on its arrow at the new place, or
+  // on the other arrow once it reaches the top or bottom.
+  function move(index: number, direction: -1 | 1) {
+    const to = index + direction;
+    const next = [...ctas];
+    [next[index], next[to]] = [next[to]!, next[index]!];
+    onChange(next);
+    const atEnd = to === 0 || to === ctas.length - 1;
+    const arrow = atEnd ? (direction === -1 ? "down" : "up") : direction === -1 ? "up" : "down";
+    requestAnimationFrame(() => document.getElementById(`design-cta-${arrow}-${to}`)?.focus());
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {ctas.length === 0 ? (
@@ -441,6 +453,8 @@ function CtaRows({ ctas, onChange }: { ctas: DesignCta[]; onChange: (ctas: Desig
           {ctas.map((cta, index) => {
             const incomplete = !isCompleteCta(cta);
             const hintId = `design-cta-hint-${index}`;
+            // Named by the label when it has one, so "Move Request a film up".
+            const name = cta.label.trim() || `button ${index + 1}`;
             return (
               <li key={index} className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -452,6 +466,34 @@ function CtaRows({ ctas, onChange }: { ctas: DesignCta[]; onChange: (ctas: Desig
                     aria-describedby={incomplete ? hintId : undefined}
                     className="min-w-0 flex-1"
                   />
+                  {ctas.length > 1 ? (
+                    <span className="flex">
+                      <Button
+                        id={`design-cta-up-${index}`}
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Move ${name} up`}
+                        title="Move up"
+                        disabled={index === 0}
+                        onClick={() => move(index, -1)}
+                      >
+                        <ArrowUp />
+                      </Button>
+                      <Button
+                        id={`design-cta-down-${index}`}
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Move ${name} down`}
+                        title="Move down"
+                        disabled={index === ctas.length - 1}
+                        onClick={() => move(index, 1)}
+                      >
+                        <ArrowDown />
+                      </Button>
+                    </span>
+                  ) : null}
                   <Button
                     type="button"
                     variant="ghost"
