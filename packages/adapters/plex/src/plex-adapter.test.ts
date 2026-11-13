@@ -64,6 +64,19 @@ describe("listLibraries", () => {
   });
 });
 
+describe("getServerId", () => {
+  it("reports the server's machine identifier, as a Tautulli watching it does", async () => {
+    mockIdentity("srv-abc123");
+    await expect(plexAdapter.getServerId!(config)).resolves.toBe("plex:srv-abc123");
+    expect(String(mockFetch.mock.calls[0]![0])).toContain("/identity");
+  });
+
+  it("says it doesn't know when the server reports no identifier", async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: {} }));
+    await expect(plexAdapter.getServerId!(config)).resolves.toBeUndefined();
+  });
+});
+
 describe("listUsers", () => {
   it("maps accounts to SourceUser with no email, and drops the local account (id 0)", async () => {
     mockFetch.mockResolvedValueOnce(

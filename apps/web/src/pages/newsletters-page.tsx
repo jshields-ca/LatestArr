@@ -287,6 +287,10 @@ function LinkedSources({
   const [error, setError] = useState<string | null>(null);
 
   const availableToAdd = allSources.filter((s) => !sources.some((linked) => linked.id === s.id));
+  // A Plex server and the Tautulli watching it return the same new items.
+  // The server lists each once (#391); say so, since people link both on
+  // purpose (Tautulli adds Most watched) and might expect doubles.
+  const plexAndTautulli = sources.some((s) => s.kind === "plex") && sources.some((s) => s.kind === "tautulli");
 
   async function handleAdd() {
     if (!selectedId) return;
@@ -350,6 +354,12 @@ function LinkedSources({
           ))}
         </ul>
       )}
+      {plexAndTautulli ? (
+        <p className="text-xs text-muted-foreground">
+          If Plex and Tautulli here read the same server, each new item is listed once, with Plex's details and
+          links. Tautulli still provides Most watched.
+        </p>
+      ) : null}
       {availableToAdd.length > 0 ? (
         <div className="flex items-center gap-2">
           <Select

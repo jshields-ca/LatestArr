@@ -437,6 +437,34 @@ describe("NewslettersPage", () => {
     240000,
   );
 
+  // #391: both are linked on purpose, and each new item is listed once.
+  it("says each item is listed once when a newsletter links both Plex and Tautulli", async () => {
+    const user = userEvent.setup();
+    const linked = { ...tautulliSource, mediaTypeFilter: null, libraryFilter: null };
+    const plex = { ...linked, id: "s-plex", name: "Home Plex", kind: "plex" };
+    const detail = (sources: unknown[]) =>
+      jsonResponse(200, { newsletter: weeklyDigest, sources, recipientGroups: [] });
+    const routes = (sources: unknown[]) =>
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/sources": jsonResponse(200, { sources: [tautulliSource] }),
+        "/api/newsletters/n1": detail(sources),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      });
+
+    mockRoutes(routes([linked]));
+    const { unmount } = renderPage();
+    await user.click(await screen.findByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    await screen.findByLabelText("Remove Home Tautulli from newsletter");
+    expect(screen.queryByText(/each new item is listed once/)).not.toBeInTheDocument();
+    unmount();
+
+    mockRoutes(routes([linked, plex]));
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    expect(await screen.findByText(/each new item is listed once, with Plex's details and links/)).toBeInTheDocument();
+  });
+
   it("sends now from the collapsed row, without expanding it first", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));
