@@ -4,6 +4,7 @@ import { KeyRound, Loader2, Pencil, Plus, Send } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
@@ -781,10 +782,7 @@ export function SmtpProfilesPage() {
       ) : null}
 
       {profiles === null && !loadError ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading email servers...
-        </div>
+        <ListSkeleton label="Loading email servers..." />
       ) : null}
 
       {profiles && profiles.length === 0 ? (

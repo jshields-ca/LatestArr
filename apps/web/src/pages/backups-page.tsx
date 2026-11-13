@@ -19,6 +19,7 @@ import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { formatDateTime } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CardsSkeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -486,10 +487,7 @@ export function BackupsPage() {
       ) : null}
 
       {overview === null && !loadError ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading backups...
-        </div>
+        <CardsSkeleton label="Loading backups..." cards={[3, 4]} />
       ) : null}
 
       {overview ? (

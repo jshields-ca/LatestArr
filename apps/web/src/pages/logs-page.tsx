@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { LoadingPlaceholder, Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { ApiError, listLogs, type LogEntry } from "@/lib/api";
@@ -187,10 +188,14 @@ export function LogsPage() {
       ) : null}
 
       {logs === null && !error ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading logs...
-        </div>
+        <LoadingPlaceholder
+          label="Loading logs..."
+          className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 shadow-inner"
+        >
+          {["w-3/4", "w-1/2", "w-2/3", "w-5/6", "w-1/2", "w-3/5", "w-3/4", "w-2/5", "w-2/3", "w-1/2"].map((width, i) => (
+            <Skeleton key={i} className={cn("h-3 bg-zinc-800", width)} />
+          ))}
+        </LoadingPlaceholder>
       ) : null}
 
       {logs && logs.length === 0 ? (

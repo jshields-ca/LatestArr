@@ -12,6 +12,7 @@ import { SourceLogo } from "@/components/source-logo";
 import { SubjectField } from "@/components/subject-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -1282,10 +1283,7 @@ export function NewslettersPage() {
       ) : null}
 
       {newsletters === null && !loadError ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading newsletters...
-        </div>
+        <ListSkeleton label="Loading newsletters..." />
       ) : null}
 
       {newsletters && newsletters.length === 0 ? (

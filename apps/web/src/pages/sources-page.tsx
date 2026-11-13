@@ -17,6 +17,7 @@ import {
 import { useHasRole } from "@/components/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -748,10 +749,7 @@ export function SourcesPage() {
       ) : null}
 
       {sources === null && !loadError ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading sources...
-        </div>
+        <ListSkeleton label="Loading sources..." />
       ) : null}
 
       {sources && sources.length === 0 ? (

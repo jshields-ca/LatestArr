@@ -5,6 +5,7 @@ import { useHasRole } from "@/components/auth-provider";
 import { DateTime } from "@/components/date-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LinesSkeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -317,10 +318,7 @@ export function SendRunHistoryList({
 
   if (runs === null) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Loading send history...
-      </div>
+      <LinesSkeleton label="Loading send history..." />
     );
   }
 
