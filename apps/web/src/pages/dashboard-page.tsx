@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Circle,
   ListChecks,
-  Loader2,
   Mail,
   Palette,
   Send,
@@ -18,6 +17,7 @@ import { useHasRole } from "@/components/auth-provider";
 import { SendRunHistoryList } from "@/components/send-run-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { LoadingPlaceholder, Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import {
@@ -128,6 +128,52 @@ function CardIconChip({
     >
       <Icon className={iconSize} aria-hidden="true" />
     </span>
+  );
+}
+
+// The dashboard as it is once set up: the title, the checklist's one-line
+// summary (admins), the tiles and Recent sends. A first run shows the
+// checklist instead of the tiles, and settles when it loads.
+function DashboardSkeleton({ showChecklist, tiles }: { showChecklist: boolean; tiles: number }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Dashboard" description={<Skeleton className="my-0.5 h-4 w-72 max-w-full" />} />
+      <LoadingPlaceholder label="Loading dashboard..." className="flex flex-col gap-6">
+        {showChecklist ? (
+          <Card>
+            <div className="flex items-center gap-3 px-6 py-4">
+              <Skeleton className="size-9 rounded-lg" />
+              <Skeleton className="h-4 w-36" />
+            </div>
+          </Card>
+        ) : null}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: tiles }, (_, i) => (
+            <Card key={i}>
+              <CardContent className="flex items-center gap-4 p-4">
+                <Skeleton className="size-11 shrink-0 rounded-lg" />
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-7 w-10" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-3 space-y-0">
+            <Skeleton className="size-9 rounded-lg" />
+            <Skeleton className="h-4 w-32" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-3/5" />
+          </CardContent>
+        </Card>
+      </LoadingPlaceholder>
+    </div>
   );
 }
 
@@ -254,10 +300,7 @@ export function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Loading dashboard...
-      </div>
+      <DashboardSkeleton showChecklist={isAdmin} tiles={canEdit ? 4 : 3} />
     );
   }
 

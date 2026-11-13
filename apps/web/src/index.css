@@ -224,6 +224,26 @@
     }
   }
 
+  /* A loading placeholder holds its space at once but stays invisible for
+     a moment, so a page that loads quickly doesn't flash grey bars. */
+  .placeholder-in {
+    animation: placeholder-in 0.2s ease-out 0.2s both;
+  }
+  @keyframes placeholder-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Still waits, but appears without the fade. */
+    .placeholder-in {
+      animation-duration: 1ms;
+    }
+  }
+
   /* The airmail stripe: rose and blue dashes, like an envelope's edge. */
   .airmail-stripe {
     height: 3px;

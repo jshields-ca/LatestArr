@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Plus, Search, Trash2,
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
@@ -963,7 +964,7 @@ function RecipientsSection({
     <section className="flex flex-col gap-4">
       {/* Both rows wrap: on a phone the three buttons don't fit beside the
           heading, and an unwrapped row pushed the whole page sideways. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="text-lg font-semibold">Recipients</h2>
         {recipients ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -997,10 +998,7 @@ function RecipientsSection({
       ) : null}
 
       {recipients === null && !loadError ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading recipients...
-        </div>
+        <TableSkeleton label="Loading recipients..." />
       ) : null}
 
       {recipients && recipients.length === 0 ? (
@@ -1628,7 +1626,7 @@ function GroupsSection({
 }) {
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex min-h-9 items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">Groups</h2>
         {groups ? <AddGroupDialog onCreated={(g) => setGroups((prev) => [...(prev ?? []), g])} /> : null}
       </div>
@@ -1640,10 +1638,7 @@ function GroupsSection({
       ) : null}
 
       {groups === null && !loadError ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading groups...
-        </div>
+        <ListSkeleton label="Loading groups..." rows={2} />
       ) : null}
 
       {groups && groups.length === 0 ? (

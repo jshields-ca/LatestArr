@@ -8,6 +8,7 @@ import { DesignLogoFields } from "@/components/design-logo-fields";
 import { EmailPreviewFrame, PreviewSchemeToggle, usePreviewScheme } from "@/components/email-preview-frame";
 import { useHasRole } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
+import { LoadingPlaceholder, Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -703,10 +704,20 @@ export function DesignEditorPage() {
 
   if (!settings) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Loading design...
-      </div>
+      <LoadingPlaceholder label="Loading design..." className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-8 w-56 max-w-full" />
+          <Skeleton className="h-9 w-28 shrink-0" />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 6 }, (_, i) => (
+              <Skeleton key={i} className="h-14 rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="hidden h-[75dvh] rounded-xl lg:block" />
+        </div>
+      </LoadingPlaceholder>
     );
   }
 

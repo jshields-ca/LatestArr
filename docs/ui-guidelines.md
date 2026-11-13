@@ -32,6 +32,7 @@ Three typefaces, bundled with the app: Plus Jakarta Sans for the interface, News
 - **`PageHeader`** gives a page its one `h1` and names the browser tab. A page without one calls `usePageTitle` and has its own `h1`, hidden with `sr-only` if a visible title would repeat something.
 - **`AuthCard`** is every signed-out screen: sign-in, setup and the password pages.
 - **`EmptyState`** is what a page shows with nothing to list yet: a heading and one line on what to do next.
+- **While a page or section loads,** show a placeholder in its shape from `ui/skeleton.tsx` (`ListSkeleton`, `TableSkeleton`, `CardsSkeleton`, `LinesSkeleton`, or `LoadingPlaceholder` with your own bars), so the page doesn't jump when the content arrives. Keep its label ("Loading newsletters..."): that's what a screen reader hears. A spinner is for a short wait inside a button, a dialog or a small panel.
 - **The sidebar's sections** are in `lib/nav-items.ts`. A new page goes in Send, Connect or System.
 
 ## Actions
@@ -59,7 +60,7 @@ Three typefaces, bundled with the app: Plus Jakarta Sans for the interface, News
 - **Name form sections** with `role="group"` and `aria-labelledby` on their `SubsectionHeading`, or a `fieldset` and `legend`.
 - **A control's name includes its visible text.** Don't cover it with a different `aria-label`.
 - **Decoration is hidden** from screen readers with `aria-hidden`.
-- **Motion plays once and stops,** and is switched off under `prefers-reduced-motion`.
+- **Motion plays once and stops,** and is switched off under `prefers-reduced-motion`. The exceptions are a spinner and a loading placeholder's pulse, which run only while something is loading; the pulse also stops under reduced motion.
 
 ## Before opening a PR
 

@@ -4,6 +4,7 @@ import { BellRing, Loader2 } from "lucide-react";
 
 import { useOptionalAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
+import { CardsSkeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,10 +144,7 @@ export function NotificationsPage() {
       ) : null}
 
       {!saved && !loadError ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          Loading alert settings...
-        </div>
+        <CardsSkeleton label="Loading alert settings..." cards={[4, 3]} />
       ) : null}
 
       {saved ? (
