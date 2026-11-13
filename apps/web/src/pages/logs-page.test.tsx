@@ -77,7 +77,11 @@ describe("LogsPage", () => {
     await screen.findByText("Newsletter send failed");
 
     expect(screen.queryByText(/Could not reach the SMTP server/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show details" }));
+    // The row is named by its own text, and says whether it's open (#332).
+    const row = screen.getByRole("button", { name: /error.*Newsletter send failed/ });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    await user.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText(/Could not reach the SMTP server/)).toBeInTheDocument();
   });
 
@@ -85,7 +89,9 @@ describe("LogsPage", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [warnEntry] }));
     render(<LogsPage />);
     await screen.findByText(`Couldn't fetch from source "Home Tautulli"`);
-    expect(screen.queryByRole("button", { name: "Show details" })).not.toBeInTheDocument();
+    const row = screen.getByRole("button", { name: /Couldn't fetch from source/ });
+    expect(row).toBeDisabled();
+    expect(row).not.toHaveAttribute("aria-expanded");
   });
 
   it("re-fetches with the level filter when changed", async () => {
@@ -148,7 +154,7 @@ describe("LogsPage", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [errorEntry, warnEntry] }));
     const { container } = render(<LogsPage />);
     await screen.findByText("Newsletter send failed");
-    await user.click(screen.getByRole("button", { name: "Show details" }));
+    await user.click(screen.getByRole("button", { name: /Newsletter send failed/ }));
 
     expect(await axe(container)).toHaveNoViolations();
   });

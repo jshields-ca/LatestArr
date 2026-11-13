@@ -689,8 +689,10 @@ function NewsletterDetailsForm({
           the expanded row; narrowing them into one column (see the
           Content-panel sibling this sits next to in NewsletterCard) also
           fixes how sparse the schedule grid looked stretched that wide. */}
-      <div className="flex flex-col gap-4 rounded-md border border-border p-3">
-        <SubsectionHeading>Schedule</SubsectionHeading>
+      {/* Each panel is a named group, so a screen reader says which
+          section a field is in ("Schedule, group"). */}
+      <div role="group" aria-labelledby={`${idPrefix}-schedule-heading`} className="flex flex-col gap-4 rounded-md border border-border p-3">
+        <SubsectionHeading id={`${idPrefix}-schedule-heading`}>Schedule</SubsectionHeading>
         <ScheduleField
           idPrefix={idPrefix}
           mode={scheduleMode}
@@ -703,8 +705,8 @@ function NewsletterDetailsForm({
           onTimezoneChange={setTimezone}
           disabled={submitting}
         />
-        <div className="flex flex-col gap-3 border-t border-border pt-3">
-          <SubsectionHeading>Delivery</SubsectionHeading>
+        <div role="group" aria-labelledby={`${idPrefix}-delivery-heading`} className="flex flex-col gap-3 border-t border-border pt-3">
+          <SubsectionHeading id={`${idPrefix}-delivery-heading`}>Delivery</SubsectionHeading>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${idPrefix}-lookback`}>Lookback (days)</Label>
@@ -1157,8 +1159,18 @@ function NewsletterCard({
                 <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
                   <NewsletterDetailsForm newsletter={newsletter} smtpProfiles={smtpProfiles} onSaved={onChanged} />
 
-                  <div className="flex flex-col gap-4 rounded-md border border-border p-3">
-                    <SubsectionHeading>Content</SubsectionHeading>
+                  <div
+                    role="group"
+                    aria-labelledby={`newsletter-${newsletter.id}-content-heading`}
+                    className="flex flex-col gap-4 rounded-md border border-border p-3"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <SubsectionHeading id={`newsletter-${newsletter.id}-content-heading`}>Content</SubsectionHeading>
+                      {/* The form beside this waits for Save changes; this
+                          panel doesn't (see "Saving" in CONTRIBUTING.md),
+                          so it says so. */}
+                      {canEdit ? <p className="text-xs text-muted-foreground">Changes here save as you make them.</p> : null}
+                    </div>
 
                     {detailError ? (
                       <p role="alert" className="text-sm text-destructive">

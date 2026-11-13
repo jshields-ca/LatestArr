@@ -784,6 +784,12 @@ describe("NewslettersPage", () => {
     expect(screen.getByLabelText("On")).toHaveTextContent("Monday");
     expect(screen.getByLabelText("Timezone")).toHaveTextContent("UTC");
     expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
+
+    // The editor's sections are named groups, and the half that saves by
+    // itself says so (#332).
+    expect(within(screen.getByRole("group", { name: "Schedule" })).getByLabelText("Repeats")).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "Delivery" })).getByLabelText("Lookback (days)")).toBeInTheDocument();
+    expect(await screen.findByRole("group", { name: "Content" })).toHaveTextContent("Changes here save as you make them.");
   });
 
   it("falls back to advanced mode in the Details tab for a cron pattern the simple picker can't express", async () => {
