@@ -349,6 +349,35 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
   }, 30000);
 
   // #290: each note has its own alignment, and says what formatting works.
+  // #401: without deleting and adding them again.
+  it("moves a button up and down, keeping focus on it", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    // One button has nothing to move past.
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    expect(screen.queryByRole("button", { name: "Move button 1 up" })).not.toBeInTheDocument();
+    await user.type(screen.getByRole("textbox", { name: "Button 1 label" }), "Plex");
+    await user.type(screen.getByRole("textbox", { name: "Button 1 URL" }), "https://plex.example.com");
+    await user.click(screen.getByRole("button", { name: "Add button" }));
+    await user.type(screen.getByRole("textbox", { name: "Button 2 label" }), "Requests");
+    await user.type(screen.getByRole("textbox", { name: "Button 2 URL" }), "https://requests.example.com");
+
+    expect(screen.getByRole("button", { name: "Move Plex up" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move Requests down" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Move Requests up" }));
+    expect(screen.getByRole("textbox", { name: "Button 1 label" })).toHaveValue("Requests");
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.content.ctas.map((cta) => cta.label)).toEqual(["Requests", "Plex"]),
+    );
+    // It's at the top now, so focus moves to its other arrow.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Move Requests down" })).toHaveFocus());
+
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("textbox", { name: "Button 2 label" })).toHaveValue("Requests");
+  });
+
   it("sets the intro and footer note alignment, and explains the formatting", async () => {
     renderEditor();
     await screen.findByTitle("Design preview");
