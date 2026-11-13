@@ -93,6 +93,10 @@ export interface MjmlRenderContext {
    * nothing new to show. Keyed by NewItem["kind"]; a kind served by more
    * than one linked source resolves to whichever was resolved first. */
   sourceLinksByContentType?: Record<string, string>;
+  /** Like sourceLinksByContentType, but only sources with a Public URL:
+   * where "+ 12 more books" links (#362). A source's own address is often
+   * one recipients can't reach, so it's never used there. */
+  publicLinksByContentType?: Record<string, string>;
   generatedAt: Date;
   /** The newsletter's timezone, for the send date and the date range
    * (the subject uses the same, see subject.ts). The server's otherwise. */
@@ -353,6 +357,47 @@ Handlebars.registerHelper("mediaList", function mediaList(
   return selected.map((item) => options.fn(item)).join("");
 });
 
+// What a {{#mediaList}} with the same hash leaves out, for a "+ 76 more
+// books" line under it (#362). Renders its block once, with {count, label,
+// url}, when the list was cut short by its count (or by MAX_SHOWN_ITEMS);
+// nothing otherwise. url is the source's Public URL, when it has one.
+// {{#moreFor contentType="book" count="5" groupEpisodes="true"}}{{label}}{{/moreFor}}
+Handlebars.registerHelper("moreFor", function moreFor(
+  this: {
+    items?: RenderableItem[];
+    publicLinksByContentType?: Record<string, string>;
+    countLabels?: Wording["countLabels"];
+  },
+  options: Handlebars.HelperOptions,
+) {
+  const { contentType, count, groupEpisodes: group } = options.hash as {
+    contentType?: string;
+    count?: number | string;
+    groupEpisodes?: boolean | string;
+  };
+  const grouped = group === true || group === "true";
+  let rows = (this.items ?? []).filter((item) => matchesContentType(item, contentType));
+  if (grouped) rows = groupEpisodes(rows);
+  const limit = Number(count);
+  const shown = Math.min(Number.isFinite(limit) && limit > 0 ? limit : rows.length, MAX_SHOWN_ITEMS);
+  const left = rows.slice(shown);
+  if (left.length === 0) return options.inverse(this);
+
+  // What they are: shows, when a TV section's episodes are grouped by show;
+  // otherwise the design's word for their kind; nothing when they're mixed.
+  const labels = this.countLabels ?? DEFAULT_WORDING.countLabels;
+  const kinds = new Set(left.map((item) => item.kind));
+  const tvOnly = [...kinds].every((kind) => kind === "tv_episode" || kind === "tv_season");
+  const [one, many]: [string, string] | [undefined, undefined] =
+    grouped && tvOnly ? ["show", "shows"] : kinds.size === 1 ? (labels[[...kinds][0] as NewItem["kind"]] ?? [undefined, undefined]) : [undefined, undefined];
+  const noun = left.length === 1 ? one : many;
+  return options.fn({
+    count: left.length,
+    label: noun ? `+ ${left.length} more ${noun}` : `+ ${left.length} more`,
+    url: libraryLink(this.publicLinksByContentType, contentType ?? Object.keys(this.publicLinksByContentType ?? {}).join(",")),
+  });
+});
+
 // The first linked source's library address for any of these content
 // types (a comma list).
 function libraryLink(links: Record<string, string> | undefined, contentType: string | undefined): string | undefined {
@@ -474,6 +519,8 @@ export async function renderMjmlTemplate(
     popularItems: (context.popularItems ?? []).map(renderable),
     fallbackItems: (context.fallbackItems ?? []).map(renderable),
     sourceLinksByContentType: context.sourceLinksByContentType ?? {},
+    publicLinksByContentType: context.publicLinksByContentType ?? {},
+    countLabels: wording.countLabels,
     hasLinkedSources: Object.keys(context.sourceLinksByContentType ?? {}).length > 0,
     generatedAtFormatted: formatDate(context.generatedAt, context.timeZone, wording.dateOrder),
     lookbackDays: context.lookbackDays,

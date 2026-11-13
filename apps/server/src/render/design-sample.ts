@@ -66,6 +66,18 @@ function sampleItems(now: Date): NewItem[] {
       pageCount: 288,
       addedAt: new Date(now.getTime() - 3 * DAY),
     },
+    // A second book, so a limit of one shows "+ 1 more book" (#362).
+    {
+      id: "sample-3b",
+      externalId: "sample-3b",
+      kind: "book",
+      title: "The Salt Road",
+      subtitle: "M. Okafor",
+      contentLabel: "Ebook",
+      posterUrl: posterDataUri("#2f6b55", "Book"),
+      pageCount: 340,
+      addedAt: new Date(now.getTime() - 3 * DAY),
+    },
     {
       id: "sample-4",
       externalId: "sample-4",
@@ -121,6 +133,7 @@ export async function renderDesignSample(
     // Every content type counts as "linked", so the preview also shows how
     // empty sections look (there's no sample audiobook, for example).
     sourceLinksByContentType: Object.fromEntries(DESIGN_KINDS.map((kind) => [kind, "https://example.com/library"])),
+    publicLinksByContentType: Object.fromEntries(DESIGN_KINDS.map((kind) => [kind, "https://example.com/library"])),
     sourceButtons: sampleSourceButtons(sources),
     generatedAt: now,
     lookbackDays: 7,

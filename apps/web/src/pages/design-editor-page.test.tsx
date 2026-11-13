@@ -272,6 +272,19 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     );
   });
 
+  // #362: on by default.
+  it("can turn off the line saying how many more a section has", async () => {
+    const user = userEvent.setup();
+    renderEditor();
+    await screen.findByTitle("Design preview");
+
+    await user.click(screen.getByText("Sections"));
+    const toggle = screen.getByRole("switch", { name: "Say how many more" });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.sections.showMore).toBe(false));
+  });
+
   it("can turn off grouping a show's episodes", async () => {
     const user = userEvent.setup();
     renderEditor();

@@ -45,6 +45,10 @@ export function DesignCodeReference() {
         <Entry code="{{generatedAtFormatted}}">The send date, e.g. September 27, 2026.</Entry>
         <Entry code="{{periodFormatted}} {{itemCount}}">The date range covered, e.g. Sep 21 – 28, 2026, and how many items are new.</Entry>
         <Entry code="{{#each kindCounts}}{{this}}{{/each}}">A count per type, largest first, e.g. 23 episodes, 9 movies.</Entry>
+        <Entry code='{{#moreFor contentType="book" count="5"}}{{label}} {{url}}{{/moreFor}}'>
+          After a <code className="font-mono">mediaList</code> with the same arguments: how many it left out, e.g. + 76
+          more books, and the source&apos;s Public URL if it has one. Shows nothing when everything fit.
+        </Entry>
         <Entry code="{{sectionNames.movie.heading}} {{sectionNames.movie.browse}}">
           A section&apos;s name from Wording, and its Browse label: Movies and Browse movies unless renamed. Also{" "}
           <code className="font-mono">tv</code>, <code className="font-mono">book</code>,{" "}

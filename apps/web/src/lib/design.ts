@@ -109,6 +109,8 @@ export interface DesignSettings {
     order: DesignKind[];
     limit: number | null;
     empty: DesignEmptySection;
+    /** "+ 76 more books" under a section the limit cut short (#362). */
+    showMore: boolean;
     mostWatched: { enabled: boolean; count: number };
   };
   content: DesignContent;
@@ -152,6 +154,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     order: ["movie", "tv_episode", "tv_season", "book", "audiobook", "game"],
     limit: null,
     empty: "message",
+    showMore: true,
     mostWatched: { enabled: false, count: 5 },
   },
   content: {
