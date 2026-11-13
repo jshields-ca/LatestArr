@@ -1,6 +1,7 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import Handlebars from "handlebars";
 import { formatDate, formatPeriod } from "./dates.js";
+import { DEFAULT_WORDING, type Wording } from "./wording.js";
 import { renderNote } from "./notes.js";
 import mjml2html from "mjml";
 import { MAX_SHOWN_ITEMS } from "./design.js";
@@ -108,6 +109,9 @@ export interface MjmlRenderContext {
   footerNote?: string;
   /** Colour for links in those notes: the design's accent. */
   noteLinkColor?: string;
+  /** The design's section names and date order (#390). Section names are
+   * bound as {{sectionNames.movie.heading}} and {{sectionNames.movie.browse}}. */
+  wording?: Wording;
   /** Up to a handful of {label, url} call-to-action buttons the default
    * template renders as a row of buttons. Bound as {{#each ctas}} for any
    * template that references it. */
@@ -141,17 +145,9 @@ function formatRating(rating: NewItem["rating"]): string | undefined {
 // resolving it into contentLabel once in toRenderable below, means badge
 // markup only ever has to read {{contentLabel}}: it never needs its own
 // copy of this map or to know about `kind` at all.
-const KIND_LABELS: Record<NewItem["kind"], string> = {
-  movie: "Movie",
-  tv_episode: "TV Episode",
-  tv_season: "TV Season",
-  game: "Game",
-  book: "Book",
-  audiobook: "Audiobook",
-};
-
-function resolveContentLabel(item: NewItem): string {
-  return item.contentLabel ?? KIND_LABELS[item.kind];
+// The labels themselves are in wording.ts, since a design can rename them (#390).
+function resolveContentLabel(item: NewItem, labels: Wording["kindLabels"]): string {
+  return item.contentLabel ?? labels[item.kind];
 }
 
 // isFallback is never set here — the mediaList helper below is the only
@@ -174,14 +170,15 @@ function shorten(text: string | undefined): string | undefined {
   return `${(lastSpace > OVERVIEW_SHORT_LENGTH / 2 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
 }
 
-function toRenderable(item: NewItem): RenderableItem {
+function toRenderable(item: NewItem, wording: Wording = DEFAULT_WORDING): RenderableItem {
+  const { dateOrder } = wording;
   const renderable: RenderableItem = {
     kind: item.kind,
     title: item.title,
     subtitle: item.subtitle,
     overview: item.overview,
-    addedAtFormatted: formatDate(item.addedAt),
-    releaseDateFormatted: item.releaseDate ? formatDate(item.releaseDate) : undefined,
+    addedAtFormatted: formatDate(item.addedAt, undefined, dateOrder),
+    releaseDateFormatted: item.releaseDate ? formatDate(item.releaseDate, undefined, dateOrder) : undefined,
     // By the time this runs, a real send has already replaced this with a
     // `cid:...` reference (or dropped it) in apps/server/src/pipeline
     // /embed-images.ts — never a source's own (often credential-bearing)
@@ -189,7 +186,7 @@ function toRenderable(item: NewItem): RenderableItem {
     // plain URL, which is fine for testing the template mechanics in
     // isolation.
     posterUrl: item.posterUrl,
-    contentLabel: resolveContentLabel(item),
+    contentLabel: resolveContentLabel(item, wording.kindLabels),
     genres: item.genres?.length ? item.genres.join(", ") : undefined,
     rating: formatRating(item.rating),
     runtimeFormatted: item.runtimeMinutes ? formatMinutes(item.runtimeMinutes) : undefined,
@@ -433,22 +430,13 @@ Handlebars.registerHelper("ifKindLinked", function ifKindLinked(
   return linked || hasItems ? options.fn(this) : options.inverse(this);
 });
 
-const KIND_COUNT_LABELS: Record<NewItem["kind"], [string, string]> = {
-  movie: ["movie", "movies"],
-  tv_episode: ["episode", "episodes"],
-  tv_season: ["season", "seasons"],
-  book: ["book", "books"],
-  audiobook: ["audiobook", "audiobooks"],
-  game: ["game", "games"],
-};
-
-// "23 episodes", "9 movies", ... largest first.
-export function kindCounts(items: NewItem[]): string[] {
+// "23 episodes", "9 movies", ... largest first, in the design's words.
+export function kindCounts(items: NewItem[], labels: Wording["countLabels"] = DEFAULT_WORDING.countLabels): string[] {
   const counts = new Map<NewItem["kind"], number>();
   for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([kind, n]) => `${n} ${KIND_COUNT_LABELS[kind][n === 1 ? 0 : 1]}`);
+    .map(([kind, n]) => `${n} ${labels[kind][n === 1 ? 0 : 1]}`);
 }
 
 // The logo's markup. Every value is escaped; src and href are already
@@ -477,21 +465,24 @@ export async function renderMjmlTemplate(
   mjmlSource: string,
   context: MjmlRenderContext,
 ): Promise<string> {
+  const wording = context.wording ?? DEFAULT_WORDING;
+  const renderable = (item: NewItem) => toRenderable(item, wording);
   const substitutedMjml = Handlebars.compile(mjmlSource)({
     newsletterName: context.newsletterName,
     logo: logoMarkup(context.logo, context.newsletterName),
-    items: context.items.map(toRenderable),
-    popularItems: (context.popularItems ?? []).map(toRenderable),
-    fallbackItems: (context.fallbackItems ?? []).map(toRenderable),
+    items: context.items.map(renderable),
+    popularItems: (context.popularItems ?? []).map(renderable),
+    fallbackItems: (context.fallbackItems ?? []).map(renderable),
     sourceLinksByContentType: context.sourceLinksByContentType ?? {},
     hasLinkedSources: Object.keys(context.sourceLinksByContentType ?? {}).length > 0,
-    generatedAtFormatted: formatDate(context.generatedAt, context.timeZone),
+    generatedAtFormatted: formatDate(context.generatedAt, context.timeZone, wording.dateOrder),
     lookbackDays: context.lookbackDays,
     periodFormatted: context.lookbackDays
-      ? formatPeriod(context.generatedAt, context.lookbackDays, context.timeZone)
+      ? formatPeriod(context.generatedAt, context.lookbackDays, context.timeZone, wording.dateOrder)
       : undefined,
     itemCount: context.items.length,
-    kindCounts: kindCounts(context.items),
+    kindCounts: kindCounts(context.items, wording.countLabels),
+    sectionNames: wording.sectionNames,
     introText: renderNote(context.introText, context.noteLinkColor),
     footerNote: renderNote(context.footerNote, context.noteLinkColor),
     ctas: context.ctas ?? [],

@@ -2,6 +2,8 @@
 // render/dates.ts, which fill them in when sending: keep the two in step.
 // Used here to flag typos as you type and to preview the next subject.
 
+import type { DesignDateOrder } from "@/lib/design";
+
 export const SUBJECT_VARIABLES: { name: string; description: string }[] = [
   { name: "newsletter", description: "The newsletter's name" },
   { name: "date", description: "The send date: September 29, 2026" },
@@ -61,21 +63,32 @@ function parts(date: Date, timeZone?: string) {
  */
 export function previewSubject(
   template: string,
-  { name, timeZone, lookbackDays, now = new Date() }: { name: string; timeZone: string; lookbackDays: number; now?: Date },
+  {
+    name,
+    timeZone,
+    lookbackDays,
+    dateOrder = "monthFirst",
+    now = new Date(),
+  }: { name: string; timeZone: string; lookbackDays: number; dateOrder?: DesignDateOrder; now?: Date },
 ): string | null {
   if (!template.trim()) return null;
   const zone = safeTimeZone(timeZone);
   const today = parts(now, zone);
   const days = Number.isInteger(lookbackDays) && lookbackDays > 0 ? lookbackDays : 7;
   const start = parts(new Date(now.getTime() - days * 24 * 60 * 60 * 1000), zone);
-  const period =
-    start.year !== today.year
+  // The same shapes as apps/server/src/render/dates.ts, in the design's order (#390).
+  const dayFirst = dateOrder === "dayFirst";
+  const period = dayFirst
+    ? start.year !== today.year
+      ? `${start.day} ${start.monthShort} ${start.year} – ${today.day} ${today.monthShort} ${today.year}`
+      : `${start.day}${start.month === today.month ? "" : ` ${start.monthShort}`} – ${today.day} ${today.monthShort} ${today.year}`
+    : start.year !== today.year
       ? `${start.monthShort} ${start.day}, ${start.year} – ${today.monthShort} ${today.day}, ${today.year}`
       : `${start.monthShort} ${start.day} – ${start.month === today.month ? today.day : `${today.monthShort} ${today.day}`}, ${today.year}`;
   const values: Record<string, string> = {
     newsletter: name || "Your newsletter",
-    date: `${today.monthLong} ${today.day}, ${today.year}`,
-    shortDate: `${today.monthShort} ${today.day}`,
+    date: dayFirst ? `${today.day} ${today.monthLong} ${today.year}` : `${today.monthLong} ${today.day}, ${today.year}`,
+    shortDate: dayFirst ? `${today.day} ${today.monthShort}` : `${today.monthShort} ${today.day}`,
     period,
     month: today.monthLong,
     year: String(today.year),

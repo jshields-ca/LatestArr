@@ -45,6 +45,12 @@ export function DesignCodeReference() {
         <Entry code="{{generatedAtFormatted}}">The send date, e.g. September 27, 2026.</Entry>
         <Entry code="{{periodFormatted}} {{itemCount}}">The date range covered, e.g. Sep 21 – 28, 2026, and how many items are new.</Entry>
         <Entry code="{{#each kindCounts}}{{this}}{{/each}}">A count per type, largest first, e.g. 23 episodes, 9 movies.</Entry>
+        <Entry code="{{sectionNames.movie.heading}} {{sectionNames.movie.browse}}">
+          A section&apos;s name from Wording, and its Browse label: Movies and Browse movies unless renamed. Also{" "}
+          <code className="font-mono">tv</code>, <code className="font-mono">book</code>,{" "}
+          <code className="font-mono">audiobook</code> and <code className="font-mono">game</code>. Dates follow
+          Wording&apos;s order.
+        </Entry>
         <Entry code="{{logo}}">
           The logo from Logo above (linked, and with its dark mode version), for inside an{" "}
           <code className="font-mono">mj-text</code>; empty without one, so{" "}

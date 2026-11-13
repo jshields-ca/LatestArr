@@ -1,6 +1,9 @@
 // Dates as newsletters show them, in the newsletter's own timezone when
 // one is given (the server's otherwise), so the subject (subject.ts) and
-// the email (mjml-template.ts) always agree.
+// the email (mjml-template.ts) always agree. A design chooses the order
+// (#390): "September 29, 2026" or "29 September 2026".
+
+import type { DateOrder } from "./wording.js";
 
 interface DateParts {
   year: number;
@@ -36,16 +39,16 @@ function safeTimeZone(timeZone?: string): string | undefined {
   }
 }
 
-/** "September 29, 2026" */
-export function formatDate(date: Date, timeZone?: string): string {
+/** "September 29, 2026", or "29 September 2026" */
+export function formatDate(date: Date, timeZone?: string, order: DateOrder = "monthFirst"): string {
   const p = partsOf(date, safeTimeZone(timeZone));
-  return `${p.monthLong} ${p.day}, ${p.year}`;
+  return order === "dayFirst" ? `${p.day} ${p.monthLong} ${p.year}` : `${p.monthLong} ${p.day}, ${p.year}`;
 }
 
-/** "Sep 29" */
-export function formatShortDate(date: Date, timeZone?: string): string {
+/** "Sep 29", or "29 Sep" */
+export function formatShortDate(date: Date, timeZone?: string, order: DateOrder = "monthFirst"): string {
   const p = partsOf(date, safeTimeZone(timeZone));
-  return `${p.monthShort} ${p.day}`;
+  return order === "dayFirst" ? `${p.day} ${p.monthShort}` : `${p.monthShort} ${p.day}`;
 }
 
 /** "September" and "2026" */
@@ -54,11 +57,21 @@ export function monthAndYear(date: Date, timeZone?: string): { month: string; ye
   return { month: p.monthLong, year: String(p.year) };
 }
 
-/** The lookback window ending at `end`: "Sep 21 – 28, 2026", "Aug 30 – Sep 5, 2026", or across years in full. */
-export function formatPeriod(end: Date, days: number, timeZone?: string): string {
+/**
+ * The lookback window ending at `end`: "Sep 21 – 28, 2026", "Aug 30 – Sep 5,
+ * 2026", or across years in full. Day first: "21 – 28 Sep 2026", "30 Aug –
+ * 5 Sep 2026".
+ */
+export function formatPeriod(end: Date, days: number, timeZone?: string, order: DateOrder = "monthFirst"): string {
   const zone = safeTimeZone(timeZone);
   const start = partsOf(new Date(end.getTime() - days * 24 * 60 * 60 * 1000), zone);
   const last = partsOf(end, zone);
+  if (order === "dayFirst") {
+    const lastPart = `${last.day} ${last.monthShort} ${last.year}`;
+    if (start.year !== last.year) return `${start.day} ${start.monthShort} ${start.year} – ${lastPart}`;
+    if (start.month !== last.month) return `${start.day} ${start.monthShort} – ${lastPart}`;
+    return `${start.day} – ${lastPart}`;
+  }
   if (start.year !== last.year) {
     return `${start.monthShort} ${start.day}, ${start.year} – ${last.monthShort} ${last.day}, ${last.year}`;
   }

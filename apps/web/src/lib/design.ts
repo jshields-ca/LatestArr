@@ -57,6 +57,33 @@ export interface DesignContent {
   sourceButtons: { enabled: boolean; placement: DesignSourceButtonPlacement };
 }
 
+// Section names and date order (#390). Mirrors apps/server/src/render/wording.ts.
+export type DesignDateOrder = "monthFirst" | "dayFirst";
+export type DesignSectionNameKey = "movie" | "tv" | "book" | "audiobook" | "game";
+/** Blank keeps the default. TV has no "for one": it's counted in episodes and seasons. */
+export interface DesignSectionName {
+  plural: string;
+  singular: string;
+}
+export interface DesignWording {
+  dateOrder: DesignDateOrder;
+  sectionNames: Record<DesignSectionNameKey, DesignSectionName>;
+}
+
+/** Mirrors the server's limit on a section name. */
+export const MAX_SECTION_NAME_LENGTH = 40;
+
+/** Each section's default name, and what one of it is called (null for TV). */
+export const DEFAULT_SECTION_NAMES: { key: DesignSectionNameKey; plural: string; singular: string | null }[] = [
+  { key: "movie", plural: "Movies", singular: "Movie" },
+  { key: "tv", plural: "TV", singular: null },
+  { key: "book", plural: "Books", singular: "Book" },
+  { key: "audiobook", plural: "Audiobooks", singular: "Audiobook" },
+  { key: "game", plural: "Games", singular: "Game" },
+];
+
+const BLANK_NAME: DesignSectionName = { plural: "", singular: "" };
+
 export interface DesignSettings {
   font: string;
   colors: {
@@ -85,6 +112,7 @@ export interface DesignSettings {
     mostWatched: { enabled: boolean; count: number };
   };
   content: DesignContent;
+  wording: DesignWording;
   customCss: string;
 }
 
@@ -135,6 +163,10 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     ctaPlacement: "afterIntro",
     sourceButtons: { enabled: true, placement: "end" },
   },
+  wording: {
+    dateOrder: "monthFirst",
+    sectionNames: { movie: BLANK_NAME, tv: BLANK_NAME, book: BLANK_NAME, audiobook: BLANK_NAME, game: BLANK_NAME },
+  },
   customCss: "",
 };
 
@@ -158,6 +190,13 @@ export function withDesignDefaults(settings: Partial<DesignSettings> | null | un
       ...DEFAULT_DESIGN_SETTINGS.content,
       ...value.content,
       sourceButtons: { ...DEFAULT_DESIGN_SETTINGS.content.sourceButtons, ...value.content?.sourceButtons },
+    },
+    wording: {
+      ...DEFAULT_DESIGN_SETTINGS.wording,
+      ...value.wording,
+      sectionNames: Object.fromEntries(
+        DEFAULT_SECTION_NAMES.map(({ key }) => [key, { ...BLANK_NAME, ...value.wording?.sectionNames?.[key] }]),
+      ) as DesignWording["sectionNames"],
     },
   };
 }

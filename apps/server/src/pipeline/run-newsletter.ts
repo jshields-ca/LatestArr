@@ -43,6 +43,7 @@ import {
 } from "../render/design.js";
 import { logger as defaultLogger, type Logger } from "../logger.js";
 import { renderSubject } from "../render/subject.js";
+import type { Wording } from "../render/wording.js";
 import { resolveLogo } from "./design-logo.js";
 import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -322,6 +323,8 @@ interface RenderedNewsletter {
    * existing characteristic of itemCountIncluded this doesn't change,
    * just extends to also record titles. */
   items: NewItem[];
+  /** The design's wording, so the subject matches the email (#390). */
+  wording: Wording;
 }
 
 const EMPTY_FETCHED_ITEMS: FetchedItems = { items: [], sourceByItem: new Map() };
@@ -391,6 +394,7 @@ async function renderNewsletterContent(
   const popularPlaceholders = preparePosterPlaceholders(popular.items);
   const fallbackPlaceholders = preparePosterPlaceholders(fallback.items);
 
+  const content = designContentVariables(settings);
   const html = await renderMjmlTemplate(mjml, {
     newsletterName: newsletter.name,
     items: addedPlaceholders.items,
@@ -402,7 +406,7 @@ async function renderNewsletterContent(
     timeZone: newsletter.timezone,
     lookbackDays: newsletter.lookbackDays,
     logo: logo.logo,
-    ...designContentVariables(settings),
+    ...content,
   });
 
   const allPlaceholders = new Map([
@@ -417,6 +421,7 @@ async function renderNewsletterContent(
     text: htmlToPlainText(resolved.html),
     attachments: [...logo.attachments, ...resolved.attachments],
     items,
+    wording: content.wording,
   };
 }
 
@@ -545,13 +550,14 @@ export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender
 }
 
 // The subject for this issue, with its {variables} filled in (#267).
-function subjectFor(newsletter: Newsletter, items: NewItem[], generatedAt: Date): string {
+function subjectFor(newsletter: Newsletter, items: NewItem[], generatedAt: Date, wording: Wording): string {
   return renderSubject(newsletter.subjectTemplate, {
     newsletterName: newsletter.name,
     generatedAt,
     lookbackDays: newsletter.lookbackDays,
     timeZone: newsletter.timezone,
     items,
+    wording,
   });
 }
 
@@ -584,11 +590,16 @@ export async function previewNewsletter(
   const newsletter = await loadNewsletter(db, newsletterId);
   try {
     const generatedAt = new Date();
-    const { html, attachments, items } = await renderNewsletterContent(db, newsletter, generatedAt, log, options.design, {
-      forPreview: true,
-    });
+    const { html, attachments, items, wording } = await renderNewsletterContent(
+      db,
+      newsletter,
+      generatedAt,
+      log,
+      options.design,
+      { forPreview: true },
+    );
     return {
-      subject: subjectFor(newsletter, items, generatedAt),
+      subject: subjectFor(newsletter, items, generatedAt, wording),
       html: inlineAttachments(html, attachments),
       items: items.map((item) => ({ title: item.title, kind: item.kind })),
     };
@@ -611,11 +622,11 @@ export async function sendTestNewsletter(
   const sender = await loadSender(db, newsletter);
   try {
     const generatedAt = new Date();
-    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, generatedAt, log);
+    const { html, text, attachments, items, wording } = await renderNewsletterContent(db, newsletter, generatedAt, log);
     const result = await sendEmail(sender.credentials, {
       from: sender.from,
       to,
-      subject: `[Test] ${subjectFor(newsletter, items, generatedAt)}`,
+      subject: `[Test] ${subjectFor(newsletter, items, generatedAt, wording)}`,
       html,
       text,
       attachments,
@@ -659,8 +670,8 @@ async function executeRun(
 
   try {
     const generatedAt = new Date();
-    const { html, text, attachments, items } = await renderNewsletterContent(db, newsletter, generatedAt, log);
-    const subject = subjectFor(newsletter, items, generatedAt);
+    const { html, text, attachments, items, wording } = await renderNewsletterContent(db, newsletter, generatedAt, log);
+    const subject = subjectFor(newsletter, items, generatedAt, wording);
 
     // "Nothing new" means nothing added in the lookback window; a custom
     // template's empty-section fallback content doesn't count. Send now

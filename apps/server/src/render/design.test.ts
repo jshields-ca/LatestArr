@@ -167,6 +167,60 @@ describe("buildDesignMjml", () => {
     expect(html).not.toContain("TV episodes");
   });
 
+  // #390: a design's own section names and date order.
+  describe("wording", () => {
+    function renderWith(settings: DesignSettings, context: Partial<MjmlRenderContext> = {}) {
+      return render(settings, { ...designContentVariables(settings), ...context });
+    }
+
+    it("names sections, their Browse button and the counts in the design's words", async () => {
+      const settings = design({
+        sections: { empty: "link" },
+        wording: { sectionNames: { movie: { plural: "Films", singular: "Film" } } },
+      });
+      const html = await renderWith(settings, {
+        items: [movie],
+        sourceLinksByContentType: { movie: "https://plex.example", book: "https://books.example" },
+      });
+      expect(html).toContain(">Films<");
+      expect(html).not.toContain(">Movies<");
+      // The item's badge too.
+      expect(html).toMatch(/>\s*Film\s*</);
+      expect(html).not.toMatch(/>\s*Movie\s*</);
+      expect(html).toContain(">1 film<");
+      // Books has nothing new, so it offers its Browse button, still in English.
+      expect(html).toContain("Browse books");
+      const empty = await renderWith(settings, {
+        items: [book],
+        sourceLinksByContentType: { movie: "https://plex.example", book: "https://books.example" },
+      });
+      expect(empty).toContain("Browse films");
+    });
+
+    it("escapes a name, which can't add markup or template code", async () => {
+      const settings = design({
+        sections: { empty: "link" },
+        wording: { sectionNames: { movie: { plural: '<b>Films</b> {{newsletterName}} "x"', singular: "" } } },
+      });
+      const html = await renderWith(settings, { items: [], sourceLinksByContentType: { movie: "https://plex.example" } });
+      expect(html).toContain("&lt;b&gt;Films&lt;/b&gt; {{newsletterName}}");
+      expect(html).not.toContain("<b>Films</b>");
+      expect(html).not.toContain("Weekly Digest {{");
+    });
+
+    it("limits a name's length", () => {
+      expect(() => design({ wording: { sectionNames: { movie: { plural: "x".repeat(41) } } } })).toThrow();
+    });
+
+    it("puts the day first in the date range and item dates when the design says so", async () => {
+      const settings = design({ wording: { dateOrder: "dayFirst" } });
+      const html = await renderWith(settings, { items: [movie] });
+      expect(html).toContain("13 – 20 Jan 2026");
+      expect(html).toContain("15 January 2026");
+      expect(html).not.toContain("January 15, 2026");
+    });
+  });
+
   it("says there's nothing new when no section would appear", async () => {
     const html = await render(DEFAULT_DESIGN_SETTINGS, { items: [] });
     expect(html).toContain("No new items in this period.");

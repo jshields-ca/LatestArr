@@ -1,6 +1,7 @@
 import type { NewItem } from "@latestarr/adapter-core";
 import { formatDate, formatPeriod, formatShortDate, monthAndYear } from "./dates.js";
 import { kindCounts } from "./mjml-template.js";
+import { DEFAULT_WORDING, type Wording } from "./wording.js";
 
 // A newsletter's subject line, with {variables} filled in on each send
 // (#267). Deliberately not Handlebars: a subject is a plain-text header, so
@@ -32,6 +33,8 @@ export interface SubjectContext {
   timeZone?: string;
   /** What's new in this issue. */
   items: NewItem[];
+  /** The design's date order and count words, so the subject matches the email (#390). */
+  wording?: Wording;
 }
 
 // Line breaks and other control characters could add email headers, so
@@ -54,15 +57,16 @@ export function renderSubject(template: string | null | undefined, context: Subj
   if (usesCounts && context.items.length === 0) return clean(`${context.newsletterName}: nothing new`);
 
   const { month, year } = monthAndYear(context.generatedAt, context.timeZone);
+  const { dateOrder, countLabels } = context.wording ?? DEFAULT_WORDING;
   const values: Record<SubjectVariable, () => string> = {
     newsletter: () => context.newsletterName,
-    date: () => formatDate(context.generatedAt, context.timeZone),
-    shortDate: () => formatShortDate(context.generatedAt, context.timeZone),
-    period: () => formatPeriod(context.generatedAt, context.lookbackDays, context.timeZone),
+    date: () => formatDate(context.generatedAt, context.timeZone, dateOrder),
+    shortDate: () => formatShortDate(context.generatedAt, context.timeZone, dateOrder),
+    period: () => formatPeriod(context.generatedAt, context.lookbackDays, context.timeZone, dateOrder),
     month: () => month,
     year: () => year,
     count: () => String(context.items.length),
-    counts: () => kindCounts(context.items).join(", "),
+    counts: () => kindCounts(context.items, countLabels).join(", "),
   };
   return clean(
     source.replace(VARIABLE_PATTERN, (match, name: string) =>
