@@ -75,6 +75,7 @@ const PUBLIC = new Set([
   // A recipient's own unsubscribe (#383): their token is the key.
   "POST /api/unsubscribe",
   "POST /api/unsubscribe/:token",
+  "GET /api/unsubscribe/:token",
   // Also registered only with OIDC configured, so not in this app:
   // POST /api/auth/oidc/link and DELETE /api/auth/me/sso need a session,
   // which oidc.test.ts checks.

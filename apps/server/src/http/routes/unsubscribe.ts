@@ -61,6 +61,14 @@ export function registerUnsubscribeRoutes(app: FastifyInstance, db: Db): void {
       return reply.send(outcome);
     });
 
+    // A mail app without one-click support opens the List-Unsubscribe
+    // address in a browser. That changes nothing: it goes on to the page,
+    // which asks, with the token moved after the #.
+    scope.get<{ Params: { token: string } }>("/unsubscribe/:token", LIMIT, async (request, reply) => {
+      const { token } = request.params;
+      return reply.redirect(isUnsubscribeToken(token) ? `/unsubscribe#${token}` : "/unsubscribe", 303);
+    });
+
     // The confirmation page: the token comes in the body, never the URL.
     scope.post("/unsubscribe", LIMIT, async (request, reply) => {
       const body = parseBody(pageSchema, request.body, reply);

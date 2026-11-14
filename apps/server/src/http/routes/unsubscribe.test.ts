@@ -110,6 +110,18 @@ describe("one-click unsubscribe (RFC 8058)", () => {
   });
 });
 
+describe("opening the one-click address in a browser", () => {
+  it("goes to the page, which asks, without changing anything", async () => {
+    const person = addRecipient();
+    const response = await app.inject({ method: "GET", url: `/api/unsubscribe/${person.unsubscribeToken}` });
+    expect(response.statusCode).toBe(303);
+    expect(response.headers.location).toBe(`/unsubscribe#${person.unsubscribeToken}`);
+    expect(stored(person.id).unsubscribedAt).toBeNull();
+    const bad = await app.inject({ method: "GET", url: "/api/unsubscribe/%3Cscript%3E" });
+    expect(bad.headers.location).toBe("/unsubscribe");
+  });
+});
+
 describe("the confirmation page's request", () => {
   it("unsubscribes, and subscribes again, with the token in the body", async () => {
     const person = addRecipient();

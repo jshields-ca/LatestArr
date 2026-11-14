@@ -17,6 +17,12 @@ export const NOT_A_RECIPIENT = "preview";
 
 const TOKEN_PATTERN = /^[0-9a-f-]{36}$/i;
 
+// The only place a token goes: after the # of the page link. Anything else
+// that happens to contain the placeholder (an item title, a code design's
+// own URL) is left alone, and a fragment is never sent to any server, so
+// an image or link in someone's content can't collect tokens.
+const PAGE_FRAGMENT = `/unsubscribe#${UNSUBSCRIBE_PLACEHOLDER}`;
+
 /** Whether this looks like a token, before touching the database. */
 export function isUnsubscribeToken(value: string): boolean {
   return TOKEN_PATTERN.test(value);
@@ -67,7 +73,7 @@ export function personalise(
   origin: string | undefined,
   token: string,
 ): { html: string; text?: string; headers?: Record<string, string> } {
-  const fill = (value: string) => value.split(UNSUBSCRIBE_PLACEHOLDER).join(token);
+  const fill = (value: string) => value.split(PAGE_FRAGMENT).join(`/unsubscribe#${token}`);
   const html = fill(message.html);
   const text = message.text === undefined ? undefined : fill(message.text);
   // RFC 8058 one-click needs an https address; over plain http the link in
@@ -85,7 +91,7 @@ export function personalise(
 
 /** For showing stored HTML in the app: no real token in it either way. */
 export function withoutPlaceholder(html: string): string {
-  return html.split(UNSUBSCRIBE_PLACEHOLDER).join(NOT_A_RECIPIENT);
+  return html.split(PAGE_FRAGMENT).join(`/unsubscribe#${NOT_A_RECIPIENT}`);
 }
 
 /** Request paths with the token hidden, for logs. */
