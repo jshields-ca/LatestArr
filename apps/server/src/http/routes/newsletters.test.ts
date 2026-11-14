@@ -231,6 +231,9 @@ describe("newsletter lifecycle", () => {
     );
     expect(getResponse.json().sources).toHaveLength(1);
     expect(getResponse.json().sources[0].mediaTypeFilter).toEqual(["movie"]);
+    // A linked source's credentials never reach the browser, even encrypted.
+    expect(getResponse.json().sources[0]).not.toHaveProperty("credentialsEncrypted");
+    expect(getResponse.json().sources[0].name).toBeTruthy();
     expect(getResponse.json().recipientGroups).toHaveLength(1);
 
     await app.inject(
