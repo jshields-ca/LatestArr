@@ -38,6 +38,10 @@ import {
   type DesignCtaPlacement,
   type DesignTextAlign,
   type DesignEmptySection,
+  type DesignNotice,
+  type DesignNoticeType,
+  MAX_NOTICE_BODY_LENGTH,
+  MAX_NOTICE_TITLE_LENGTH,
   type DesignSummaryLength,
   type DesignLayout,
   type DesignSettings,
@@ -111,6 +115,7 @@ function NoteField({
   value,
   align,
   showAlign,
+  maxLength,
   onChange,
   onAlignChange,
 }: {
@@ -120,6 +125,7 @@ function NoteField({
   value: string;
   align: DesignTextAlign;
   showAlign: boolean;
+  maxLength?: number;
   onChange: (value: string) => void;
   onAlignChange: (align: DesignTextAlign) => void;
 }) {
@@ -147,6 +153,7 @@ function NoteField({
         rows={3}
         placeholder={placeholder}
         value={value}
+        maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
         aria-describedby={`${id}-hint`}
       />
@@ -156,6 +163,17 @@ function NoteField({
     </div>
   );
 }
+
+const NOTICE_TYPES: { value: DesignNoticeType; label: string }[] = [
+  { value: "info", label: "Info" },
+  { value: "warning", label: "Warning" },
+  { value: "alert", label: "Alert" },
+];
+
+const NOTICE_PLACEMENTS: { value: DesignNotice["placement"]; label: string }[] = [
+  { value: "afterIntro", label: "After the intro" },
+  { value: "beforeFooter", label: "Before the footer note" },
+];
 
 const CTA_PLACEMENTS: { value: DesignCtaPlacement; label: string }[] = [
   { value: "afterIntro", label: "Below the intro" },
@@ -805,7 +823,15 @@ export function DesignEditorPage() {
   );
 
   const textSection = (
-    <Section title="Text" summary={listOrNone([content.intro.trim() && "Intro", content.footerNote.trim() && "Footer note"])} defaultOpen>
+    <Section
+      title="Text"
+      summary={listOrNone([
+        content.intro.trim() && "Intro",
+        (content.notice.title.trim() || content.notice.body.trim()) && "Notice",
+        content.footerNote.trim() && "Footer note",
+      ])}
+      defaultOpen
+    >
       <NoteField
         id="design-intro"
         label="Intro (optional)"
@@ -816,6 +842,52 @@ export function DesignEditorPage() {
         onChange={(intro) => setContent({ intro })}
         onAlignChange={(introAlign) => setContent({ introAlign })}
       />
+      <Group title="Notice">
+        <p className="text-xs text-muted-foreground">
+          A highlighted box for something people shouldn&apos;t miss. Shown when it has a title or text.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <ChoiceField
+            id="design-notice-type"
+            label="Type"
+            name="Notice type"
+            value={content.notice.type}
+            options={NOTICE_TYPES}
+            onChange={(type) => setContent({ notice: { ...content.notice, type } })}
+          />
+          {isDesign ? (
+            <ChoiceField
+              id="design-notice-placement"
+              label="Where it goes"
+              name="Where the notice goes"
+              value={content.notice.placement}
+              options={NOTICE_PLACEMENTS}
+              onChange={(placement) => setContent({ notice: { ...content.notice, placement } })}
+            />
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="design-notice-title">Notice title</Label>
+          <Input
+            id="design-notice-title"
+            placeholder="e.g. Maintenance on Saturday"
+            maxLength={MAX_NOTICE_TITLE_LENGTH}
+            value={content.notice.title}
+            onChange={(e) => setContent({ notice: { ...content.notice, title: e.target.value } })}
+          />
+        </div>
+        <NoteField
+          id="design-notice-body"
+          label="Notice text"
+          placeholder="e.g. Plex will be down from 9 to 11 AM."
+          value={content.notice.body}
+          align="left"
+          showAlign={false}
+          maxLength={MAX_NOTICE_BODY_LENGTH}
+          onChange={(body) => setContent({ notice: { ...content.notice, body } })}
+          onAlignChange={() => {}}
+        />
+      </Group>
       <NoteField
         id="design-footer"
         label="Footer note (optional)"

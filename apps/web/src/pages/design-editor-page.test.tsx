@@ -333,6 +333,7 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
       footerAlign: "left",
       ctas: [{ label: "Open Plex", url: "https://app.plex.tv" }],
       ctaPlacement: "afterIntro",
+      notice: { type: "info", title: "", body: "", placement: "afterIntro" },
       sourceButtons: { enabled: true, placement: "end" },
     });
   });
@@ -402,6 +403,29 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
 
     await user.keyboard("{Enter}");
     expect(screen.getByRole("textbox", { name: "Button 2 label" })).toHaveValue("Requests");
+  });
+
+  // #402: a highlighted notice.
+  it("adds a notice with a type, a title, text and where it goes", async () => {
+    const user = userEvent.setup();
+    const { container } = renderEditor();
+    await screen.findByTitle("Design preview");
+
+    selectOption(screen.getByLabelText("Notice type"), "Warning");
+    await user.type(screen.getByLabelText("Notice title"), "Maintenance on Saturday");
+    await user.type(screen.getByLabelText("Notice text"), "Plex is down from 9 to 11 AM.");
+    selectOption(screen.getByLabelText("Where the notice goes"), "Before the footer note");
+    await waitFor(() =>
+      expect(previewBodies.at(-1)?.settings.content.notice).toEqual({
+        type: "warning",
+        title: "Maintenance on Saturday",
+        body: "Plex is down from 9 to 11 AM.",
+        placement: "beforeFooter",
+      }),
+    );
+    // The Text panel's summary says it has one.
+    expect(screen.getByText("Notice", { selector: "summary *" })).toBeInTheDocument();
+    expect(await axe(container, { iframes: false })).toHaveNoViolations();
   });
 
   it("sets the intro and footer note alignment, and explains the formatting", async () => {

@@ -116,6 +116,10 @@ export interface MjmlRenderContext {
   footerNote?: string;
   /** Colour for links in those notes: the design's accent. */
   noteLinkColor?: string;
+  /** A design's notice (#402), bound as {{notice.title}} (escaped),
+   * {{notice.body}} (Markdown, like the intro) and {{notice.type}}: info,
+   * warning or alert. Absent when the design has none. */
+  notice?: { type: string; title: string; body: string };
   /** The design's section names and date order (#390). Section names are
    * bound as {{sectionNames.movie.heading}} and {{sectionNames.movie.browse}}. */
   wording?: Wording;
@@ -544,6 +548,13 @@ export async function renderMjmlTemplate(
     sectionNames: wording.sectionNames,
     introText: renderNote(context.introText, context.noteLinkColor),
     footerNote: renderNote(context.footerNote, context.noteLinkColor),
+    notice: context.notice
+      ? {
+          type: context.notice.type,
+          title: context.notice.title || undefined,
+          body: renderNote(context.notice.body, context.noteLinkColor),
+        }
+      : undefined,
     ctas: context.ctas ?? [],
     sourceButtons: context.sourceButtons ?? [],
   });

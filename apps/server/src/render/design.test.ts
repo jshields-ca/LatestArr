@@ -292,6 +292,64 @@ describe("buildDesignMjml", () => {
     expect(html).toContain("Short and sweet.<");
   });
 
+  // #402: a highlighted notice, in the tinted style with a bar (N1).
+  describe("notice", () => {
+    function renderWith(settings: DesignSettings, context: Partial<MjmlRenderContext> = {}) {
+      return render(settings, { ...designContentVariables(settings), ...context });
+    }
+    const notice = (extra: Record<string, unknown>) =>
+      design({ content: { intro: "Hello all.", footerNote: "See you next week.", notice: extra } });
+
+    it("adds nothing without a title or text", async () => {
+      const html = await renderWith(design({ content: { notice: { type: "alert" } } }));
+      expect(html).not.toContain("border-left:4px solid");
+      expect(buildDesignMjml(DEFAULT_DESIGN_SETTINGS)).not.toContain("notice");
+    });
+
+    it("shows its title and Markdown text after the intro, in its type's colours", async () => {
+      const html = await renderWith(
+        notice({ type: "warning", title: "Maintenance on Saturday", body: "Plex is down **9 to 11**." }),
+      );
+      expect(html).toContain("Maintenance on Saturday");
+      expect(html).toContain("<strong>9 to 11</strong>");
+      expect(html).toContain("border-left:4px solid #a15c00");
+      expect(html).toContain("background:#fbf0dc");
+      expect(html.indexOf("Hello all.")).toBeLessThan(html.indexOf("Maintenance on Saturday"));
+      expect(html.indexOf("Maintenance on Saturday")).toBeLessThan(html.indexOf("A Movie"));
+      // Its dark-mode colours.
+      expect(html).toMatch(/\[style\*="background:#fbf0dc"\] \{ background:#33261a !important; \}/);
+    });
+
+    it("can go before the footer note instead", async () => {
+      const html = await renderWith(notice({ title: "Heads up", placement: "beforeFooter" }));
+      expect(html.indexOf("A Book")).toBeLessThan(html.indexOf("Heads up"));
+      expect(html.indexOf("Heads up")).toBeLessThan(html.indexOf("See you next week."));
+    });
+
+    it("escapes its title and keeps raw HTML out of its text", async () => {
+      const html = await renderWith(notice({ title: "<img src=x onerror=alert(1)>", body: "<script>x</script> [ok](javascript:alert(1))" }));
+      expect(html).not.toContain("<img src=x");
+      expect(html).not.toContain("<script>x");
+      expect(html).not.toContain('href="javascript:');
+    });
+
+    it("limits how long it can be", () => {
+      expect(() => notice({ title: "x".repeat(101) })).toThrow();
+      expect(() => notice({ body: "x".repeat(1001) })).toThrow();
+    });
+
+    it("is available to code designs", async () => {
+      const settings = notice({ type: "info", title: "Hi" });
+      const html = await renderMjmlTemplate("<mjml><mj-body><mj-section><mj-column><mj-text>{{notice.type}}: {{notice.title}}</mj-text></mj-column></mj-section></mj-body></mjml>", {
+        newsletterName: "Weekly Digest",
+        items: [],
+        generatedAt,
+        ...designContentVariables(settings),
+      });
+      expect(html).toContain("info: Hi");
+    });
+  });
+
   it("says there's nothing new when no section would appear", async () => {
     const html = await render(DEFAULT_DESIGN_SETTINGS, { items: [] });
     expect(html).toContain("No new items in this period.");

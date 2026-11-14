@@ -62,6 +62,9 @@ export function DesignCodeReference() {
         </Entry>
         <Entry code="{{introText}} {{footerNote}}">From Text and buttons above, with their Markdown formatting as HTML; empty when not set.</Entry>
         <Entry code="{{#each ctas}}{{label}} {{url}}{{/each}}">The buttons from Text and buttons.</Entry>
+        <Entry code="{{#if notice}}{{notice.title}} {{notice.body}} {{notice.type}}{{/if}}">
+          The notice from Text: its title, its text with Markdown formatting as HTML, and info, warning or alert.
+        </Entry>
         <Entry code="{{#each sourceButtons}}{{label}} {{url}}{{/each}}">
           A button per linked source with a public URL, e.g. Watch on Plex.{" "}
           <code className="font-mono">{'{{#sourceButtonsFor contentType="movie"}}'}</code> gives just those for a type.
