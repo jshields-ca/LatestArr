@@ -137,6 +137,22 @@ describe("RecipientsPage", () => {
     await waitFor(() => expect(screen.getByText("Inactive")).toBeInTheDocument());
   });
 
+  // #383: their own choice, which an editor can't switch back.
+  it("shows when someone unsubscribed, with no switch to turn them back on", async () => {
+    const gone = { ...alice, id: "r2", email: "gone@example.com", displayName: "Gone", unsubscribedAt: "2026-11-12T10:00:00.000Z" };
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/recipients") return Promise.resolve(jsonResponse(200, { recipients: [alice, gone], memberships: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      throw new Error(`Unexpected fetch to ${url}`);
+    });
+    render(<RecipientsPage />);
+    const row = (await screen.findByText("Gone")).closest("tr")!;
+    expect(within(row).getByText("Unsubscribed")).toBeInTheDocument();
+    expect(within(row).getByText(/Nov/)).toBeInTheDocument();
+    expect(within(row).queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("switch")).toHaveLength(1);
+  });
+
   it("adds a recipient through the dialog", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {

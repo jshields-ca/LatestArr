@@ -24,6 +24,7 @@ import { registerNotificationRoutes } from "./http/routes/notifications.js";
 import { registerOidcRoutes } from "./http/routes/oidc.js";
 import { registerRecipientGroupRoutes } from "./http/routes/recipient-groups.js";
 import { registerRecipientRoutes } from "./http/routes/recipients.js";
+import { registerUnsubscribeRoutes } from "./http/routes/unsubscribe.js";
 import { registerSmtpProfileRoutes } from "./http/routes/smtp-profiles.js";
 import { registerSourceRoutes } from "./http/routes/sources.js";
 import { registerSystemMailRoutes } from "./http/routes/system-mail.js";
@@ -180,6 +181,7 @@ export async function buildApp(
       registerSmtpProfileRoutes(api, db);
       registerRecipientRoutes(api, db);
       registerRecipientGroupRoutes(api, db);
+      registerUnsubscribeRoutes(api, db);
       registerNewsletterRoutes(api, db, scheduler);
       registerTemplateRoutes(api, db);
       registerUserRoutes(api, db);

@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import pino from "pino";
 import { logBufferStream } from "./log-buffer.js";
+import { hideUnsubscribeToken } from "./mailer/unsubscribe.js";
 
 // Fastify's logger interface, so a route's request.log (a child that also
 // carries the request id and user) can be passed wherever this is expected.
@@ -36,6 +37,20 @@ export const logger: Logger = pino(
         "*.authPass",
       ],
       censor: "[redacted]",
+    },
+    // Fastify's own request summary, with an unsubscribe token hidden: a
+    // one-click unsubscribe (#383) carries it in the path, and the Logs
+    // page shows every request.
+    serializers: {
+      req(request: { method?: string; url?: string; host?: string; ip?: string; socket?: { remotePort?: number } }) {
+        return {
+          method: request.method,
+          url: request.url === undefined ? undefined : hideUnsubscribeToken(request.url),
+          host: request.host,
+          remoteAddress: request.ip,
+          remotePort: request.socket?.remotePort,
+        };
+      },
     },
   },
   pino.multistream([

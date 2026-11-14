@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, recipientImports, runMigrations, type Db } from "@latestarr/db";
+import { createDb, recipientImports, recipients, runMigrations, type Db } from "@latestarr/db";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../app.js";
@@ -67,7 +67,10 @@ describe("POST /recipients", () => {
     );
     expect(response.statusCode).toBe(201);
     expect(response.json().recipient.email).toBe("person@example.com");
-    expect(response.json().recipient.unsubscribeToken).toBeTruthy();
+    // Their unsubscribe token (#383) is theirs: it's stored, but never sent to the app.
+    expect(response.json().recipient).not.toHaveProperty("unsubscribeToken");
+    const [stored] = await db.select().from(recipients);
+    expect(stored?.unsubscribeToken).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it("rejects a duplicate email with 409", async () => {

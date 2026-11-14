@@ -45,6 +45,94 @@ The message's `DKIM-Signature` header names the selector (`s=`) and domain (`d=`
 - **One message per recipient,** never one message to the whole list, which spam filters also distrust.
 - **A plain-text version** goes with every HTML email. HTML-only mail scores worse with spam filters.
 
+## Unsubscribing
+
+Every newsletter carries an **Unsubscribe** link for its recipient, and the `List-Unsubscribe` and `List-Unsubscribe-Post` headers (RFC 8058) that let Gmail, Yahoo and other mail apps show their own Unsubscribe button.
+
+- **Unsubscribing leaves every newsletter** on your LatestArr. The **Recipients** page shows who unsubscribed and when. An editor can't switch them back on; the person can, from the same link.
+- **Opening the link changes nothing.** The page asks first, so a mail scanner that follows links can't unsubscribe anyone.
+- **Code designs** add the link with `{{unsubscribeUrl}}`. The headers go out either way.
+
+### Where the link points
+
+The link uses `PUBLIC_URL` if it's set, otherwise `WEB_ORIGIN`. What recipients get depends on that address:
+
+| The address | What recipients get |
+| --- | --- |
+| Public and `https://` | The link, and their mail app's own Unsubscribe button. |
+| Public, plain `http://` | The link. No button from the mail app, which needs `https://`. |
+| On your home or private network (`192.168…`, `10…`, Tailscale, `.local`, …) | A link that only works for people on that network. The Logs page warns on each send. |
+| `localhost` (the default), or not set | No link. The Logs page warns on each send. |
+
+Whenever the link can't work for everyone, recipients can still **unsubscribe by replying**. Each email carries a `List-Unsubscribe` header with a `mailto:` address, so Gmail, Apple Mail and others show an Unsubscribe button that emails you "Unsubscribe". Without a link, the footer also says "Don't want these? Reply and ask to unsubscribe." LatestArr doesn't read your mail, so you turn them off on the **Recipients** page yourself.
+
+- **Replies go** to the newsletter's reply-to address if it has one, otherwise its From address.
+- **A `noreply@` address gets no reply option,** since nobody reads it. Use a From address someone reads.
+
+### Publish only the unsubscribe page
+
+LatestArr can stay private while its unsubscribe page is public. Give the page its own address through a reverse proxy or tunnel that passes on only these paths, and set `PUBLIC_URL` to it. Keep `WEB_ORIGIN` as the address you use, so sign-in, SSO and password resets carry on as before.
+
+| Path | What it is |
+| --- | --- |
+| `/unsubscribe` | The page |
+| `/assets/*`, `/favicon.svg` | The app's scripts, styles and icon (the same code as on GitHub; nothing private) |
+| `/api/unsubscribe`, `/api/unsubscribe/*` | Unsubscribing, and mail apps' one-click requests |
+
+Everything else, including sign-in and the rest of the API, stays unreachable from outside. The unsubscribe requests need no account, are rate-limited, and say nothing about who's on your list. The page also checks whether someone's signed in; blocking that is fine.
+
+Set `TRUST_PROXY=true` in LatestArr, so its rate limit counts each visitor separately rather than treating everyone as the proxy.
+
+**Caddy:**
+
+```
+unsubscribe.example.com {
+	@unsubscribe path /unsubscribe /assets/* /favicon.svg /api/unsubscribe /api/unsubscribe/*
+	handle @unsubscribe {
+		reverse_proxy latestarr:3000
+	}
+	handle {
+		respond 404
+	}
+}
+```
+
+**Cloudflare Tunnel** (`config.yml`; nothing to open on your router):
+
+```yaml
+ingress:
+  - hostname: unsubscribe.example.com
+    path: ^/(unsubscribe|assets/.*|favicon\.svg|api/unsubscribe(/.*)?)$
+    service: http://latestarr:3000
+  - hostname: unsubscribe.example.com
+    service: http_status:404
+  - service: http_status:404
+```
+
+**nginx:**
+
+```nginx
+server {
+    server_name unsubscribe.example.com;
+    # listen 443 ssl; and your certificate here
+
+    location ~ ^/(unsubscribe|favicon\.svg|api/unsubscribe(/.*)?)$ {
+        proxy_pass http://latestarr:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    location /assets/ {
+        proxy_pass http://latestarr:3000;
+    }
+    location / {
+        return 404;
+    }
+}
+```
+
+Then set `PUBLIC_URL=https://unsubscribe.example.com` and restart LatestArr. To check, open `https://unsubscribe.example.com/unsubscribe#preview`: it should say the link is from a preview. The sign-in page at the same address should not load.
+
 ## What it doesn't do yet
 
-**There's no unsubscribe link or `List-Unsubscribe` header yet.** To stop sending to someone, an editor or admin turns them off (**Active**) or deletes them on the **Recipients** page. Mailbox providers increasingly expect one-click unsubscribe, and laws like CAN-SPAM and GDPR may too. If you send to people who didn't ask to be on the list, keep this gap in mind.
+Deleting an unsubscribed person and adding them again starts them afresh, subscribed. Leave them on the list instead.

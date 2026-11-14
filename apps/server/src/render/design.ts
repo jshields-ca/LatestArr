@@ -884,7 +884,9 @@ ${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? al
           Sent by LatestArr on {{generatedAtFormatted}}<br />
           <a href="https://www.latestarr.app" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${WEBSITE_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />LatestArr.app</a>
           &nbsp;·&nbsp;
-          <a href="https://github.com/jshields-ca/LatestArr/issues" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${REPORT_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />Report an issue</a>
+          <a href="https://github.com/jshields-ca/LatestArr/issues" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${REPORT_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />Report an issue</a>{{#if unsubscribeUrl}}<br />
+          <a href="{{unsubscribeUrl}}" style="color:${p.subtle};text-decoration:underline;" target="_blank" rel="noopener">Unsubscribe</a>{{else if unsubscribeByReply}}<br />
+          Don't want these? Reply and ask to unsubscribe.{{/if}}
         </mj-text>
       </mj-column>
     </mj-section>

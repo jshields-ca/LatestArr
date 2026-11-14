@@ -146,6 +146,8 @@ export async function renderDesignSample(
     generatedAt: now,
     lookbackDays: 7,
     logo,
+    // Every real email has one (#383); the sample's goes nowhere.
+    unsubscribeUrl: "https://example.com/unsubscribe",
     ...designContentVariables(settings),
   });
 }
