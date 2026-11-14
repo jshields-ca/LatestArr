@@ -7,8 +7,8 @@ import type { NewItem } from "@latestarr/adapter-core";
 
 export type DateOrder = "monthFirst" | "dayFirst";
 
-/** A grouped design's sections. TV covers episodes and seasons. */
-export const SECTION_NAME_KEYS = ["movie", "tv", "book", "audiobook", "game"] as const;
+/** A grouped design's sections. TV covers episodes and seasons; Music is albums. */
+export const SECTION_NAME_KEYS = ["movie", "tv", "book", "audiobook", "game", "music"] as const;
 export type SectionNameKey = (typeof SECTION_NAME_KEYS)[number];
 
 /** As a design stores them: blank keeps the default. */
@@ -21,6 +21,8 @@ const DEFAULT_NAMES: Record<SectionNameKey, { plural: string; singular: string |
   book: { plural: "Books", singular: "Book" },
   audiobook: { plural: "Audiobooks", singular: "Audiobook" },
   game: { plural: "Games", singular: "Game" },
+  // The section is "Music"; what it counts is albums.
+  music: { plural: "Music", singular: "Album" },
 };
 
 const COUNTED_KINDS: Record<Exclude<SectionNameKey, "tv">, NewItem["kind"]> = {
@@ -28,6 +30,7 @@ const COUNTED_KINDS: Record<Exclude<SectionNameKey, "tv">, NewItem["kind"]> = {
   book: "book",
   audiobook: "audiobook",
   game: "game",
+  music: "album",
 };
 
 const DEFAULT_COUNT_LABELS: Record<NewItem["kind"], [string, string]> = {
@@ -37,6 +40,7 @@ const DEFAULT_COUNT_LABELS: Record<NewItem["kind"], [string, string]> = {
   book: ["book", "books"],
   audiobook: ["audiobook", "audiobooks"],
   game: ["game", "games"],
+  album: ["album", "albums"],
 };
 
 // An item's type badge when its source doesn't set one (Plex, Tautulli and
@@ -48,6 +52,7 @@ const DEFAULT_KIND_LABELS: Record<NewItem["kind"], string> = {
   game: "Game",
   book: "Book",
   audiobook: "Audiobook",
+  album: "Album",
 };
 
 export interface Wording {

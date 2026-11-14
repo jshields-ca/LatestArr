@@ -1,6 +1,7 @@
 import {
   getAdapter,
   MAX_RECENT_ITEMS,
+  mediaKindsFor,
   type MediaKind,
   type NewItem,
   type SourceAdapter,
@@ -198,6 +199,13 @@ async function resolveServerIds(linkedSources: LinkedSource[], log: Logger): Pro
   return serverIds;
 }
 
+// What to ask a source for. Nothing chosen asks for everything, unless the
+// source leaves some kinds off until they're chosen (music, #354).
+function fetchKinds(link: LinkedSource["link"], adapter: LinkedSource["adapter"]): MediaKind[] | undefined {
+  if (link.mediaTypeFilter) return link.mediaTypeFilter as MediaKind[];
+  return adapter.capabilities.defaultMediaKinds ? [...adapter.capabilities.defaultMediaKinds] : undefined;
+}
+
 async function fetchRecentItemsFromSources(
   linkedSources: LinkedSource[],
   since: Date,
@@ -219,7 +227,7 @@ async function fetchRecentItemsFromSources(
     const sourceItems = await fetchFromSource(log, source, () =>
       adapter.fetchRecentItems(config, {
         since,
-        mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
+        mediaKinds: fetchKinds(link, adapter),
         libraryIds: link.libraryFilter ?? undefined,
         onCapReached: () => {
           capReached = true;
@@ -273,7 +281,7 @@ async function fetchPopularItemsFromSources(
     const sourceItems = await fetchFromSource(log, source, () =>
       fetchPopular.call(adapter, config, {
         since,
-        mediaKinds: link.mediaTypeFilter as MediaKind[] | undefined,
+        mediaKinds: fetchKinds(link, adapter),
       }),
     );
     for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
@@ -294,7 +302,7 @@ function buildSourceLinksByContentType(
 ): Record<string, string> {
   const result: Record<string, string> = {};
   for (const { link, source, adapter } of linkedSources) {
-    const kinds = (link.mediaTypeFilter as MediaKind[] | undefined) ?? adapter.capabilities.supportsMediaKinds;
+    const kinds = mediaKindsFor(adapter.capabilities, link.mediaTypeFilter);
     // publicUrl (when set) is the address a recipient can actually reach —
     // baseUrl may be an internal/API-only host (see the source_connections
     // schema comment), so it's only the fallback here, not the default.
@@ -313,7 +321,7 @@ function buildNewsletterSourceButtons(linkedSources: LinkedSource[]): SourceButt
       kind: source.kind,
       name: source.name,
       publicUrl: source.publicUrl,
-      kinds: (link.mediaTypeFilter as MediaKind[] | undefined) ?? adapter.capabilities.supportsMediaKinds,
+      kinds: mediaKindsFor(adapter.capabilities, link.mediaTypeFilter),
     })),
   );
 }

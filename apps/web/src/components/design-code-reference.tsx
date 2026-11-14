@@ -52,7 +52,8 @@ export function DesignCodeReference() {
         <Entry code="{{sectionNames.movie.heading}} {{sectionNames.movie.browse}}">
           A section&apos;s name from Wording, and its Browse label: Movies and Browse movies unless renamed. Also{" "}
           <code className="font-mono">tv</code>, <code className="font-mono">book</code>,{" "}
-          <code className="font-mono">audiobook</code> and <code className="font-mono">game</code>. Dates follow
+          <code className="font-mono">audiobook</code>, <code className="font-mono">game</code> and{" "}
+          <code className="font-mono">music</code>. Dates follow
           Wording&apos;s order.
         </Entry>
         <Entry code="{{logo}}">
@@ -81,12 +82,14 @@ export function DesignCodeReference() {
           The summary cut to about 30, 60 or 100 words, at a whole word.
         </Entry>
         <Entry code="{{contentLabel}} {{kind}}">
-          Badge text (Movie, Ebook, ...) and type: movie, tv_episode, tv_season, book, audiobook, or game.
+          Badge text (Movie, Ebook, ...) and type: movie, tv_episode, tv_season, book, audiobook, game, or album.
         </Entry>
         <Entry code="{{posterUrl}} {{externalUrl}}">Poster or cover image, and a link to the item.</Entry>
         <Entry code="{{addedAtFormatted}} {{releaseDateFormatted}}">When it was added and released.</Entry>
         <Entry code="{{genres}} {{rating}} {{runtimeFormatted}}">Genres, rating like 8.1/10, and runtime like 1h 45m.</Entry>
-        <Entry code="{{pageCount}} {{durationFormatted}} {{platform}}">Book pages, audiobook length, game platform.</Entry>
+        <Entry code="{{pageCount}} {{durationFormatted}} {{platform}} {{trackCount}}">
+          Book pages, audiobook length, game platform, an album&apos;s number of tracks.
+        </Entry>
         <Entry code="{{detailsLine}}">
           Runtime, pages, length, or platform, then rating, e.g. 1h 52m · 7.8/10. Empty when there are none.
         </Entry>

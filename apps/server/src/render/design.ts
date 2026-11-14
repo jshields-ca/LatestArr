@@ -15,7 +15,7 @@ export const MAX_SHOWN_ITEMS = 100;
 // settings' output is recorded in default-design.snapshot.test.ts, so any
 // change to it is deliberate.
 
-export const DESIGN_KINDS = ["movie", "tv_episode", "tv_season", "book", "audiobook", "game"] as const;
+export const DESIGN_KINDS = ["movie", "tv_episode", "tv_season", "book", "audiobook", "game", "album"] as const;
 export type DesignKind = (typeof DESIGN_KINDS)[number];
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Colours must be 6-digit hex values like #c31d4c");
@@ -606,6 +606,7 @@ const SECTIONS: { kinds: DesignKind[]; name: SectionNameKey }[] = [
   { kinds: ["book"], name: "book" },
   { kinds: ["audiobook"], name: "audiobook" },
   { kinds: ["game"], name: "game" },
+  { kinds: ["album"], name: "music" },
 ];
 
 // Sections in the design's chosen order: each sits where its first kind is.

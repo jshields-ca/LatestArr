@@ -184,7 +184,7 @@ const CTA_PLACEMENTS: { value: DesignCtaPlacement; label: string }[] = [
 // Under each section needs sections; the server puts them after the items otherwise.
 const SOURCE_BUTTON_PLACEMENTS: { value: DesignSourceButtonPlacement; label: string }[] = [
   { value: "end", label: "After the items" },
-  { value: "sections", label: "Under each section (Movies, TV, Games, ...)" },
+  { value: "sections", label: "Under each section (Movies, TV, Music, ...)" },
   { value: "top", label: "Near the top" },
 ];
 

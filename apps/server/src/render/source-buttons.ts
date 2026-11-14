@@ -41,6 +41,7 @@ const VERB_BY_KIND: Record<string, string> = {
   book: "Read on",
   audiobook: "Listen on",
   game: "Play on",
+  album: "Listen on",
 };
 
 export function buildSourceButtons(sources: SourceButtonInput[]): SourceButton[] {

@@ -2,7 +2,7 @@
 // server validates and fills defaults; this copy gives the editor a typed
 // shape and a starting point for new designs. Keep the two in sync.
 
-export type DesignKind = "movie" | "tv_episode" | "tv_season" | "book" | "audiobook" | "game";
+export type DesignKind = "movie" | "tv_episode" | "tv_season" | "book" | "audiobook" | "game" | "album";
 export type DesignLayout = "cards" | "compact" | "grid";
 export type DesignEmptySection = "hide" | "message" | "link" | "random";
 export type DesignSummaryLength = "short" | "medium" | "long";
@@ -74,7 +74,7 @@ export interface DesignContent {
 
 // Section names and date order (#390). Mirrors apps/server/src/render/wording.ts.
 export type DesignDateOrder = "monthFirst" | "dayFirst";
-export type DesignSectionNameKey = "movie" | "tv" | "book" | "audiobook" | "game";
+export type DesignSectionNameKey = "movie" | "tv" | "book" | "audiobook" | "game" | "music";
 /** Blank keeps the default. TV has no "for one": it's counted in episodes and seasons. */
 export interface DesignSectionName {
   plural: string;
@@ -95,6 +95,8 @@ export const DEFAULT_SECTION_NAMES: { key: DesignSectionNameKey; plural: string;
   { key: "book", plural: "Books", singular: "Book" },
   { key: "audiobook", plural: "Audiobooks", singular: "Audiobook" },
   { key: "game", plural: "Games", singular: "Game" },
+  // The section is Music; what it counts is albums.
+  { key: "music", plural: "Music", singular: "Album" },
 ];
 
 const BLANK_NAME: DesignSectionName = { plural: "", singular: "" };
@@ -169,7 +171,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   sections: {
     groupByType: true,
     groupEpisodes: true,
-    order: ["movie", "tv_episode", "tv_season", "book", "audiobook", "game"],
+    order: ["movie", "tv_episode", "tv_season", "book", "audiobook", "game", "album"],
     limit: null,
     empty: "message",
     showMore: true,
@@ -187,7 +189,14 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
   },
   wording: {
     dateOrder: "monthFirst",
-    sectionNames: { movie: BLANK_NAME, tv: BLANK_NAME, book: BLANK_NAME, audiobook: BLANK_NAME, game: BLANK_NAME },
+    sectionNames: {
+      movie: BLANK_NAME,
+      tv: BLANK_NAME,
+      book: BLANK_NAME,
+      audiobook: BLANK_NAME,
+      game: BLANK_NAME,
+      music: BLANK_NAME,
+    },
   },
   customCss: "",
 };
@@ -259,6 +268,7 @@ export const DESIGN_SECTIONS: { label: string; kinds: DesignKind[] }[] = [
   { label: "Books", kinds: ["book"] },
   { label: "Audiobooks", kinds: ["audiobook"] },
   { label: "Games", kinds: ["game"] },
+  { label: "Music", kinds: ["album"] },
 ];
 
 // Sections in the design's order: each sits where its first kind is.

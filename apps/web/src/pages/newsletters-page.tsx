@@ -32,6 +32,8 @@ import { SubsectionHeading } from "@/components/ui/subsection-heading";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
+import { isGroupIncluded, kindGroupsOf, toggledFilter, type KindGroup } from "@/lib/source-kinds";
 import {
   ApiError,
   addNewsletterGroup,
@@ -48,6 +50,7 @@ import {
   previewNewsletter,
   removeNewsletterGroup,
   removeNewsletterSource,
+  setNewsletterSourceKinds,
   sendNewsletterNow,
   sendTestNewsletter,
   updateNewsletter,
@@ -286,9 +289,28 @@ function LinkedSources({
   const [selectedId, setSelectedId] = useState("");
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [changingId, setChangingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const availableToAdd = allSources.filter((s) => !sources.some((linked) => linked.id === s.id));
+
+  // Turning a kind on or off saves straight away, like linking does.
+  async function handleToggle(source: LinkedSource, group: KindGroup) {
+    const mediaTypeFilter = toggledFilter(source, group);
+    setChangingId(source.id);
+    try {
+      await setNewsletterSourceKinds(newsletterId, source.id, mediaTypeFilter);
+      onChange(sources.map((s) => (s.id === source.id ? { ...s, mediaTypeFilter } : s)));
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: `Couldn't change what ${source.name} includes`,
+        description: err instanceof ApiError ? err.message : undefined,
+      });
+    } finally {
+      setChangingId(null);
+    }
+  }
   // A Plex server and the Tautulli watching it return the same new items.
   // The server lists each once (#391); say so, since people link both on
   // purpose (Tautulli adds Most watched) and might expect doubles.
@@ -336,24 +358,69 @@ function LinkedSources({
       {sources.length === 0 ? (
         <p className="text-sm text-muted-foreground">No sources linked yet.</p>
       ) : (
-        <ul className="flex flex-wrap gap-2">
-          {sources.map((source) => (
-            <li key={source.id}>
-              <Badge variant="neutral" className="gap-1.5 py-1 pl-2.5 pr-1">
-                <SourceLogo kind={source.kind} className="size-3.5" />
-                {source.name}
-                <button
+        <ul className="divide-y rounded-md border">
+          {sources.map((source) => {
+            const groups = kindGroupsOf(source.mediaKinds ?? []);
+            const includedCount = groups.filter((group) => isGroupIncluded(source, group)).length;
+            return (
+              <li key={source.id} className="flex items-start gap-3 px-3 py-2.5">
+                <SourceLogo kind={source.kind} className="mt-0.5 size-4 shrink-0" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <span className="truncate text-sm font-medium">{source.name}</span>
+                  {groups.length > 1 ? (
+                    <div
+                      role="group"
+                      aria-label={`What ${source.name} includes`}
+                      className="flex flex-wrap items-center gap-1.5"
+                    >
+                      <span className="text-xs text-muted-foreground" aria-hidden="true">
+                        Includes:
+                      </span>
+                      {groups.map((group) => {
+                        const on = isGroupIncluded(source, group);
+                        // One kind always stays on: none at all is unlinking.
+                        const last = on && includedCount === 1;
+                        return (
+                          <button
+                            key={group.label}
+                            type="button"
+                            aria-pressed={on}
+                            title={last ? "Unlink the source to include nothing from it" : undefined}
+                            disabled={changingId === source.id || last}
+                            onClick={() => void handleToggle(source, group)}
+                            className={cn(
+                              "inline-flex min-h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
+                              on
+                                ? "border-primary bg-primary/10 text-foreground"
+                                : "border-border text-muted-foreground hover:bg-muted",
+                            )}
+                          >
+                            {on ? <Check className="size-3" aria-hidden="true" /> : null}
+                            {group.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : groups.length === 1 ? (
+                    <span className="text-xs text-muted-foreground">{groups[0]!.label}</span>
+                  ) : null}
+                </div>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon"
                   aria-label={`Remove ${source.name} from newsletter`}
+                  title={`Remove ${source.name} from newsletter`}
                   onClick={() => void handleRemove(source.id)}
                   disabled={removingId === source.id}
-                  className="-my-1 rounded-full p-1.5 hover:bg-muted-foreground/20"
+                  className="-my-1 -mr-1.5 size-8 shrink-0"
                 >
-                  <X className="size-3" />
-                </button>
-              </Badge>
-            </li>
-          ))}
+                  <X className="size-4" />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
       {plexAndTautulli ? (

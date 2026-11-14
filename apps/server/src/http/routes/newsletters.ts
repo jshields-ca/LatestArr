@@ -1,3 +1,4 @@
+import { getAdapter, MEDIA_KINDS } from "@latestarr/adapter-core";
 import {
   type Db,
   newsletterRecipientGroups,
@@ -95,10 +96,29 @@ const updateNewsletterSchema = z.object({
   senderIdentity: senderIdentitySchema.optional(),
 });
 
+// The kinds of content a newsletter takes from a source. Leaving it out (or
+// null) means the source's defaults.
+const mediaTypeFilterSchema = z
+  .array(z.enum(MEDIA_KINDS))
+  .min(1, "Choose at least one kind of content, or unlink the source")
+  .max(MEDIA_KINDS.length)
+  .transform((kinds) => [...new Set(kinds)]);
+
+// Kinds the source doesn't have, which a filter can't ask for.
+function unsupportedKinds(sourceKind: string, kinds: string[] | undefined | null): string[] {
+  if (!kinds) return [];
+  const supported: readonly string[] = getAdapter(sourceKind)?.capabilities.supportsMediaKinds ?? [];
+  return kinds.filter((kind) => !supported.includes(kind));
+}
+
 const addSourceSchema = z.object({
   sourceConnectionId: z.string().min(1, "sourceConnectionId is required"),
-  mediaTypeFilter: z.array(z.string()).optional(),
+  mediaTypeFilter: mediaTypeFilterSchema.optional(),
   libraryFilter: z.array(z.string()).optional(),
+});
+
+const updateSourceSchema = z.object({
+  mediaTypeFilter: mediaTypeFilterSchema.nullable(),
 });
 
 const addRecipientGroupSchema = z.object({
@@ -285,6 +305,10 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         if (!source) {
           return reply.code(404).send({ error: "Source connection not found" });
         }
+        const unsupported = unsupportedKinds(source.kind, mediaTypeFilter);
+        if (unsupported.length > 0) {
+          return reply.code(400).send({ error: `"${source.name}" doesn't have ${unsupported.join(", ")}` });
+        }
 
         try {
           await db.insert(newsletterSources).values({
@@ -303,6 +327,39 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         request.log.info(
           { newsletterId: newsletter.id, sourceId: source.id },
           `Linked source "${source.name}" to newsletter "${newsletter.name}"`,
+        );
+        return reply.code(204).send();
+      },
+    );
+
+    // What a newsletter takes from a linked source: some of its kinds, or
+    // null for the source's defaults.
+    scope.patch<{ Params: NewsletterSourceParams }>(
+      "/newsletters/:id/sources/:sourceConnectionId",
+      async (request, reply) => {
+        const body = parseBody(updateSourceSchema, request.body, reply);
+        if (!body) return reply;
+        const { id, sourceConnectionId } = request.params;
+        const [link] = await db
+          .select({ newsletter: newsletters.name, source: sourceConnections.name, sourceKind: sourceConnections.kind })
+          .from(newsletterSources)
+          .innerJoin(newsletters, eq(newsletterSources.newsletterId, newsletters.id))
+          .innerJoin(sourceConnections, eq(newsletterSources.sourceConnectionId, sourceConnections.id))
+          .where(and(eq(newsletterSources.newsletterId, id), eq(newsletterSources.sourceConnectionId, sourceConnectionId)));
+        if (!link) {
+          return reply.code(404).send({ error: "That source isn't linked to this newsletter" });
+        }
+        const unsupported = unsupportedKinds(link.sourceKind, body.mediaTypeFilter);
+        if (unsupported.length > 0) {
+          return reply.code(400).send({ error: `"${link.source}" doesn't have ${unsupported.join(", ")}` });
+        }
+        await db
+          .update(newsletterSources)
+          .set({ mediaTypeFilter: body.mediaTypeFilter })
+          .where(and(eq(newsletterSources.newsletterId, id), eq(newsletterSources.sourceConnectionId, sourceConnectionId)));
+        request.log.info(
+          { newsletterId: id, sourceId: sourceConnectionId, mediaTypeFilter: body.mediaTypeFilter },
+          `Changed what newsletter "${link.newsletter}" includes from "${link.source}"`,
         );
         return reply.code(204).send();
       },

@@ -6,11 +6,13 @@ import { buildSourceButtons, type SourceButton, type SourceButtonInput } from ".
 // Made-up content for previewing a design that isn't attached to a
 // newsletter yet. Posters are small inline SVGs so the preview needs no
 // network access.
-function posterDataUri(fill: string, label: string): string {
+// Album covers are square; everything else is a 2:3 poster.
+function posterDataUri(fill: string, label: string, square = false): string {
+  const height = square ? 176 : 264;
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="176" height="264" viewBox="0 0 176 264">` +
-    `<rect width="176" height="264" rx="12" fill="${fill}"/>` +
-    `<text x="88" y="140" font-family="Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle">${label}</text>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="176" height="${height}" viewBox="0 0 176 ${height}">` +
+    `<rect width="176" height="${height}" rx="12" fill="${fill}"/>` +
+    `<text x="88" y="${height / 2 + 8}" font-family="Arial, sans-serif" font-size="20" fill="#ffffff" text-anchor="middle">${label}</text>` +
     `</svg>`;
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
@@ -95,6 +97,28 @@ function sampleItems(now: Date): NewItem[] {
       posterUrl: posterDataUri("#7a5b3b", "Game"),
       addedAt: new Date(now.getTime() - 4 * DAY),
     },
+    // Music is albums, with the artist underneath (#354).
+    {
+      id: "sample-5",
+      externalId: "sample-5",
+      kind: "album",
+      title: "Low Tide Radio",
+      subtitle: "The Harbour Lights",
+      posterUrl: posterDataUri("#7a3b5b", "Album", true),
+      trackCount: 12,
+      releaseDate: new Date(now.getTime() - 30 * DAY),
+      addedAt: new Date(now.getTime() - 4 * DAY),
+    },
+    {
+      id: "sample-5b",
+      externalId: "sample-5b",
+      kind: "album",
+      title: "Paper Satellites",
+      subtitle: "Mira Vance",
+      posterUrl: posterDataUri("#5b2f6b", "Album", true),
+      trackCount: 9,
+      addedAt: new Date(now.getTime() - 5 * DAY),
+    },
   ];
 }
 
@@ -103,7 +127,7 @@ function sampleItems(now: Date): NewItem[] {
 const NEUTRAL_SOURCE_BUTTONS: SourceButton[] = [
   { label: "Watch now", url: "https://example.com/watch", kinds: ["movie", "tv_episode", "tv_season"] },
   { label: "Read now", url: "https://example.com/read", kinds: ["book"] },
-  { label: "Listen now", url: "https://example.com/listen", kinds: ["audiobook"] },
+  { label: "Listen now", url: "https://example.com/listen", kinds: ["audiobook", "album"] },
   { label: "Play now", url: "https://example.com/play", kinds: ["game"] },
 ];
 

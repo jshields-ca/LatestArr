@@ -266,9 +266,9 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
     const order = within(screen.getByRole("list", { name: "Section order" }))
       .getAllByRole("listitem")
       .map((item) => item.textContent);
-    expect(order).toEqual(["Movies", "Books", "TV", "Audiobooks", "Games"]);
+    expect(order).toEqual(["Movies", "Books", "TV", "Audiobooks", "Games", "Music"]);
     await waitFor(() =>
-      expect(previewBodies.at(-1)?.settings.sections.order).toEqual(["movie", "book", "tv_episode", "tv_season", "audiobook", "game"]),
+      expect(previewBodies.at(-1)?.settings.sections.order).toEqual(["movie", "book", "tv_episode", "tv_season", "audiobook", "game", "album"]),
     );
   });
 
