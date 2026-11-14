@@ -14,8 +14,8 @@
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
     "@fastify/helmet": "^13.2.0",
-    "@fastify/rate-limit": "^11.2.1",
-    "@fastify/static": "^10.1.9",
+    "@fastify/rate-limit": "^11.2.2",
+    "@fastify/static": "^10.1.10",
     "@latestarr/adapter-audiobookshelf": "workspace:*",
     "@latestarr/adapter-booklore-family": "workspace:*",
     "@latestarr/adapter-core": "workspace:*",
@@ -28,13 +28,13 @@
     "@node-rs/argon2": "^2.2.2",
     "croner": "^11.0.0",
     "drizzle-orm": "^0.45.4",
-    "fastify": "^5.12.7",
+    "fastify": "^5.12.8",
     "handlebars": "^4.7.10",
     "html-to-text": "^10.0.1",
     "markdown-it": "^15.0.3",
     "mjml": "^5.4.1",
-    "nodemailer": "^10.2.1",
-    "openid-client": "^6.1.0",
+    "nodemailer": "^10.5.0",
+    "openid-client": "^6.8.9",
     "pino": "^10.4.0",
     "sharp": "^0.35.5",
     "zod": "^4.6.7"
@@ -45,9 +45,9 @@
     "@types/mjml": "^5.4.2",
     "@types/node": "^24.19.2",
     "@types/nodemailer": "^8.0.2",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
