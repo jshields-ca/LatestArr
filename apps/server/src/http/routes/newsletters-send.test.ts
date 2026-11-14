@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   createDb,
+  recipients as recipientsTable,
   newsletters,
   runMigrations,
   sendRunRecipientResults,
@@ -1106,5 +1107,117 @@ describe("a Plex server and its Tautulli linked to one newsletter", () => {
     });
 
     expect(await previewTitles(newsletterId)).toEqual(["Dune", "Dune"]);
+  });
+});
+
+// #383: each copy carries its recipient's own unsubscribe link and the
+// one-click headers; anyone who unsubscribed is skipped and recorded.
+describe("unsubscribing", () => {
+  const ORIGIN = "https://news.example.com";
+
+  async function newsletterFor(...emails: string[]) {
+    const smtpProfileId = await createSmtpProfile();
+    const sourceId = await createSourceConnection();
+    const { groupId } = await createRecipientAndGroup(...emails);
+    const newsletterId = await createNewsletter(smtpProfileId);
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/sources`, payload: { sourceConnectionId: sourceId } }),
+    );
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/recipient-groups`, payload: { groupId } }),
+    );
+    return newsletterId;
+  }
+
+  async function tokenOf(email: string): Promise<string> {
+    const [row] = await db.select().from(recipientsTable).where(eq(recipientsTable.email, email));
+    return row!.unsubscribeToken;
+  }
+
+  beforeEach(() => {
+    process.env.WEB_ORIGIN = ORIGIN;
+  });
+  afterEach(() => {
+    delete process.env.WEB_ORIGIN;
+  });
+
+  it("gives each copy its own link and one-click headers, and stores none of them", async () => {
+    const newsletterId = await newsletterFor("a@example.com", "b@example.com");
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValue({ messageId: "msg" });
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+    expect(response.statusCode).toBe(200);
+
+    const sent = mockSendMail.mock.calls.map(([message]) => message);
+    expect(sent).toHaveLength(2);
+    for (const message of sent) {
+      const token = await tokenOf(message.to);
+      expect(message.html).toContain(`${ORIGIN}/unsubscribe#${token}`);
+      expect(message.text).toContain(`${ORIGIN}/unsubscribe#${token}`);
+      expect(message.headers).toEqual({
+        "List-Unsubscribe": `<${ORIGIN}/api/unsubscribe/${token}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      });
+    }
+    expect(sent[0].html).not.toContain(await tokenOf(sent[1].to));
+    // What's kept with the send has no one's token.
+    const [run] = await db.select().from(sendRuns).where(eq(sendRuns.id, response.json().sendRunId));
+    expect(run?.renderedHtml).toContain("/unsubscribe#latestarr-unsubscribe-token");
+    expect(run?.renderedHtml).not.toContain(await tokenOf("a@example.com"));
+  });
+
+  it("skips someone who unsubscribed, and says so in the send's results", async () => {
+    const newsletterId = await newsletterFor("a@example.com", "gone@example.com");
+    const unsubscribe = await app.inject({
+      method: "POST",
+      url: `/api/unsubscribe/${await tokenOf("gone@example.com")}`,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      payload: "List-Unsubscribe=One-Click",
+    });
+    expect(unsubscribe.statusCode).toBe(200);
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValue({ messageId: "msg" });
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+    expect(mockSendMail.mock.calls.map(([message]) => message.to)).toEqual(["a@example.com"]);
+    const results = await db
+      .select({ status: sendRunRecipientResults.status })
+      .from(sendRunRecipientResults)
+      .where(eq(sendRunRecipientResults.sendRunId, response.json().sendRunId));
+    expect(results.map((r) => r.status).sort()).toEqual(["sent", "skipped_unsubscribed"]);
+    const [run] = await db.select().from(sendRuns).where(eq(sendRuns.id, response.json().sendRunId));
+    expect(run?.recipientCount).toBe(1);
+  });
+
+  it("goes without a link or headers when WEB_ORIGIN isn't set, and says so", async () => {
+    delete process.env.WEB_ORIGIN;
+    clearLogBuffer();
+    const newsletterId = await newsletterFor("a@example.com");
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValue({ messageId: "msg" });
+
+    await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+    const [message] = mockSendMail.mock.calls[0]!;
+    expect(message.html).not.toContain("Unsubscribe");
+    expect(message.headers).toBeUndefined();
+    expect(getRecentLogs(500).some((entry) => entry.msg.includes("without an unsubscribe link"))).toBe(true);
+  });
+
+  it("gives a preview and a test send a link that isn't anyone's", async () => {
+    const newsletterId = await newsletterFor("a@example.com");
+    mockRecentlyAdded();
+    const preview = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+    expect(preview.json().html).toContain(`${ORIGIN}/unsubscribe#preview`);
+    expect(preview.json().html).not.toContain(await tokenOf("a@example.com"));
+
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValueOnce({ messageId: "msg" });
+    await app.inject(
+      authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-test`, payload: { to: "me@example.com" } }),
+    );
+    const [message] = mockSendMail.mock.calls[0]!;
+    expect(message.html).toContain(`${ORIGIN}/unsubscribe#preview`);
+    expect(message.headers).toBeUndefined();
   });
 });

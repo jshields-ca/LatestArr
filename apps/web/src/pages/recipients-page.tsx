@@ -47,6 +47,7 @@ import {
   type RecipientGroup,
   type RecipientMembership,
 } from "@/lib/api";
+import { formatDate } from "@/lib/dates";
 import { compareText, matchesSearch } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
@@ -564,6 +565,18 @@ function RecipientTableRow({
         <GroupChips names={groupNames} />
       </td>
       <td className="py-2.5 pr-4">
+        {recipient.unsubscribedAt ? (
+          // Their own choice (#383): not a switch an editor can flip back.
+          <span
+            className="flex flex-col text-xs leading-tight"
+            title="They unsubscribed using the link in a newsletter. Only they can subscribe again, from the same link."
+          >
+            <span className="font-medium">Unsubscribed</span>
+            <span className="text-muted-foreground">
+              {formatDate(recipient.unsubscribedAt)}
+            </span>
+          </span>
+        ) : (
         <div className="flex items-center gap-2">
           <Switch
             id={`recipient-active-${recipient.id}`}
@@ -576,6 +589,7 @@ function RecipientTableRow({
             {recipient.isActive ? "Active" : "Inactive"}
           </Label>
         </div>
+        )}
       </td>
       <td className="py-2.5 pr-4">
         <div className="flex items-center justify-end gap-1">
@@ -627,7 +641,8 @@ function recipientSortValue(recipient: Recipient, key: RecipientSortKey): string
     case "email":
       return recipient.email;
     case "status":
-      return recipient.isActive ? 1 : 0;
+      // Unsubscribed people sort after inactive ones.
+      return recipient.unsubscribedAt ? -1 : recipient.isActive ? 1 : 0;
   }
 }
 
@@ -1461,7 +1476,10 @@ function GroupMembers({ groupId, allRecipients }: { groupId: string; allRecipien
         .map((r) => ({
           value: r.id,
           label: r.displayName || r.email,
-          detail: [r.displayName ? r.email : null, r.isActive ? null : "inactive"].filter(Boolean).join(" · ") || undefined,
+          detail:
+            [r.displayName ? r.email : null, r.unsubscribedAt ? "unsubscribed" : r.isActive ? null : "inactive"]
+              .filter(Boolean)
+              .join(" · ") || undefined,
         })),
     [allRecipients, members],
   );

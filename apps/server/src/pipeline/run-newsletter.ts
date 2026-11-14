@@ -44,6 +44,13 @@ import {
 import { logger as defaultLogger, type Logger } from "../logger.js";
 import { renderSubject } from "../render/subject.js";
 import type { Wording } from "../render/wording.js";
+import {
+  NOT_A_RECIPIENT,
+  personalise,
+  unsubscribeOrigin,
+  unsubscribeUrlTemplate,
+  withoutPlaceholder,
+} from "../mailer/unsubscribe.js";
 import { resolveLogo } from "./design-logo.js";
 import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -413,6 +420,7 @@ async function renderNewsletterContent(
     timeZone: newsletter.timezone,
     lookbackDays: newsletter.lookbackDays,
     logo: logo.logo,
+    unsubscribeUrl: unsubscribeUrlTemplate(unsubscribeOrigin()),
     ...content,
   });
 
@@ -607,7 +615,7 @@ export async function previewNewsletter(
     );
     return {
       subject: subjectFor(newsletter, items, generatedAt, wording),
-      html: inlineAttachments(html, attachments),
+      html: withoutPlaceholder(inlineAttachments(html, attachments)),
       items: items.map((item) => ({ title: item.title, kind: item.kind })),
     };
   } catch (err) {
@@ -634,8 +642,7 @@ export async function sendTestNewsletter(
       from: sender.from,
       to,
       subject: `[Test] ${subjectFor(newsletter, items, generatedAt, wording)}`,
-      html,
-      text,
+      ...personalise({ html, text }, unsubscribeOrigin(), NOT_A_RECIPIENT),
       attachments,
     });
     log.info({ items: items.length }, `Sent a test of "${newsletter.name}" to ${to}`);
@@ -711,7 +718,17 @@ async function executeRun(
     await keepAttachmentsForLatestSend(db, newsletterId, sendRunId, attachments);
 
     const recipientRows = await resolveRecipients(db, newsletterId);
-    const activeRecipients = recipientRows.filter((recipient) => recipient.isActive);
+    // Inactive people are left out quietly, as always. Anyone who
+    // unsubscribed themselves (#383) is recorded as skipped, so the send's
+    // history says why they didn't get it.
+    const activeRecipients = recipientRows.filter((recipient) => recipient.isActive && !recipient.unsubscribedAt);
+    const unsubscribed = recipientRows.filter((recipient) => recipient.isActive && recipient.unsubscribedAt);
+    const origin = unsubscribeOrigin();
+    if (!origin && activeRecipients.length > 0) {
+      log.warn(
+        `"${newsletter.name}" is going out without an unsubscribe link: set WEB_ORIGIN to the address people reach LatestArr at (not localhost)`,
+      );
+    }
     // Recorded before sending, so a send interrupted partway (see
     // interrupted-sends.ts) can still say how many it was meant to reach.
     await db
@@ -722,14 +739,19 @@ async function executeRun(
     let sentCount = 0;
     let failedCount = 0;
 
+    if (unsubscribed.length > 0) {
+      await db.insert(sendRunRecipientResults).values(
+        unsubscribed.map((recipient) => ({ sendRunId, recipientId: recipient.id, status: "skipped_unsubscribed" as const })),
+      );
+    }
+
     for (const recipient of activeRecipients) {
       try {
         const result = await sendEmail(sender.credentials, {
           from: sender.from,
           to: recipient.email,
           subject,
-          html,
-          text,
+          ...personalise({ html, text }, origin, recipient.unsubscribeToken),
           attachments,
         });
         await db.insert(sendRunRecipientResults).values({

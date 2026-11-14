@@ -45,6 +45,15 @@ The message's `DKIM-Signature` header names the selector (`s=`) and domain (`d=`
 - **One message per recipient,** never one message to the whole list, which spam filters also distrust.
 - **A plain-text version** goes with every HTML email. HTML-only mail scores worse with spam filters.
 
+## Unsubscribing
+
+Every newsletter carries an **Unsubscribe** link for its recipient, and the `List-Unsubscribe` and `List-Unsubscribe-Post` headers (RFC 8058) that let Gmail, Yahoo and other mail apps show their own Unsubscribe button.
+
+- **Unsubscribing leaves every newsletter** on your LatestArr. The **Recipients** page shows who unsubscribed and when. An editor can't switch them back on; the person can, from the same link.
+- **The link needs `WEB_ORIGIN`** set to the address your recipients can reach LatestArr at. Left at `localhost`, emails go without a link (the Logs page says so on each send). The one-click headers also need that address to be `https://`; over plain `http://` the link in the email still works.
+- **Opening the link changes nothing.** The page asks first, so a mail scanner that follows links can't unsubscribe anyone.
+- **Code designs** add the link with `{{unsubscribeUrl}}`. The headers go out either way.
+
 ## What it doesn't do yet
 
-**There's no unsubscribe link or `List-Unsubscribe` header yet.** To stop sending to someone, an editor or admin turns them off (**Active**) or deletes them on the **Recipients** page. Mailbox providers increasingly expect one-click unsubscribe, and laws like CAN-SPAM and GDPR may too. If you send to people who didn't ask to be on the list, keep this gap in mind.
+Deleting an unsubscribed person and adding them again starts them afresh, subscribed. Leave them on the list instead.

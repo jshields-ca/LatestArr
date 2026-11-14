@@ -20,6 +20,7 @@ import { ResetPasswordPage } from "@/pages/reset-password-page";
 import { SetupPage } from "@/pages/setup-page";
 import { SmtpProfilesPage } from "@/pages/smtp-profiles-page";
 import { SourcesPage } from "@/pages/sources-page";
+import { UnsubscribePage } from "@/pages/unsubscribe-page";
 import { UsersPage } from "@/pages/users-page";
 
 // Old bookmarks to the retired drag-and-drop editor open the same design
@@ -37,6 +38,8 @@ export default function App() {
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        {/* A recipient's own page (#383): no account, no sign-in. */}
+        <Route path="/unsubscribe" element={<UnsubscribePage />} />
         <Route
           path="/*"
           element={

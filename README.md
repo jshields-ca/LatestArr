@@ -94,7 +94,7 @@ This repository keeps the technical reference alongside the code: [`docs/self-ho
 
 - **Pre-1.0.** Usable today, with rough edges and occasional breaking changes. Back up before updating.
 - **Limited real-world testing.** Testing so far is the maintainer's own setup; the 🧪 sources above still need testers.
-- **Known gaps:** no unsubscribe link yet (an admin deactivates recipients instead; see [Unsubscribe](https://www.latestarr.app/docs/email-delivery/unsubscribe)), and Gmail's mobile apps apply their own dark mode.
+- **Known gaps:** Gmail's mobile apps apply their own dark mode.
 
 ## How it's built
 

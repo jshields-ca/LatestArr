@@ -123,6 +123,10 @@ export interface MjmlRenderContext {
   /** The design's section names and date order (#390). Section names are
    * bound as {{sectionNames.movie.heading}} and {{sectionNames.movie.browse}}. */
   wording?: Wording;
+  /** Where a recipient unsubscribes (#383), with a placeholder for their
+   * token that each copy fills in. Bound as {{unsubscribeUrl}}; absent when
+   * WEB_ORIGIN isn't set. */
+  unsubscribeUrl?: string;
   /** Up to a handful of {label, url} call-to-action buttons the default
    * template renders as a row of buttons. Bound as {{#each ctas}} for any
    * template that references it. */
@@ -546,6 +550,7 @@ export async function renderMjmlTemplate(
     itemCount: context.items.length,
     kindCounts: kindCounts(context.items, wording.countLabels),
     sectionNames: wording.sectionNames,
+    unsubscribeUrl: context.unsubscribeUrl,
     introText: renderNote(context.introText, context.noteLinkColor),
     footerNote: renderNote(context.footerNote, context.noteLinkColor),
     notice: context.notice

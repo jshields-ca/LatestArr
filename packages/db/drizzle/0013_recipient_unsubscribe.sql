@@ -1,0 +1,1 @@
+ALTER TABLE `recipients` ADD `unsubscribed_at` integer;

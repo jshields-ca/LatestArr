@@ -2,6 +2,7 @@ import { type Db, sendRunAttachments, sendRunRecipientResults, sendRuns } from "
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { sendEmail, type EmailAttachment } from "../mailer/send.js";
 import { htmlToPlainText } from "../render/plain-text.js";
+import { NOT_A_RECIPIENT, personalise, unsubscribeOrigin } from "../mailer/unsubscribe.js";
 import type { Logger } from "../logger.js";
 import {
   loadNewsletter,
@@ -133,7 +134,7 @@ export async function planSendToTheRest(
   // The newsletter's recipients as they are now: anyone deactivated since
   // is left out, and anyone added since is included.
   const rest = (await resolveRecipients(db, newsletterId))
-    .filter((recipient) => recipient.isActive && !sent.has(recipient.id))
+    .filter((recipient) => recipient.isActive && !recipient.unsubscribedAt && !sent.has(recipient.id))
     .sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email))
     .map((recipient) => ({
       id: recipient.id,
@@ -190,6 +191,12 @@ export async function sendToTheRest(
 
   const text = htmlToPlainText(run.renderedHtml!);
   const name = newsletter.name;
+  // Each copy gets its own unsubscribe link (#383); tokens aren't part of
+  // the plan, which the app shows.
+  const origin = unsubscribeOrigin();
+  const tokens = new Map(
+    (await resolveRecipients(db, newsletterId)).map((recipient) => [recipient.id, recipient.unsubscribeToken]),
+  );
   log.info({ sendRunId: runId, recipients: plan.recipients.length }, `Sending "${name}" to the rest`);
 
   let sent = 0;
@@ -202,8 +209,7 @@ export async function sendToTheRest(
           from: sender.from,
           to: recipient.email,
           subject: run.subject!,
-          html: run.renderedHtml!,
-          text,
+          ...personalise({ html: run.renderedHtml!, text }, origin, tokens.get(recipient.id) ?? NOT_A_RECIPIENT),
           attachments,
         });
         outcome = { status: "sent", providerMessageId: result.messageId, error: null };

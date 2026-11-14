@@ -13,6 +13,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { designSettingsSchema } from "../../render/design.js";
+import { withoutPlaceholder } from "../../mailer/unsubscribe.js";
 import {
   describeSendFailure,
   NewsletterMisconfiguredError,
@@ -562,7 +563,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
             "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src * data:; style-src 'unsafe-inline' https:; font-src https: data:",
           )
           .type("text/html")
-          .send(row.renderedHtml);
+          .send(withoutPlaceholder(row.renderedHtml));
       },
     );
   });
