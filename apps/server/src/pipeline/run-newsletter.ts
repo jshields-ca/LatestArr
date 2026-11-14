@@ -44,6 +44,15 @@ import {
 import { logger as defaultLogger, type Logger } from "../logger.js";
 import { renderSubject } from "../render/subject.js";
 import type { Wording } from "../render/wording.js";
+import {
+  isPrivateOrigin,
+  NOT_A_RECIPIENT,
+  personalise,
+  unsubscribeOrigin,
+  unsubscribeReplyAddress,
+  unsubscribeUrlTemplate,
+  withoutPlaceholder,
+} from "../mailer/unsubscribe.js";
 import { resolveLogo } from "./design-logo.js";
 import { sendFailureAlert } from "../notifications/alerts.js";
 import { getEncryptionKey } from "../secrets.js";
@@ -413,6 +422,8 @@ async function renderNewsletterContent(
     timeZone: newsletter.timezone,
     lookbackDays: newsletter.lookbackDays,
     logo: logo.logo,
+    unsubscribeUrl: unsubscribeUrlTemplate(unsubscribeOrigin()),
+    unsubscribeByReply: Boolean(await unsubscribeReplyFor(db, newsletter)),
     ...content,
   });
 
@@ -537,6 +548,23 @@ export async function loadNewsletter(db: Db, newsletterId: string): Promise<News
 interface Sender {
   credentials: SmtpCredentials;
   from: SendEmailInput["from"];
+  /** The newsletter's own reply-to, when it has one. */
+  replyTo?: string;
+  /** Where "unsubscribe" replies go (#383): reply-to, else From; none for no-reply. */
+  unsubscribeReply?: string;
+}
+
+// The reply address for unsubscribing (#383), without failing when the
+// newsletter has no email server yet (a preview can still render).
+async function unsubscribeReplyFor(db: Db, newsletter: Newsletter): Promise<string | undefined> {
+  const identity = newsletter.senderIdentity;
+  if (identity?.replyTo || identity?.fromEmail) return unsubscribeReplyAddress(identity.replyTo || identity.fromEmail);
+  if (!newsletter.smtpProfileId) return undefined;
+  const [profile] = await db
+    .select({ email: smtpProfiles.defaultFromEmail })
+    .from(smtpProfiles)
+    .where(eq(smtpProfiles.id, newsletter.smtpProfileId));
+  return unsubscribeReplyAddress(profile?.email);
 }
 
 export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender> {
@@ -553,7 +581,13 @@ export async function loadSender(db: Db, newsletter: Newsletter): Promise<Sender
 
   const fromName = newsletter.senderIdentity?.fromName ?? smtpProfile.defaultFromName;
   const fromEmail = newsletter.senderIdentity?.fromEmail ?? smtpProfile.defaultFromEmail;
-  return { credentials: smtpCredentialsFor(smtpProfile), from: fromHeader(fromName, fromEmail) };
+  const replyTo = newsletter.senderIdentity?.replyTo || undefined;
+  return {
+    credentials: smtpCredentialsFor(smtpProfile),
+    from: fromHeader(fromName, fromEmail),
+    ...(replyTo && { replyTo }),
+    unsubscribeReply: unsubscribeReplyAddress(replyTo ?? fromEmail),
+  };
 }
 
 // The subject for this issue, with its {variables} filled in (#267).
@@ -566,6 +600,21 @@ function subjectFor(newsletter: Newsletter, items: NewItem[], generatedAt: Date,
     items,
     wording,
   });
+}
+
+// Says when recipients can't unsubscribe themselves, or only from home
+// (#383), once per send, with what to change.
+export function warnAboutUnsubscribing(log: Logger, name: string, origin: string | undefined, reply: string | undefined): void {
+  const byReply = reply ? ` They can still unsubscribe by replying to ${reply}.` : "";
+  if (!origin) {
+    log.warn(
+      `"${name}" is going out without an unsubscribe link: set PUBLIC_URL (or WEB_ORIGIN) to an address recipients can reach, not localhost.${byReply}`,
+    );
+  } else if (isPrivateOrigin(origin)) {
+    log.warn(
+      `Unsubscribe links in "${name}" only work on your own network (${origin}). To make them work anywhere, publish just the unsubscribe page and set PUBLIC_URL to that address.${byReply}`,
+    );
+  }
 }
 
 // A browser can't resolve cid: references, so the preview swaps each
@@ -607,7 +656,7 @@ export async function previewNewsletter(
     );
     return {
       subject: subjectFor(newsletter, items, generatedAt, wording),
-      html: inlineAttachments(html, attachments),
+      html: withoutPlaceholder(inlineAttachments(html, attachments)),
       items: items.map((item) => ({ title: item.title, kind: item.kind })),
     };
   } catch (err) {
@@ -634,8 +683,8 @@ export async function sendTestNewsletter(
       from: sender.from,
       to,
       subject: `[Test] ${subjectFor(newsletter, items, generatedAt, wording)}`,
-      html,
-      text,
+      ...(sender.replyTo && { replyTo: sender.replyTo }),
+      ...personalise({ html, text }, unsubscribeOrigin(), NOT_A_RECIPIENT),
       attachments,
     });
     log.info({ items: items.length }, `Sent a test of "${newsletter.name}" to ${to}`);
@@ -711,7 +760,13 @@ async function executeRun(
     await keepAttachmentsForLatestSend(db, newsletterId, sendRunId, attachments);
 
     const recipientRows = await resolveRecipients(db, newsletterId);
-    const activeRecipients = recipientRows.filter((recipient) => recipient.isActive);
+    // Inactive people are left out quietly, as always. Anyone who
+    // unsubscribed themselves (#383) is recorded as skipped, so the send's
+    // history says why they didn't get it.
+    const activeRecipients = recipientRows.filter((recipient) => recipient.isActive && !recipient.unsubscribedAt);
+    const unsubscribed = recipientRows.filter((recipient) => recipient.isActive && recipient.unsubscribedAt);
+    const origin = unsubscribeOrigin();
+    if (activeRecipients.length > 0) warnAboutUnsubscribing(log, newsletter.name, origin, sender.unsubscribeReply);
     // Recorded before sending, so a send interrupted partway (see
     // interrupted-sends.ts) can still say how many it was meant to reach.
     await db
@@ -722,14 +777,20 @@ async function executeRun(
     let sentCount = 0;
     let failedCount = 0;
 
+    if (unsubscribed.length > 0) {
+      await db.insert(sendRunRecipientResults).values(
+        unsubscribed.map((recipient) => ({ sendRunId, recipientId: recipient.id, status: "skipped_unsubscribed" as const })),
+      );
+    }
+
     for (const recipient of activeRecipients) {
       try {
         const result = await sendEmail(sender.credentials, {
           from: sender.from,
           to: recipient.email,
           subject,
-          html,
-          text,
+          ...(sender.replyTo && { replyTo: sender.replyTo }),
+          ...personalise({ html, text }, origin, recipient.unsubscribeToken, sender.unsubscribeReply),
           attachments,
         });
         await db.insert(sendRunRecipientResults).values({

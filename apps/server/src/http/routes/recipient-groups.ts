@@ -26,6 +26,18 @@ const addMemberSchema = z.object({
   recipientId: z.string().min(1, "recipientId is required"),
 });
 
+// A recipient's unsubscribe token (#383) stays on the server: it's their
+// key to their own subscription, and editors have no use for it.
+function withoutTokens(payload: unknown): unknown {
+  if (Array.isArray(payload)) return payload.map(withoutTokens);
+  if (payload && typeof payload === "object" && !(payload instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(payload).filter(([key]) => key !== "unsubscribeToken").map(([key, value]) => [key, withoutTokens(value)]),
+    );
+  }
+  return payload;
+}
+
 interface IdParams {
   id: string;
 }
@@ -38,6 +50,7 @@ interface GroupMemberParams {
 export function registerRecipientGroupRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db, { read: "editor", write: "editor" }));
+    scope.addHook("preSerialization", async (_request, _reply, payload) => withoutTokens(payload));
 
     scope.post("/recipient-groups", async (request, reply) => {
       const body = parseBody(createGroupSchema, request.body, reply);

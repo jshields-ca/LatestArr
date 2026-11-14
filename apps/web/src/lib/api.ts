@@ -109,6 +109,14 @@ export function getAuthProviders(): Promise<AuthProviders> {
   return apiFetch<AuthProviders>("/auth/providers");
 }
 
+/** From the unsubscribe page (#383): the person's own code, no sign-in. */
+export function setSubscription(token: string, subscribed: boolean): Promise<{ subscribed: boolean }> {
+  return apiFetch<{ subscribed: boolean }>("/unsubscribe", {
+    method: "POST",
+    body: JSON.stringify({ token, subscribed }),
+  });
+}
+
 /** Always answers the same way, whether or not the account exists. */
 export function requestPasswordReset(email: string): Promise<{ message: string }> {
   return apiFetch<{ message: string }>("/auth/password-reset/request", {
@@ -272,6 +280,8 @@ export interface Recipient {
   email: string;
   displayName: string | null;
   isActive: boolean;
+  /** When they unsubscribed themselves (#383); only they can undo it. */
+  unsubscribedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -43,6 +43,10 @@ export interface SendEmailInput {
   html: string;
   text?: string;
   attachments?: EmailAttachment[];
+  /** Extra headers, e.g. one-click unsubscribe (#383). */
+  headers?: Record<string, string>;
+  /** Where replies go, when not to the From address. */
+  replyTo?: string;
 }
 
 export interface SendEmailResult {

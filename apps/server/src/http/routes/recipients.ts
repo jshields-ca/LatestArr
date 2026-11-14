@@ -72,6 +72,18 @@ function recipientCount(count: number): string {
   return `${count} recipient${count === 1 ? "" : "s"}`;
 }
 
+// A recipient's unsubscribe token (#383) stays on the server: it's their
+// key to their own subscription, and editors have no use for it.
+function withoutTokens(payload: unknown): unknown {
+  if (Array.isArray(payload)) return payload.map(withoutTokens);
+  if (payload && typeof payload === "object" && !(payload instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(payload).filter(([key]) => key !== "unsubscribeToken").map(([key, value]) => [key, withoutTokens(value)]),
+    );
+  }
+  return payload;
+}
+
 interface IdParams {
   id: string;
 }
@@ -79,6 +91,7 @@ interface IdParams {
 export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
   void app.register(async (scope) => {
     scope.addHook("preHandler", requireAuth(db, { read: "editor", write: "editor" }));
+    scope.addHook("preSerialization", async (_request, _reply, payload) => withoutTokens(payload));
 
     scope.post("/recipients", async (request, reply) => {
       const body = parseBody(createRecipientSchema, request.body, reply);
