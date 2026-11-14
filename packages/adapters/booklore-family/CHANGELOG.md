@@ -1,5 +1,30 @@
 # @latestarr/adapter-booklore-family
 
+## 0.13.0
+
+### Patch Changes
+
+- [#423](https://github.com/jshields-ca/LatestArr/pull/423) [`1641b29`](https://github.com/jshields-ca/LatestArr/commit/1641b298992b30ee0cc052419ac23013217a59da) - **Improved:** Updated the library that reads BookLore, BookOrbit and Grimmory feeds, clearing a low-severity security alert. LatestArr wasn't exposed: the problem needs a parser option it doesn't use.
+
+  <details>
+  <summary>Technical details</summary>
+
+  fast-xml-parser 5.11.2 → 5.12.0 ([#423](https://github.com/jshields-ca/LatestArr/issues/423)), with strnum 2.5.1 and is-unsafe 2.0.3. Clears GHSA-474x-hrwr-fgx4 (quadratic CPU use on unterminated tags inside a stop node), which needs the non-default `stopNodes` option; `booklore-client.ts` sets only `ignoreAttributes` and `attributeNamePrefix`. No code change. Checked by parsing the same feed of 24 awkward values (numbers, leading zeros, exponents, CRLF line endings, entities, CDATA) with both versions and LatestArr's parser options: the output is identical.
+
+  </details>
+
+- [#442](https://github.com/jshields-ca/LatestArr/pull/442) [`cd3c79a`](https://github.com/jshields-ca/LatestArr/commit/cd3c79aab8930a130408118425a9602376c00dd5) - **Fixed:** BookLore, BookOrbit and Grimmory sources showed a book whose title is only digits wrongly: "007" appeared as "7" and "1.50" as "1.5". Titles, authors and descriptions now show exactly as the library has them.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Fixes [#426](https://github.com/jshields-ca/LatestArr/issues/426). The OPDS feed was parsed with fast-xml-parser's defaults, which turn a text node that looks like a number into a JavaScript number. `parseTagValue: false` keeps text as text, and `parseAttributeValue: false` is now set explicitly. `dc:issued` no longer needs converting back to a string. Entry ids were affected the same way (a numeric `<id>` such as `0042` became `42`); the three apps use `urn:` ids, so no links change.
+
+  </details>
+
+- Updated dependencies [[`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83)]:
+  - @latestarr/adapter-core@0.13.0
+
 ## 0.12.8
 
 ### Patch Changes

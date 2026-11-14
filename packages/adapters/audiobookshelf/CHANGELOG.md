@@ -1,5 +1,12 @@
 # @latestarr/adapter-audiobookshelf
 
+## 0.13.0
+
+### Patch Changes
+
+- Updated dependencies [[`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83)]:
+  - @latestarr/adapter-core@0.13.0
+
 ## 0.12.8
 
 ### Patch Changes
