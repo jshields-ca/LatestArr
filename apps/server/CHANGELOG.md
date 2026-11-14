@@ -1,5 +1,153 @@
 # @latestarr/server
 
+## 0.13.0
+
+### Minor Changes
+
+- [#444](https://github.com/jshields-ca/LatestArr/pull/444) [`afd0bdc`](https://github.com/jshields-ca/LatestArr/commit/afd0bdc63190539ddafe033c49c9750cf86881c4) - **New:** When a section has more new items than its limit, it ends with how many were left out: "+ 76 more books".
+
+  - **Linked** to the source's Public URL when it has one, so people can go and see the rest. Without one it's just the count, rather than a link to an address recipients might not reach.
+  - **TV** counts shows when a show's episodes are grouped, and episodes when they aren't. Other sections use their own name, including one you've renamed.
+  - **On by default,** and only shown when something was left out. Turn it off with **Say how many more** under the design's **Sections**.
+  - **Code designs** can add it with `{{#moreFor}}`, given the same arguments as the `{{#mediaList}}` above it.
+
+  Thanks to crispybegs for the idea ([#362](https://github.com/jshields-ca/LatestArr/issues/362)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#362](https://github.com/jshields-ca/LatestArr/issues/362). A `moreFor` Handlebars helper repeats `mediaList`'s filtering and grouping to count the rows past its `count` (or `MAX_SHOWN_ITEMS`), and renders its block with `{count, label, url}`. `url` comes from a new `publicLinksByContentType` in the render context, built from linked sources' Public URLs only; the existing `sourceLinksByContentType` falls back to a source's own address, which can be an API host. Design settings gain `sections.showMore` (default true). The Default design's rendered email is unchanged unless a section overflows.
+
+  Linking to each app's own "recently added" view, suggested on the issue, isn't in this change: it needs checking app by app for a stable address.
+
+  </details>
+
+- [#447](https://github.com/jshields-ca/LatestArr/pull/447) [`fbce2f0`](https://github.com/jshields-ca/LatestArr/commit/fbce2f0bc9053fecb267187780abc51ee2612c85) - **New:** A design can carry a highlighted notice: a title and a short note, as **Info**, **Warning** or **Alert**. Good for "Maintenance on Saturday" or "Verify with the email you use for Plex".
+
+  - Add it under the design editor's **Text**: choose its type, write a title and some text (with the same formatting as the intro), and put it after the intro or before the footer note.
+  - Each type has its own colour, as a tinted box with a bar down the left and a small icon, in light and dark mode.
+  - **Code designs** get it as `{{notice.title}}`, `{{notice.body}}` and `{{notice.type}}`.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#402](https://github.com/jshields-ca/LatestArr/issues/402), in the style picked during review (N1). Design settings gain `content.notice` (`type`, `title` up to 100 characters, `body` up to 1,000, `placement`). The title is escaped and the text goes through `render/notes.ts` like the intro, so neither can add markup or unsafe links. The colours are fixed per type rather than taken from the palette, so a warning always reads as one, and each has a dark-mode pair in the design's dark-mode CSS. The icon is a coloured circle with "i", "!" or "×" drawn in HTML rather than an image, so there's nothing to host or fetch and it shows with images off; its glyph colour (`#fffffe`) is unique so dark mode can recolour it without touching button text. One notice per design for now.
+
+  </details>
+
+- [#438](https://github.com/jshields-ca/LatestArr/pull/438) [`3633272`](https://github.com/jshields-ca/LatestArr/commit/36332729c0093b536161337bd71a76341c6b56f9) - **New:** On the Recipients page, see who is in which group, and change several people at once.
+
+  - **Groups in the table:** each person's groups show beside their email, and a menu next to the search box narrows the list to one group, or to people in no group.
+  - **Tick several people:** a box on each row, one in the heading for the whole page, and **Select all** for everyone who matches the search and group filter.
+  - **Change them together:** make them active or inactive, add them to a group, remove them from one, or delete them. Delete asks first and says how many.
+  - **One line on the Logs page** for each change, saying how many people it changed and naming them.
+
+  Deleting someone, alone or with others, now also says that they'll go from the list of who past sends went to. That was already the case; the message didn't mention it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 13 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)) and [#400](https://github.com/jshields-ca/LatestArr/issues/400). `GET /api/recipients` also returns `memberships` (`{ recipientId, groupId }` pairs), so the table shows and filters by group without a request per person. `POST /api/recipients/bulk` takes `{ action, ids, groupId? }` with `action` one of `activate`, `deactivate`, `addToGroup`, `removeFromGroup` or `delete`, up to 5,000 ids, and needs the editor role like the single-recipient routes. It runs in one transaction, skips ids that don't exist, and answers `{ changed, requested }`, where `changed` counts only the people it altered. Its log entry names up to 25 addresses.
+
+  In the web app the actions replace the search row while anyone is ticked, so the search and filter can't change under a selection; from 1024px up the table doesn't move when the first box is ticked. The Groups column shows from 1280px, and under the name below that.
+
+  </details>
+
+- [#443](https://github.com/jshields-ca/LatestArr/pull/443) [`5e95e0f`](https://github.com/jshields-ca/LatestArr/commit/5e95e0f22c7fcb45354497fac14e9e953e1ae19e) - **New:** A design can rename its sections and put the day before the month: "Films" for "Movies", and "29 September 2026".
+
+  - **Section names:** in the design editor's new **Wording** panel, give any section its own name. It's used for the heading, the section's Browse button, the counts under the title ("9 films"), and each item's badge ("Film"). Blank keeps the default.
+  - **Dates:** "September 29, 2026" or "29 September 2026", in the email and its subject line.
+  - **Use UK English** sets both at once: Films, and the day first.
+  - **Code designs** get the names as `{{sectionNames.movie.heading}}` and `{{sectionNames.movie.browse}}`, and their dates follow the same order.
+
+  Thanks to crispybegs for asking ([#390](https://github.com/jshields-ca/LatestArr/issues/390)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#390](https://github.com/jshields-ca/LatestArr/issues/390). `render/wording.ts` gathers what a design can change: section names, count words and date order. Design settings gain `wording: { dateOrder, sectionNames }`, each name up to 40 characters. The default design no longer writes "Movies" into its markup: headings read `{{sectionNames.<section>.heading}}` and the library link `label=sectionNames.<section>.browse`, so a name is escaped by Handlebars like any other value and can't add markup or template code. The Default design's rendered email is unchanged (its snapshot test passes as it was). `render/dates.ts` takes the order; the subject, item dates and date range all use it, and so does the newsletter form's subject preview. "Most watched", "Nothing new this time" and the Where to watch verbs stay in English for now.
+
+  </details>
+
+- [#446](https://github.com/jshields-ca/LatestArr/pull/446) [`3c2afc8`](https://github.com/jshields-ca/LatestArr/commit/3c2afc815fa6041442a747557868a3e84534f65f) - **New:** A design can show longer summaries: about 2, 4 or 6 lines (30, 60 or 100 words), chosen under **Item details**. Handy for books, whose blurbs say more than a film's.
+
+  Thanks to crispybegs for asking ([#359](https://github.com/jshields-ca/LatestArr/issues/359)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#359](https://github.com/jshields-ca/LatestArr/issues/359). Design settings gain `summaryLength` (`short`, the default and today's length; `medium`; `long`). Each item now also carries `{{overviewMedium}}` and `{{overviewLong}}` (360 and 600 characters, cut at a whole word) beside `{{overviewShort}}` (180), so code designs can use them too.
+
+  </details>
+
+### Patch Changes
+
+- [#431](https://github.com/jshields-ca/LatestArr/pull/431) [`be40b9f`](https://github.com/jshields-ca/LatestArr/commit/be40b9fdacc042f5ec6bf1d031edc1ba2a768297) - **Improved:** LatestArr's fonts now ship inside the app, so opening it no longer fetches them from Google.
+
+  - Nothing about your visit goes to a font host, and the app looks the same on a server with no internet access.
+  - One exception: previewing an email design that uses the Ubuntu font still loads that font from Google, as the email itself does for the people who receive it. Choose Arial, Georgia or Verdana for a design that loads nothing.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 2 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `@fontsource-variable/plus-jakarta-sans`, `/newsreader` (its `opsz.css`) and `/jetbrains-mono` 5.3.0 (OFL-1.1) are imported in `main.tsx`, and `index.html` no longer links `fonts.googleapis.com`. `--font-brand` pins `"opsz" 72` through `--font-brand--font-variation-settings`, the display cut the Google link used to request. The Content-Security-Policy still allows `fonts.googleapis.com` and `fonts.gstatic.com`, because the design editor's preview is a `srcdoc` iframe that inherits the page's policy and MJML loads Ubuntu from there; the comment in `app.ts` now says so. Checked in the built app: no requests to another site on the dashboard, Email servers, Logs and Newsletters pages, and all three families load from the app.
+
+  </details>
+
+- [#434](https://github.com/jshields-ca/LatestArr/pull/434) [`fd4e052`](https://github.com/jshields-ca/LatestArr/commit/fd4e052de2df6e8c1342a9a172ae5a949a18a0c6) - **Fixed:** An email server that a newsletter sends through can now be deleted. It used to fail with "Something went wrong on the server".
+
+  Its newsletters are kept, with no email server chosen. They can't send until you choose another for them, and a scheduled send that fails for that reason raises the usual failure alert.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Found while reworking delete confirmations ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `newsletters.smtp_profile_id` references `smtp_profiles` with no delete rule and foreign keys are on, so `DELETE /api/smtp-profiles/:id` threw `FOREIGN KEY constraint failed` (a 500) whenever a newsletter used the profile. The route now clears `smtpProfileId` on those newsletters and deletes the profile in one transaction, as deleting a design already does for `templateId`, and logs how many newsletters were left without one. The pipeline and alerts already handled a newsletter with no email server. Regression tests cover an in-use delete and a repeated delete. The other foreign keys without a delete rule (`templates.created_by`, `newsletters.template_id`) were already handled in their routes.
+
+  </details>
+
+- [#433](https://github.com/jshields-ca/LatestArr/pull/433) [`7aff8a9`](https://github.com/jshields-ca/LatestArr/commit/7aff8a91131f310d4ef3dfeae4addc922bf8a801) - **Improved:** "SMTP profile" is now "email server" throughout, so the app says what the thing is.
+
+  - Buttons, labels, messages and log lines say **email server**, like "Add email server" and "Choose an email server".
+  - The form's fields are now **SMTP host** and **SMTP port**, the names your mail provider's instructions use.
+  - The setup checklist step is "Add an email server".
+
+  Nothing about how it works has changed, and your saved servers are untouched.
+
+  <details>
+  <summary>Technical details</summary>
+
+  A wording change from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)), following the page's rename to "Email servers". It covers the web app's strings, the server's error and log messages (for example "Newsletter has no email server configured" and `Added email server "…"`), and `docs/self-hosting.md` and `docs/deliverability.md`. The `/smtp` route, the `/api/smtp-profiles` endpoints, `smtpProfileId` in requests and logs, and the database are unchanged, so scripts, bookmarks and backups keep working. Anything that matches on the old message text, such as a log alert, needs the new wording. The docs' two mentions of the header's pencil button now describe the account menu from [#428](https://github.com/jshields-ca/LatestArr/issues/428).
+
+  </details>
+
+- [#441](https://github.com/jshields-ca/LatestArr/pull/441) [`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83) - **Fixed:** A newsletter linked to both a Plex server and the Tautulli that watches it listed every new item twice, and doubled its counts. Each item is now listed once.
+
+  - **Which copy is used:** Plex's, with its details and links. Anything only Tautulli knows, such as genres, is added to it.
+  - **Most watched** still comes from Tautulli.
+  - **Different servers are never merged,** even when their items share a number. If either app can't say which server it reads, both copies are listed as before.
+  - **The newsletter's Sources list** says so when both are linked.
+  - Two different servers reading the same files (Plex and Jellyfin, say) still list items twice; that's [#392](https://github.com/jshields-ca/LatestArr/issues/392).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Fixes [#391](https://github.com/jshields-ca/LatestArr/issues/391). Adapters gain an optional `getServerId(config)`: Plex returns its machine identifier from `/identity`, Tautulli the same value from `get_server_id`, both as `plex:<id>`. The pipeline asks only when two or more linked sources implement it, so a newsletter with one such source makes no extra requests. `mergeSharedServerItems` in `pipeline/shared-server-items.ts` keeps one copy of each `(server id, externalId)` across sources: the server's own copy over Tautulli's, otherwise the first, in the earlier copy's position. It applies to the new-items pool and the random fallback pool, so counts, sections and the cap warning all work on the merged list.
+
+  The issue suggested the source listed first should win, and a shared Public URL as a fallback signal. Neither is used. Linked sources have no order a user sets (the link table has none), and two different Plex servers commonly share a Public URL such as `https://app.plex.tv`; with rating keys being small numbers, merging on the URL would drop real items.
+
+  </details>
+
+- Updated dependencies [[`1641b29`](https://github.com/jshields-ca/LatestArr/commit/1641b298992b30ee0cc052419ac23013217a59da), [`cd3c79a`](https://github.com/jshields-ca/LatestArr/commit/cd3c79aab8930a130408118425a9602376c00dd5), [`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83)]:
+  - @latestarr/adapter-booklore-family@0.13.0
+  - @latestarr/adapter-core@0.13.0
+  - @latestarr/adapter-plex@0.13.0
+  - @latestarr/adapter-tautulli@0.13.0
+  - @latestarr/adapter-audiobookshelf@0.13.0
+  - @latestarr/adapter-jellyfin@0.13.0
+  - @latestarr/adapter-romm@0.13.0
+  - @latestarr/crypto@0.13.0
+  - @latestarr/db@0.13.0
+
 ## 0.12.8
 
 ### Patch Changes

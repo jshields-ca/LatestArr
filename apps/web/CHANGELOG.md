@@ -1,5 +1,279 @@
 # @latestarr/web
 
+## 0.13.0
+
+### Minor Changes
+
+- [#427](https://github.com/jshields-ca/LatestArr/pull/427) [`5c82454`](https://github.com/jshields-ca/LatestArr/commit/5c824545cd8cb2c8e32e5d577db496979a327b50) - **Improved:** A new look for the app: airmail colours on paper, with a navy sidebar.
+
+  - **Light theme:** cream paper with near-white cards and navy text, in place of the pink tint. **Dark theme:** deep navy.
+  - **A navy sidebar** in both themes, and in the phone menu.
+  - **An airmail stripe** under the header on every page.
+  - **Two colours with jobs:** rose marks the main action and where you are; blue is for links, information and keyboard focus. Green, amber and red are now only used for status.
+  - **Easier to read:** field and button outlines are stronger, and red error text and the Sent badge have more contrast.
+
+  <details>
+  <summary>Technical details</summary>
+
+  The "Envelope" direction from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `index.css` has new values for every token in both themes; `--tertiary` is now airmail blue and `--ring` uses it, so focus can't be mistaken for a selected or primary item. `--input` clears 3:1 against cards, and each text pair clears 4.5:1. In the dark theme `--destructive` is a light red with dark text on it, the way `--primary` works there. New: `--sidebar*` tokens, a `.surface-navy` class that redefines the semantic tokens for anything placed on navy (the sidebar and the phone menu's sheet), and `.airmail-stripe`. The shell is full width, with the sidebar at the left edge and the page content and footer in a centred column beside it. The dashboard's tiles use one neutral icon chip, the Recent sends card is a plain card, and the `accent` badge is tinted blue; the violet, sky and amber decoration is gone. `theme-color` is the navy. The grouped sidebar, sign-in page and bundled fonts follow separately.
+
+  </details>
+
+- [#428](https://github.com/jshields-ca/LatestArr/pull/428) [`678ad6e`](https://github.com/jshields-ca/LatestArr/commit/678ad6eea5266f17c83abe31703fd40aba66187b) - **Improved:** A sidebar grouped by job, an account menu, and a clearer header.
+
+  - **Grouped sidebar:** Dashboard, then **Send** (Newsletters, Designs, Recipients), **Connect** (Sources, Email servers) and **System** (Notifications, Users, Backups, Logs).
+  - **"Email servers"** is the new name for the SMTP Profiles page. It works as before.
+  - **Account menu:** your name in the header opens a menu with Edit profile and Sign out, in place of unlabelled icons.
+  - **Tidier header and footer:** the version, Docs and GitHub links are at the foot of the sidebar, the page footer is one line, and the logo takes you to the dashboard.
+  - **Browser tabs are named after the page,** like "Newsletters · LatestArr".
+  - **Keyboard:** a "Skip to content" link is first on every page.
+
+  <details>
+  <summary>Technical details</summary>
+
+  The C2 shell from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `nav-items.ts` gains `navGroups` and a `group` per item; a group with nothing in it for a role isn't shown. `SidebarFoot` replaces the header's `ProjectInfoCard`, and `AccountMenu` (a popover) replaces the header's name, email and icon buttons; the phone menu keeps `UserSummary` at its foot. `EditProfileDialog` is now opened by its parent, since a dialog inside the menu's popover would close with it. `usePageTitle` (`lib/page-title.ts`) sets `document.title`, called by `PageHeader`, the design editor and the 404 page. The 404 page and the design editor gain an `h1`, `main` is focusable for the skip link, and the footer's maintainer link is underlined. Audit findings 7 and 16, and part of 10. The `/smtp` route, the API and the "SMTP profile" wording inside pages are unchanged.
+
+  </details>
+
+- [#444](https://github.com/jshields-ca/LatestArr/pull/444) [`afd0bdc`](https://github.com/jshields-ca/LatestArr/commit/afd0bdc63190539ddafe033c49c9750cf86881c4) - **New:** When a section has more new items than its limit, it ends with how many were left out: "+ 76 more books".
+
+  - **Linked** to the source's Public URL when it has one, so people can go and see the rest. Without one it's just the count, rather than a link to an address recipients might not reach.
+  - **TV** counts shows when a show's episodes are grouped, and episodes when they aren't. Other sections use their own name, including one you've renamed.
+  - **On by default,** and only shown when something was left out. Turn it off with **Say how many more** under the design's **Sections**.
+  - **Code designs** can add it with `{{#moreFor}}`, given the same arguments as the `{{#mediaList}}` above it.
+
+  Thanks to crispybegs for the idea ([#362](https://github.com/jshields-ca/LatestArr/issues/362)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#362](https://github.com/jshields-ca/LatestArr/issues/362). A `moreFor` Handlebars helper repeats `mediaList`'s filtering and grouping to count the rows past its `count` (or `MAX_SHOWN_ITEMS`), and renders its block with `{count, label, url}`. `url` comes from a new `publicLinksByContentType` in the render context, built from linked sources' Public URLs only; the existing `sourceLinksByContentType` falls back to a source's own address, which can be an API host. Design settings gain `sections.showMore` (default true). The Default design's rendered email is unchanged unless a section overflows.
+
+  Linking to each app's own "recently added" view, suggested on the issue, isn't in this change: it needs checking app by app for a stable address.
+
+  </details>
+
+- [#447](https://github.com/jshields-ca/LatestArr/pull/447) [`fbce2f0`](https://github.com/jshields-ca/LatestArr/commit/fbce2f0bc9053fecb267187780abc51ee2612c85) - **New:** A design can carry a highlighted notice: a title and a short note, as **Info**, **Warning** or **Alert**. Good for "Maintenance on Saturday" or "Verify with the email you use for Plex".
+
+  - Add it under the design editor's **Text**: choose its type, write a title and some text (with the same formatting as the intro), and put it after the intro or before the footer note.
+  - Each type has its own colour, as a tinted box with a bar down the left and a small icon, in light and dark mode.
+  - **Code designs** get it as `{{notice.title}}`, `{{notice.body}}` and `{{notice.type}}`.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#402](https://github.com/jshields-ca/LatestArr/issues/402), in the style picked during review (N1). Design settings gain `content.notice` (`type`, `title` up to 100 characters, `body` up to 1,000, `placement`). The title is escaped and the text goes through `render/notes.ts` like the intro, so neither can add markup or unsafe links. The colours are fixed per type rather than taken from the palette, so a warning always reads as one, and each has a dark-mode pair in the design's dark-mode CSS. The icon is a coloured circle with "i", "!" or "×" drawn in HTML rather than an image, so there's nothing to host or fetch and it shows with images off; its glyph colour (`#fffffe`) is unique so dark mode can recolour it without touching button text. One notice per design for now.
+
+  </details>
+
+- [#438](https://github.com/jshields-ca/LatestArr/pull/438) [`3633272`](https://github.com/jshields-ca/LatestArr/commit/36332729c0093b536161337bd71a76341c6b56f9) - **New:** On the Recipients page, see who is in which group, and change several people at once.
+
+  - **Groups in the table:** each person's groups show beside their email, and a menu next to the search box narrows the list to one group, or to people in no group.
+  - **Tick several people:** a box on each row, one in the heading for the whole page, and **Select all** for everyone who matches the search and group filter.
+  - **Change them together:** make them active or inactive, add them to a group, remove them from one, or delete them. Delete asks first and says how many.
+  - **One line on the Logs page** for each change, saying how many people it changed and naming them.
+
+  Deleting someone, alone or with others, now also says that they'll go from the list of who past sends went to. That was already the case; the message didn't mention it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 13 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)) and [#400](https://github.com/jshields-ca/LatestArr/issues/400). `GET /api/recipients` also returns `memberships` (`{ recipientId, groupId }` pairs), so the table shows and filters by group without a request per person. `POST /api/recipients/bulk` takes `{ action, ids, groupId? }` with `action` one of `activate`, `deactivate`, `addToGroup`, `removeFromGroup` or `delete`, up to 5,000 ids, and needs the editor role like the single-recipient routes. It runs in one transaction, skips ids that don't exist, and answers `{ changed, requested }`, where `changed` counts only the people it altered. Its log entry names up to 25 addresses.
+
+  In the web app the actions replace the search row while anyone is ticked, so the search and filter can't change under a selection; from 1024px up the table doesn't move when the first box is ticked. The Groups column shows from 1280px, and under the name below that.
+
+  </details>
+
+- [#443](https://github.com/jshields-ca/LatestArr/pull/443) [`5e95e0f`](https://github.com/jshields-ca/LatestArr/commit/5e95e0f22c7fcb45354497fac14e9e953e1ae19e) - **New:** A design can rename its sections and put the day before the month: "Films" for "Movies", and "29 September 2026".
+
+  - **Section names:** in the design editor's new **Wording** panel, give any section its own name. It's used for the heading, the section's Browse button, the counts under the title ("9 films"), and each item's badge ("Film"). Blank keeps the default.
+  - **Dates:** "September 29, 2026" or "29 September 2026", in the email and its subject line.
+  - **Use UK English** sets both at once: Films, and the day first.
+  - **Code designs** get the names as `{{sectionNames.movie.heading}}` and `{{sectionNames.movie.browse}}`, and their dates follow the same order.
+
+  Thanks to crispybegs for asking ([#390](https://github.com/jshields-ca/LatestArr/issues/390)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#390](https://github.com/jshields-ca/LatestArr/issues/390). `render/wording.ts` gathers what a design can change: section names, count words and date order. Design settings gain `wording: { dateOrder, sectionNames }`, each name up to 40 characters. The default design no longer writes "Movies" into its markup: headings read `{{sectionNames.<section>.heading}}` and the library link `label=sectionNames.<section>.browse`, so a name is escaped by Handlebars like any other value and can't add markup or template code. The Default design's rendered email is unchanged (its snapshot test passes as it was). `render/dates.ts` takes the order; the subject, item dates and date range all use it, and so does the newsletter form's subject preview. "Most watched", "Nothing new this time" and the Where to watch verbs stay in English for now.
+
+  </details>
+
+- [#429](https://github.com/jshields-ca/LatestArr/pull/429) [`5f73304`](https://github.com/jshields-ca/LatestArr/commit/5f73304a5ce1e89d3ef40c571637a86febb19135) - **Improved:** A new look for the sign-in page and the other signed-out pages.
+
+  - The stamp sits above the name at a slight tilt, with a postmark showing today's date beside it, and the airmail stripe runs along the top of the card.
+  - On the sign-in and setup pages, the stamp presses onto the page once as it opens. It doesn't repeat, and it's skipped if your system asks for reduced motion.
+  - Setup, forgotten password, reset password and the temporary-password screen share the same card.
+  - Each of these pages now has a proper heading and its own browser-tab name, for screen readers and keyboard users.
+
+  <details>
+  <summary>Technical details</summary>
+
+  From the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)): the L3 postmark and L6 press. A new `AuthCard` (`components/auth-card.tsx`) holds what `login-page`, `setup-page`, `forgot-password-page`, `reset-password-page` and `change-password-screen` each repeated. It renders a `main`, an `h1` (visually hidden on sign-in and setup, where the description says it), and calls `usePageTitle`, which finishes audit finding 10 for these pages. `.stamp-tilt`, `.stamp-press` and `.postmark-in` are in `index.css`; they use `transform` so the keyframes and the resting tilt are one property, and `prefers-reduced-motion` switches the animations off. The postmark is `aria-hidden`.
+
+  </details>
+
+- [#424](https://github.com/jshields-ca/LatestArr/pull/424) [`232af02`](https://github.com/jshields-ca/LatestArr/commit/232af023dde655ea65f3e916025cff0fd7223927) - **Improved:** A clearer logo: the stamp no longer sits on a rose tile, so it fills its space and stays crisp in the header and the browser tab.
+
+  - The stamp is white paper in the dark theme and rose in the light theme, and switches with the theme.
+  - The browser tab icon is the rose stamp, drawn with fewer, larger perforations so it's clear at 16px.
+  - The phone home-screen icon is the paper stamp on a navy tile.
+
+  <details>
+  <summary>Technical details</summary>
+
+  First of the brand changes from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `docs/assets/brand/generate.mjs` stays the single source: the stamp face is now 52×52 at (6, 4) on the 64 grid, with a second drawing of five perforations a side for sizes under 24px. It writes `mark.svg`, `mark-on-dark.svg`, `mark-small.svg`, `mark-small-on-dark.svg`, `mark-mono.svg`, `icon.svg` and `icon-maskable.svg`, the web app's favicon and icons, and `logo-geometry.ts`. `icon-dark.svg`, `icon-light.svg` and their PNGs are removed. `LogoMark` takes a `variant` (`auto`, `paper` or `rose`): `auto` draws both stamps and shows one by theme with `dark:` classes; name one where the background doesn't follow the theme. The manifest's `background_color` is the icon's navy, `#14213d`. The social preview images still show the old icon and follow with the colour changes.
+
+  </details>
+
+- [#446](https://github.com/jshields-ca/LatestArr/pull/446) [`3c2afc8`](https://github.com/jshields-ca/LatestArr/commit/3c2afc815fa6041442a747557868a3e84534f65f) - **New:** A design can show longer summaries: about 2, 4 or 6 lines (30, 60 or 100 words), chosen under **Item details**. Handy for books, whose blurbs say more than a film's.
+
+  Thanks to crispybegs for asking ([#359](https://github.com/jshields-ca/LatestArr/issues/359)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#359](https://github.com/jshields-ca/LatestArr/issues/359). Design settings gain `summaryLength` (`short`, the default and today's length; `medium`; `long`). Each item now also carries `{{overviewMedium}}` and `{{overviewLong}}` (360 and 600 characters, cut at a whole word) beside `{{overviewShort}}` (180), so code designs can use them too.
+
+  </details>
+
+### Patch Changes
+
+- [#432](https://github.com/jshields-ca/LatestArr/pull/432) [`a3d9af6`](https://github.com/jshields-ca/LatestArr/commit/a3d9af6ca835302f6beca6284e559863afc6b7a8) - **Fixed:** Five small problems found in the interface review.
+
+  - **Recipients on a phone:** the page no longer slides sideways. Import, From a source and Add recipient wrap under the heading, so Add recipient is back on screen.
+  - **Dashboard:** the Sources tile says "All connected" only when every source has passed a test. Otherwise it says how many aren't tested yet, or how many need attention.
+  - **Newsletters:** the switch beside each newsletter says **Scheduled** or **Paused**. It used to say "Enabled" even when it was off. Paused stops scheduled sends only; Send now still works.
+  - **Dates** are written one way, like "Sun, Nov 8, 9:46 PM", with the exact time when you hover. Recent sends used to show seconds.
+  - **Switches are larger,** so they're easier to tap.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit findings 1, 3, 5, 9 and 11 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). The Recipients heading row and its button group use `flex-wrap` (the row was 543px wide at 390px). The dashboard counts `status === "unconfigured"` sources separately from errors. `Switch` is 44×24px (`h-6 w-11`), up from 36×20; the custom-cron toggle and the design editor's "More colours" summary are 24px tall. `lib/dates.ts` adds `formatDateTime` (no seconds; the year only when it isn't this one), `formatExactDateTime` and `formatDate`, in the viewer's locale; `DateTime` renders a `<time>` with the exact moment as its title. Send history, Backups and Users use them. Logs keep their own second-level timestamps. The newsletter switch isn't labelled "On" because the schedule's day field already is.
+
+  </details>
+
+- [#431](https://github.com/jshields-ca/LatestArr/pull/431) [`be40b9f`](https://github.com/jshields-ca/LatestArr/commit/be40b9fdacc042f5ec6bf1d031edc1ba2a768297) - **Improved:** LatestArr's fonts now ship inside the app, so opening it no longer fetches them from Google.
+
+  - Nothing about your visit goes to a font host, and the app looks the same on a server with no internet access.
+  - One exception: previewing an email design that uses the Ubuntu font still loads that font from Google, as the email itself does for the people who receive it. Choose Arial, Georgia or Verdana for a design that loads nothing.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 2 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `@fontsource-variable/plus-jakarta-sans`, `/newsreader` (its `opsz.css`) and `/jetbrains-mono` 5.3.0 (OFL-1.1) are imported in `main.tsx`, and `index.html` no longer links `fonts.googleapis.com`. `--font-brand` pins `"opsz" 72` through `--font-brand--font-variation-settings`, the display cut the Google link used to request. The Content-Security-Policy still allows `fonts.googleapis.com` and `fonts.gstatic.com`, because the design editor's preview is a `srcdoc` iframe that inherits the page's policy and MJML loads Ubuntu from there; the comment in `app.ts` now says so. Checked in the built app: no requests to another site on the dashboard, Email servers, Logs and Newsletters pages, and all three families load from the app.
+
+  </details>
+
+- [#435](https://github.com/jshields-ca/LatestArr/pull/435) [`0028e5f`](https://github.com/jshields-ca/LatestArr/commit/0028e5f542a0695f0549c3ca85c916fc93064ace) - **Improved:** Deleting anything now asks the same way, in a dialog that names it and says what goes with it.
+
+  - The dialog asks "Delete Home Plex?", says what else changes ("Newsletters that use it will stop including its items."), and its button says what it does: **Delete source**, not "Confirm".
+  - It's the same for newsletters, designs, recipients, groups, sources, email servers, users and backups. Before, the row's buttons were swapped for "Delete? Confirm / Cancel", in three slightly different versions.
+  - Keyboard users are put back where they were when any confirmation closes. Focus used to jump to the top of the page.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 6 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `ConfirmDeleteButton` (`components/list-row.tsx`) now calls `confirmAction()` and takes `noun` and an optional `consequence`; the inline prompt is gone, along with the hand-rolled copies and their `confirmingDelete` state on the Sources, Newsletters and Email servers pages. The dialog is an `alertdialog` with Cancel focused first. `ConfirmHost` records the focused element when a question is asked and restores it in `onCloseAutoFocus`, falling back to `#main-content` when that element is gone or disabled (the row just deleted); this also fixes focus after the unsaved-changes and unlink-SSO confirmations. Each consequence was checked against the schema's cascades.
+
+  </details>
+
+- [#437](https://github.com/jshields-ca/LatestArr/pull/437) [`6c8504b`](https://github.com/jshields-ca/LatestArr/commit/6c8504bd37480fb9283e8095e54c1edc8ba70203) - **Improved:** The design editor works on a phone: a switch at the top shows either the options or the preview.
+
+  - Before, the preview sat below every option, a long scroll away. Now **Options** and **Preview** are one tap apart, and the switch stays at the top as you scroll.
+  - Each view keeps its place. Check the preview, switch back, and you're at the option you were editing.
+  - On a wider screen, where both fit side by side, nothing changes, except that the preview's controls no longer slide under the header when you scroll.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 12 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `NarrowViewSwitch` in `design-editor-page.tsx` is shown below `lg` (1024px), so it covers tablets held upright too; it's a pair of `aria-pressed` buttons, labelled "Code" in place of "Options" for a code design. The column not chosen is `hidden lg:flex`, and each view's `window.scrollY` is kept in a ref and restored on switching. The preview keeps updating while hidden. The preview column's sticky offset is now `calc(3.5rem + 3px + 1rem)`, below the app header and its stripe; `top-4` had put its "Preview with" row underneath the header once the page scrolled.
+
+  </details>
+
+- [#433](https://github.com/jshields-ca/LatestArr/pull/433) [`7aff8a9`](https://github.com/jshields-ca/LatestArr/commit/7aff8a91131f310d4ef3dfeae4addc922bf8a801) - **Improved:** "SMTP profile" is now "email server" throughout, so the app says what the thing is.
+
+  - Buttons, labels, messages and log lines say **email server**, like "Add email server" and "Choose an email server".
+  - The form's fields are now **SMTP host** and **SMTP port**, the names your mail provider's instructions use.
+  - The setup checklist step is "Add an email server".
+
+  Nothing about how it works has changed, and your saved servers are untouched.
+
+  <details>
+  <summary>Technical details</summary>
+
+  A wording change from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)), following the page's rename to "Email servers". It covers the web app's strings, the server's error and log messages (for example "Newsletter has no email server configured" and `Added email server "…"`), and `docs/self-hosting.md` and `docs/deliverability.md`. The `/smtp` route, the `/api/smtp-profiles` endpoints, `smtpProfileId` in requests and logs, and the database are unchanged, so scripts, bookmarks and backups keep working. Anything that matches on the old message text, such as a log alert, needs the new wording. The docs' two mentions of the header's pencil button now describe the account menu from [#428](https://github.com/jshields-ca/LatestArr/issues/428).
+
+  </details>
+
+- [#430](https://github.com/jshields-ca/LatestArr/pull/430) [`6572d09`](https://github.com/jshields-ca/LatestArr/commit/6572d092c4e7a035ed86619822d0387d7d5aa641) - **Improved:** Pages with nothing to list yet show a greyed stamp, a heading and what to do next, in place of a plain text card.
+
+  This covers Newsletters, Recipients and its groups, Sources and Email servers.
+
+  <details>
+  <summary>Technical details</summary>
+
+  From the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)), logo extra L7. A new `EmptyState` (`components/ui/empty-state.tsx`) replaces the five copies of a `Card` holding only a title and description. `LogoMark` gains a `muted` variant, drawn in the muted text colour so it greys with either theme; it's `aria-hidden` here, since it's decoration. The headings and their wording are unchanged.
+
+  </details>
+
+- [#440](https://github.com/jshields-ca/LatestArr/pull/440) [`66f422a`](https://github.com/jshields-ca/LatestArr/commit/66f422aba062d53c86bfb3d9b695dcc5199d364d) - **Improved:** While a page loads, it shows grey bars in the shape of what's coming, in place of a spinner and a line of text.
+
+  - **Less jumping:** the placeholder takes up the room the content will, so the page moves less when it arrives. The Dashboard keeps its title and layout from the start.
+  - **No flash on a fast connection:** the bars wait a fifth of a second before showing, so a page that loads straight away never shows them.
+  - **Where:** the Dashboard, Newsletters, Designs, Recipients, Sources, Email servers, Notifications, Users, Backups, Logs, the design editor and a newsletter's send history. Short waits inside buttons and dialogs keep their spinner.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 17 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)), the last of its 17. `components/ui/skeleton.tsx` has `Skeleton` (one bar), `LoadingPlaceholder` (a `role="status"` wrapper whose label is read to screen readers while the bars are `aria-hidden`), and the shapes `ListSkeleton`, `TableSkeleton`, `CardsSkeleton` and `LinesSkeleton`. The bars pulse with `motion-safe:animate-pulse`, so they hold still under `prefers-reduced-motion`. `.placeholder-in` in `index.css` delays and fades the placeholder in; under reduced motion it keeps the delay and drops the fade. `docs/ui-guidelines.md` says when to use a placeholder and when a spinner.
+
+  </details>
+
+- [#441](https://github.com/jshields-ca/LatestArr/pull/441) [`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83) - **Fixed:** A newsletter linked to both a Plex server and the Tautulli that watches it listed every new item twice, and doubled its counts. Each item is now listed once.
+
+  - **Which copy is used:** Plex's, with its details and links. Anything only Tautulli knows, such as genres, is added to it.
+  - **Most watched** still comes from Tautulli.
+  - **Different servers are never merged,** even when their items share a number. If either app can't say which server it reads, both copies are listed as before.
+  - **The newsletter's Sources list** says so when both are linked.
+  - Two different servers reading the same files (Plex and Jellyfin, say) still list items twice; that's [#392](https://github.com/jshields-ca/LatestArr/issues/392).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Fixes [#391](https://github.com/jshields-ca/LatestArr/issues/391). Adapters gain an optional `getServerId(config)`: Plex returns its machine identifier from `/identity`, Tautulli the same value from `get_server_id`, both as `plex:<id>`. The pipeline asks only when two or more linked sources implement it, so a newsletter with one such source makes no extra requests. `mergeSharedServerItems` in `pipeline/shared-server-items.ts` keeps one copy of each `(server id, externalId)` across sources: the server's own copy over Tautulli's, otherwise the first, in the earlier copy's position. It applies to the new-items pool and the random fallback pool, so counts, sections and the cap warning all work on the merged list.
+
+  The issue suggested the source listed first should win, and a shared Public URL as a fallback signal. Neither is used. Linked sources have no order a user sets (the link table has none), and two different Plex servers commonly share a Public URL such as `https://app.plex.tv`; with rating keys being small numbers, merging on the URL would drop real items.
+
+  </details>
+
+- [#445](https://github.com/jshields-ca/LatestArr/pull/445) [`0ba23ac`](https://github.com/jshields-ca/LatestArr/commit/0ba23ac29ea45a51844a0b3b7c7106d56ca8313e) - **Improved:** A design's own buttons can be moved up and down, rather than deleted and added again in the order wanted.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#401](https://github.com/jshields-ca/LatestArr/issues/401). Up and down arrows on each row of **Your buttons** (`CtaRows` in `design-editor-page.tsx`), shown when there are two or more. Each is named after the button ("Move Requests up"), and focus follows the button to its new place, or to its other arrow once it reaches the top or bottom. The **Where to watch** buttons follow the order of a newsletter's sources and aren't changed here.
+
+  </details>
+
+- [#436](https://github.com/jshields-ca/LatestArr/pull/436) [`945892e`](https://github.com/jshields-ca/LatestArr/commit/945892ee0f1f8e4be34808b601cb224e8001b0d0) - **Improved:** Smaller consistency and accessibility fixes in Newsletters, the design editor and Logs.
+
+  - **Newsletters:** the Content panel of an open newsletter now says "Changes here save as you make them", since the form beside it waits for Save changes.
+  - **Design editor:** "More colours" opens with the same arrow as the other sections, and a section's summary shows only while it's closed.
+  - **Logs:** each line is easier to tap, its time is easier to read, and screen readers and voice control hear the line itself in place of "Show details".
+  - **Screen readers:** the newsletter editor's Schedule, Delivery and Content sections are announced by name.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit findings 4, 14 and the rest of 10 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). The newsletter editor's three panels are `role="group"` labelled by their `SubsectionHeading`. In the design editor the section summary is `group-open:invisible`, and "More colours" uses a `ChevronRight` that turns in place of the native marker. A log row's button drops its `aria-label` (a `label-content-name-mismatch`), keeps `aria-expanded`, and carries the row's padding so the target is 24px; the time is `zinc-400` (4.12:1 before). `docs/ui-guidelines.md` is new, linked from CONTRIBUTING.md, and records the patterns this review settled.
+
+  On finding 4: the audit said the Content panel saved with no sign that it had. That was wrong. It already confirmed each change with "Saved" or a toast, as the saving rule from [#295](https://github.com/jshields-ca/LatestArr/issues/295) asks; what was missing was saying so up front.
+
+  </details>
+
 ## 0.12.8
 
 ### Patch Changes
