@@ -209,7 +209,13 @@ export async function sendToTheRest(
           from: sender.from,
           to: recipient.email,
           subject: run.subject!,
-          ...personalise({ html: run.renderedHtml!, text }, origin, tokens.get(recipient.id) ?? NOT_A_RECIPIENT),
+          ...(sender.replyTo && { replyTo: sender.replyTo }),
+          ...personalise(
+            { html: run.renderedHtml!, text },
+            origin,
+            tokens.get(recipient.id) ?? NOT_A_RECIPIENT,
+            sender.unsubscribeReply,
+          ),
           attachments,
         });
         outcome = { status: "sent", providerMessageId: result.messageId, error: null };

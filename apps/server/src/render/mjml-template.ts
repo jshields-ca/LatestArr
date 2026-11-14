@@ -127,6 +127,8 @@ export interface MjmlRenderContext {
    * token that each copy fills in. Bound as {{unsubscribeUrl}}; absent when
    * WEB_ORIGIN isn't set. */
   unsubscribeUrl?: string;
+  /** No link, but a reply reaches someone: the footer says to reply. */
+  unsubscribeByReply?: boolean;
   /** Up to a handful of {label, url} call-to-action buttons the default
    * template renders as a row of buttons. Bound as {{#each ctas}} for any
    * template that references it. */
@@ -551,6 +553,7 @@ export async function renderMjmlTemplate(
     kindCounts: kindCounts(context.items, wording.countLabels),
     sectionNames: wording.sectionNames,
     unsubscribeUrl: context.unsubscribeUrl,
+    unsubscribeByReply: Boolean(!context.unsubscribeUrl && context.unsubscribeByReply),
     introText: renderNote(context.introText, context.noteLinkColor),
     footerNote: renderNote(context.footerNote, context.noteLinkColor),
     notice: context.notice

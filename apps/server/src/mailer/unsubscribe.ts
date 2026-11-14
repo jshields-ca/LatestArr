@@ -34,12 +34,16 @@ export function isUnsubscribeToken(value: string): boolean {
 const LOOPBACK = /^(localhost|127(\.\d{1,3}){3}|\[::1\]|0\.0\.0\.0)$/i;
 
 /**
- * Where unsubscribe links point: WEB_ORIGIN, the address recipients can
- * reach this install at. Never the request's own Host, which a client
- * controls. Undefined when it isn't an http(s) address, or is this machine
- * (localhost), and emails then go without a link or headers.
+ * Where unsubscribe links point: PUBLIC_URL, the address recipients can
+ * reach, or else WEB_ORIGIN, the one you open LatestArr at. PUBLIC_URL is
+ * for an install that stays private but publishes only its unsubscribe
+ * page (docs/deliverability.md). Never the request's own Host, which a
+ * client controls. Undefined when it isn't an http(s) address, or is this
+ * machine (localhost), and emails then go without a link.
  */
-export function unsubscribeOrigin(webOrigin = process.env.WEB_ORIGIN): string | undefined {
+export function unsubscribeOrigin(
+  webOrigin = process.env.PUBLIC_URL?.trim() || process.env.WEB_ORIGIN,
+): string | undefined {
   if (!webOrigin) return undefined;
   try {
     const url = new URL(webOrigin);
@@ -48,6 +52,32 @@ export function unsubscribeOrigin(webOrigin = process.env.WEB_ORIGIN): string | 
   } catch {
     return undefined;
   }
+}
+
+// Addresses only reachable from a home or private network: RFC 1918,
+// Tailscale and other carrier-grade NAT (100.64/10), IPv6 unique-local and
+// link-local, single-word hostnames, and the private top-level names.
+const PRIVATE_HOST =
+  /^(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2}|\[f[cd][0-9a-f:]*\]|\[fe80:[0-9a-f:]*\]|[^.]+|.+\.(local|lan|home|home\.arpa|internal|localdomain|ts\.net))$/i;
+
+/** Whether links to this origin only work on the sender's own network. */
+export function isPrivateOrigin(origin: string): boolean {
+  try {
+    return PRIVATE_HOST.test(new URL(origin).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where an unsubscribe-by-reply goes: the newsletter's reply-to, else its
+ * From address. Undefined for a no-reply address, where a reply goes
+ * nowhere. LatestArr doesn't read mail, so a person handles these.
+ */
+export function unsubscribeReplyAddress(address: string | null | undefined): string | undefined {
+  const trimmed = address?.trim();
+  if (!trimmed || !/^[^\s@<>"]+@[^\s@<>"]+$/.test(trimmed)) return undefined;
+  return /^(no-?reply|do-?not-?reply)([+.@-]|$)/i.test(trimmed) ? undefined : trimmed;
 }
 
 /** The confirmation page, with the token after the #, which browsers never
@@ -72,21 +102,29 @@ export function personalise(
   message: { html: string; text?: string },
   origin: string | undefined,
   token: string,
+  replyAddress?: string,
 ): { html: string; text?: string; headers?: Record<string, string> } {
   const fill = (value: string) => value.split(PAGE_FRAGMENT).join(`/unsubscribe#${token}`);
   const html = fill(message.html);
   const text = message.text === undefined ? undefined : fill(message.text);
+  if (token === NOT_A_RECIPIENT) return { html, text };
+  // A mail app can also offer unsubscribing by email (RFC 2369): it sends
+  // "Unsubscribe" to the reply address, and someone deactivates them. The
+  // only way for an install nobody outside can reach.
+  const mailto = replyAddress ? `<mailto:${replyAddress}?subject=Unsubscribe>` : undefined;
   // RFC 8058 one-click needs an https address; over plain http the link in
-  // the email still works, but mail apps won't offer their own button.
-  if (!origin?.startsWith("https:") || token === NOT_A_RECIPIENT) return { html, text };
-  return {
-    html,
-    text,
-    headers: {
-      "List-Unsubscribe": `<${origin}/api/unsubscribe/${token}>`,
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-    },
-  };
+  // the email still works, but mail apps won't offer their own button for it.
+  if (origin?.startsWith("https:")) {
+    return {
+      html,
+      text,
+      headers: {
+        "List-Unsubscribe": [`<${origin}/api/unsubscribe/${token}>`, mailto].filter(Boolean).join(", "),
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
+    };
+  }
+  return mailto ? { html, text, headers: { "List-Unsubscribe": mailto } } : { html, text };
 }
 
 /** For showing stored HTML in the app: no real token in it either way. */

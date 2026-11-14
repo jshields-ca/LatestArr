@@ -1204,6 +1204,43 @@ describe("unsubscribing", () => {
     expect(getRecentLogs(500).some((entry) => entry.msg.includes("without an unsubscribe link"))).toBe(true);
   });
 
+  // An install nobody outside can reach.
+  it("without a reachable address, offers unsubscribing by reply to an address someone reads", async () => {
+    delete process.env.WEB_ORIGIN;
+    clearLogBuffer();
+    const newsletterId = await newsletterFor("a@example.com");
+    await db
+      .update(newsletters)
+      .set({ senderIdentity: { fromEmail: "news@example.com", replyTo: "me@example.com" } })
+      .where(eq(newsletters.id, newsletterId));
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValue({ messageId: "msg" });
+
+    await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+    const [message] = mockSendMail.mock.calls[0]!;
+    expect(message.replyTo).toBe("me@example.com");
+    expect(message.headers).toEqual({ "List-Unsubscribe": "<mailto:me@example.com?subject=Unsubscribe>" });
+    expect(message.html).toContain("Reply and ask to unsubscribe.");
+    expect(
+      getRecentLogs(500).some((entry) => entry.msg.includes("They can still unsubscribe by replying to me@example.com")),
+    ).toBe(true);
+  });
+
+  it("warns when the link only works on your own network", async () => {
+    process.env.WEB_ORIGIN = "http://192.168.1.10:3000";
+    clearLogBuffer();
+    const newsletterId = await newsletterFor("a@example.com");
+    mockRecentlyAdded();
+    mockSendMail.mockResolvedValue({ messageId: "msg" });
+
+    await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/send-now` }));
+    const [message] = mockSendMail.mock.calls[0]!;
+    expect(message.html).toContain("http://192.168.1.10:3000/unsubscribe#");
+    expect(
+      getRecentLogs(500).some((entry) => entry.msg.includes("only work on your own network (http://192.168.1.10:3000)")),
+    ).toBe(true);
+  });
+
   it("gives a preview and a test send a link that isn't anyone's", async () => {
     const newsletterId = await newsletterFor("a@example.com");
     mockRecentlyAdded();

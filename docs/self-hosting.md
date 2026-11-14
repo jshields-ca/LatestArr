@@ -31,6 +31,7 @@ Everything else is optional. These are the settings most installs touch:
 | Variable | Default | Set it when |
 | --- | --- | --- |
 | `WEB_ORIGIN` | `http://localhost:3000` | You open LatestArr at any other address. Password reset links, SSO sign-ins and newsletters' Unsubscribe links use it; at `localhost`, newsletters go without one. |
+| `PUBLIC_URL` | `WEB_ORIGIN` | Recipients reach LatestArr at a different address from you, e.g. when [only the unsubscribe page is public](deliverability.md#publish-only-the-unsubscribe-page). Newsletters' Unsubscribe links use it. |
 | `PORT` | `3000` | Port 3000 is taken on the host. Update `WEB_ORIGIN` to match. |
 | `TZ` | `UTC` | You want the daily backup at 3:00 AM your time, e.g. `America/Winnipeg`. |
 | `TRUST_PROXY` | off | LatestArr is behind a reverse proxy. See [below](#running-behind-a-reverse-proxy). |
