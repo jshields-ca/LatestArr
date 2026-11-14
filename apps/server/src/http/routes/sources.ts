@@ -11,7 +11,8 @@ import { parseBody } from "../validate.js";
 
 type SelectedSourceConnection = typeof sourceConnections.$inferSelect;
 
-function sanitize(row: SelectedSourceConnection) {
+// A source as the API returns it: never its credentials, even encrypted.
+export function sanitize<T extends Pick<SelectedSourceConnection, "credentialsEncrypted">>(row: T): Omit<T, "credentialsEncrypted"> {
   const { credentialsEncrypted: _credentialsEncrypted, ...safe } = row;
   return safe;
 }

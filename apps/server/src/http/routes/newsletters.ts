@@ -36,6 +36,7 @@ import { changedFields } from "../log-fields.js";
 import { requireAuth } from "../require-auth.js";
 import { MAX_SUBJECT_LENGTH, SUBJECT_VARIABLES, unknownSubjectVariables } from "../../render/subject.js";
 import { parseBody } from "../validate.js";
+import { sanitize as withoutCredentials } from "./sources.js";
 
 const senderIdentitySchema = z.object({
   fromName: z.string().trim().min(1).optional(),
@@ -198,7 +199,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
       return reply.send({
         newsletter,
         sources: sources.map((row) => ({
-          ...row.source,
+          ...withoutCredentials(row.source),
           mediaTypeFilter: row.filters.mediaTypeFilter,
           libraryFilter: row.filters.libraryFilter,
         })),
