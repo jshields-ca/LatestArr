@@ -475,7 +475,7 @@ describe("ImportSourceUsersDialog", () => {
     const dialog = await screen.findByRole("dialog");
     await within(dialog).findByText("alice@example.com");
     // Listed by name, whatever order the source gives (#398).
-    const names = within(dialog).getAllByRole("checkbox").map((box) => box.closest("li")?.textContent ?? "");
+    const names = within(dialog).getAllByRole("listitem").map((item) => item.textContent ?? "");
     expect(names[0]).toMatch(/^alice/);
     expect(names[1]).toMatch(/^bob/);
 
@@ -507,7 +507,7 @@ describe("ImportSourceUsersDialog", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
     fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
 
-    await user.click(within(dialog).getByRole("button", { name: /Import 2 recipients/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Import 2 people" }));
 
     await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*2\s*recipients.*Home Tautulli/));
 
@@ -582,11 +582,79 @@ describe("ImportSourceUsersDialog", () => {
     );
     fetchMock.mockResolvedValueOnce(jsonResponse(201, { group: { id: "g1", name: "Home Tautulli", description: null } }));
     fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
-    await user.click(within(dialog).getByRole("button", { name: /Import 1 recipient/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Import 1 person" }));
     await waitFor(() => expect(dialog.textContent).toMatch(/1 already on your list was left as they are/));
 
     const importCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipients/import") as [string, RequestInit];
     expect(JSON.parse(importCall[1].body as string)).toEqual({ rows: [{ email: "bob@example.com", displayName: "bob" }] });
+  });
+
+  // #453: Select all, none, and partly ticked, counting only who can be imported.
+  it("selects everyone or no one to import", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [exampleSource] });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        users: [
+          { externalId: "1", username: "ann", email: "ann@example.com" },
+          { externalId: "2", username: "bob", email: "bob@example.com" },
+          { externalId: "3", username: "cy" },
+          { externalId: "4", username: "dee", email: "dee@example.com" },
+        ],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        recipients: [{ id: "r1", email: "dee@example.com", displayName: "Dee", isActive: true }],
+        memberships: [],
+      }),
+    );
+
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+    await user.click(screen.getByRole("button", { name: "Import users" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("ann@example.com");
+
+    // Cy has no email and Dee is already on the list, so two can be imported.
+    const all = within(dialog).getByRole("checkbox", { name: "Select all" }) as HTMLInputElement;
+    expect(all).toBeChecked();
+    expect(within(dialog).getByText("2 of 2 selected")).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("checkbox", { name: /bob/ }));
+    expect(all).not.toBeChecked();
+    expect(all.indeterminate).toBe(true);
+    expect(within(dialog).getByRole("button", { name: "Import 1 person" })).toBeEnabled();
+
+    await user.click(all);
+    expect(all).toBeChecked();
+    expect(all.indeterminate).toBe(false);
+    expect(within(dialog).getByRole("checkbox", { name: /bob/ })).toBeChecked();
+
+    await user.click(all);
+    expect(all).not.toBeChecked();
+    expect(all.indeterminate).toBe(false);
+    expect(within(dialog).getByText("0 of 2 selected")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Import" })).toBeDisabled();
+    expect(within(dialog).getByRole("checkbox", { name: /dee/ })).not.toBeChecked();
+
+    // Typing an email for Cy makes three who can be imported.
+    await user.type(within(dialog).getByLabelText("Email for cy"), "cy@example.com");
+    expect(within(dialog).getByText("1 of 3 selected")).toBeInTheDocument();
+    await user.click(all);
+    expect(within(dialog).getByText("3 of 3 selected")).toBeInTheDocument();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { created: [], skipped: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { group: { id: "g1", name: "Home Tautulli", description: null } }));
+    await user.click(within(dialog).getByRole("button", { name: "Import 3 people" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url === "/api/recipients/import")).toBe(true));
+    const importCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipients/import") as [string, RequestInit];
+    expect(JSON.parse(importCall[1].body as string).rows.map((row: { email: string }) => row.email)).toEqual([
+      "ann@example.com",
+      "bob@example.com",
+      "cy@example.com",
+    ]);
   });
 
   it("has no accessibility violations with the import-users dialog open", async () => {

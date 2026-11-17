@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseRecipientImportText, splitCells } from "./recipient-import";
+import type { RecipientImportPlan } from "./api";
+import { parseRecipientImportText, splitCells, withoutLeftOut } from "./recipient-import";
 
 describe("parseRecipientImportText", () => {
   it("parses one bare email per line", () => {
@@ -100,5 +101,56 @@ describe("parseRecipientImportText with a Group column (#288)", () => {
   it("uses commas between groups in a file separated by semicolons", () => {
     const result = parseRecipientImportText("Email;Group\na@example.com;Family, Friends");
     expect(result.rows).toEqual([{ email: "a@example.com", groups: ["Family", "Friends"] }]);
+  });
+});
+
+// #453: new people left out of a file import.
+describe("withoutLeftOut", () => {
+  const plan: RecipientImportPlan = {
+    create: [
+      { email: "Ann@example.com", groups: ["Family", " family ", "Book club"] },
+      { email: "bo@example.com", groups: ["Book club"] },
+      { email: "cy@example.com" },
+    ],
+    update: [],
+    nameDifferences: 0,
+    unchanged: [{ email: "dee@example.com" }],
+    skipped: [
+      { email: "ANN@example.com", reason: "Duplicate in this import" },
+      { email: "nope", reason: "Invalid email address" },
+    ],
+    groups: [
+      { name: "Family", isNew: true, adding: 1 },
+      { name: "Book club", isNew: false, adding: 3 },
+      { name: "Friends", isNew: false, adding: 0 },
+    ],
+  };
+
+  it("returns the plan as it is when no one is left out", () => {
+    expect(withoutLeftOut(plan, new Set())).toBe(plan);
+    expect(withoutLeftOut(plan, new Set(["dee@example.com"]))).toBe(plan);
+  });
+
+  it("drops the people left out, and their place in each group", () => {
+    const result = withoutLeftOut(plan, new Set(["ann@example.com"]));
+    expect(result.create.map((row) => row.email)).toEqual(["bo@example.com", "cy@example.com"]);
+    // Family was only Ann's, so it's no longer created; Friends was never changing.
+    expect(result.groups).toEqual([
+      { name: "Book club", isNew: false, adding: 2 },
+      { name: "Friends", isNew: false, adding: 0 },
+    ]);
+    expect(result.unchanged).toEqual(plan.unchanged);
+    // Ann's repeated row isn't sent either, so it's no longer skipped.
+    expect(result.skipped).toEqual([{ email: "nope", reason: "Invalid email address" }]);
+  });
+
+  it("leaves no one to create when everyone new is left out", () => {
+    const result = withoutLeftOut(plan, new Set(["ann@example.com", "bo@example.com", "cy@example.com"]));
+    expect(result.create).toEqual([]);
+    // Book club's third is someone already on the list, who still joins.
+    expect(result.groups).toEqual([
+      { name: "Book club", isNew: false, adding: 1 },
+      { name: "Friends", isNew: false, adding: 0 },
+    ]);
   });
 });
