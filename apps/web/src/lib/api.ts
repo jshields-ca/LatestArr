@@ -353,8 +353,10 @@ export interface RecipientImportSkip {
 /** What an import would do (#288), from a dry run. */
 export interface RecipientImportPlan {
   create: { email: string; displayName?: string }[];
-  /** Existing recipients whose name the file changes. */
+  /** Existing recipients whose name the import changes (only with updateNames). */
   update: { id: string; email: string; displayName: string; previousName: string | null }[];
+  /** Existing recipients with a different name in the import, renamed or not (#452). */
+  nameDifferences: number;
   unchanged: { email: string }[];
   skipped: RecipientImportSkip[];
   /** Each group the file names, whether it's new, and how many people
@@ -397,18 +399,20 @@ export function undoImport(id: string): Promise<UndoImportResult> {
 }
 
 type ImportRows = { email: string; displayName?: string; groups?: string[] }[];
+/** updateNames: use the import's names for people already on the list (#452). Off unless asked. */
+type ImportOptions = { updateNames?: boolean };
 
-export function previewRecipientImport(rows: ImportRows): Promise<{ plan: RecipientImportPlan }> {
+export function previewRecipientImport(rows: ImportRows, options: ImportOptions = {}): Promise<{ plan: RecipientImportPlan }> {
   return apiFetch<{ plan: RecipientImportPlan }>("/recipients/import", {
     method: "POST",
-    body: JSON.stringify({ rows, dryRun: true }),
+    body: JSON.stringify({ rows, dryRun: true, ...(options.updateNames ? { updateNames: true } : {}) }),
   });
 }
 
-export function importRecipients(rows: ImportRows): Promise<RecipientImportResult> {
+export function importRecipients(rows: ImportRows, options: ImportOptions = {}): Promise<RecipientImportResult> {
   return apiFetch<RecipientImportResult>("/recipients/import", {
     method: "POST",
-    body: JSON.stringify({ rows }),
+    body: JSON.stringify({ rows, ...(options.updateNames ? { updateNames: true } : {}) }),
   });
 }
 

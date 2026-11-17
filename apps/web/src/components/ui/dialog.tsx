@@ -36,8 +36,10 @@ const DialogContent = React.forwardRef<
         // runs under a phone's edges or its browser toolbars (dvh, not vh,
         // tracks the visible height as mobile toolbars show and hide); a
         // dialog taller than that scrolls instead of pushing its buttons
-        // off-screen.
-        "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border/80 bg-background/95 p-5 shadow-lg backdrop-blur-md sm:p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        // off-screen. Its one column never grows past the dialog, so a long
+        // name or email truncates rather than pushing everything off the
+        // right edge.
+        "fixed left-1/2 top-1/2 z-50 grid grid-cols-[minmax(0,1fr)] max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border/80 bg-background/95 p-5 shadow-lg backdrop-blur-md sm:p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className,
       )}
       {...props}

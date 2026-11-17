@@ -72,8 +72,8 @@ function FormatHelp() {
           or <code>Jane &lt;jane@example.com&gt;</code>. Copying cells straight from a spreadsheet works too.
         </p>
         <p>
-          Someone already on your list keeps their place; a name in the file updates theirs. Nothing changes until you
-          confirm.
+          Someone already on your list is never added twice, and keeps their name unless you choose otherwise on the
+          review. Nothing changes until you confirm.
         </p>
         <div>
           <Button type="button" variant="outline" size="sm" onClick={downloadTemplate}>
@@ -120,17 +120,54 @@ function PlanSection<T>({
   );
 }
 
-function Review({ plan, unreadable }: { plan: RecipientImportPlan; unreadable: string[] }) {
+function Review({
+  plan,
+  unreadable,
+  updateNames,
+  onUpdateNamesChange,
+  busy,
+}: {
+  plan: RecipientImportPlan;
+  unreadable: string[];
+  updateNames: boolean;
+  onUpdateNamesChange: (updateNames: boolean) => void;
+  busy: boolean;
+}) {
   const skipped = [...plan.skipped, ...unreadable.map((line) => ({ email: line, reason: "Couldn't read this line" }))];
   const joining = plan.groups.reduce((total, group) => total + group.adding, 0);
+  const differing = plan.nameDifferences;
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm">
-        {plural(plan.create.length, "new recipient")}, {plural(plan.update.length, "name change")},{" "}
+        {plural(plan.create.length, "new recipient")}
+        {plan.update.length > 0 ? `, ${plural(plan.update.length, "name change")}` : ""},{" "}
         {plural(plan.unchanged.length, "already on the list", "already on the list")}
         {skipped.length > 0 ? `, ${plural(skipped.length, "row")} skipped` : ""}.
         {joining > 0 ? ` Adds ${plural(joining, "group membership", "group memberships")}.` : ""}
       </p>
+      {differing > 0 ? (
+        // People already on the list keep their names unless this is ticked (#452).
+        <div className="flex items-start gap-2.5 rounded-md border border-border px-3 py-2.5 text-sm">
+          <input
+            type="checkbox"
+            id="recipient-import-update-names"
+            checked={updateNames}
+            disabled={busy}
+            onChange={(e) => onUpdateNamesChange(e.target.checked)}
+            aria-describedby="recipient-import-update-names-hint"
+            className="mt-0.5 size-4 shrink-0 accent-primary"
+          />
+          <div className="flex flex-col gap-0.5">
+            <label htmlFor="recipient-import-update-names" className="font-medium">
+              Use the names in the file
+            </label>
+            <p id="recipient-import-update-names-hint" className="text-muted-foreground">
+              In the file, {plural(differing, "person", "people")} {differing === 1 ? "has" : "have"} a different name from the
+              one on your list. Unticked, they keep the names they have.
+            </p>
+          </div>
+        </div>
+      ) : null}
       <PlanSection
         title="New"
         rows={plan.create}
@@ -203,6 +240,7 @@ export function ImportRecipientsDialog({
   const [open, setOpen] = useState(false);
   const [rawText, setRawText] = useState("");
   const [step, setStep] = useState<Step>({ name: "edit" });
+  const [updateNames, setUpdateNames] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -216,6 +254,7 @@ export function ImportRecipientsDialog({
     if (next) {
       setRawText("");
       setStep({ name: "edit" });
+      setUpdateNames(false);
       setError(null);
     }
   }
@@ -239,11 +278,14 @@ export function ImportRecipientsDialog({
     }
   }
 
-  async function handleReview() {
+  // Ticking "Use the names in the file" checks the list again with it.
+  async function handleReview(withNames = updateNames) {
     setError(null);
     setBusy(true);
     try {
-      const { plan } = await previewRecipientImport(parsed.rows);
+      const { plan } = await previewRecipientImport(parsed.rows, { updateNames: withNames });
+      // Only once the review shows it, so Import never does more than shown.
+      setUpdateNames(withNames);
       setStep({ name: "review", plan });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't check the list. Please try again.");
@@ -256,7 +298,7 @@ export function ImportRecipientsDialog({
     setError(null);
     setBusy(true);
     try {
-      const result = await importRecipients(parsed.rows);
+      const result = await importRecipients(parsed.rows, { updateNames });
       setStep({ name: "done", result });
       onImported(result);
       const details = [
@@ -305,7 +347,7 @@ export function ImportRecipientsDialog({
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {[
                 { label: "Added", value: step.result.created.length, show: true },
-                { label: "Updated", value: step.result.updated.length, show: true },
+                { label: "Renamed", value: step.result.updated.length, show: step.result.updated.length > 0 },
                 { label: "Group memberships", value: step.result.membershipsAdded, show: step.result.membershipsAdded > 0 },
                 { label: "Groups created", value: step.result.createdGroups.length, show: step.result.createdGroups.length > 0 },
                 { label: "Skipped", value: step.result.skipped.length, show: step.result.skipped.length > 0 },
@@ -336,7 +378,13 @@ export function ImportRecipientsDialog({
           </div>
         ) : step.name === "review" ? (
           <div className="flex flex-col gap-4">
-            <Review plan={step.plan} unreadable={parsed.unparsedLines} />
+            <Review
+              plan={step.plan}
+              unreadable={parsed.unparsedLines}
+              updateNames={updateNames}
+              onUpdateNamesChange={(next) => void handleReview(next)}
+              busy={busy}
+            />
             {error ? (
               <p role="alert" className="text-sm text-destructive">
                 {error}

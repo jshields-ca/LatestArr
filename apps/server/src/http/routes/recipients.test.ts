@@ -123,7 +123,36 @@ describe("POST /recipients/import", () => {
     expect(listResponse.json().recipients).toHaveLength(3);
   });
 
-  // #288: preview first, then apply; names of existing recipients update.
+  // #452: someone already on the list keeps their name unless renaming is
+  // asked for, however their name differs in the import.
+  it("leaves existing recipients' names alone by default", async () => {
+    await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "Ann@example.com", displayName: "Ann" } }));
+    const rows = [
+      { email: "ann@example.com", displayName: "ann_plex" },
+      { email: "cy@example.com", displayName: "Cy" },
+    ];
+
+    const preview = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows, dryRun: true } }));
+    expect(preview.json().plan).toMatchObject({
+      create: [{ email: "cy@example.com" }],
+      update: [],
+      nameDifferences: 1,
+      unchanged: [{ email: "Ann@example.com" }],
+    });
+
+    const applied = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows } }));
+    expect(applied.json()).toMatchObject({ updated: [], unchanged: [{ email: "Ann@example.com" }] });
+    const list = (await app.inject(authed({ method: "GET", url: "/api/recipients" }))).json().recipients;
+    expect(list.map((r: { email: string; displayName: string }) => [r.email, r.displayName]).sort()).toEqual([
+      ["Ann@example.com", "Ann"],
+      ["cy@example.com", "Cy"],
+    ]);
+    const latest = (await app.inject(authed({ method: "GET", url: "/api/recipients/imports/latest" }))).json().import;
+    expect(latest.counts).toMatchObject({ created: 1, renamed: 0 });
+  });
+
+  // #288: preview first, then apply; with updateNames (#452), names of
+  // existing recipients update.
   it("previews an import without changing anything, then applies it", async () => {
     await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "Ann@example.com", displayName: "Ann" } }));
     await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "bo@example.com", displayName: "Bo" } }));
@@ -134,18 +163,21 @@ describe("POST /recipients/import", () => {
       { email: "nope" },
     ];
 
-    const preview = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows, dryRun: true } }));
+    const preview = await app.inject(
+      authed({ method: "POST", url: "/api/recipients/import", payload: { rows, dryRun: true, updateNames: true } }),
+    );
     expect(preview.statusCode).toBe(200);
     expect(preview.json().plan).toMatchObject({
       create: [{ email: "cy@example.com", displayName: "Cy" }],
       update: [{ email: "Ann@example.com", displayName: "Ann Smith", previousName: "Ann" }],
+      nameDifferences: 1,
       unchanged: [{ email: "bo@example.com" }],
       skipped: [{ email: "nope", reason: "Invalid email address" }],
     });
     const before = await app.inject(authed({ method: "GET", url: "/api/recipients" }));
     expect(before.json().recipients).toHaveLength(2);
 
-    const applied = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows } }));
+    const applied = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows, updateNames: true } }));
     expect(applied.statusCode).toBe(201);
     expect(applied.json().created.map((r: { email: string }) => r.email)).toEqual(["cy@example.com"]);
     expect(applied.json().updated.map((r: { displayName: string }) => r.displayName)).toEqual(["Ann Smith"]);
@@ -200,6 +232,7 @@ describe("POST /recipients/import", () => {
         { email: "ren@example.com", displayName: "New name", groups: ["Club"] },
         { email: "kept@example.com", groups: ["Club"] },
       ],
+      updateNames: true,
     });
     const { importId, created } = imported.json();
     const latest = (await app.inject(authed({ method: "GET", url: "/api/recipients/imports/latest" }))).json().import;
