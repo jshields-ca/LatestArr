@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -6,13 +6,16 @@ import { LoadingPlaceholder, Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { ApiError, listLogs, type LogEntry } from "@/lib/api";
+import { formatDay, formatExactDateTime, isSameDay } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 const LIVE_POLL_MS = 3000;
 
+// Fixed colours, not theme ones: the log panel is dark in both themes, and
+// the light theme's red is too dark to read on it.
 const LEVEL_STYLES: Record<LogEntry["levelLabel"], string> = {
-  fatal: "text-destructive",
-  error: "text-destructive",
+  fatal: "text-red-400",
+  error: "text-red-400",
   warn: "text-amber-400",
   info: "text-sky-300",
   debug: "text-zinc-400",
@@ -44,8 +47,22 @@ function formatClock(time: number): string {
   return new Date(time).toLocaleTimeString(undefined, { hour12: false });
 }
 
-function formatFullTime(time: number): string {
-  return new Date(time).toLocaleString();
+// A line over each day's entries (#454), so a time like 08:00 says which
+// day it was. It stays at the top while that day's lines scroll past, and
+// is a heading, so screen readers can jump from day to day.
+function DayLine({ time }: { time: number }) {
+  const date = new Date(time);
+  const iso = [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join("-");
+  return (
+    <div className="sticky top-0 z-10 flex items-center gap-3 bg-zinc-950 px-3 pt-2 pb-1">
+      <h2 className="shrink-0 font-sans text-xs font-semibold text-zinc-300">
+        <time dateTime={iso}>{formatDay(time)}</time>
+      </h2>
+      <span className="h-px flex-1 bg-zinc-800" aria-hidden="true" />
+    </div>
+  );
 }
 
 function LogLine({ entry }: { entry: LogEntry }) {
@@ -85,7 +102,7 @@ function LogLine({ entry }: { entry: LogEntry }) {
         ) : (
           <span className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
         )}
-        <span className="shrink-0 text-zinc-400" title={formatFullTime(entry.time)}>
+        <span className="shrink-0 text-zinc-400" title={formatExactDateTime(entry.time)}>
           {formatClock(entry.time)}
         </span>
         <span className={cn("w-12 shrink-0 font-semibold uppercase", LEVEL_STYLES[entry.levelLabel])}>
@@ -204,9 +221,13 @@ export function LogsPage() {
 
       {logs && logs.length > 0 ? (
         <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 font-mono text-xs shadow-inner">
-          <div className="max-h-[70vh] divide-y divide-zinc-900 overflow-y-auto py-1">
+          <div className="max-h-[70vh] divide-y divide-zinc-900 overflow-y-auto pb-1">
             {logs.map((entry, index) => (
-              <LogLine key={`${entry.time}-${index}`} entry={entry} />
+              <Fragment key={`${entry.time}-${index}`}>
+                {/* Newest first, so a new day starts wherever the one above is a later day. */}
+                {index === 0 || !isSameDay(logs[index - 1].time, entry.time) ? <DayLine time={entry.time} /> : null}
+                <LogLine entry={entry} />
+              </Fragment>
             ))}
           </div>
         </div>
