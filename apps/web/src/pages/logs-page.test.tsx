@@ -143,6 +143,57 @@ describe("LogsPage", () => {
     vi.useRealTimers();
   });
 
+  // #454: a line over each day, as the buffer can span several.
+  describe("day lines", () => {
+    const at = (day: number, hour: number) => new Date(2026, 10, day, hour).getTime();
+    const sent = { time: at(17, 11), level: 30, levelLabel: "info", msg: "Sent the weekly digest" };
+    const signIn = { time: at(17, 9), level: 30, levelLabel: "info", msg: "Signed in" };
+    const failed = { time: at(14, 8), level: 50, levelLabel: "error", msg: "Send failed" };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 10, 17, 12, 0));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("puts a date line where the day changes", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [sent, signIn, failed] }));
+      render(<LogsPage />);
+      await screen.findByText("Send failed");
+
+      const days = screen.getAllByRole("heading", { level: 2 });
+      expect(days.map((day) => day.textContent)).toEqual(["Today", expect.stringMatching(/Saturday/)]);
+      expect(days[1]).toHaveTextContent(/November/);
+      // Each heading comes right before its own day's lines.
+      const order = [
+        days[0],
+        screen.getByText("Sent the weekly digest"),
+        screen.getByText("Signed in"),
+        days[1],
+        screen.getByText("Send failed"),
+      ];
+      for (let i = 1; i < order.length; i++) {
+        expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+    });
+
+    it("leaves out a day with no lines under the filter", async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [sent, failed] }));
+      render(<LogsPage />);
+      await screen.findByText("Send failed");
+      expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(2);
+
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { logs: [failed] }));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("combobox", { name: "Filter by level" }));
+      await user.click(await screen.findByRole("option", { name: "Error & above" }));
+      await waitFor(() => expect(screen.queryByText("Sent the weekly digest")).not.toBeInTheDocument());
+      expect(screen.getAllByRole("heading", { level: 2 }).map((day) => day.textContent)).toEqual([
+        expect.stringMatching(/Saturday/),
+      ]);
+    });
+  });
+
   it("shows an error message when loading fails", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(500, { error: "Something broke" }));
     render(<LogsPage />);
