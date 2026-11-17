@@ -30,11 +30,24 @@ export interface SkippedRow {
   reason: string;
 }
 
+export interface ImportOptions {
+  /**
+   * Whether a name in the import replaces an existing recipient's (#452).
+   * Off unless asked for: an import never changes who's already there.
+   */
+  updateNames?: boolean;
+}
+
 export interface ImportPlan {
   /** New recipients. */
   create: ImportRow[];
-  /** Existing recipients whose name the file changes. */
+  /** Existing recipients whose name the import changes (only with updateNames). */
   update: { id: string; email: string; displayName: string; previousName: string | null }[];
+  /**
+   * How many existing recipients have a different name in the import,
+   * whether or not they'll be renamed: the review offers renaming them.
+   */
+  nameDifferences: number;
   /** Already there, with nothing to change (name or groups). */
   unchanged: { email: string }[];
   skipped: SkippedRow[];
@@ -58,7 +71,7 @@ interface Planned {
   joins: [string, string][];
 }
 
-function plan(db: Db | Tx, rows: ImportRow[]): Planned {
+function plan(db: Db | Tx, rows: ImportRow[], options: ImportOptions): Planned {
   const existing = new Map(
     db
       .select({ id: recipients.id, email: recipients.email, displayName: recipients.displayName })
@@ -83,7 +96,7 @@ function plan(db: Db | Tx, rows: ImportRow[]): Planned {
       .map((row) => `${row.recipientId}:${row.groupId}`),
   );
 
-  const result: ImportPlan = { create: [], update: [], unchanged: [], skipped: [], groups: [] };
+  const result: ImportPlan = { create: [], update: [], nameDifferences: 0, unchanged: [], skipped: [], groups: [] };
   const adding = new Map<string, number>();
   const joins: [string, string][] = [];
   const seen = new Set<string>();
@@ -119,8 +132,12 @@ function plan(db: Db | Tx, rows: ImportRow[]): Planned {
 
     if (!match) {
       result.create.push({ email: parsed.data, displayName: row.displayName, groups: row.groups });
-    } else if (row.displayName && row.displayName !== match.displayName) {
-      result.update.push({ id: match.id, email: match.email, displayName: row.displayName, previousName: match.displayName });
+      continue;
+    }
+    const renames = Boolean(row.displayName && row.displayName !== match.displayName);
+    if (renames) result.nameDifferences += 1;
+    if (renames && options.updateNames) {
+      result.update.push({ id: match.id, email: match.email, displayName: row.displayName!, previousName: match.displayName });
     } else if (!joinsGroup) {
       result.unchanged.push({ email: match.email });
     }
@@ -136,12 +153,14 @@ function plan(db: Db | Tx, rows: ImportRow[]): Planned {
 
 /**
  * What importing `rows` would do. Emails match existing recipients ignoring
- * case. A row with a name updates an existing recipient's name; a row
- * without one leaves it alone (an import never clears a name). Groups are
- * only ever joined, never left, and missing ones are created.
+ * case, and someone already there is never added twice. Their name is left
+ * alone unless `updateNames` is on (#452); then a row with a name replaces
+ * theirs, and a row without one still leaves it (an import never clears a
+ * name). Groups are only ever joined, never left, and missing ones are
+ * created.
  */
-export function planRecipientImport(db: Db | Tx, rows: ImportRow[]): ImportPlan {
-  return plan(db, rows).plan;
+export function planRecipientImport(db: Db | Tx, rows: ImportRow[], options: ImportOptions = {}): ImportPlan {
+  return plan(db, rows, options).plan;
 }
 
 /** What an import changed, kept so Undo can reverse exactly that. */
@@ -157,9 +176,9 @@ export interface ImportChanges {
  * records what it changed as the latest import (replacing the one before,
  * which can then no longer be undone).
  */
-export function applyRecipientImport(db: Db, rows: ImportRow[], createdBy: string | null = null) {
+export function applyRecipientImport(db: Db, rows: ImportRow[], createdBy: string | null = null, options: ImportOptions = {}) {
   return db.transaction((tx) => {
-    const { plan: result, groupIds, joins } = plan(tx, rows);
+    const { plan: result, groupIds, joins } = plan(tx, rows, options);
 
     const createdGroups = result.groups
       .filter((group) => group.isNew)

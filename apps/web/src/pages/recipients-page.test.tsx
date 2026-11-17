@@ -941,12 +941,16 @@ describe("RecipientsPage", () => {
       if (url === "/api/recipients/import" && init?.method === "POST") {
         const body = JSON.parse(init.body as string);
         if (body.dryRun) {
+          // #452: names are only changed when asked.
           return Promise.resolve(
             jsonResponse(200, {
               plan: {
                 create: [{ email: "new@example.com", displayName: "New Person" }],
-                update: [{ id: "r1", email: "old@example.com", displayName: "Renamed", previousName: "Old" }],
-                unchanged: [],
+                update: body.updateNames
+                  ? [{ id: "r1", email: "old@example.com", displayName: "Renamed", previousName: "Old" }]
+                  : [],
+                nameDifferences: 1,
+                unchanged: body.updateNames ? [] : [{ email: "old@example.com" }],
                 skipped: [{ email: "bad", reason: "Invalid email address" }],
                 groups: [{ name: "Book club", isNew: true, adding: 1 }],
               },
@@ -981,32 +985,37 @@ describe("RecipientsPage", () => {
     expect(within(dialog).getByText(/2 rows found, 2 lines couldn't be read/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Review" }));
 
-    // The review: nothing imported yet.
-    expect(await within(dialog).findByText(/1 new recipient, 1 name change/)).toBeInTheDocument();
+    // The review: nothing imported yet, and names are kept unless asked (#452).
+    expect(await within(dialog).findByText(/1 new recipient, 1 already on the list/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("region", { name: "Name changes" })).not.toBeInTheDocument();
+    const useNames = within(dialog).getByRole("checkbox", { name: "Use the names in the file" });
+    expect(useNames).toHaveAccessibleDescription(/In the file, 1 person has a different name from the one on your list/);
+    expect(useNames).not.toBeChecked();
+    await user.click(useNames);
+    expect(await within(dialog).findByText(/1 new recipient, 1 name change, 0 already on the list/)).toBeInTheDocument();
     expect(within(dialog).getByRole("region", { name: "Name changes" })).toHaveTextContent("Old → Renamed");
     expect(within(dialog).getByRole("region", { name: "Skipped" })).toHaveTextContent("Couldn't read this line");
     expect(within(dialog).getByRole("region", { name: "Groups" })).toHaveTextContent(/Book clubNew groupAdding 1 person/);
     const calls = () => fetchMock.mock.calls.filter(([url]) => url === "/api/recipients/import");
-    expect(calls()).toHaveLength(1);
-    expect(JSON.parse(calls()[0]![1].body as string)).toEqual({
-      rows: [
-        { email: "new@example.com", displayName: "New Person", groups: ["Book club"] },
-        { email: "old@example.com", displayName: "Renamed" },
-      ],
-      dryRun: true,
-    });
+    expect(calls()).toHaveLength(2);
+    const rows = [
+      { email: "new@example.com", displayName: "New Person", groups: ["Book club"] },
+      { email: "old@example.com", displayName: "Renamed" },
+    ];
+    expect(JSON.parse(calls()[0]![1].body as string)).toEqual({ rows, dryRun: true });
+    expect(JSON.parse(calls()[1]![1].body as string)).toEqual({ rows, dryRun: true, updateNames: true });
 
     await user.click(within(dialog).getByRole("button", { name: "Import 3 changes" }));
     await within(dialog).findByText("Group memberships");
     const values = within(dialog).getAllByRole("definition");
     expect(within(dialog).getAllByRole("term").map((term, i) => `${term.textContent} ${values[i]!.textContent}`)).toEqual([
       "Added 1",
-      "Updated 1",
+      "Renamed 1",
       "Group memberships 1",
       "Groups created 1",
       "Skipped 1",
     ]);
-    expect(JSON.parse(calls()[1]![1].body as string)).not.toHaveProperty("dryRun");
+    expect(JSON.parse(calls()[2]![1].body as string)).toEqual({ rows, updateNames: true });
 
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());

@@ -26,7 +26,7 @@ const ALL_KINDS = ["tautulli", "plex", "jellyfin", "emby", "booklore", "bookorbi
 
 // SourcesPage fetches the sources list and the available adapter kinds
 // in parallel on mount, so every render in these tests needs both queued.
-// The import dialog loads its users, then the groups, when it opens.
+// The import dialog loads its users, the groups, then the recipients, when it opens.
 function mockLoad(sourcesBody: unknown, kinds: string[] = ALL_KINDS) {
   fetchMock.mockResolvedValueOnce(jsonResponse(200, sourcesBody));
   fetchMock.mockResolvedValueOnce(jsonResponse(200, { kinds }));
@@ -466,6 +466,7 @@ describe("ImportSourceUsersDialog", () => {
       ),
     );
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [], memberships: [] }));
 
     render(<SourcesPage />);
     await screen.findByText("Home Tautulli");
@@ -533,13 +534,79 @@ describe("ImportSourceUsersDialog", () => {
     expect(JSON.parse(addMemberCall[1].body as string)).toEqual({ recipientId: "r1" });
   });
 
+  // #452: someone already on the list is shown as such and left alone,
+  // rather than imported again under their username.
+  it("leaves people already on the list out of the import", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [exampleSource] });
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        users: [
+          { externalId: "1", username: "alice_plex", email: "Alice@Example.com" },
+          { externalId: "2", username: "bob", email: "bob@example.com" },
+          { externalId: "3", username: "cy" },
+        ],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        recipients: [{ id: "r1", email: "alice@example.com", displayName: "Alice Smith", isActive: true }],
+        memberships: [],
+      }),
+    );
+
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+    await user.click(screen.getByRole("button", { name: "Import users" }));
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("bob@example.com");
+
+    const alice = within(dialog).getByRole("checkbox", { name: /alice_plex/ });
+    expect(alice).toHaveAccessibleName(/Already on your list/);
+    expect(alice).not.toBeChecked();
+    expect(alice).toBeDisabled();
+    expect(within(dialog).getByRole("checkbox", { name: /bob/ })).toBeChecked();
+
+    // A typed email that's already on the list doesn't pick the person either.
+    await user.type(within(dialog).getByLabelText("Email for cy"), "ALICE@example.com");
+    expect(within(dialog).getByRole("checkbox", { name: /cy/ })).not.toBeChecked();
+    expect(within(dialog).getByRole("checkbox", { name: /cy/ })).toBeDisabled();
+    await user.clear(within(dialog).getByLabelText("Email for cy"));
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(201, {
+        created: [{ id: "r2", email: "bob@example.com", displayName: "bob", isActive: true }],
+        skipped: [],
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(201, { group: { id: "g1", name: "Home Tautulli", description: null } }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
+    await user.click(within(dialog).getByRole("button", { name: /Import 1 recipient/ }));
+    await waitFor(() => expect(dialog.textContent).toMatch(/1 already on your list was left as they are/));
+
+    const importCall = fetchMock.mock.calls.find(([url]) => url === "/api/recipients/import") as [string, RequestInit];
+    expect(JSON.parse(importCall[1].body as string)).toEqual({ rows: [{ email: "bob@example.com", displayName: "bob" }] });
+  });
+
   it("has no accessibility violations with the import-users dialog open", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [exampleSource] });
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { users: [{ externalId: "1", username: "alice", email: "alice@example.com" }] }),
+      jsonResponse(200, {
+        users: [
+          { externalId: "1", username: "alice", email: "alice@example.com" },
+          { externalId: "2", username: "bob", email: "bob@example.com" },
+        ],
+      }),
     );
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        recipients: [{ id: "r1", email: "bob@example.com", displayName: "Bob", isActive: true }],
+        memberships: [],
+      }),
+    );
 
     render(<SourcesPage />);
     await screen.findByText("Home Tautulli");

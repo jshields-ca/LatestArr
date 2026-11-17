@@ -44,6 +44,9 @@ const bulkImportSchema = z.object({
     .min(1)
     .max(1000),
   dryRun: z.boolean().optional(),
+  // Replace existing recipients' names with the import's (#452). Off by
+  // default: an import adds people and joins groups, nothing more.
+  updateNames: z.boolean().optional(),
 });
 
 // One change to many recipients at once (#400). The web app sends the ids
@@ -119,13 +122,14 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
       if (!body) return reply;
 
       if (body.dryRun) {
-        return reply.send({ plan: planRecipientImport(db, body.rows) });
+        return reply.send({ plan: planRecipientImport(db, body.rows, { updateNames: body.updateNames }) });
       }
 
       const { plan, created, updated, createdGroups, membershipsAdded, importId } = applyRecipientImport(
         db,
         body.rows,
         request.sessionUser?.id ?? null,
+        { updateNames: body.updateNames },
       );
       request.log.info(
         {

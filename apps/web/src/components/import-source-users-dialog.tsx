@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, UserPlus } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,8 +23,10 @@ import {
   createGroup,
   importRecipients,
   listGroups,
+  listRecipients,
   listSources,
   listSourceUsers,
+  type Recipient,
   type RecipientGroup,
   type SourceConnection,
   type SourceUser,
@@ -48,8 +51,9 @@ function byName(a: SourceUser, b: SourceUser): number {
 // those with a known email — a recipient can't exist without one) to
 // import as recipients, and adds them to a group named after the source
 // — reusing that name across repeat imports rather than creating a new
-// group every time, the same way `importRecipients` itself skips a
-// recipient whose email already exists rather than duplicating it.
+// group every time. Anyone whose email is already on the list is shown as
+// such and can't be picked (#452): the import leaves them as they are,
+// name, groups and all.
 // With `open` given, the caller opens it (the Recipients page's source
 // picker); otherwise it has its own "Import users" button (Sources page).
 export function ImportSourceUsersDialog({
@@ -70,14 +74,19 @@ export function ImportSourceUsersDialog({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [users, setUsers] = useState<SourceUser[] | null>(null);
   const [groups, setGroups] = useState<RecipientGroup[]>([]);
+  // Emails already on the list, lowercased: those people aren't imported again.
+  const [existingEmails, setExistingEmails] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Emails typed in for users the source has none for (Plex, Jellyfin, ...).
   const [typedEmails, setTypedEmails] = useState<Record<string, string>>({});
   const [groupName, setGroupName] = useState(source.name);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ created: number; addedToGroup: number; noEmail: number } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    created: number;
+    addedToGroup: number;
+    noEmail: number;
+    alreadyOnList: number;
+  } | null>(null);
 
   function setOpen(next: boolean) {
     if (!controlled) setOpenState(next);
@@ -94,11 +103,21 @@ export function ImportSourceUsersDialog({
     setTypedEmails({});
     setLoading(true);
     // Without the groups, an import still works; it just can't reuse one.
-    Promise.all([listSourceUsers(source.id), listGroups().catch(() => ({ groups: [] as RecipientGroup[] }))])
-      .then(([{ users: loaded }, { groups: loadedGroups }]) => {
+    // Without the recipients, no one's marked as already on the list, but
+    // the import still leaves them as they are.
+    Promise.all([
+      listSourceUsers(source.id),
+      listGroups().catch(() => ({ groups: [] as RecipientGroup[] })),
+      listRecipients().catch(() => ({ recipients: [] as Recipient[] })),
+    ])
+      .then(([{ users: loaded }, { groups: loadedGroups }, { recipients: loadedRecipients }]) => {
+        const emails = new Set(loadedRecipients.map((r) => r.email.toLowerCase()));
         setUsers([...loaded].sort(byName));
         setGroups(loadedGroups);
-        setSelected(new Set(loaded.filter((u) => u.email).map((u) => u.externalId)));
+        setExistingEmails(emails);
+        setSelected(
+          new Set(loaded.filter((u) => u.email && !emails.has(u.email.toLowerCase())).map((u) => u.externalId)),
+        );
       })
       .catch((err) => setLoadError(err instanceof ApiError ? err.message : "Failed to load users."))
       .finally(() => setLoading(false));
@@ -110,10 +129,20 @@ export function ImportSourceUsersDialog({
     return typed && EMAIL_PATTERN.test(typed) ? typed : undefined;
   }
 
+  function isOnList(user: SourceUser): boolean {
+    const email = emailFor(user);
+    return email !== undefined && existingEmails.has(email.toLowerCase());
+  }
+
+  // Who'd be imported: picked, with an email, and not already on the list.
+  function importable(user: SourceUser): boolean {
+    return selected.has(user.externalId) && Boolean(emailFor(user)) && !isOnList(user);
+  }
+
   // Typing a complete address selects the user; clearing it deselects them.
   function typeEmail(user: SourceUser, value: string) {
     setTypedEmails((prev) => ({ ...prev, [user.externalId]: value }));
-    const valid = EMAIL_PATTERN.test(value.trim());
+    const valid = EMAIL_PATTERN.test(value.trim()) && !existingEmails.has(value.trim().toLowerCase());
     setSelected((prev) => {
       const next = new Set(prev);
       if (valid) next.add(user.externalId);
@@ -133,9 +162,7 @@ export function ImportSourceUsersDialog({
 
   async function handleImport() {
     if (!users) return;
-    const rows = users
-      .filter((u) => emailFor(u) && selected.has(u.externalId))
-      .map((u) => ({ email: emailFor(u)!, displayName: u.username }));
+    const rows = users.filter(importable).map((u) => ({ email: emailFor(u)!, displayName: u.username }));
     if (rows.length === 0) return;
 
     setSubmitting(true);
@@ -162,6 +189,7 @@ export function ImportSourceUsersDialog({
         created: importResult.created.length,
         addedToGroup,
         noEmail: users.filter((u) => !emailFor(u)).length,
+        alreadyOnList: users.filter(isOnList).length,
       });
       onImported?.();
       toast({
@@ -179,9 +207,7 @@ export function ImportSourceUsersDialog({
     }
   }
 
-  const selectedWithEmailCount = users
-    ? users.filter((u) => emailFor(u) && selected.has(u.externalId)).length
-    : 0;
+  const importCount = users ? users.filter(importable).length : 0;
   const groupExists = groups.some((g) => g.name === groupName.trim());
 
   return (
@@ -198,8 +224,8 @@ export function ImportSourceUsersDialog({
         <DialogHeader>
           <DialogTitle>Import users from {source.name}</DialogTitle>
           <DialogDescription>
-            Add its users as recipients, grouped together. Type an email for anyone {source.name} doesn&apos;t
-            have one for.
+            Add its users as recipients, grouped together. Anyone already on your list is left as they are. Type an
+            email for anyone {source.name} doesn&apos;t have one for.
           </DialogDescription>
         </DialogHeader>
 
@@ -223,6 +249,9 @@ export function ImportSourceUsersDialog({
                 </>
               ) : null}
               .{" "}
+              {result.alreadyOnList > 0
+                ? `${result.alreadyOnList} already on your list ${result.alreadyOnList === 1 ? "was" : "were"} left as they are. `
+                : ""}
               {result.noEmail > 0
                 ? `${result.noEmail} user${result.noEmail === 1 ? "" : "s"} without an email ${result.noEmail === 1 ? "wasn't" : "weren't"} imported.`
                 : ""}
@@ -239,38 +268,49 @@ export function ImportSourceUsersDialog({
           ) : (
             <div className="flex flex-col gap-4">
               <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
-                {users.map((user) => (
-                  <li key={user.externalId} className="flex flex-wrap items-center gap-2 rounded px-1.5 py-1">
-                    <input
-                      type="checkbox"
-                      id={`import-user-${source.id}-${user.externalId}`}
-                      checked={selected.has(user.externalId)}
-                      disabled={!emailFor(user)}
-                      onChange={() => toggle(user.externalId)}
-                      className="size-4 shrink-0 accent-primary disabled:opacity-50"
-                    />
-                    <label
-                      htmlFor={`import-user-${source.id}-${user.externalId}`}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-2 text-sm"
-                    >
-                      <span className="truncate">{user.username}</span>
-                      {user.email && user.email !== user.username ? (
-                        <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                      ) : null}
-                    </label>
-                    {user.email ? null : (
-                      <Input
-                        type="email"
-                        aria-label={`Email for ${user.username}`}
-                        placeholder="Add an email"
-                        value={typedEmails[user.externalId] ?? ""}
-                        onChange={(e) => typeEmail(user, e.target.value)}
-                        disabled={submitting}
-                        className="h-8 basis-full sm:basis-56"
+                {users.map((user) => {
+                  const onList = isOnList(user);
+                  return (
+                    <li key={user.externalId} className="flex flex-wrap items-center gap-2 rounded px-1.5 py-1">
+                      <input
+                        type="checkbox"
+                        id={`import-user-${source.id}-${user.externalId}`}
+                        checked={selected.has(user.externalId) && !onList}
+                        disabled={!emailFor(user) || onList}
+                        onChange={() => toggle(user.externalId)}
+                        className="size-4 shrink-0 accent-primary disabled:opacity-50"
                       />
-                    )}
-                  </li>
-                ))}
+                      <label
+                        htmlFor={`import-user-${source.id}-${user.externalId}`}
+                        className="flex min-w-0 flex-1 items-center justify-between gap-2 text-sm"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate">{user.username}</span>
+                          {onList ? (
+                            <Badge variant="neutral" className="shrink-0">
+                              Already on your list
+                            </Badge>
+                          ) : null}
+                        </span>
+                        {user.email && user.email !== user.username ? (
+                          // Narrow, the email gives way before the name does.
+                          <span className="shrink-[3] truncate text-xs text-muted-foreground">{user.email}</span>
+                        ) : null}
+                      </label>
+                      {user.email ? null : (
+                        <Input
+                          type="email"
+                          aria-label={`Email for ${user.username}`}
+                          placeholder="Add an email"
+                          value={typedEmails[user.externalId] ?? ""}
+                          onChange={(e) => typeEmail(user, e.target.value)}
+                          disabled={submitting}
+                          className="h-8 basis-full sm:basis-56"
+                        />
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
 
               <div className="flex flex-col gap-1.5">
@@ -292,10 +332,10 @@ export function ImportSourceUsersDialog({
                 <Button
                   type="button"
                   onClick={() => void handleImport()}
-                  disabled={submitting || selectedWithEmailCount === 0}
+                  disabled={submitting || importCount === 0}
                 >
                   {submitting ? <Loader2 className="animate-spin" /> : null}
-                  Import {selectedWithEmailCount || ""} recipient{selectedWithEmailCount === 1 ? "" : "s"}
+                  Import {importCount || ""} recipient{importCount === 1 ? "" : "s"}
                 </Button>
               </DialogFooter>
             </div>
