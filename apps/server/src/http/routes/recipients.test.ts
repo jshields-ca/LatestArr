@@ -219,6 +219,14 @@ describe("POST /recipients/import", () => {
     expect(await members(bookClub.id)).toEqual(["bo@example.com", "cy@example.com"]);
   });
 
+  it("counts a group once when a row names it twice in different cases", async () => {
+    const rows = [{ email: "ann@example.com", groups: ["Family", " family "] }];
+    const preview = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows, dryRun: true } }));
+    expect(preview.json().plan.groups).toEqual([{ name: "Family", isNew: true, adding: 1 }]);
+    const applied = await app.inject(authed({ method: "POST", url: "/api/recipients/import", payload: { rows } }));
+    expect(applied.json().membershipsAdded).toBe(1);
+  });
+
   // #288 part 3: Undo reverses exactly what the latest import did.
   it("undoes the latest import, keeping anything changed since", async () => {
     const post = (url: string, payload: unknown) => app.inject(authed({ method: "POST", url, payload }));

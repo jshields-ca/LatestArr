@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { ArrowLeft, Download, Loader2, Undo2, Upload } from "lucide-react";
 
@@ -26,10 +26,18 @@ import {
   type RecipientImportPlan,
   type RecipientImportResult,
 } from "@/lib/api";
-import { EMAIL_HEADERS, GROUP_HEADERS, NAME_HEADERS, parseRecipientImportText } from "@/lib/recipient-import";
+import {
+  EMAIL_HEADERS,
+  emailKey,
+  GROUP_HEADERS,
+  NAME_HEADERS,
+  parseRecipientImportText,
+  withoutLeftOut,
+} from "@/lib/recipient-import";
 import { isSpreadsheet, readSpreadsheetAsText, SpreadsheetError } from "@/lib/spreadsheet";
 import { guardClose } from "@/lib/unsaved-changes";
 import { confirmAction } from "@/components/confirm-dialog";
+import { SelectAllCheckbox } from "@/components/select-all-checkbox";
 
 // Shown this many rows per part of the review, with the rest behind "Show all".
 const PREVIEW_ROWS = 5;
@@ -86,17 +94,30 @@ function FormatHelp() {
   );
 }
 
+// Ticking rows in one part of the review (#453).
+interface PlanSelection<T> {
+  isSelected: (row: T) => boolean;
+  onToggle: (row: T) => void;
+  onSelectAll: (all: boolean) => void;
+  disabled?: boolean;
+}
+
 // One part of the review: a heading with its count, and the first few rows.
+// With `selection`, each row has a checkbox, and Select all covers every
+// row, shown or not.
 function PlanSection<T>({
   title,
   rows,
   render,
+  selection,
 }: {
   title: string;
   rows: T[];
   render: (row: T) => ReactNode;
+  selection?: PlanSelection<T>;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const id = useId();
   if (rows.length === 0) return null;
   const shown = showAll ? rows : rows.slice(0, PREVIEW_ROWS);
   return (
@@ -104,12 +125,37 @@ function PlanSection<T>({
       <h3 className="text-sm font-medium">
         {title} <span className="text-muted-foreground">({rows.length})</span>
       </h3>
+      {selection ? (
+        <SelectAllCheckbox
+          total={rows.length}
+          selected={rows.filter(selection.isSelected).length}
+          onChange={selection.onSelectAll}
+          disabled={selection.disabled}
+          className="px-2"
+        />
+      ) : null}
       <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2 text-sm">
-        {shown.map((row, index) => (
-          <li key={index} className="flex items-center justify-between gap-2">
-            {render(row)}
-          </li>
-        ))}
+        {shown.map((row, index) =>
+          selection ? (
+            <li key={index} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id={`${id}-${index}`}
+                checked={selection.isSelected(row)}
+                disabled={selection.disabled}
+                onChange={() => selection.onToggle(row)}
+                className="size-4 shrink-0 cursor-pointer accent-primary disabled:opacity-50"
+              />
+              <label htmlFor={`${id}-${index}`} className="flex min-h-6 min-w-0 flex-1 cursor-pointer items-center justify-between gap-2">
+                {render(row)}
+              </label>
+            </li>
+          ) : (
+            <li key={index} className="flex items-center justify-between gap-2">
+              {render(row)}
+            </li>
+          ),
+        )}
       </ul>
       {rows.length > PREVIEW_ROWS ? (
         <Button type="button" variant="link" size="sm" className="self-start px-0" onClick={() => setShowAll((all) => !all)}>
@@ -121,18 +167,40 @@ function PlanSection<T>({
 }
 
 function Review({
+  fullPlan,
   plan,
   unreadable,
   updateNames,
   onUpdateNamesChange,
+  leftOut,
+  onLeftOutChange,
   busy,
 }: {
+  /** Everyone new, ticked or not. */
+  fullPlan: RecipientImportPlan;
+  /** What will be imported: withoutLeftOut(fullPlan, leftOut). */
   plan: RecipientImportPlan;
   unreadable: string[];
   updateNames: boolean;
   onUpdateNamesChange: (updateNames: boolean) => void;
+  /** New people unticked (#453), by emailKey(). */
+  leftOut: ReadonlySet<string>;
+  onLeftOutChange: (leftOut: Set<string>) => void;
   busy: boolean;
 }) {
+  // Everything but the list of new people counts only those still ticked.
+  const newSelection: PlanSelection<RecipientImportPlan["create"][number]> = {
+    isSelected: (row) => !leftOut.has(emailKey(row.email)),
+    onToggle: (row) => {
+      const key = emailKey(row.email);
+      const next = new Set(leftOut);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      onLeftOutChange(next);
+    },
+    onSelectAll: (all) => onLeftOutChange(all ? new Set() : new Set(fullPlan.create.map((row) => emailKey(row.email)))),
+    disabled: busy,
+  };
   const skipped = [...plan.skipped, ...unreadable.map((line) => ({ email: line, reason: "Couldn't read this line" }))];
   const joining = plan.groups.reduce((total, group) => total + group.adding, 0);
   const differing = plan.nameDifferences;
@@ -170,7 +238,8 @@ function Review({
       ) : null}
       <PlanSection
         title="New"
-        rows={plan.create}
+        rows={fullPlan.create}
+        selection={newSelection}
         render={(row) => (
           <>
             <span className="truncate">{row.email}</span>
@@ -241,6 +310,8 @@ export function ImportRecipientsDialog({
   const [rawText, setRawText] = useState("");
   const [step, setStep] = useState<Step>({ name: "edit" });
   const [updateNames, setUpdateNames] = useState(false);
+  // New people unticked on the review (#453), by emailKey().
+  const [leftOut, setLeftOut] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -255,6 +326,7 @@ export function ImportRecipientsDialog({
       setRawText("");
       setStep({ name: "edit" });
       setUpdateNames(false);
+      setLeftOut(new Set());
       setError(null);
     }
   }
@@ -298,7 +370,8 @@ export function ImportRecipientsDialog({
     setError(null);
     setBusy(true);
     try {
-      const result = await importRecipients(parsed.rows, { updateNames });
+      const rows = parsed.rows.filter((row) => !leftOut.has(emailKey(row.email)));
+      const result = await importRecipients(rows, { updateNames });
       setStep({ name: "done", result });
       onImported(result);
       const details = [
@@ -317,10 +390,10 @@ export function ImportRecipientsDialog({
     }
   }
 
-  const changes =
-    step.name === "review"
-      ? step.plan.create.length + step.plan.update.length + step.plan.groups.reduce((total, group) => total + group.adding, 0)
-      : 0;
+  const reviewed = step.name === "review" ? withoutLeftOut(step.plan, leftOut) : null;
+  const changes = reviewed
+    ? reviewed.create.length + reviewed.update.length + reviewed.groups.reduce((total, group) => total + group.adding, 0)
+    : 0;
 
   return (
     <Dialog open={open} onOpenChange={guardClose(unsaved, openChange)}>
@@ -379,10 +452,13 @@ export function ImportRecipientsDialog({
         ) : step.name === "review" ? (
           <div className="flex flex-col gap-4">
             <Review
-              plan={step.plan}
+              fullPlan={step.plan}
+              plan={reviewed!}
               unreadable={parsed.unparsedLines}
               updateNames={updateNames}
               onUpdateNamesChange={(next) => void handleReview(next)}
+              leftOut={leftOut}
+              onLeftOutChange={setLeftOut}
               busy={busy}
             />
             {error ? (

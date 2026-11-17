@@ -93,7 +93,7 @@ describe("RecipientsPage", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Import users from Home Tautulli" });
     await within(dialog).findByText("alice@example.com");
-    await user.click(within(dialog).getByRole("button", { name: /Import 1 recipient/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Import 1 person" }));
     await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1\s*recipient/));
     // The page reloads its lists, so the new recipient shows.
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
@@ -916,6 +916,75 @@ describe("RecipientsPage", () => {
     await screen.findByRole("dialog");
 
     expect(await axe(document.body)).toHaveNoViolations();
+  });
+
+  // #453: new people can be left out on the review, without editing the file.
+  it("leaves unticked new people out of a file import", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/recipients" && !init?.method) return Promise.resolve(jsonResponse(200, { recipients: [], memberships: [] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients/imports/latest") return Promise.resolve(jsonResponse(200, { import: null }));
+      if (url === "/api/recipients/import" && init?.method === "POST") {
+        const body = JSON.parse(init.body as string);
+        if (body.dryRun) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              plan: {
+                create: [
+                  { email: "ann@example.com", groups: ["Club"] },
+                  { email: "bo@example.com", groups: ["Club"] },
+                  { email: "cy@example.com" },
+                ],
+                update: [],
+                nameDifferences: 0,
+                unchanged: [],
+                skipped: [],
+                groups: [{ name: "Club", isNew: true, adding: 2 }],
+              },
+            }),
+          );
+        }
+        return Promise.resolve(
+          jsonResponse(201, { created: [], updated: [], unchanged: [], skipped: [], createdGroups: [], membershipsAdded: 0 }),
+        );
+      }
+      return Promise.resolve(jsonResponse(404, { error: "Not found" }));
+    });
+
+    render(<RecipientsPage />);
+    await screen.findByText("No recipients yet");
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Paste recipients"), {
+      target: { value: "email,groups\nann@example.com,Club\nbo@example.com,Club\ncy@example.com," },
+    });
+    await user.click(within(dialog).getByRole("button", { name: "Review" }));
+    await within(dialog).findByText(/3 new recipients/);
+    const newPeople = within(dialog).getByRole("region", { name: "New" });
+    const all = within(newPeople).getByRole("checkbox", { name: "Select all" }) as HTMLInputElement;
+    expect(all).toBeChecked();
+    expect(await axe(document.body)).toHaveNoViolations();
+
+    await user.click(within(newPeople).getByRole("checkbox", { name: /ann@example\.com/ }));
+    expect(all.indeterminate).toBe(true);
+    expect(within(dialog).getByText(/^2 new recipients/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("region", { name: "Groups" })).toHaveTextContent("Adding 1 person");
+    expect(within(dialog).getByRole("button", { name: "Import 3 changes" })).toBeInTheDocument();
+
+    // None, then the Club group goes too, as no one would join it.
+    await user.click(all);
+    expect(all).toBeChecked();
+    await user.click(all);
+    expect(within(newPeople).getByText("0 of 3 selected")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("region", { name: "Groups" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Nothing to import" })).toBeDisabled();
+
+    await user.click(within(newPeople).getByRole("checkbox", { name: /cy@example\.com/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Import 1 change" }));
+    await within(dialog).findByText("Your list is updated.");
+    const sent = fetchMock.mock.calls.filter(([url]) => url === "/api/recipients/import").at(-1)!;
+    expect(JSON.parse((sent[1] as RequestInit).body as string)).toEqual({ rows: [{ email: "cy@example.com" }] });
   });
 
   // #288: nothing changes until the review is confirmed.

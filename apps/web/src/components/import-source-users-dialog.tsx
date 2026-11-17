@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SelectAllCheckbox } from "@/components/select-all-checkbox";
 import { toast } from "@/components/ui/use-toast";
 import {
   addGroupMember,
@@ -134,9 +135,14 @@ export function ImportSourceUsersDialog({
     return email !== undefined && existingEmails.has(email.toLowerCase());
   }
 
-  // Who'd be imported: picked, with an email, and not already on the list.
+  // Who can be imported: with an email, and not already on the list.
+  function canImport(user: SourceUser): boolean {
+    return Boolean(emailFor(user)) && !isOnList(user);
+  }
+
+  // Who will be: those of them who are ticked.
   function importable(user: SourceUser): boolean {
-    return selected.has(user.externalId) && Boolean(emailFor(user)) && !isOnList(user);
+    return selected.has(user.externalId) && canImport(user);
   }
 
   // Typing a complete address selects the user; clearing it deselects them.
@@ -149,6 +155,11 @@ export function ImportSourceUsersDialog({
       else next.delete(user.externalId);
       return next;
     });
+  }
+
+  // Select all ticks everyone who can be imported (#453).
+  function selectAll(all: boolean) {
+    setSelected(all && users ? new Set(users.filter(canImport).map((u) => u.externalId)) : new Set());
   }
 
   function toggle(externalId: string) {
@@ -208,6 +219,7 @@ export function ImportSourceUsersDialog({
   }
 
   const importCount = users ? users.filter(importable).length : 0;
+  const canImportCount = users ? users.filter(canImport).length : 0;
   const groupExists = groups.some((g) => g.name === groupName.trim());
 
   return (
@@ -267,51 +279,60 @@ export function ImportSourceUsersDialog({
             <p className="text-sm text-muted-foreground">{source.name} has no known users yet.</p>
           ) : (
             <div className="flex flex-col gap-4">
-              <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
-                {users.map((user) => {
-                  const onList = isOnList(user);
-                  return (
-                    <li key={user.externalId} className="flex flex-wrap items-center gap-2 rounded px-1.5 py-1">
-                      <input
-                        type="checkbox"
-                        id={`import-user-${source.id}-${user.externalId}`}
-                        checked={selected.has(user.externalId) && !onList}
-                        disabled={!emailFor(user) || onList}
-                        onChange={() => toggle(user.externalId)}
-                        className="size-4 shrink-0 accent-primary disabled:opacity-50"
-                      />
-                      <label
-                        htmlFor={`import-user-${source.id}-${user.externalId}`}
-                        className="flex min-w-0 flex-1 items-center justify-between gap-2 text-sm"
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="truncate">{user.username}</span>
-                          {onList ? (
-                            <Badge variant="neutral" className="shrink-0">
-                              Already on your list
-                            </Badge>
-                          ) : null}
-                        </span>
-                        {user.email && user.email !== user.username ? (
-                          // Narrow, the email gives way before the name does.
-                          <span className="shrink-[3] truncate text-xs text-muted-foreground">{user.email}</span>
-                        ) : null}
-                      </label>
-                      {user.email ? null : (
-                        <Input
-                          type="email"
-                          aria-label={`Email for ${user.username}`}
-                          placeholder="Add an email"
-                          value={typedEmails[user.externalId] ?? ""}
-                          onChange={(e) => typeEmail(user, e.target.value)}
-                          disabled={submitting}
-                          className="h-8 basis-full sm:basis-56"
+              <div className="flex flex-col gap-1.5">
+                <SelectAllCheckbox
+                  total={canImportCount}
+                  selected={importCount}
+                  onChange={selectAll}
+                  disabled={submitting}
+                  className="px-2"
+                />
+                <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
+                  {users.map((user) => {
+                    const onList = isOnList(user);
+                    return (
+                      <li key={user.externalId} className="flex flex-wrap items-center gap-2 rounded px-1.5 py-1">
+                        <input
+                          type="checkbox"
+                          id={`import-user-${source.id}-${user.externalId}`}
+                          checked={selected.has(user.externalId) && !onList}
+                          disabled={!emailFor(user) || onList}
+                          onChange={() => toggle(user.externalId)}
+                          className="size-4 shrink-0 accent-primary disabled:opacity-50"
                         />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+                        <label
+                          htmlFor={`import-user-${source.id}-${user.externalId}`}
+                          className="flex min-w-0 flex-1 items-center justify-between gap-2 text-sm"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate">{user.username}</span>
+                            {onList ? (
+                              <Badge variant="neutral" className="shrink-0">
+                                Already on your list
+                              </Badge>
+                            ) : null}
+                          </span>
+                          {user.email && user.email !== user.username ? (
+                            // Narrow, the email gives way before the name does.
+                            <span className="shrink-[3] truncate text-xs text-muted-foreground">{user.email}</span>
+                          ) : null}
+                        </label>
+                        {user.email ? null : (
+                          <Input
+                            type="email"
+                            aria-label={`Email for ${user.username}`}
+                            placeholder="Add an email"
+                            value={typedEmails[user.externalId] ?? ""}
+                            onChange={(e) => typeEmail(user, e.target.value)}
+                            disabled={submitting}
+                            className="h-8 basis-full sm:basis-56"
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="import-users-group">Add to group</Label>
@@ -335,7 +356,7 @@ export function ImportSourceUsersDialog({
                   disabled={submitting || importCount === 0}
                 >
                   {submitting ? <Loader2 className="animate-spin" /> : null}
-                  Import {importCount || ""} recipient{importCount === 1 ? "" : "s"}
+                  {importCount === 0 ? "Import" : `Import ${importCount} ${importCount === 1 ? "person" : "people"}`}
                 </Button>
               </DialogFooter>
             </div>

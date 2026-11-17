@@ -116,8 +116,13 @@ function plan(db: Db | Tx, rows: ImportRow[], options: ImportOptions): Planned {
 
     const match = existing.get(key);
     let joinsGroup = false;
-    for (const name of new Set((row.groups ?? []).map((group) => group.trim()).filter(Boolean))) {
-      const gkey = groupKey(name);
+    // One row naming a group twice ("Family;family") joins it once.
+    const rowGroups = new Map<string, string>();
+    for (const group of row.groups ?? []) {
+      const name = group.trim();
+      if (name && !rowGroups.has(groupKey(name))) rowGroups.set(groupKey(name), name);
+    }
+    for (const [gkey, name] of rowGroups) {
       if (!groupIds.has(gkey)) {
         groupIds.set(gkey, null);
         groupNames.set(gkey, name);

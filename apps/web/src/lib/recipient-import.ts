@@ -7,6 +7,8 @@
 // just good-enough client-side parsing to build a review table before
 // anything is submitted.
 
+import type { RecipientImportPlan } from "./api";
+
 export interface ParsedRecipientRow {
   email: string;
   displayName?: string;
@@ -189,4 +191,38 @@ export function parseRecipientImportText(text: string): ParseRecipientImportResu
   });
 
   return { rows, unparsedLines };
+}
+
+/** An email as the server matches it: ignoring case and surrounding spaces. */
+export const emailKey = (email: string) => email.trim().toLowerCase();
+const groupKey = (name: string) => name.trim().toLowerCase();
+/** The server's reason for a row repeating an earlier one (recipient-import.ts). */
+const DUPLICATE_REASON = "Duplicate in this import";
+
+/**
+ * The review with some new people left out (#453): they aren't created,
+ * and the groups no longer count them. A group only they were joining is
+ * dropped, as the server would no longer create or change it, and so are
+ * their duplicate rows, which aren't sent either. `leftOut` holds
+ * emailKey()s; emails that aren't new are ignored.
+ */
+export function withoutLeftOut(plan: RecipientImportPlan, leftOut: ReadonlySet<string>): RecipientImportPlan {
+  const dropped = plan.create.filter((row) => leftOut.has(emailKey(row.email)));
+  if (dropped.length === 0) return plan;
+  const notJoining = new Map<string, number>();
+  for (const row of dropped) {
+    for (const key of new Set((row.groups ?? []).map(groupKey).filter(Boolean))) {
+      notJoining.set(key, (notJoining.get(key) ?? 0) + 1);
+    }
+  }
+  return {
+    ...plan,
+    create: plan.create.filter((row) => !leftOut.has(emailKey(row.email))),
+    skipped: plan.skipped.filter(
+      (row) => !(row.reason === DUPLICATE_REASON && dropped.some((left) => emailKey(left.email) === emailKey(row.email))),
+    ),
+    groups: plan.groups
+      .map((group) => ({ ...group, adding: group.adding - (notJoining.get(groupKey(group.name)) ?? 0) }))
+      .filter((group, index) => group.adding > 0 || plan.groups[index]!.adding === 0),
+  };
 }

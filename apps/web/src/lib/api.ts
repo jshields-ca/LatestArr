@@ -352,7 +352,7 @@ export interface RecipientImportSkip {
 
 /** What an import would do (#288), from a dry run. */
 export interface RecipientImportPlan {
-  create: { email: string; displayName?: string }[];
+  create: { email: string; displayName?: string; groups?: string[] }[];
   /** Existing recipients whose name the import changes (only with updateNames). */
   update: { id: string; email: string; displayName: string; previousName: string | null }[];
   /** Existing recipients with a different name in the import, renamed or not (#452). */
