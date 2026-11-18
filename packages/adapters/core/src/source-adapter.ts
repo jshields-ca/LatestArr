@@ -1,4 +1,6 @@
-export type MediaKind = "movie" | "tv_episode" | "tv_season" | "book" | "audiobook" | "game";
+/** "album" is music (#354): one row per album, never per track. */
+export const MEDIA_KINDS = ["movie", "tv_episode", "tv_season", "book", "audiobook", "game", "album"] as const;
+export type MediaKind = (typeof MEDIA_KINDS)[number];
 
 export interface NewItem {
   /** Adapter-local identifier for de-dupe; callers should namespace this
@@ -25,6 +27,8 @@ export interface NewItem {
   runtimeMinutes?: number;
   pageCount?: number;
   durationSeconds?: number;
+  /** An album's number of tracks. */
+  trackCount?: number;
   platform?: string;
   libraryName?: string;
   externalUrl?: string;
@@ -43,7 +47,38 @@ export interface NewItem {
 
 export interface SourceCapabilities {
   supportsMediaKinds: MediaKind[];
+  /** What a newsletter gets from this source until someone chooses, when
+   * that's less than everything: a kind added to a source later (music on
+   * Plex, #354) stays off, so newsletters that already use the source
+   * don't change. Defaults to supportsMediaKinds. */
+  defaultMediaKinds?: MediaKind[];
   supportsIncrementalSync: boolean;
+}
+
+/**
+ * An album's release date, from Plex's `originallyAvailableAt` (or
+ * Tautulli's copy of it). Music tagged with only a year gets 1 January of
+ * that year, which would read as a real date ("Released Jan 1"), so that's
+ * left out; a real date is kept. (#354)
+ */
+export function albumReleaseDate(value: string | undefined): Date | undefined {
+  if (!value || /^\d{4}-01-01$/.test(value)) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+/** A Plex-style `originallyAvailableAt`, with albums read as above. */
+export function releaseDateOf(kind: MediaKind, value: string | undefined): Date | undefined {
+  if (kind === "album") return albumReleaseDate(value);
+  return value ? new Date(value) : undefined;
+}
+
+/** The kinds a newsletter gets from a linked source: the ones chosen for
+ * it, or the source's defaults. Kinds the source doesn't have are dropped.
+ * An empty choice, which linking allowed before #354, means the defaults. */
+export function mediaKindsFor(capabilities: SourceCapabilities, chosen?: readonly string[] | null): MediaKind[] {
+  if (!chosen || chosen.length === 0) return [...(capabilities.defaultMediaKinds ?? capabilities.supportsMediaKinds)];
+  return capabilities.supportsMediaKinds.filter((kind) => chosen.includes(kind));
 }
 
 export interface ConnectionTestResult {

@@ -105,6 +105,7 @@ const ROLE_NEEDED: Record<string, Role> = {
   "PATCH /api/newsletters/:id": "editor",
   "DELETE /api/newsletters/:id": "editor",
   "POST /api/newsletters/:id/sources": "editor",
+  "PATCH /api/newsletters/:id/sources/:sourceConnectionId": "editor",
   "DELETE /api/newsletters/:id/sources/:sourceConnectionId": "editor",
   "POST /api/newsletters/:id/recipient-groups": "editor",
   "DELETE /api/newsletters/:id/recipient-groups/:groupId": "editor",

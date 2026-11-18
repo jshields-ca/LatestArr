@@ -213,6 +213,10 @@ export interface SourceConnection {
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The kinds of content it has (movie, tv_episode, album, ...), and the
+   * ones a newsletter gets from it until someone chooses (#354). */
+  mediaKinds: string[];
+  defaultMediaKinds: string[];
 }
 
 export interface CreateSourceInput {
@@ -659,6 +663,18 @@ export function addNewsletterSource(newsletterId: string, sourceConnectionId: st
   return apiFetch<void>(`/newsletters/${newsletterId}/sources`, {
     method: "POST",
     body: JSON.stringify({ sourceConnectionId }),
+  });
+}
+
+/** Some of a linked source's kinds, or null for its defaults. */
+export function setNewsletterSourceKinds(
+  newsletterId: string,
+  sourceConnectionId: string,
+  mediaTypeFilter: string[] | null,
+): Promise<void> {
+  return apiFetch<void>(`/newsletters/${newsletterId}/sources/${sourceConnectionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ mediaTypeFilter }),
   });
 }
 

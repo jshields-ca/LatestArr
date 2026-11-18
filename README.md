@@ -39,8 +39,8 @@
 
 | Source | Content | Connects via | Status |
 | --- | --- | --- | --- |
-| [Tautulli](https://tautulli.com/) | Movies, TV | Tautulli API | ✅ Working |
-| Plex (direct) | Movies, TV | Plex API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
+| [Tautulli](https://tautulli.com/) | Movies, TV, music | Tautulli API | ✅ Working |
+| Plex (direct) | Movies, TV, music | Plex API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
 | [Jellyfin](https://jellyfin.org/) | Movies, TV, books, audiobooks | Jellyfin API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
 | [Emby](https://emby.media/) | Movies, TV, books, audiobooks | Emby API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
 | [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |

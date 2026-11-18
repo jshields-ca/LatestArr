@@ -9,7 +9,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, plexWebAppUrl, readNewest } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
 import {
   buildImageUrl,
   fetchImage,
@@ -29,14 +29,19 @@ function mapMediaType(type: string): MediaKind | null {
       return "tv_episode";
     case "season":
       return "tv_season";
+    case "album":
+      return "album";
     default:
-      // Plex's recently-added feed also emits show/artist/album/track/photo
-      // entries we don't model yet; skip rather than mis-map them.
+      // The feed can also hold show/artist/track/photo entries we don't
+      // model; skip rather than mis-map them. Music arrives as albums: a
+      // new album, single or EP is one entry. Tracks added later to an
+      // album already there don't bring it back up the list (#354).
       return null;
   }
 }
 
 function mapLibraryType(sectionType: string): MediaKind {
+  if (sectionType === "artist") return "album";
   return sectionType === "show" ? "tv_episode" : "movie";
 }
 
@@ -102,7 +107,9 @@ function posterPath(kind: MediaKind, item: PlexMetadataItem): string | undefined
 export const plexAdapter: SourceAdapter = {
   kind: "plex",
   capabilities: {
-    supportsMediaKinds: ["movie", "tv_episode", "tv_season"],
+    supportsMediaKinds: ["movie", "tv_episode", "tv_season", "album"],
+    // Music came later (#354), so it's off until a newsletter turns it on.
+    defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
     supportsIncrementalSync: false,
   },
 
@@ -202,11 +209,14 @@ export const plexAdapter: SourceAdapter = {
               ? buildEpisodeSubtitle(item)
               : kind === "tv_season"
                 ? buildSeasonSubtitle(item)
-                : undefined,
+                : kind === "album"
+                  ? item.parentTitle
+                  : undefined,
           overview: item.summary || undefined,
           addedAt,
-          releaseDate: item.originallyAvailableAt ? new Date(item.originallyAvailableAt) : undefined,
+          releaseDate: releaseDateOf(kind, item.originallyAvailableAt),
           posterUrl: poster ? buildImageUrl(config.baseUrl, token, poster) : undefined,
+          ...(kind === "album" && item.leafCount ? { trackCount: item.leafCount } : {}),
           externalUrl: buildExternalUrl(webUrl, machineIdentifier, item.ratingKey),
           ...(kind === "tv_episode" && machineIdentifier && {
             seasonUrl: item.parentRatingKey ? buildPlexWebDeepLink(webUrl, machineIdentifier, item.parentRatingKey) : undefined,

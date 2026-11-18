@@ -25,6 +25,8 @@ export interface PlexMetadataItem {
   parentIndex?: number;
   index?: number;
   year?: number;
+  /** An album's number of tracks (a show's or season's episodes). */
+  leafCount?: number;
 }
 
 interface PlexEnvelope<T> {

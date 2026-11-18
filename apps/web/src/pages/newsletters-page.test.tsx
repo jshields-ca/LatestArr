@@ -61,6 +61,8 @@ const tautulliSource = {
   lastError: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
+  mediaKinds: ["movie", "tv_episode", "tv_season"],
+  defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
 };
 
 const everyoneGroup = {
@@ -463,6 +465,67 @@ describe("NewslettersPage", () => {
     renderPage();
     await user.click(await screen.findByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
     expect(await screen.findByText(/each new item is listed once, with Plex's details and links/)).toBeInTheDocument();
+  });
+
+  // #354: music stays off until it's ticked, per source.
+  it("chooses what each source includes, saving each change", async () => {
+    const user = userEvent.setup();
+    const plex = {
+      ...tautulliSource,
+      id: "s-plex",
+      name: "Home Plex",
+      kind: "plex",
+      mediaKinds: ["movie", "tv_episode", "tv_season", "album"],
+      defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
+      mediaTypeFilter: null,
+      libraryFilter: null,
+    };
+    const romm = {
+      ...tautulliSource,
+      id: "s-romm",
+      name: "Games",
+      kind: "romm",
+      mediaKinds: ["game"],
+      defaultMediaKinds: ["game"],
+      mediaTypeFilter: null,
+      libraryFilter: null,
+    };
+    const routes: Record<string, unknown> = baseRoutes({
+      "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+      "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [plex, romm], recipientGroups: [] }),
+      "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+      "/api/newsletters/n1/sources/s-plex": { status: 204, ok: true, json: () => Promise.resolve(undefined) },
+    });
+    mockRoutes(routes);
+    const { container } = renderPage();
+    await user.click(await screen.findByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+
+    const includes = await screen.findByRole("group", { name: "What Home Plex includes" });
+    const button = (name: string) => within(includes).getByRole("button", { name });
+    expect(button("Movies")).toHaveAttribute("aria-pressed", "true");
+    expect(button("TV")).toHaveAttribute("aria-pressed", "true");
+    expect(button("Music")).toHaveAttribute("aria-pressed", "false");
+    // One kind only: nothing to choose.
+    expect(screen.queryByRole("group", { name: "What Games includes" })).not.toBeInTheDocument();
+
+    const patches = () =>
+      fetchMock.mock.calls.filter(([url, init]) => url === "/api/newsletters/n1/sources/s-plex" && init?.method === "PATCH");
+    await user.click(button("Music"));
+    await waitFor(() => expect(button("Music")).toHaveAttribute("aria-pressed", "true"));
+    expect(JSON.parse(patches().at(-1)![1].body)).toEqual({ mediaTypeFilter: ["movie", "tv_episode", "tv_season", "album"] });
+
+    // Back to just the defaults: follows them again.
+    await user.click(button("Music"));
+    await waitFor(() => expect(button("Music")).toHaveAttribute("aria-pressed", "false"));
+    expect(JSON.parse(patches().at(-1)![1].body)).toEqual({ mediaTypeFilter: null });
+
+    // The last kind left on can't be turned off.
+    await user.click(button("TV"));
+    await waitFor(() => expect(button("TV")).toHaveAttribute("aria-pressed", "false"));
+    expect(JSON.parse(patches().at(-1)![1].body)).toEqual({ mediaTypeFilter: ["movie"] });
+    expect(button("Movies")).toBeDisabled();
+
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it("sends now from the collapsed row, without expanding it first", async () => {

@@ -1,4 +1,4 @@
-import { getAdapter, listAdapterKinds } from "@latestarr/adapter-core";
+import { getAdapter, listAdapterKinds, mediaKindsFor } from "@latestarr/adapter-core";
 import { decrypt, encrypt } from "@latestarr/crypto";
 import { type Db, sourceConnections } from "@latestarr/db";
 import { eq } from "drizzle-orm";
@@ -12,9 +12,16 @@ import { parseBody } from "../validate.js";
 type SelectedSourceConnection = typeof sourceConnections.$inferSelect;
 
 // A source as the API returns it: never its credentials, even encrypted.
-export function sanitize<T extends Pick<SelectedSourceConnection, "credentialsEncrypted">>(row: T): Omit<T, "credentialsEncrypted"> {
+// With the kinds of content it has, and the ones a newsletter gets from it
+// until someone chooses (#354).
+export function sanitize<T extends Pick<SelectedSourceConnection, "credentialsEncrypted" | "kind">>(row: T) {
   const { credentialsEncrypted: _credentialsEncrypted, ...safe } = row;
-  return safe;
+  const capabilities = getAdapter(row.kind)?.capabilities;
+  return {
+    ...safe,
+    mediaKinds: capabilities ? [...capabilities.supportsMediaKinds] : [],
+    defaultMediaKinds: capabilities ? mediaKindsFor(capabilities) : [],
+  };
 }
 
 function decryptCredentials(row: SelectedSourceConnection): Record<string, string> {

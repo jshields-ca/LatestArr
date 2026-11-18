@@ -10,7 +10,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, plexWebAppUrl, readNewest } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
 import {
   buildImageProxyUrl,
   fetchImage,
@@ -54,14 +54,18 @@ function mapMediaType(mediaType: string): MediaKind | null {
       return "tv_episode";
     case "season":
       return "tv_season";
+    case "album":
+      return "album";
     default:
-      // Tautulli's recently-added feed also emits show/artist/album/track
-      // entries we don't model yet; skip rather than mis-map them.
+      // The feed can also hold show/artist/track entries we don't model;
+      // skip rather than mis-map them. Music arrives as albums, as it does
+      // from Plex (#354).
       return null;
   }
 }
 
 function mapLibraryType(sectionType: string): MediaKind {
+  if (sectionType === "artist") return "album";
   return sectionType === "show" ? "tv_episode" : "movie";
 }
 
@@ -165,7 +169,9 @@ function mapHomeStatRow(
 export const tautulliAdapter: SourceAdapter = {
   kind: "tautulli",
   capabilities: {
-    supportsMediaKinds: ["movie", "tv_episode", "tv_season"],
+    supportsMediaKinds: ["movie", "tv_episode", "tv_season", "album"],
+    // Music came later (#354), so it's off until a newsletter turns it on.
+    defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
     supportsIncrementalSync: false,
   },
 
@@ -269,14 +275,14 @@ export const tautulliAdapter: SourceAdapter = {
             ? buildEpisodeSubtitle(item)
             : isSeasonWithShowInfo
               ? buildSeasonSubtitle(item)
-              : item.full_title !== item.title
+              : kind === "album" && item.parent_title
+                ? item.parent_title
+                : item.full_title !== item.title
                 ? item.full_title
                 : undefined,
           overview: item.summary || undefined,
           addedAt,
-          releaseDate: item.originally_available_at
-            ? new Date(item.originally_available_at)
-            : undefined,
+          releaseDate: releaseDateOf(kind, item.originally_available_at),
           genres: item.genres,
           // Episodes use the series poster, so every image is the same
           // portrait shape rather than some being wide video stills.

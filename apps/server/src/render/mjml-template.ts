@@ -25,15 +25,17 @@ interface RenderableItem {
    * "Ebook" vs "Comic", or "Audiobook" vs "Podcast") takes priority when
    * present; otherwise this falls back to a label for item.kind itself
    * (see KIND_LABELS below), so every item gets some badge — Movie, TV
-   * Episode, TV Season, Game, Book, or Audiobook. Always set. */
+   * Episode, TV Season, Game, Book, Audiobook, or Album. Always set. */
   contentLabel: string;
   genres?: string;
   rating?: string;
   runtimeFormatted?: string;
   pageCount?: number;
   durationFormatted?: string;
+  /** An album's tracks. */
+  trackCount?: number;
   platform?: string;
-  /** Runtime, pages, length, or platform, then rating, joined with " · ";
+  /** Runtime, pages, tracks, length, or platform, then rating, joined with " · ";
    * absent when the item has none of them. */
   detailsLine?: string;
   /** The overview cut to about two lines, at a word, with an ellipsis. */
@@ -171,7 +173,11 @@ function resolveContentLabel(item: NewItem, labels: Wording["kindLabels"]): stri
 // place that flags an item as a fallback suggestion, by spreading it onto
 // an already-mapped RenderableItem once it's decided to use it that way.
 function detailsLineOf(item: RenderableItem): string | undefined {
-  const size = item.runtimeFormatted ?? (item.pageCount ? `${item.pageCount} pages` : undefined) ?? item.durationFormatted;
+  const size =
+    item.runtimeFormatted ??
+    (item.pageCount ? `${item.pageCount} pages` : undefined) ??
+    (item.trackCount ? `${item.trackCount} ${item.trackCount === 1 ? "track" : "tracks"}` : undefined) ??
+    item.durationFormatted;
   const parts = [size, item.platform, item.rating].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
@@ -209,6 +215,7 @@ function toRenderable(item: NewItem, wording: Wording = DEFAULT_WORDING): Render
     rating: formatRating(item.rating),
     runtimeFormatted: item.runtimeMinutes ? formatMinutes(item.runtimeMinutes) : undefined,
     pageCount: item.pageCount,
+    trackCount: item.trackCount,
     durationFormatted: item.durationSeconds
       ? formatMinutes(Math.round(item.durationSeconds / 60))
       : undefined,
