@@ -43,6 +43,7 @@ import {
   MAX_NOTICE_BODY_LENGTH,
   MAX_NOTICE_TITLE_LENGTH,
   type DesignSummaryLength,
+  type DesignTopEdge,
   type DesignLayout,
   type DesignSettings,
   type DesignSourceButtonPlacement,
@@ -85,6 +86,12 @@ const DETAILS: { key: keyof DesignSettings["show"]; label: string }[] = [
   { key: "details", label: "Runtime, pages, platform, rating" },
   { key: "overview", label: "Summary" },
   { key: "dates", label: "Added and release dates" },
+];
+
+// The card's top edge (#332). Airmail uses the accent and airmail blue.
+const TOP_EDGES: { value: DesignTopEdge; label: string }[] = [
+  { value: "solid", label: "A line in the accent" },
+  { value: "airmail", label: "Airmail stripe (accent and blue)" },
 ];
 
 const SUMMARY_LENGTHS: { value: DesignSummaryLength; label: string }[] = [
@@ -1158,6 +1165,13 @@ export function DesignEditorPage() {
                 value={settings.font}
                 options={EMAIL_FONT_OPTIONS}
                 onChange={(font) => update((c) => ({ ...c, font }))}
+              />
+              <ChoiceField
+                id="design-top-edge"
+                label="Top edge"
+                value={settings.topEdge}
+                options={TOP_EDGES}
+                onChange={(topEdge) => update((c) => ({ ...c, topEdge }))}
               />
             </Section>
 

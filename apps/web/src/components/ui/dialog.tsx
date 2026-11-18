@@ -44,6 +44,8 @@ const DialogContent = React.forwardRef<
       )}
       {...props}
     >
+      {/* The airmail stripe along the top, as on the sign-in card (#332). */}
+      <div className="airmail-stripe absolute inset-x-0 top-0" aria-hidden="true" />
       {children}
       <DialogPrimitive.Close className="absolute right-2 top-2 rounded-sm p-2 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
         <X className="size-4" />

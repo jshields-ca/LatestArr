@@ -40,6 +40,8 @@
   --popover-foreground: hsl(225 41% 18%);
   --primary: hsl(343 74% 44%);
   --primary-foreground: hsl(0 0% 100%);
+  /* The strip under a primary button, like the stamp's lifted edge. */
+  --primary-edge: hsl(343 74% 27%);
   --secondary: hsl(38 40% 90%);
   --secondary-foreground: hsl(225 41% 18%);
   --muted: hsl(38 40% 90%);
@@ -71,6 +73,7 @@
   --popover-foreground: hsl(210 40% 96%);
   --primary: hsl(343 82% 65%);
   --primary-foreground: hsl(224 45% 10%);
+  --primary-edge: hsl(343 55% 42%);
   --secondary: hsl(222 33% 19%);
   --secondary-foreground: hsl(210 40% 96%);
   --muted: hsl(222 33% 19%);
@@ -107,6 +110,7 @@
   --card-foreground: hsl(0 0% 100%);
   --primary: hsl(343 82% 65%);
   --primary-foreground: hsl(224 45% 10%);
+  --primary-edge: hsl(343 55% 42%);
   --secondary: hsl(0 0% 100% / 0.1);
   --secondary-foreground: hsl(0 0% 100%);
   --muted: hsl(0 0% 100% / 0.1);
@@ -265,52 +269,29 @@
       0 10px 28px -10px hsl(var(--shadow-tint) / 0.22);
   }
 
-  /* A one-shot diagonal light sweep for the primary button's hover state
-   * (see button.tsx's `default` variant) — a `::after` pseudo-element
-   * holding a diagonal, semi-transparent-white gradient, parked off the
-   * button's left edge and swept across to the right edge on hover. It's
-   * a transform transition (not a looping @keyframes animation) so it
-   * plays once per hover-enter and simply holds at the far side rather
-   * than replaying while the pointer sits still — a repeating sweep reads
-   * as a busy/looping ad unit, not "premium". `overflow-hidden` on the
-   * button (applied alongside this class) clips it to the button's own
-   * rounded shape.
-   *
-   * Round 2 tuning: production feedback was that the sweep read as
-   * "clunky and abrupt" (too fast, too thin a band) but also wanted it
-   * *more* noticeable overall — the fix is both a wider/brighter band
-   * (bigger visual tell) and a longer, purely-decelerating easing curve
-   * (`cubic-bezier(0.22, 1, 0.36, 1)`, a standard "ease-out-expo"-style
-   * curve with zero overshoot) instead of the old spring
-   * (`cubic-bezier(0.34, 1.56, 0.64, 1)`), which had enough overshoot to
-   * make a straight-line sweep look like it jittered/snapped back at the
-   * end. 0.85s keeps it clearly visible without looping.
-   */
-  .btn-glint {
-    position: relative;
-    isolation: isolate;
+  /* "Send started" and "Test sent" (#332): the stamp presses on beside
+   * the message, as on sign-in, with the postmark lines following. */
+  .stamp-press-small {
+    animation: stamp-press-small 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
   }
-  .btn-glint::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      115deg,
-      transparent 30%,
-      hsl(0 0% 100% / 0.45) 50%,
-      transparent 70%
-    );
-    transform: translateX(-130%);
-    transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
-    pointer-events: none;
-  }
-  .btn-glint:hover::after {
-    transform: translateX(130%);
+  @keyframes stamp-press-small {
+    0% {
+      transform: scale(1.6) rotate(-16deg);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(0.94) rotate(-8deg);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1) rotate(-8deg);
+      opacity: 1;
+    }
   }
   @media (prefers-reduced-motion: reduce) {
-    .btn-glint::after {
-      transition: none;
-      display: none;
+    .stamp-press-small {
+      animation: none;
+      transform: rotate(-8deg);
     }
   }
 

@@ -911,7 +911,7 @@ function NewsletterPreviewDialog({ newsletter }: { newsletter: Newsletter }) {
     setTestError(null);
     try {
       await sendTestNewsletter(newsletter.id, testTo);
-      toast({ variant: "success", title: "Test sent", description: `A test of ${newsletter.name} was sent to ${testTo}.` });
+      toast({ variant: "sent", title: "Test sent", description: `A test of ${newsletter.name} was sent to ${testTo}.` });
     } catch (err) {
       setTestError(err instanceof ApiError ? err.message : "Couldn't send the test.");
     } finally {
@@ -1104,7 +1104,7 @@ function NewsletterCard({
     try {
       await sendNewsletterNow(newsletter.id);
       setSendResult("Send started.");
-      toast({ variant: "success", title: "Send started", description: `${newsletter.name} is being sent.` });
+      toast({ variant: "sent", title: "Send started", description: `${newsletter.name} is being sent.` });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to start send.";
       setSendError(message);

@@ -145,6 +145,20 @@ describe("buildDesignMjml", () => {
     expect(hidden).not.toMatch(/ · \d+ new/);
   });
 
+  // #332: the airmail stripe can be the card's top edge; solid stays the default.
+  it("tops the card with the accent line, or the airmail stripe when chosen", async () => {
+    const solid = await render(DEFAULT_DESIGN_SETTINGS);
+    expect(solid).toContain("border-top:4px solid #c31d4c");
+    expect(solid).not.toContain("airmail-edge");
+
+    const airmail = await render(design({ topEdge: "airmail", colors: { accent: "#1f8a4c" } }));
+    expect(airmail).not.toContain("border-top:4px solid");
+    // Table cells in the accent and airmail blue, twelve of each: every
+    // email app draws those, where it might not draw a gradient.
+    expect(airmail.match(/bgcolor="#1f8a4c"/g)).toHaveLength(12);
+    expect(airmail.match(/bgcolor="#2f5fb8"/g)).toHaveLength(12);
+  });
+
   it("groups a series' new episodes into one row by default, and lists them separately when that's off", async () => {
     const episodes = [1, 2, 3].map((n) =>
       item({ id: `e${n}`, title: "Night Shift", kind: "tv_episode", subtitle: `S02E0${n} - Part ${n}` }),
