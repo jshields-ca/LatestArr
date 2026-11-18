@@ -33,6 +33,6 @@ describe("Toast", () => {
     const toast = screen.getByText("Send started").closest("li")!;
     expect(toast.querySelector('svg[aria-label="LatestArr"]')).toBeNull();
     // The tick icon is still there.
-    expect(toast.querySelector("svg")).not.toBeNull();
+    expect(toast.querySelector("svg.lucide-circle-check-big, svg.lucide-check-circle-2")).not.toBeNull();
   });
 });

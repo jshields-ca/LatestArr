@@ -619,8 +619,22 @@ const SECTIONS: { kinds: DesignKind[]; name: SectionNameKey }[] = [
 // client draws; the dashes are straight rather than slanted. The rounded
 // corners clip it where the app supports it, and Outlook draws it square.
 const AIRMAIL_BLUE = "#2f5fb8";
+const AIRMAIL_ROSE = "#c31d4c";
 const AIRMAIL_REPEATS = 12;
+
+// Whether a colour is a blue that airmail blue wouldn't stand apart from.
+function isBlue(hex: string): boolean {
+  const [r, g, b] = [0, 1, 2].map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max - min < 0.15 || max !== b) return false;
+  const hue = 60 * (4 + (r - g) / (max - min));
+  return hue >= 190 && hue <= 250;
+}
+
 function airmailEdge(accent: string): string {
+  // A blue accent pairs with rose instead, so the dashes still alternate.
+  const second = isBlue(accent) ? AIRMAIL_ROSE : AIRMAIL_BLUE;
   // Each repeat: a dash in the accent, a gap, a blue dash, a gap (4:3:4:3).
   const unit = 100 / (14 * AIRMAIL_REPEATS);
   const cell = (colour: string | null, units: number) => {
@@ -630,14 +644,17 @@ function airmailEdge(accent: string): string {
       : `<td width="${width}" height="4" style="width:${width};height:4px;line-height:4px;font-size:0;">&nbsp;</td>`;
   };
   const cells = Array.from({ length: AIRMAIL_REPEATS }, () =>
-    [cell(accent, 4), cell(null, 3), cell(AIRMAIL_BLUE, 4), cell(null, 3)].join(""),
+    [cell(accent, 4), cell(null, 3), cell(second, 4), cell(null, 3)].join(""),
   ).join("");
   // Straight in the wrapper, not in a column: a column puts raw markup
   // inside a <tbody>, where a table isn't allowed and browsers move it out.
+  // Outlook reads the wrapper's own table there, so it gets a row of its own.
   return `
       <mj-raw>
+        <!--[if mso | IE]><tr><td><![endif]-->
         <table role="presentation" class="airmail-edge" width="100%" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;border-collapse:collapse;"><tr>${cells}</tr></table>
         <div style="height:12px;line-height:12px;font-size:0;">&nbsp;</div>
+        <!--[if mso | IE]></td></tr><![endif]-->
       </mj-raw>`;
 }
 

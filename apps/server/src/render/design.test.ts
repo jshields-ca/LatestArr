@@ -157,6 +157,15 @@ describe("buildDesignMjml", () => {
     // email app draws those, where it might not draw a gradient.
     expect(airmail.match(/bgcolor="#1f8a4c"/g)).toHaveLength(12);
     expect(airmail.match(/bgcolor="#2f5fb8"/g)).toHaveLength(12);
+    // Outlook gets the stripe in a row of its own (MJML merges these
+    // Outlook-only comments with its own, so only the end of one is fixed).
+    expect(airmail).toMatch(/<tr><td><!\[endif\]-->\s*<table role="presentation" class="airmail-edge"/);
+    expect(airmail).toMatch(/&nbsp;<\/div>\s*<!--\[if mso \| IE\]><\/td><\/tr>/);
+
+    // A blue accent pairs with rose, so the dashes still alternate.
+    const blue = await render(design({ topEdge: "airmail", colors: { accent: "#2563eb" } }));
+    expect(blue.match(/bgcolor="#2563eb"/g)).toHaveLength(12);
+    expect(blue.match(/bgcolor="#c31d4c"/g)).toHaveLength(12);
   });
 
   it("groups a series' new episodes into one row by default, and lists them separately when that's off", async () => {

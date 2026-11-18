@@ -286,6 +286,15 @@ describe("DesignEditorPage", { timeout: 30_000 }, () => {
   });
 
   // #359: longer summaries, closer to a book's blurb.
+  // #332: the email card's top edge.
+  it("chooses an airmail stripe for the top edge", async () => {
+    renderEditor();
+    await screen.findByTitle("Design preview");
+    expect(screen.getByLabelText("Top edge")).toHaveTextContent("A line in the accent");
+    selectOption(screen.getByLabelText("Top edge"), "Airmail stripe (accent and blue)");
+    await waitFor(() => expect(previewBodies.at(-1)?.settings.topEdge).toBe("airmail"));
+  });
+
   it("chooses how long summaries are, and hides the choice with summaries off", async () => {
     const user = userEvent.setup();
     renderEditor();
