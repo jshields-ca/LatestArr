@@ -51,6 +51,7 @@ describe("listLibraries", () => {
           Directory: [
             { key: "1", title: "Movies", type: "movie" },
             { key: "2", title: "TV Shows", type: "show" },
+            { key: "3", title: "Music", type: "artist" },
           ],
         },
       }),
@@ -60,6 +61,7 @@ describe("listLibraries", () => {
     expect(libraries).toEqual([
       { id: "1", name: "Movies", kind: "movie" },
       { id: "2", name: "TV Shows", kind: "tv_episode" },
+      { id: "3", name: "Music", kind: "album" },
     ]);
   });
 });
@@ -138,6 +140,95 @@ describe("fetchRecentItems", () => {
     // name — see plex-adapter.ts's buildEpisodeTitle for why.
     expect(items[1]?.title).toBe("Show");
     expect(items[1]?.subtitle).toBe("S01E01 - Ep");
+  });
+
+  // #354: music arrives as albums, from a real Plex's recently-added list.
+  it("maps albums: the artist underneath, the track count and the cover", async () => {
+    mockIdentity();
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          viewGroup: "album",
+          Metadata: [
+            {
+              ratingKey: "49",
+              parentRatingKey: "48",
+              type: "album",
+              title: "Summer Mix",
+              parentTitle: "Various Artists",
+              summary: "",
+              year: 2026,
+              thumb: "/library/metadata/49/thumb/1795035865",
+              originallyAvailableAt: "2026-01-01",
+              leafCount: 5,
+              addedAt: 1795035863,
+            },
+            {
+              ratingKey: "26",
+              parentRatingKey: "25",
+              type: "album",
+              title: "Paper Boats",
+              parentTitle: "Paper Boats",
+              summary: "The first single.",
+              thumb: "/library/metadata/26/thumb/1795035834",
+              originallyAvailableAt: "2026-03-14",
+              leafCount: 1,
+              addedAt: 1795035833,
+            },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0), mediaKinds: ["album"] });
+
+    expect(items.map(({ raw: _raw, ...item }) => item)).toEqual([
+      {
+        id: "49",
+        externalId: "49",
+        kind: "album",
+        title: "Summer Mix",
+        subtitle: "Various Artists",
+        overview: undefined,
+        addedAt: new Date(1795035863 * 1000),
+        // Only a year in the tags, so Plex's 1 January isn't shown as a date.
+        releaseDate: undefined,
+        posterUrl: "http://plex.local:32400/library/metadata/49/thumb/1795035865?X-Plex-Token=tok123",
+        trackCount: 5,
+        externalUrl: expect.stringContaining("/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F49"),
+      },
+      expect.objectContaining({
+        title: "Paper Boats",
+        subtitle: "Paper Boats",
+        overview: "The first single.",
+        releaseDate: new Date("2026-03-14"),
+        trackCount: 1,
+      }),
+    ]);
+  });
+
+  it("leaves music out unless asked for, and skips tracks and artists", async () => {
+    expect(plexAdapter.capabilities.defaultMediaKinds).toEqual(["movie", "tv_episode", "tv_season"]);
+    expect(plexAdapter.capabilities.supportsMediaKinds).toContain("album");
+    mockIdentity();
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            { ...baseItem, ratingKey: "1", type: "movie", addedAt: 1700000003 },
+            { ...baseItem, ratingKey: "2", type: "album", parentTitle: "Lantern Field", addedAt: 1700000002 },
+            { ...baseItem, ratingKey: "3", type: "track", addedAt: 1700000001 },
+            { ...baseItem, ratingKey: "4", type: "artist", addedAt: 1700000000 },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, {
+      since: new Date(0),
+      mediaKinds: plexAdapter.capabilities.defaultMediaKinds,
+    });
+    expect(items.map((item) => item.externalId)).toEqual(["1"]);
   });
 
   it("falls back to the bare episode title/no subtitle when Plex gives no grandparentTitle", async () => {

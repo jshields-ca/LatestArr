@@ -70,6 +70,7 @@ describe("listLibraries", () => {
           data: [
             { section_id: "1", section_name: "Movies", section_type: "movie" },
             { section_id: "2", section_name: "TV Shows", section_type: "show" },
+            { section_id: "3", section_name: "Music", section_type: "artist" },
           ],
         },
       }),
@@ -79,6 +80,7 @@ describe("listLibraries", () => {
     expect(libraries).toEqual([
       { id: "1", name: "Movies", kind: "movie" },
       { id: "2", name: "TV Shows", kind: "tv_episode" },
+      { id: "3", name: "Music", kind: "album" },
     ]);
   });
 });
@@ -155,6 +157,88 @@ describe("fetchRecentItems", () => {
     // "SxxExx - Episode" form.
     expect(items[1]?.title).toBe("Ep");
     expect(items[1]?.subtitle).toBe("Show - S01E01 - Ep");
+  });
+
+  // #354: music arrives as albums, from a real Tautulli's recently-added list.
+  it("maps albums with the artist underneath and the cover", async () => {
+    const album = {
+      media_type: "album",
+      section_id: "1",
+      rating_key: "49",
+      parent_rating_key: "48",
+      grandparent_rating_key: "",
+      title: "Summer Mix",
+      parent_title: "Various Artists",
+      grandparent_title: "",
+      full_title: "Summer Mix",
+      summary: "",
+      year: "2026",
+      thumb: "/library/metadata/49/thumb/1795035865",
+      parent_thumb: "",
+      grandparent_thumb: "",
+      art: "",
+      originally_available_at: "2026-01-01",
+      added_at: "1795035863",
+      genres: ["Test"],
+      child_count: "",
+    };
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              album,
+              { ...album, rating_key: "26", title: "Paper Boats", full_title: "Paper Boats", parent_title: "Paper Boats", originally_available_at: "2026-03-14", added_at: "1795035833" },
+              { ...baseItem, rating_key: "3", media_type: "track", added_at: "1700000002" },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0), mediaKinds: ["album"] });
+
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({
+      kind: "album",
+      title: "Summer Mix",
+      subtitle: "Various Artists",
+      genres: ["Test"],
+      addedAt: new Date(1795035863 * 1000),
+    });
+    // Only a year in the tags, so Plex's 1 January isn't shown as a date.
+    expect(items[0]?.releaseDate).toBeUndefined();
+    expect(items[1]?.releaseDate).toEqual(new Date("2026-03-14"));
+    // Tautulli doesn't say how many tracks.
+    expect(items[0]?.trackCount).toBeUndefined();
+    expect(new URL(items[0]!.posterUrl!).searchParams.get("img")).toBe("/library/metadata/49/thumb/1795035865");
+  });
+
+  it("leaves music out unless asked for", async () => {
+    expect(tautulliAdapter.capabilities.defaultMediaKinds).toEqual(["movie", "tv_episode", "tv_season"]);
+    expect(tautulliAdapter.capabilities.supportsMediaKinds).toContain("album");
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            recently_added: [
+              { ...baseItem, rating_key: "1", media_type: "movie", added_at: "1700000001" },
+              { ...baseItem, rating_key: "2", media_type: "album", parent_title: "Lantern Field", added_at: "1700000000" },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, {
+      since: new Date(0),
+      mediaKinds: tautulliAdapter.capabilities.defaultMediaKinds,
+    });
+    expect(items.map((item) => item.externalId)).toEqual(["1"]);
   });
 
   it("uses the series title and SxxExx when Tautulli gives grandparent/episode info", async () => {

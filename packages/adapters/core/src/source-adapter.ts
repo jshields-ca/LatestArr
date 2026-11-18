@@ -55,6 +55,18 @@ export interface SourceCapabilities {
   supportsIncrementalSync: boolean;
 }
 
+/**
+ * An album's release date, from Plex's `originallyAvailableAt` (or
+ * Tautulli's copy of it). Music tagged with only a year gets 1 January of
+ * that year, which would read as a real date ("Released Jan 1"), so that's
+ * left out; a real date is kept. (#354)
+ */
+export function albumReleaseDate(value: string | undefined): Date | undefined {
+  if (!value || /^\d{4}-01-01$/.test(value)) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
 /** The kinds a newsletter gets from a linked source: the ones chosen for
  * it, or the source's defaults. Kinds the source doesn't have are dropped. */
 export function mediaKindsFor(capabilities: SourceCapabilities, chosen?: readonly string[] | null): MediaKind[] {
