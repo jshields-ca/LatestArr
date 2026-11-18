@@ -157,13 +157,13 @@ async function createNewsletter(smtpProfileId?: string) {
 }
 
 // The Tautulli adapter's fetchRecentItems/fetchPopularItems each fetch
-// get_server_id once (to build a per-item Plex deep link) before their own
+// get_server_info once (to build a per-item Plex deep link) before their own
 // item request, but only when the source connection has a publicUrl
 // configured (Tautulli's own baseUrl is its API host, never a page a
 // recipient should be sent to, so without a publicUrl there's no link to
 // build and the lookup is skipped entirely) — createSourceConnection()
 // below never sets one, so none of the mock sequences in this file need
-// to queue a get_server_id response.
+// to queue a get_server_info response.
 function mockRecentlyAdded() {
   mockFetch.mockResolvedValueOnce(
     jsonResponse({
@@ -586,7 +586,7 @@ describe("POST /newsletters/:id/send-now", () => {
 
     mockRecentlyAdded();
     // No publicUrl on this newsletter's source connection, so
-    // fetchPopularItems skips its own get_server_id lookup too — just
+    // fetchPopularItems skips its own get_server_info lookup too — just
     // top_movies and top_tv.
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
@@ -1009,7 +1009,11 @@ describe("a Plex server and its Tautulli linked to one newsletter", () => {
       }
       if (url.host === "tautulli.local:8181") {
         const cmd = url.searchParams.get("cmd");
+        // As a real Tautulli answers (#459): get_server_id gives no server.
         if (cmd === "get_server_id") {
+          return Promise.resolve(jsonResponse({ response: { result: "success", message: null, data: { identifier: null } } }));
+        }
+        if (cmd === "get_server_info") {
           if (options.tautulliServer === null) return Promise.resolve(jsonResponse({}, false, 500));
           return Promise.resolve(
             jsonResponse({ response: { result: "success", message: null, data: { pms_identifier: options.tautulliServer } } }),

@@ -74,18 +74,31 @@ describe("getLibraries", () => {
 });
 
 describe("getServerId", () => {
-  it("returns the underlying Plex server's pms_identifier", async () => {
-    mockFetch.mockResolvedValueOnce(
-      jsonResponse({
-        response: { result: "success", message: null, data: { pms_identifier: "srv-abc123" } },
-      }),
-    );
+  // #459: answered as a real Tautulli (with Plex 1.43) does. get_server_id
+  // gives a null "identifier" without a hostname and port; get_server_info
+  // gives the configured server's pms_identifier.
+  it("returns the Plex server Tautulli is set up to watch", async () => {
+    mockFetch.mockImplementation(async (url: string) => {
+      const cmd = new URL(url).searchParams.get("cmd");
+      const data =
+        cmd === "get_server_id"
+          ? { identifier: null }
+          : cmd === "get_server_info"
+            ? { pms_name: "LatestArr Test", pms_identifier: "2c8ebb97", pms_ip: "plex", pms_port: 32400 }
+            : {};
+      return jsonResponse({ response: { result: "success", message: null, data } });
+    });
 
     const machineIdentifier = await getServerId("http://tautulli.local:8181", "key123");
 
-    expect(machineIdentifier).toBe("srv-abc123");
-    const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
-    expect(calledUrl.searchParams.get("cmd")).toBe("get_server_id");
+    expect(machineIdentifier).toBe("2c8ebb97");
+  });
+
+  it("returns undefined when Tautulli has no server set up yet", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "success", message: null, data: { pms_identifier: "" } } }),
+    );
+    await expect(getServerId("http://tautulli.local:8181", "key123")).resolves.toBeUndefined();
   });
 
   it("returns undefined when the response has no pms_identifier", async () => {

@@ -17,7 +17,7 @@ function jsonResponse(body: unknown, ok = true, status = 200) {
   return { ok, status, json: async () => body };
 }
 
-// fetchRecentItems and fetchPopularItems each fetch get_server_id once,
+// fetchRecentItems and fetchPopularItems each fetch get_server_info once,
 // before their own item requests, but only when the connection has a
 // publicUrl configured (see buildExternalUrl's comment: without a
 // publicUrl there's no link to build regardless of machineIdentifier, so
@@ -56,7 +56,7 @@ describe("getServerId", () => {
   it("reports the machine identifier of the Plex server it watches, as that server's Plex source does", async () => {
     mockServerId("srv-abc123");
     await expect(tautulliAdapter.getServerId!(config)).resolves.toBe("plex:srv-abc123");
-    expect(String(mockFetch.mock.calls[0]![0])).toContain("cmd=get_server_id");
+    expect(String(mockFetch.mock.calls[0]![0])).toContain("cmd=get_server_info");
   });
 });
 
@@ -276,7 +276,7 @@ describe("fetchRecentItems", () => {
     // Regression test for the tv_season title fix and the clickable-links
     // feature landing in the same function: a season item needs both its
     // show-name title/subtitle mapping AND a real per-item deep link built
-    // from the same fetch's get_server_id lookup (only made here because
+    // from the same fetch's get_server_info lookup (only made here because
     // publicConfig below carries a publicUrl).
     mockServerId("srv-abc123");
     mockFetch.mockResolvedValueOnce(
@@ -496,7 +496,7 @@ describe("fetchRecentItems", () => {
   });
 
   describe("externalUrl", () => {
-    it("omits externalUrl entirely (and skips the get_server_id lookup) when no publicUrl is configured", async () => {
+    it("omits externalUrl entirely (and skips the get_server_info lookup) when no publicUrl is configured", async () => {
       // Unlike Plex/Audiobookshelf/RomM, Tautulli's own baseUrl is its API
       // host, never a page a recipient should be sent to — so with no
       // publicUrl there's no link to build at all, matching this
@@ -517,7 +517,7 @@ describe("fetchRecentItems", () => {
       const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0) });
 
       expect(items[0]?.externalUrl).toBeUndefined();
-      // Only the recently_added request — get_server_id would be wasted
+      // Only the recently_added request — get_server_info would be wasted
       // work here since buildExternalUrl can't use it without a publicUrl.
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
@@ -573,7 +573,7 @@ describe("fetchRecentItems", () => {
       );
     });
 
-    it("falls back to a plain publicUrl-based library link when get_server_id fails", async () => {
+    it("falls back to a plain publicUrl-based library link when get_server_info fails", async () => {
       mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
       mockFetch.mockResolvedValueOnce(
         jsonResponse({
@@ -682,7 +682,7 @@ describe("fetchPopularItems", () => {
       mediaKinds: ["movie"],
     });
 
-    // No get_server_id call here — config has no publicUrl, so it's
+    // No get_server_info call here — config has no publicUrl, so it's
     // skipped and the home_stats request is the only call made.
     const calledUrl = new URL(mockFetch.mock.calls[0]![0] as string);
     expect(calledUrl.searchParams.get("time_range")).toBe("7");

@@ -290,6 +290,8 @@ function LinkedSources({
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [changingId, setChangingId] = useState<string | null>(null);
+  // Like the rest of the Content panel: "Saving..." then "Saved", no toast.
+  const [kindsSave, setKindsSave] = useState<SaveState>({ status: "idle" });
   const [error, setError] = useState<string | null>(null);
 
   const availableToAdd = allSources.filter((s) => !sources.some((linked) => linked.id === s.id));
@@ -298,14 +300,15 @@ function LinkedSources({
   async function handleToggle(source: LinkedSource, group: KindGroup) {
     const mediaTypeFilter = toggledFilter(source, group);
     setChangingId(source.id);
+    setKindsSave({ status: "saving" });
     try {
       await setNewsletterSourceKinds(newsletterId, source.id, mediaTypeFilter);
       onChange(sources.map((s) => (s.id === source.id ? { ...s, mediaTypeFilter } : s)));
+      setKindsSave({ status: "saved" });
     } catch (err) {
-      toast({
-        variant: "destructive",
-        title: `Couldn't change what ${source.name} includes`,
-        description: err instanceof ApiError ? err.message : undefined,
+      setKindsSave({
+        status: "error",
+        message: `Couldn't change what ${source.name} includes${err instanceof ApiError ? `: ${err.message}` : "."}`,
       });
     } finally {
       setChangingId(null);
@@ -354,7 +357,10 @@ function LinkedSources({
 
   return (
     <div className="flex flex-col gap-2">
-      <SubsectionHeading>Sources</SubsectionHeading>
+      <div className="flex items-center justify-between gap-2">
+        <SubsectionHeading>Sources</SubsectionHeading>
+        <SaveStatus state={kindsSave} />
+      </div>
       {sources.length === 0 ? (
         <p className="text-sm text-muted-foreground">No sources linked yet.</p>
       ) : (

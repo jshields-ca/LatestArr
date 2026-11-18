@@ -127,7 +127,7 @@ function resolvePosterUrl(
 // existed at all.
 //
 // Builds the per-item deep link once the underlying Plex server's
-// machineIdentifier is known (via Tautulli's own get_server_id); falls
+// machineIdentifier is known (via Tautulli's own get_server_info); falls
 // back to a plain library-root link (still built from publicUrl, never
 // baseUrl) when the identifier lookup failed.
 function buildExternalUrl(
@@ -231,7 +231,7 @@ export const tautulliAdapter: SourceAdapter = {
     // regardless of machineIdentifier, so skipping this call then saves a
     // request most connections (no publicUrl set) would otherwise pay for
     // on every fetch. Best-effort when it does run: a failed lookup (e.g.
-    // an older Tautulli version without get_server_id, or a transient
+    // Tautulli not set up with a server yet, or a transient
     // network hiccup) shouldn't fail the whole fetch, just mean every
     // item's externalUrl falls back to a plain library link.
     const machineIdentifier = config.publicUrl

@@ -110,18 +110,21 @@ export async function getLibraries(baseUrl: string, apiKey: string): Promise<Tau
   return callTautulli<TautulliLibrary[]>(baseUrl, apiKey, "get_libraries");
 }
 
-interface TautulliServerId {
+interface TautulliServerInfo {
   pms_identifier?: string;
 }
 
-// The underlying Plex Media Server's own machineIdentifier, proxied
-// through Tautulli's own API — used to build the same Plex web app deep
-// link the Plex adapter builds directly (see @latestarr/adapter-core's
-// buildPlexWebDeepLink), since Tautulli's rating_key values are the same
-// Plex rating keys the server itself uses.
+// The machineIdentifier of the Plex server Tautulli watches, from
+// Tautulli's own settings (get_server_info), so it answers even when Plex
+// is down. Used to build the same Plex web app deep link the Plex adapter
+// builds directly (see @latestarr/adapter-core's buildPlexWebDeepLink),
+// since Tautulli's rating_key values are the server's own, and to spot a
+// Plex source for the same server (#391). Not get_server_id: that one
+// needs a hostname and port, and answers {"identifier": null} without
+// them (#459).
 export async function getServerId(baseUrl: string, apiKey: string): Promise<string | undefined> {
-  const data = await callTautulli<TautulliServerId>(baseUrl, apiKey, "get_server_id");
-  return data.pms_identifier;
+  const data = await callTautulli<TautulliServerInfo>(baseUrl, apiKey, "get_server_info");
+  return data.pms_identifier || undefined;
 }
 
 export interface TautulliUser {
