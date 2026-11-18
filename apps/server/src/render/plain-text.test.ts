@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { htmlToPlainText } from "./plain-text.js";
+import { htmlToPlainText, summaryText } from "./plain-text.js";
+
+// #461: Audiobookshelf (and others) keep summaries as HTML.
+describe("summaryText", () => {
+  it("turns an HTML summary into plain words", () => {
+    expect(
+      summaryText(
+        "<p>A <b>gripping</b> tale of <i>two</i> cities.</p><p>Read by <a href=\"https://x.example\">Jane Doe</a> &amp; friends.</p><br/>",
+      ),
+    ).toBe("A gripping tale of two cities. Read by Jane Doe & friends.");
+  });
+
+  it("keeps list items and headings readable", () => {
+    expect(summaryText("<h3>Praise</h3><ul><li>Moving</li><li>Funny</li></ul>")).toBe("Praise Moving Funny");
+  });
+
+  it("leaves text with no markup as it was, angle brackets and all", () => {
+    expect(summaryText("Plain text, 3 < 5 and 7 > 2.")).toBe("Plain text, 3 < 5 and 7 > 2.");
+    expect(summaryText(undefined)).toBeUndefined();
+  });
+
+  it("gives nothing for markup with no words", () => {
+    expect(summaryText("<p><br/></p>")).toBeUndefined();
+  });
+});
 
 describe("htmlToPlainText", () => {
   it("keeps the words and links, drops images and styles, and wraps long lines", () => {

@@ -3,6 +3,7 @@ import Handlebars from "handlebars";
 import { formatDate, formatPeriod } from "./dates.js";
 import { DEFAULT_WORDING, type Wording } from "./wording.js";
 import { renderNote } from "./notes.js";
+import { summaryText } from "./plain-text.js";
 import mjml2html from "mjml";
 import { MAX_SHOWN_ITEMS } from "./design.js";
 import type { SourceButton } from "./source-buttons.js";
@@ -200,7 +201,8 @@ function toRenderable(item: NewItem, wording: Wording = DEFAULT_WORDING): Render
     kind: item.kind,
     title: item.title,
     subtitle: item.subtitle,
-    overview: item.overview,
+    // Plain words, whichever source it came from (#461).
+    overview: summaryText(item.overview),
     addedAtFormatted: formatDate(item.addedAt, undefined, dateOrder),
     releaseDateFormatted: item.releaseDate ? formatDate(item.releaseDate, undefined, dateOrder) : undefined,
     // By the time this runs, a real send has already replaced this with a

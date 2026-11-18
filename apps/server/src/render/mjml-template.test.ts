@@ -695,6 +695,18 @@ describe("the summary, grouping, and section helpers", () => {
     expect(await render(source, [], { lookbackDays: 30 })).toContain("[Aug 29 – Sep 28, 2026|0|]");
   });
 
+  // #461: the email showed an Audiobookshelf summary's tags as text.
+  it("shows an HTML summary as plain words, in every length", async () => {
+    const overview = "<p>A <b>gripping</b> tale.</p><p>Second &amp; last.</p>";
+    const html = await render(
+      `{{#each items}}<mj-text>@@{{overview}}|{{overviewShort}}|{{overviewLong}}@@</mj-text>{{/each}}`,
+      [item({ overview })],
+    );
+    const [shown] = [...html.matchAll(/@@([^@]*)@@/g)].map((m) => m[1]!);
+    expect(shown).toBe("A gripping tale. Second &amp; last.|A gripping tale. Second &amp; last.|A gripping tale. Second &amp; last.");
+    expect(html).not.toContain("&lt;p&gt;");
+  });
+
   it("cuts a long overview to about two lines at a word, and leaves a short one alone", async () => {
     const long = "word ".repeat(60).trim();
     const html = await render(`{{#each items}}<mj-text>@@{{overviewShort}}@@</mj-text>{{/each}}`, [
