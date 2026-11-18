@@ -513,6 +513,8 @@ describe("NewslettersPage", () => {
     await user.click(button("Music"));
     await waitFor(() => expect(button("Music")).toHaveAttribute("aria-pressed", "true"));
     expect(JSON.parse(patches().at(-1)![1].body)).toEqual({ mediaTypeFilter: ["movie", "tv_episode", "tv_season", "album"] });
+    // Said inline, like the panel's other fields, not as a toast.
+    expect(screen.getByRole("status")).toHaveTextContent("Saved");
 
     // Back to just the defaults: follows them again.
     await user.click(button("Music"));
@@ -526,6 +528,35 @@ describe("NewslettersPage", () => {
     expect(button("Movies")).toBeDisabled();
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("says inline when a change to what a source includes isn't saved", async () => {
+    const user = userEvent.setup();
+    const plex = {
+      ...tautulliSource,
+      id: "s-plex",
+      name: "Home Plex",
+      kind: "plex",
+      mediaKinds: ["movie", "tv_episode", "tv_season", "album"],
+      defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
+      mediaTypeFilter: null,
+      libraryFilter: null,
+    };
+    mockRoutes(
+      baseRoutes({
+        "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+        "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [plex], recipientGroups: [] }),
+        "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+        "/api/newsletters/n1/sources/s-plex": jsonResponse(400, { error: "\"Home Plex\" doesn't have album" }),
+      }),
+    );
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+    const includes = await screen.findByRole("group", { name: "What Home Plex includes" });
+    await user.click(within(includes).getByRole("button", { name: "Music" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't change what Home Plex includes: \"Home Plex\" doesn't have album");
+    expect(within(includes).getByRole("button", { name: "Music" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("sends now from the collapsed row, without expanding it first", async () => {
