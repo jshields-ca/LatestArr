@@ -25,6 +25,11 @@ describe("source kinds", () => {
     expect(isGroupIncluded(plex, music!)).toBe(false);
   });
 
+  // Linking allowed an empty list before #354; it shows and sends the defaults.
+  it("treats an empty filter as the defaults", () => {
+    expect(includedKinds({ ...plex, mediaTypeFilter: [] })).toEqual(plex.defaultMediaKinds);
+  });
+
   it("turns a group on or off, back to null when that's the defaults", () => {
     const [movies, tv, music] = kindGroupsOf(plex.mediaKinds);
     const withMusic = toggledFilter(plex, music!);

@@ -91,7 +91,7 @@ export function DesignCodeReference() {
           Book pages, audiobook length, game platform, an album&apos;s number of tracks.
         </Entry>
         <Entry code="{{detailsLine}}">
-          Runtime, pages, length, or platform, then rating, e.g. 1h 52m · 7.8/10. Empty when there are none.
+          Runtime, pages, tracks, length, or platform, then rating, e.g. 1h 52m · 7.8/10. Empty when there are none.
         </Entry>
         <Entry code="{{episodeCount}} {{#each episodes}}{{subtitle}}{{/each}} {{moreEpisodes}}">
           On a row standing for several episodes of one show (groupEpisodes): how many, up to five of them with

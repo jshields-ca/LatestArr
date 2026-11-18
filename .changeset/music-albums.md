@@ -20,7 +20,7 @@ Closes #354. Built from what a real Plex 1.43 and Tautulli report for a test lib
 - `MediaKind` gains `album`, exported as `MEDIA_KINDS`. `NewItem` gains `trackCount`. `SourceCapabilities` gains optional `defaultMediaKinds`, and `mediaKindsFor()` works out a link's kinds.
 - **Plex and Tautulli** map `album` entries in their recently-added lists, and `artist` libraries as music. The artist (`parentTitle`) is the subtitle. Plex's `leafCount` is the track count; Tautulli doesn't give one. Both list `album` as a kind, with music left out of `defaultMediaKinds`.
 - **Release dates:** music tagged with only a year gets 1 January from Plex, so an album's release date is left out when it's exactly 1 January (`albumReleaseDate()`).
-- `PATCH /api/newsletters/:id/sources/:sourceConnectionId` sets `mediaTypeFilter`, where null means the source's defaults. Filters are validated against the source's kinds, here and on linking. Sources in API responses carry `mediaKinds` and `defaultMediaKinds`.
+- `PATCH /api/newsletters/:id/sources/:sourceConnectionId` sets `mediaTypeFilter`, where null means the source's defaults. Filters are validated against the source's kinds, here and on linking. An empty filter, which linking used to accept, now means the defaults rather than nothing. Sources in API responses carry `mediaKinds` and `defaultMediaKinds`.
 - The wording key `music` defaults to "Music"; the album kind is counted as albums. Most-watched lists stay movies and TV.
 
 </details>

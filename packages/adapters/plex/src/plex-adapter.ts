@@ -9,7 +9,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { albumReleaseDate, buildPlexWebDeepLink, plexWebAppUrl, readNewest } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
 import {
   buildImageUrl,
   fetchImage,
@@ -214,12 +214,7 @@ export const plexAdapter: SourceAdapter = {
                   : undefined,
           overview: item.summary || undefined,
           addedAt,
-          releaseDate:
-            kind === "album"
-              ? albumReleaseDate(item.originallyAvailableAt)
-              : item.originallyAvailableAt
-                ? new Date(item.originallyAvailableAt)
-                : undefined,
+          releaseDate: releaseDateOf(kind, item.originallyAvailableAt),
           posterUrl: poster ? buildImageUrl(config.baseUrl, token, poster) : undefined,
           ...(kind === "album" && item.leafCount ? { trackCount: item.leafCount } : {}),
           externalUrl: buildExternalUrl(webUrl, machineIdentifier, item.ratingKey),

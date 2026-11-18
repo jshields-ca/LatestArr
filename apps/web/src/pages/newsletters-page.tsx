@@ -386,7 +386,8 @@ function LinkedSources({
                             type="button"
                             aria-pressed={on}
                             title={last ? "Unlink the source to include nothing from it" : undefined}
-                            disabled={changingId === source.id || last}
+                            // One save at a time: each builds on the list as it was.
+                            disabled={changingId !== null || last}
                             onClick={() => void handleToggle(source, group)}
                             className={cn(
                               "inline-flex min-h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors",

@@ -10,7 +10,7 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { albumReleaseDate, buildPlexWebDeepLink, plexWebAppUrl, readNewest } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
 import {
   buildImageProxyUrl,
   fetchImage,
@@ -282,12 +282,7 @@ export const tautulliAdapter: SourceAdapter = {
                 : undefined,
           overview: item.summary || undefined,
           addedAt,
-          releaseDate:
-            kind === "album"
-              ? albumReleaseDate(item.originally_available_at)
-              : item.originally_available_at
-                ? new Date(item.originally_available_at)
-                : undefined,
+          releaseDate: releaseDateOf(kind, item.originally_available_at),
           genres: item.genres,
           // Episodes use the series poster, so every image is the same
           // portrait shape rather than some being wide video stills.

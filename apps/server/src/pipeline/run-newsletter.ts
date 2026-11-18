@@ -202,8 +202,8 @@ async function resolveServerIds(linkedSources: LinkedSource[], log: Logger): Pro
 // What to ask a source for. Nothing chosen asks for everything, unless the
 // source leaves some kinds off until they're chosen (music, #354).
 function fetchKinds(link: LinkedSource["link"], adapter: LinkedSource["adapter"]): MediaKind[] | undefined {
-  if (link.mediaTypeFilter) return link.mediaTypeFilter as MediaKind[];
-  return adapter.capabilities.defaultMediaKinds ? [...adapter.capabilities.defaultMediaKinds] : undefined;
+  if (!link.mediaTypeFilter?.length && !adapter.capabilities.defaultMediaKinds) return undefined;
+  return mediaKindsFor(adapter.capabilities, link.mediaTypeFilter);
 }
 
 async function fetchRecentItemsFromSources(

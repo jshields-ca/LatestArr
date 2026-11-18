@@ -67,10 +67,17 @@ export function albumReleaseDate(value: string | undefined): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+/** A Plex-style `originallyAvailableAt`, with albums read as above. */
+export function releaseDateOf(kind: MediaKind, value: string | undefined): Date | undefined {
+  if (kind === "album") return albumReleaseDate(value);
+  return value ? new Date(value) : undefined;
+}
+
 /** The kinds a newsletter gets from a linked source: the ones chosen for
- * it, or the source's defaults. Kinds the source doesn't have are dropped. */
+ * it, or the source's defaults. Kinds the source doesn't have are dropped.
+ * An empty choice, which linking allowed before #354, means the defaults. */
 export function mediaKindsFor(capabilities: SourceCapabilities, chosen?: readonly string[] | null): MediaKind[] {
-  if (!chosen) return [...(capabilities.defaultMediaKinds ?? capabilities.supportsMediaKinds)];
+  if (!chosen || chosen.length === 0) return [...(capabilities.defaultMediaKinds ?? capabilities.supportsMediaKinds)];
   return capabilities.supportsMediaKinds.filter((kind) => chosen.includes(kind));
 }
 

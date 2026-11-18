@@ -30,8 +30,9 @@ export function kindGroupsOf(mediaKinds: string[]): KindGroup[] {
   );
 }
 
+// An empty filter, which linking allowed before #354, follows the defaults.
 export function includedKinds(source: LinkedSourceKinds): string[] {
-  return source.mediaTypeFilter ?? source.defaultMediaKinds;
+  return source.mediaTypeFilter?.length ? source.mediaTypeFilter : source.defaultMediaKinds;
 }
 
 export function isGroupIncluded(source: LinkedSourceKinds, group: KindGroup): boolean {
