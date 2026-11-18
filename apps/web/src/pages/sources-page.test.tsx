@@ -365,10 +365,15 @@ describe("SourcesPage", { timeout: 30_000 }, () => {
 
       await user.click(screen.getByRole("button", { name: "Add source" }));
       const dialog = await screen.findByRole("dialog");
-      // Audiobookshelf, first alphabetically, needs testers too, tracked separately.
-      expect(within(dialog).getByRole("link", { name: "tell us how it went" })).toHaveAttribute(
+      // Audiobookshelf, first alphabetically, needs testers: problems go to
+      // a bug report, and "it works" to Discussions.
+      expect(within(dialog).getByRole("link", { name: "open an issue" })).toHaveAttribute(
         "href",
-        "https://github.com/jshields-ca/LatestArr/issues/244",
+        "https://github.com/jshields-ca/LatestArr/issues/new?template=bug_report.yml",
+      );
+      expect(within(dialog).getByRole("link", { name: "say so in Discussions" })).toHaveAttribute(
+        "href",
+        "https://github.com/jshields-ca/LatestArr/discussions/categories/general",
       );
       expect(within(dialog).getByRole("link", { name: /Setup guide for Audiobookshelf/ })).toHaveAttribute(
         "href",
@@ -386,10 +391,7 @@ describe("SourcesPage", { timeout: 30_000 }, () => {
       // Example values match the chosen type, not Tautulli's.
       expect(within(dialog).getByLabelText("Base URL")).toHaveAttribute("placeholder", "http://localhost:8096");
       expect(within(dialog).getByLabelText("Name")).toHaveAttribute("placeholder", "Home Jellyfin");
-      expect(within(dialog).getByRole("link", { name: "tell us how it went" })).toHaveAttribute(
-        "href",
-        "https://github.com/jshields-ca/LatestArr/issues/196",
-      );
+      expect(within(dialog).getByRole("link", { name: "open an issue" })).toBeInTheDocument();
     },
     240000,
   );

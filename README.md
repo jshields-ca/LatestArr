@@ -40,20 +40,20 @@
 | Source | Content | Connects via | Status |
 | --- | --- | --- | --- |
 | [Tautulli](https://tautulli.com/) | Movies, TV, music | Tautulli API | ✅ Working |
-| Plex (direct) | Movies, TV, music | Plex API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
-| [Jellyfin](https://jellyfin.org/) | Movies, TV, books, audiobooks | Jellyfin API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
-| [Emby](https://emby.media/) | Movies, TV, books, audiobooks | Emby API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/196) |
-| [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
+| Plex (direct) | Movies, TV, music | Plex API | 🧪 Needs testers |
+| [Jellyfin](https://jellyfin.org/) | Movies, TV, books, audiobooks | Jellyfin API | 🧪 Needs testers |
+| [Emby](https://emby.media/) | Movies, TV, books, audiobooks | Emby API | 🧪 Needs testers |
+| [BookLore](https://github.com/booklore-app/booklore) | Books | OPDS | 🧪 Needs testers |
 | [BookOrbit](https://github.com/bookorbit/bookorbit) | Books, audiobooks | OPDS | ✅ Working |
-| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | OPDS | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
-| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks, podcasts | Audiobookshelf API | 🧪 [Needs testers](https://github.com/jshields-ca/LatestArr/issues/244) |
+| [Grimmory](https://github.com/grimmory-tools/grimmory) | Books | OPDS | 🧪 Needs testers |
+| [Audiobookshelf](https://www.audiobookshelf.org/) | Audiobooks, podcasts | Audiobookshelf API | 🧪 Needs testers |
 | [RomM](https://github.com/rommapp/romm) | Games | RomM API | ✅ Working |
 | Kavita, Komga, Calibre-Web, Immich, ... | Various | | Under consideration: [request one](https://github.com/jshields-ca/LatestArr/issues/new?template=adapter_request.yml) |
 
 Each source has a setup guide in the [docs](https://www.latestarr.app/docs/sources). BookLore, BookOrbit, and Grimmory are separate apps from a common lineage that share the same [OPDS](https://opds.io/) catalog feed, so one adapter covers all three.
 
 > [!TIP]
-> **Help test the 🧪 sources.** They're built from each app's published API and covered by tests, but haven't been confirmed on a real server yet. If you run one, add it as a source, send yourself a test newsletter, and tell us how it went: [Jellyfin and Emby](https://github.com/jshields-ca/LatestArr/issues/196), or [Plex (direct), BookLore, Grimmory, and Audiobookshelf](https://github.com/jshields-ca/LatestArr/issues/244). Include your server version, what worked, and any errors from the **Logs** page. Each moves to ✅ once someone confirms it works.
+> **Help test the 🧪 sources.** They're built from each app's published API and covered by tests, but haven't been confirmed on a real server yet. If you run one, add it as a source and send yourself a test newsletter. If something doesn't work, [open an issue](https://github.com/jshields-ca/LatestArr/issues/new?template=bug_report.yml) with your server version and any errors from the **Logs** page. If it works, [say so in Discussions](https://github.com/jshields-ca/LatestArr/discussions/categories/general). Each moves to ✅ once someone confirms it works.
 
 ## Quick start
 

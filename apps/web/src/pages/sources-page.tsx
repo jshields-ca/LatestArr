@@ -49,10 +49,11 @@ import {
 } from "@/lib/api";
 import { guardClose, saveShortcutRef, useUnsavedChanges } from "@/lib/unsaved-changes";
 
-// Where testers report back: Jellyfin and Emby, and the other sources not
-// yet confirmed on a real server. Matches the README's sources table.
-const JELLYFIN_EMBY_TESTERS_URL = "https://github.com/jshields-ca/LatestArr/issues/196";
-const SOURCE_TESTERS_URL = "https://github.com/jshields-ca/LatestArr/issues/244";
+// Where testers of a source not yet confirmed on a real server report back:
+// a bug report when something's wrong, Discussions when it works. Matches
+// the README's note on the 🧪 sources.
+const BUG_REPORT_URL = "https://github.com/jshields-ca/LatestArr/issues/new?template=bug_report.yml";
+const DISCUSSIONS_URL = "https://github.com/jshields-ca/LatestArr/discussions/categories/general";
 
 // Each source type's setup guide on the docs site. The BookLore family
 // shares one page.
@@ -85,9 +86,8 @@ interface SourceKindConfig {
   opdsHint?: boolean;
   /** Where to find the credential, shown under its field. */
   fieldHint?: string;
-  /** Not yet confirmed on a real server: the issue where testers report
-   *  how it went. */
-  testersIssue?: string;
+  /** Not confirmed on a real server yet: the add dialog asks for reports. */
+  needsTesters?: boolean;
   /** Example values for the Name, Base URL, and Public URL fields. */
   examples: { name: string; baseUrl: string; publicUrl: string };
 }
@@ -106,7 +106,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   plex: {
     label: "Plex",
-    testersIssue: SOURCE_TESTERS_URL,
+    needsTesters: true,
     examples: { name: "Home Plex", baseUrl: "http://localhost:32400", publicUrl: "https://plex.example.com" },
     description: "Connect directly to a Plex Media Server.",
     fields: [{ key: "token", label: "Plex token", type: "password" }],
@@ -117,7 +117,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
     description: "Connect to a Jellyfin server for movies, TV, books, and audiobooks.",
     fields: [{ key: "apiKey", label: "Jellyfin API key", type: "password" }],
     fieldHint: "Create one in Jellyfin's Dashboard, under API Keys.",
-    testersIssue: JELLYFIN_EMBY_TESTERS_URL,
+    needsTesters: true,
   },
   emby: {
     label: "Emby",
@@ -125,11 +125,11 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
     description: "Connect to an Emby server for movies, TV, books, and audiobooks.",
     fields: [{ key: "apiKey", label: "Emby API key", type: "password" }],
     fieldHint: "Create one in Emby's server settings, under API Keys.",
-    testersIssue: JELLYFIN_EMBY_TESTERS_URL,
+    needsTesters: true,
   },
   booklore: {
     label: "BookLore",
-    testersIssue: SOURCE_TESTERS_URL,
+    needsTesters: true,
     examples: { name: "Books", baseUrl: "http://localhost:6060", publicUrl: "https://books.example.com" },
     description: "Connect to a BookLore OPDS catalog.",
     fields: [
@@ -150,7 +150,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   grimmory: {
     label: "Grimmory",
-    testersIssue: SOURCE_TESTERS_URL,
+    needsTesters: true,
     examples: { name: "Books", baseUrl: "http://grimmory.local", publicUrl: "https://books.example.com" },
     description: "Connect to a Grimmory OPDS catalog.",
     fields: [
@@ -161,7 +161,7 @@ const KIND_CONFIG: Record<string, SourceKindConfig> = {
   },
   audiobookshelf: {
     label: "Audiobookshelf",
-    testersIssue: SOURCE_TESTERS_URL,
+    needsTesters: true,
     examples: { name: "Audiobooks", baseUrl: "http://localhost:13378", publicUrl: "https://audiobooks.example.com" },
     description: "Connect to an Audiobookshelf server.",
     fields: [{ key: "token", label: "Audiobookshelf API token", type: "password" }],
@@ -217,14 +217,20 @@ function OpdsHint({ id, label }: { id: string; label: string }) {
   );
 }
 
-function TestersNote({ label, issueUrl }: { label: string; issueUrl: string }) {
+function TestersNote({ label }: { label: string }) {
+  const link = "font-medium text-primary underline";
   return (
     <p className="rounded-md border border-border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-      {label} support still needs testers: it hasn&apos;t been confirmed on a real server yet. If you try it, please{" "}
-      <a href={issueUrl} target="_blank" rel="noreferrer" className="font-medium text-primary underline">
-        tell us how it went
+      {label} support still needs testers: it hasn&apos;t been confirmed on a real server yet. If something
+      doesn&apos;t work,{" "}
+      <a href={BUG_REPORT_URL} target="_blank" rel="noreferrer" className={link}>
+        open an issue
+      </a>{" "}
+      with your server version and any errors from the Logs page. If it works,{" "}
+      <a href={DISCUSSIONS_URL} target="_blank" rel="noreferrer" className={link}>
+        say so in Discussions
       </a>
-      : your server version, what worked, and any errors from the Logs page.
+      .
     </p>
   );
 }
@@ -429,7 +435,7 @@ function AddSourceDialog({
               {config.fieldHint}
             </p>
           ) : null}
-          {config.testersIssue ? <TestersNote label={config.label} issueUrl={config.testersIssue} /> : null}
+          {config.needsTesters ? <TestersNote label={config.label} /> : null}
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
