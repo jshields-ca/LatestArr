@@ -12,7 +12,7 @@
 
 **[Website](https://www.latestarr.app)** · **[Docs](https://www.latestarr.app/docs)** · **[Install](https://www.latestarr.app/docs/installation)** · **[Discussions](https://github.com/jshields-ca/LatestArr/discussions)** · **[Releases](https://github.com/jshields-ca/LatestArr/releases)**
 
-<img src="docs/assets/social-preview.png" alt="LatestArr: self-hosted digest newsletters for Plex, books, audiobooks and games" width="100%" />
+<img src="docs/assets/social-preview.png" alt="LatestArr: self-hosted &quot;what&#39;s new&quot; newsletters for your media server, shown beside a sample newsletter" width="100%" />
 
 > [!WARNING]
 > **Early days, in active development.** LatestArr is pre-1.0. It's usable today, but expect rough edges, and an update may occasionally change how something works. Back up your data and `ENCRYPTION_KEY` before you update, and read the [release notes](https://github.com/jshields-ca/LatestArr/releases). See [Project status](#project-status) for the known gaps.
