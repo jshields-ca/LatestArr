@@ -1,5 +1,277 @@
 # @latestarr/server
 
+## 0.13.0
+
+### Minor Changes
+
+- [#464](https://github.com/jshields-ca/LatestArr/pull/464) [`88b44b6`](https://github.com/jshields-ca/LatestArr/commit/88b44b67f9c434f93982cf86cb0b22abbafe78db) - **Improved:** More of LatestArr's envelope look.
+
+  - **The stamp in the header** sits at the same slight tilt as on the sign-in screen.
+  - **Dialogs** have the airmail stripe along their top edge.
+  - **Buttons for the main action** have a darker edge under them, like the stamp's, and press down onto it.
+  - **Send started and Test sent** show the stamp and a postmark.
+  - **Designs** can top the newsletter with an airmail stripe: in the design editor, under **Colours and font**, set **Top edge** to **Airmail stripe**. It uses your accent colour and airmail blue. Existing designs keep their solid line.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Approved options from the [#332](https://github.com/jshields-ca/LatestArr/issues/332) review.
+
+  - **Design setting:** `topEdge: "solid" | "airmail"` (default `solid`). The airmail stripe is a row of table cells in the accent and `#2f5fb8`, not a CSS gradient, because email apps don't draw gradients reliably. Its dashes are straight, and the card's rounded corners clip it where the email app supports that. It sits directly in the card's `mj-wrapper`: inside a column, MJML would put it in a `<tbody>`, and browsers move a table out of there.
+  - **Toasts:** a `sent` variant shows the stamp and postmark lines in place of the tick, hidden from screen readers. The stamp presses on once and stays still with reduced motion.
+  - **Buttons:** the `default` variant uses `--primary-edge` and translates on press. It replaces the hover lift and light sweep (`.btn-glint`, removed).
+  - **Dialogs:** `DialogContent` adds `.airmail-stripe` along its top. `docs/ui-guidelines.md` now says where the stripe and the stamp's press belong.
+
+  </details>
+
+- [#444](https://github.com/jshields-ca/LatestArr/pull/444) [`afd0bdc`](https://github.com/jshields-ca/LatestArr/commit/afd0bdc63190539ddafe033c49c9750cf86881c4) - **New:** When a section has more new items than its limit, it ends with how many were left out: "+ 76 more books".
+
+  - **Linked** to the source's Public URL when it has one, so people can go and see the rest. Without one it's just the count, rather than a link to an address recipients might not reach.
+  - **TV** counts shows when a show's episodes are grouped, and episodes when they aren't. Other sections use their own name, including one you've renamed.
+  - **On by default,** and only shown when something was left out. Turn it off with **Say how many more** under the design's **Sections**.
+  - **Code designs** can add it with `{{#moreFor}}`, given the same arguments as the `{{#mediaList}}` above it.
+
+  Thanks to crispybegs for the idea ([#362](https://github.com/jshields-ca/LatestArr/issues/362)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#362](https://github.com/jshields-ca/LatestArr/issues/362). A `moreFor` Handlebars helper repeats `mediaList`'s filtering and grouping to count the rows past its `count` (or `MAX_SHOWN_ITEMS`), and renders its block with `{count, label, url}`. `url` comes from a new `publicLinksByContentType` in the render context, built from linked sources' Public URLs only; the existing `sourceLinksByContentType` falls back to a source's own address, which can be an API host. Design settings gain `sections.showMore` (default true). The Default design's rendered email is unchanged unless a section overflows.
+
+  Linking to each app's own "recently added" view, suggested on the issue, isn't in this change: it needs checking app by app for a stable address.
+
+  </details>
+
+- [#458](https://github.com/jshields-ca/LatestArr/pull/458) [`4c40059`](https://github.com/jshields-ca/LatestArr/commit/4c40059ff65eb616934d32ae7d4bfc034980ebf5) - **New:** Music from Plex and Tautulli. New albums appear in a **Music** section, with the cover, the artist underneath and, from Plex, the number of tracks. Singles and EPs are included, since Plex treats them as albums too.
+
+  - **Choose what each newsletter includes.** On a newsletter, each linked source lists what it has (Movies, TV, Music, ...) as toggles that save straight away. Music is off until you turn it on, so existing newsletters don't change, and you can leave it off for people who can't see your music library.
+  - **Albums only.** Plex and Tautulli both list new albums, not tracks. Tracks added later to an album that's already in your library don't bring it back up, so they aren't in the newsletter.
+  - **Designs** have a Music section with a **Listen on Plex** button, and the editor's sample shows two albums.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#354](https://github.com/jshields-ca/LatestArr/issues/354). Built from what a real Plex 1.43 and Tautulli report for a test library: a new album, a single, an EP, two albums by one artist, a compilation, and tracks added to an existing album.
+
+  - `MediaKind` gains `album`, exported as `MEDIA_KINDS`. `NewItem` gains `trackCount`. `SourceCapabilities` gains optional `defaultMediaKinds`, and `mediaKindsFor()` works out a link's kinds.
+  - **Plex and Tautulli** map `album` entries in their recently-added lists, and `artist` libraries as music. The artist (`parentTitle`) is the subtitle. Plex's `leafCount` is the track count; Tautulli doesn't give one. Both list `album` as a kind, with music left out of `defaultMediaKinds`.
+  - **Release dates:** music tagged with only a year gets 1 January from Plex, so an album's release date is left out when it's exactly 1 January (`albumReleaseDate()`).
+  - `PATCH /api/newsletters/:id/sources/:sourceConnectionId` sets `mediaTypeFilter`, where null means the source's defaults. Filters are validated against the source's kinds, here and on linking. An empty filter, which linking used to accept, now means the defaults rather than nothing. Sources in API responses carry `mediaKinds` and `defaultMediaKinds`.
+  - The wording key `music` defaults to "Music"; the album kind is counted as albums. Most-watched lists stay movies and TV.
+
+  </details>
+
+- [#447](https://github.com/jshields-ca/LatestArr/pull/447) [`fbce2f0`](https://github.com/jshields-ca/LatestArr/commit/fbce2f0bc9053fecb267187780abc51ee2612c85) - **New:** A design can carry a highlighted notice: a title and a short note, as **Info**, **Warning** or **Alert**. Good for "Maintenance on Saturday" or "Verify with the email you use for Plex".
+
+  - Add it under the design editor's **Text**: choose its type, write a title and some text (with the same formatting as the intro), and put it after the intro or before the footer note.
+  - Each type has its own colour, as a tinted box with a bar down the left and a small icon, in light and dark mode.
+  - **Code designs** get it as `{{notice.title}}`, `{{notice.body}}` and `{{notice.type}}`.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#402](https://github.com/jshields-ca/LatestArr/issues/402), in the style picked during review (N1). Design settings gain `content.notice` (`type`, `title` up to 100 characters, `body` up to 1,000, `placement`). The title is escaped and the text goes through `render/notes.ts` like the intro, so neither can add markup or unsafe links. The colours are fixed per type rather than taken from the palette, so a warning always reads as one, and each has a dark-mode pair in the design's dark-mode CSS. The icon is a coloured circle with "i", "!" or "×" drawn in HTML rather than an image, so there's nothing to host or fetch and it shows with images off; its glyph colour (`#fffffe`) is unique so dark mode can recolour it without touching button text. One notice per design for now.
+
+  </details>
+
+- [#438](https://github.com/jshields-ca/LatestArr/pull/438) [`3633272`](https://github.com/jshields-ca/LatestArr/commit/36332729c0093b536161337bd71a76341c6b56f9) - **New:** On the Recipients page, see who is in which group, and change several people at once.
+
+  - **Groups in the table:** each person's groups show beside their email, and a menu next to the search box narrows the list to one group, or to people in no group.
+  - **Tick several people:** a box on each row, one in the heading for the whole page, and **Select all** for everyone who matches the search and group filter.
+  - **Change them together:** make them active or inactive, add them to a group, remove them from one, or delete them. Delete asks first and says how many.
+  - **One line on the Logs page** for each change, saying how many people it changed and naming them.
+
+  Deleting someone, alone or with others, now also says that they'll go from the list of who past sends went to. That was already the case; the message didn't mention it.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 13 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)) and [#400](https://github.com/jshields-ca/LatestArr/issues/400). `GET /api/recipients` also returns `memberships` (`{ recipientId, groupId }` pairs), so the table shows and filters by group without a request per person. `POST /api/recipients/bulk` takes `{ action, ids, groupId? }` with `action` one of `activate`, `deactivate`, `addToGroup`, `removeFromGroup` or `delete`, up to 5,000 ids, and needs the editor role like the single-recipient routes. It runs in one transaction, skips ids that don't exist, and answers `{ changed, requested }`, where `changed` counts only the people it altered. Its log entry names up to 25 addresses.
+
+  In the web app the actions replace the search row while anyone is ticked, so the search and filter can't change under a selection; from 1024px up the table doesn't move when the first box is ticked. The Groups column shows from 1280px, and under the name below that.
+
+  </details>
+
+- [#443](https://github.com/jshields-ca/LatestArr/pull/443) [`5e95e0f`](https://github.com/jshields-ca/LatestArr/commit/5e95e0f22c7fcb45354497fac14e9e953e1ae19e) - **New:** A design can rename its sections and put the day before the month: "Films" for "Movies", and "29 September 2026".
+
+  - **Section names:** in the design editor's new **Wording** panel, give any section its own name. It's used for the heading, the section's Browse button, the counts under the title ("9 films"), and each item's badge ("Film"). Blank keeps the default.
+  - **Dates:** "September 29, 2026" or "29 September 2026", in the email and its subject line.
+  - **Use UK English** sets both at once: Films, and the day first.
+  - **Code designs** get the names as `{{sectionNames.movie.heading}}` and `{{sectionNames.movie.browse}}`, and their dates follow the same order.
+
+  Thanks to crispybegs for asking ([#390](https://github.com/jshields-ca/LatestArr/issues/390)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#390](https://github.com/jshields-ca/LatestArr/issues/390). `render/wording.ts` gathers what a design can change: section names, count words and date order. Design settings gain `wording: { dateOrder, sectionNames }`, each name up to 40 characters. The default design no longer writes "Movies" into its markup: headings read `{{sectionNames.<section>.heading}}` and the library link `label=sectionNames.<section>.browse`, so a name is escaped by Handlebars like any other value and can't add markup or template code. The Default design's rendered email is unchanged (its snapshot test passes as it was). `render/dates.ts` takes the order; the subject, item dates and date range all use it, and so does the newsletter form's subject preview. "Most watched", "Nothing new this time" and the Where to watch verbs stay in English for now.
+
+  </details>
+
+- [#446](https://github.com/jshields-ca/LatestArr/pull/446) [`3c2afc8`](https://github.com/jshields-ca/LatestArr/commit/3c2afc815fa6041442a747557868a3e84534f65f) - **New:** A design can show longer summaries: about 2, 4 or 6 lines (30, 60 or 100 words), chosen under **Item details**. Handy for books, whose blurbs say more than a film's.
+
+  Thanks to crispybegs for asking ([#359](https://github.com/jshields-ca/LatestArr/issues/359)).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#359](https://github.com/jshields-ca/LatestArr/issues/359). Design settings gain `summaryLength` (`short`, the default and today's length; `medium`; `long`). Each item now also carries `{{overviewMedium}}` and `{{overviewLong}}` (360 and 600 characters, cut at a whole word) beside `{{overviewShort}}` (180), so code designs can use them too.
+
+  </details>
+
+- [#448](https://github.com/jshields-ca/LatestArr/pull/448) [`7f160fd`](https://github.com/jshields-ca/LatestArr/commit/7f160fd596037bf123f5026467eb5f61fbe197a9) - **New:** Recipients can unsubscribe themselves. Every newsletter has an **Unsubscribe** link, and mail apps like Gmail can show their own Unsubscribe button.
+
+  - **One step for them:** the link opens a short page that asks first. Unsubscribing leaves every newsletter on your LatestArr, and they can subscribe again from the same page.
+  - **On the Recipients page,** they show as **Unsubscribed** with the date, in place of the Active switch. An editor can't switch them back on.
+  - **In a send's history,** they're listed as skipped because they unsubscribed.
+  - **The link needs an address recipients can reach:** `WEB_ORIGIN`, or the new `PUBLIC_URL` if they reach LatestArr somewhere else. Mail apps' own button also needs it to be `https://`.
+  - **Hosted at home?** If the address is `localhost` or only works on your network, the Logs page says so on each send, and recipients can **unsubscribe by replying** instead: their mail app's Unsubscribe button emails the newsletter's reply-to or From address, and the footer says to reply. You then turn them off yourself. The docs also show how to publish only the unsubscribe page through Caddy, nginx or a Cloudflare Tunnel while the rest of LatestArr stays private.
+  - **Reply-to:** a newsletter's reply-to address, which could already be saved, is now used on its emails.
+  - **Code designs** add the link with `{{unsubscribeUrl}}`.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#383](https://github.com/jshields-ca/LatestArr/issues/383). Recipients gain `unsubscribed_at` (migration 0013), separate from `isActive`. Each recipient's existing random `unsubscribeToken` is the key; it's no longer included in any recipients or groups API response.
+
+  - **Links and headers:** the email is rendered once with a placeholder, and each copy gets its recipient's token just before sending (`mailer/unsubscribe.ts`), so stored sends hold no tokens. Copies carry `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058) when `WEB_ORIGIN` is `https`. Previews and test sends get a link marked as a preview, and no headers. Send to the rest gives each copy its own link too.
+  - **Public routes,** listed as public in `security.test.ts`: `POST /api/unsubscribe/:token` (one-click; accepts the form-encoded or multipart body mail providers send) and `POST /api/unsubscribe` (the page, with the token in the body). Both are limited to 20 requests a minute per address, answer 404 for an unknown token without saying anything about the list, and log the change. The page's link puts the token after `#`, which browsers don't send; the one-click path's token is hidden in request logs.
+  - **Local installs:** `PUBLIC_URL` (falling back to `WEB_ORIGIN`) sets the link's address. A `mailto:` `List-Unsubscribe` entry goes beside the https one, or alone without one, to the reply-to or From address unless it's a no-reply address. Each send logs a warning when the address is loopback or private (RFC 1918, 100.64/10, IPv6 ULA, single-word, `.local`/`.lan`/`.home.arpa`/`.internal`/`.ts.net`). `GET /api/unsubscribe/:token` redirects to the page for mail apps that open the address in a browser; it changes nothing.
+  - **Same-origin check:** the page's request goes through it like any other; a mail provider's post has no `Origin` and is let through, as the RFC expects.
+
+  </details>
+
+### Patch Changes
+
+- [#431](https://github.com/jshields-ca/LatestArr/pull/431) [`be40b9f`](https://github.com/jshields-ca/LatestArr/commit/be40b9fdacc042f5ec6bf1d031edc1ba2a768297) - **Improved:** LatestArr's fonts now ship inside the app, so opening it no longer fetches them from Google.
+
+  - Nothing about your visit goes to a font host, and the app looks the same on a server with no internet access.
+  - One exception: previewing an email design that uses the Ubuntu font still loads that font from Google, as the email itself does for the people who receive it. Choose Arial, Georgia or Verdana for a design that loads nothing.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Audit finding 2 from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `@fontsource-variable/plus-jakarta-sans`, `/newsreader` (its `opsz.css`) and `/jetbrains-mono` 5.3.0 (OFL-1.1) are imported in `main.tsx`, and `index.html` no longer links `fonts.googleapis.com`. `--font-brand` pins `"opsz" 72` through `--font-brand--font-variation-settings`, the display cut the Google link used to request. The Content-Security-Policy still allows `fonts.googleapis.com` and `fonts.gstatic.com`, because the design editor's preview is a `srcdoc` iframe that inherits the page's policy and MJML loads Ubuntu from there; the comment in `app.ts` now says so. Checked in the built app: no requests to another site on the dashboard, Email servers, Logs and Newsletters pages, and all three families load from the app.
+
+  </details>
+
+- [#434](https://github.com/jshields-ca/LatestArr/pull/434) [`fd4e052`](https://github.com/jshields-ca/LatestArr/commit/fd4e052de2df6e8c1342a9a172ae5a949a18a0c6) - **Fixed:** An email server that a newsletter sends through can now be deleted. It used to fail with "Something went wrong on the server".
+
+  Its newsletters are kept, with no email server chosen. They can't send until you choose another for them, and a scheduled send that fails for that reason raises the usual failure alert.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Found while reworking delete confirmations ([#332](https://github.com/jshields-ca/LatestArr/issues/332)). `newsletters.smtp_profile_id` references `smtp_profiles` with no delete rule and foreign keys are on, so `DELETE /api/smtp-profiles/:id` threw `FOREIGN KEY constraint failed` (a 500) whenever a newsletter used the profile. The route now clears `smtpProfileId` on those newsletters and deletes the profile in one transaction, as deleting a design already does for `templateId`, and logs how many newsletters were left without one. The pipeline and alerts already handled a newsletter with no email server. Regression tests cover an in-use delete and a repeated delete. The other foreign keys without a delete rule (`templates.created_by`, `newsletters.template_id`) were already handled in their routes.
+
+  </details>
+
+- [#433](https://github.com/jshields-ca/LatestArr/pull/433) [`7aff8a9`](https://github.com/jshields-ca/LatestArr/commit/7aff8a91131f310d4ef3dfeae4addc922bf8a801) - **Improved:** "SMTP profile" is now "email server" throughout, so the app says what the thing is.
+
+  - Buttons, labels, messages and log lines say **email server**, like "Add email server" and "Choose an email server".
+  - The form's fields are now **SMTP host** and **SMTP port**, the names your mail provider's instructions use.
+  - The setup checklist step is "Add an email server".
+
+  Nothing about how it works has changed, and your saved servers are untouched.
+
+  <details>
+  <summary>Technical details</summary>
+
+  A wording change from the UI review ([#332](https://github.com/jshields-ca/LatestArr/issues/332)), following the page's rename to "Email servers". It covers the web app's strings, the server's error and log messages (for example "Newsletter has no email server configured" and `Added email server "…"`), and `docs/self-hosting.md` and `docs/deliverability.md`. The `/smtp` route, the `/api/smtp-profiles` endpoints, `smtpProfileId` in requests and logs, and the database are unchanged, so scripts, bookmarks and backups keep working. Anything that matches on the old message text, such as a log alert, needs the new wording. The docs' two mentions of the header's pencil button now describe the account menu from [#428](https://github.com/jshields-ca/LatestArr/issues/428).
+
+  </details>
+
+- [#455](https://github.com/jshields-ca/LatestArr/pull/455) [`1afe7d8`](https://github.com/jshields-ca/LatestArr/commit/1afe7d840faface4cb6b441438d95348e1f2d698) - **Fixed:** Importing recipients no longer changes anyone already on your list. Before, importing a source's users renamed existing recipients to their username, and a file renamed anyone whose name in it was different.
+
+  - **From a source:** people already on your list are marked **Already on your list** and can't be ticked. The import leaves them as they are.
+  - **From a file:** the review asks first. When some names in the file differ, tick **Use the names in the file** to use them. Otherwise everyone keeps the name they have. A file's groups still add people already on your list to those groups.
+  - **Dialogs** no longer run off the right edge when a name or email is long.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#452](https://github.com/jshields-ca/LatestArr/issues/452). Both imports already matched emails ignoring case, so nobody was ever added twice. The problem was renaming. The source import sends each user's username as `displayName`, and `plan()` in `recipient-import.ts` renamed any existing recipient whose `displayName` differed.
+
+  - **Server:** `POST /api/recipients/import` takes `updateNames` (off by default). Without it, a differing name leaves the person in `unchanged` instead of `update`. The plan gains `nameDifferences`, the count the review uses to offer renaming. Undo is unchanged; it only reverses renames that happened.
+  - **Source dialog:** loads the recipients when it opens and leaves existing emails out of the selection, including emails typed in for users the source has none for. If the recipients can't be loaded, no one is marked, and the server still renames no one.
+  - **File dialog:** the review asks the server again when the checkbox changes, so what it shows is what Import does. The done step says "Renamed" and only when something was.
+  - **Dialog layout:** `DialogContent` is a grid whose single column grew to fit the widest unbreakable text, so long usernames or emails pushed the whole dialog's content past its right edge. It's now `grid-cols-[minmax(0,1fr)]`, which fixes every dialog.
+
+  Regression tests: names are kept by default (server); people already on the list aren't picked or sent, including by a typed email (Sources page); and the review offers renaming and sends `updateNames` only when it's ticked (Recipients page).
+
+  </details>
+
+- [#456](https://github.com/jshields-ca/LatestArr/pull/456) [`c8f0947`](https://github.com/jshields-ca/LatestArr/commit/c8f09472ab09b9667ea21a418636ba64c5a318c5) - **Improved:** Choose who to import with **Select all**, in both ways of importing recipients.
+
+  - **From a source:** a **Select all** box above the list ticks or unticks everyone who can be imported, and shows how many are ticked. People with no email and people already on your list aren't counted. The button says how many it will import: **Import 12 people**.
+  - **From a file:** the review's list of new recipients has a box on each row and the same **Select all**, all ticked to start. Untick someone to leave them out without editing the file. The review's counts and groups update to match.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#453](https://github.com/jshields-ca/LatestArr/issues/453). A new `SelectAllCheckbox` component shows the partly-ticked state the way the Recipients table's heading box does, with an "N of M selected" count that covers rows hidden behind **Show all**.
+
+  - **Source dialog:** `canImport()` (an email, not already on the list) decides who the box covers. Select none leaves nothing ticked and turns off Import.
+  - **File dialog:** people left out are kept by email (lowercased and trimmed) and filtered from the rows sent to `POST /api/recipients/import`. `withoutLeftOut()` in `lib/recipient-import.ts` adjusts the review on the client. It drops those people and their place in each group, and drops a group that only they were joining, which the server would then neither create nor change. People already on the list who join a group are still counted. The review also stops listing their repeated rows as skipped, since those aren't sent either. Applying needs no server change, because it works the plan out again from the rows sent.
+  - **Server fix found in review:** a row naming one group twice in different cases (`Family;family`) counted twice towards that group and added the membership twice. It now counts once.
+
+  </details>
+
+- [#451](https://github.com/jshields-ca/LatestArr/pull/451) [`610cb2b`](https://github.com/jshields-ca/LatestArr/commit/610cb2b4ae0e1f0c6fbd45eb0a5c022ad30a40d4) - **Fixed:** A newsletter's page no longer receives its sources' saved credentials. They were sent encrypted, and the key never left the server, so they couldn't be read, but they had no reason to reach the browser.
+
+  <details>
+  <summary>Technical details</summary>
+
+  `GET /api/newsletters/:id` spread each linked `source_connections` row into its response, including `credentialsEncrypted`, since the route was added. It now uses the same `sanitize()` as the Sources routes, with a regression test. No other route returns source rows.
+
+  </details>
+
+- [#441](https://github.com/jshields-ca/LatestArr/pull/441) [`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83) - **Fixed:** A newsletter linked to both a Plex server and the Tautulli that watches it listed every new item twice, and doubled its counts. Each item is now listed once.
+
+  - **Which copy is used:** Plex's, with its details and links. Anything only Tautulli knows, such as genres, is added to it.
+  - **Most watched** still comes from Tautulli.
+  - **Different servers are never merged,** even when their items share a number. If either app can't say which server it reads, both copies are listed as before.
+  - **The newsletter's Sources list** says so when both are linked.
+  - Two different servers reading the same files (Plex and Jellyfin, say) still list items twice; that's [#392](https://github.com/jshields-ca/LatestArr/issues/392).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Fixes [#391](https://github.com/jshields-ca/LatestArr/issues/391). Adapters gain an optional `getServerId(config)`: Plex returns its machine identifier from `/identity`, Tautulli the same value from `get_server_id`, both as `plex:<id>`. The pipeline asks only when two or more linked sources implement it, so a newsletter with one such source makes no extra requests. `mergeSharedServerItems` in `pipeline/shared-server-items.ts` keeps one copy of each `(server id, externalId)` across sources: the server's own copy over Tautulli's, otherwise the first, in the earlier copy's position. It applies to the new-items pool and the random fallback pool, so counts, sections and the cap warning all work on the merged list.
+
+  The issue suggested the source listed first should win, and a shared Public URL as a fallback signal. Neither is used. Linked sources have no order a user sets (the link table has none), and two different Plex servers commonly share a Public URL such as `https://app.plex.tv`; with rating keys being small numbers, merging on the URL would drop real items.
+
+  </details>
+
+- [#462](https://github.com/jshields-ca/LatestArr/pull/462) [`79d80fc`](https://github.com/jshields-ca/LatestArr/commit/79d80fca06542dd4ab9717f6f6a5ec39b9214139) - **Fixed:** Summaries show as plain words in the newsletter. A summary saved with formatting, as Audiobookshelf often does, no longer shows its formatting code as text.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#461](https://github.com/jshields-ca/LatestArr/issues/461), reported in [#244](https://github.com/jshields-ca/LatestArr/issues/244) with Audiobookshelf 2.37.2. A summary that contains HTML tags or entities is turned into plain text (`summaryText()` in `render/plain-text.ts`) before it's shortened and rendered. This happens once, where every source's summary is prepared for the email, because Jellyfin, Emby and OPDS can send HTML too. Paragraphs and line breaks become single spaces, entities become characters, links keep only their text, and images are dropped. A summary with no markup is left exactly as it was. The text is still escaped when it's rendered.
+
+  </details>
+
+- [#460](https://github.com/jshields-ca/LatestArr/pull/460) [`5c204d5`](https://github.com/jshields-ca/LatestArr/commit/5c204d503824dcc8f2117443812b31eb21cf9eda) - **Fixed:** Items from Tautulli link to their own page in Plex again, rather than the Plex home page, when the source has a Public URL. A newsletter with both Plex and the Tautulli watching the same server now lists each item once, as intended, rather than twice.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#459](https://github.com/jshields-ca/LatestArr/issues/459). The Tautulli adapter asked which Plex server it watches with `get_server_id` and read `pms_identifier`, which that command never returns. Without a hostname and port it answers `{"identifier": null}`. The lookup always came back empty, so item links fell back to the Plex Web home page, and the Plex and Tautulli de-duplication from [#391](https://github.com/jshields-ca/LatestArr/issues/391) never matched. It now uses `get_server_info`, which returns the configured server's `pms_identifier` from Tautulli's own settings, so it answers even when Plex is down. Checked against Tautulli watching Plex 1.43, and the tests now answer each command the way a real Tautulli does.
+
+  </details>
+
+- Updated dependencies [[`1641b29`](https://github.com/jshields-ca/LatestArr/commit/1641b298992b30ee0cc052419ac23013217a59da), [`4c40059`](https://github.com/jshields-ca/LatestArr/commit/4c40059ff65eb616934d32ae7d4bfc034980ebf5), [`cd3c79a`](https://github.com/jshields-ca/LatestArr/commit/cd3c79aab8930a130408118425a9602376c00dd5), [`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83), [`5c204d5`](https://github.com/jshields-ca/LatestArr/commit/5c204d503824dcc8f2117443812b31eb21cf9eda), [`7f160fd`](https://github.com/jshields-ca/LatestArr/commit/7f160fd596037bf123f5026467eb5f61fbe197a9)]:
+  - @latestarr/adapter-booklore-family@0.13.0
+  - @latestarr/adapter-core@0.13.0
+  - @latestarr/adapter-plex@0.13.0
+  - @latestarr/adapter-tautulli@0.13.0
+  - @latestarr/db@0.13.0
+  - @latestarr/adapter-audiobookshelf@0.13.0
+  - @latestarr/adapter-jellyfin@0.13.0
+  - @latestarr/adapter-romm@0.13.0
+  - @latestarr/crypto@0.13.0
+
 ## 0.12.8
 
 ### Patch Changes
