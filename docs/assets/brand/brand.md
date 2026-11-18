@@ -10,7 +10,7 @@ node docs/assets/brand/generate.mjs
 
 That rewrites the SVGs and PNGs in this folder, the web UI's favicon and app icons (`apps/web/public`), and the geometry the in-app logo draws from (`apps/web/src/components/logo-geometry.ts`).
 
-The social images are rendered from `social-preview.html` in a headless browser, at 1280×640 (`../social-preview.png`, for GitHub and the README) and 1200×630 (`og-image.png`, for latestarr.app's Open Graph and Twitter cards). Pass `?w=&h=` to render other sizes.
+The social images are rendered from `social-preview.html` in a headless browser, at 1280×640 (`../social-preview.png`, for GitHub and the README) and 1200×630 (`og-image.png`, for latestarr.app's Open Graph and Twitter cards). Pass `?w=&h=` to render other sizes. They show the paper stamp and wordmark on navy beside a real newsletter (`social-newsletter.png`: the design editor's sample content with the airmail top edge, captured at 640px wide and 2x). Retake that screenshot when the newsletter's look changes.
 
 ## Files
 
@@ -24,6 +24,7 @@ The social images are rendered from `social-preview.html` in a headless browser,
 | `icon-maskable.svg` | Full-bleed navy square with the stamp in the 80% safe zone, for Android and PWA maskable icons. |
 | `png/` | The app icon and both marks at 16–1024px. |
 | `og-image.png` | 1200×630 social card for the website. |
+| `social-newsletter.png` | The newsletter shown in both social images. |
 | `social-preview.html` | Source for both social images. |
 
 ## Colours
