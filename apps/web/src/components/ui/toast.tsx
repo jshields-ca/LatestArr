@@ -3,6 +3,7 @@ import * as ToastPrimitives from "@radix-ui/react-toast";
 import { cva, type VariantProps } from "class-variance-authority";
 import { CheckCircle2, X, XCircle } from "lucide-react";
 
+import { LogoMark } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
 const ToastProvider = ToastPrimitives.Provider;
@@ -36,6 +37,8 @@ const toastVariants = cva(
       variant: {
         default: "",
         success: "border-emerald-500/30",
+        // Something was mailed: Send started, Test sent (#332).
+        sent: "border-emerald-500/30",
         destructive: "border-destructive/40",
       },
     },
@@ -45,15 +48,41 @@ const toastVariants = cva(
   },
 );
 
+// The stamp pressed on with postmark lines beside it, for a toast saying
+// something was mailed. Decoration only: the title says what happened.
+function SentMark({ className }: { className?: string }) {
+  return (
+    <span className={cn("relative inline-flex h-8 w-14 items-center", className)} aria-hidden="true">
+      <LogoMark size={28} className="stamp-press-small" />
+      <svg
+        viewBox="0 0 64 30"
+        width="34"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        className="postmark-in absolute left-5 top-2 text-muted-foreground/70"
+      >
+        {[5, 12, 19, 26].map((y) => (
+          <path key={y} d={`M2 ${y}q5 -4 10 0t10 0t10 0t10 0t10 0t10 0`} />
+        ))}
+      </svg>
+    </span>
+  );
+}
+
 const TOAST_ICON = {
   default: null,
   success: CheckCircle2,
+  sent: null,
   destructive: XCircle,
 } as const;
 
 const TOAST_ICON_CLASS = {
   default: "",
   success: "text-emerald-600 dark:text-emerald-400",
+  sent: "",
   destructive: "text-destructive",
 } as const;
 
@@ -66,6 +95,7 @@ const Toast = React.forwardRef<React.ElementRef<typeof ToastPrimitives.Root>, To
     const Icon = TOAST_ICON[variant ?? "default"];
     return (
       <ToastPrimitives.Root ref={ref} className={cn(toastVariants({ variant }), className)} {...props}>
+        {variant === "sent" ? <SentMark className="-my-1 -ml-1 shrink-0" /> : null}
         {Icon ? (
           <Icon
             className={cn("mt-0.5 size-5 shrink-0", TOAST_ICON_CLASS[variant ?? "default"])}

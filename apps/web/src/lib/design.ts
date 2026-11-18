@@ -5,6 +5,8 @@
 export type DesignKind = "movie" | "tv_episode" | "tv_season" | "book" | "audiobook" | "game" | "album";
 export type DesignLayout = "cards" | "compact" | "grid";
 export type DesignEmptySection = "hide" | "message" | "link" | "random";
+/** The email card's top edge: a line in the accent, or the airmail stripe (#332). */
+export type DesignTopEdge = "solid" | "airmail";
 export type DesignSummaryLength = "short" | "medium" | "long";
 
 export interface DesignCta {
@@ -118,6 +120,7 @@ export interface DesignSettings {
   buttons: DesignButtons;
   logo: DesignLogo;
   showLookbackLine: boolean;
+  topEdge: DesignTopEdge;
   /** About 30, 60 or 100 words of each summary (#359). */
   summaryLength: DesignSummaryLength;
   layout: DesignLayout;
@@ -165,6 +168,7 @@ export const DEFAULT_DESIGN_SETTINGS: DesignSettings = {
     alt: "",
   },
   showLookbackLine: true,
+  topEdge: "solid",
   summaryLength: "short",
   layout: "cards",
   show: { poster: true, badge: true, subtitle: true, details: true, overview: true, dates: true },

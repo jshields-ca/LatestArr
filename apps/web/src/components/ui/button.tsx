@@ -18,24 +18,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // The lift + tinted shadow is reserved for the primary action on
-        // a screen — applying it to every button variant would make
-        // nothing stand out as *the* button to press. The hover state
-        // also gets its own slightly slower duration/easing (via the
-        // `hover:` variants below) instead of the base's snappy 150ms
-        // ease-out, so the lift reads as smooth/premium rather than an
-        // abrupt bump — the base timing stays as-is for every variant's
-        // active:scale press, which is deliberately quick and un-springy
-        // (see the comment on the shared classes above). Round 2: the
-        // original hover curve (`cubic-bezier(0.34,1.56,0.64,1)`) had a
-        // large, bouncy overshoot that read as "clunky" on a 2px lift —
-        // swapped for a gentle spring (`cubic-bezier(0.22,1.08,0.36,1)`,
-        // ~8% overshoot instead of 56%) that still feels alive without
-        // the bounce. `btn-glint` (index.css) adds a one-shot diagonal
-        // light sweep across the button on hover, clipped by
-        // `overflow-hidden`.
+        // The primary action on a screen looks like the stamp (#332): a
+        // darker strip under it, as if lifted off the page, and pressing
+        // pushes it down onto that strip. It replaces the old hover lift and
+        // light sweep, so only this variant has it and nothing else
+        // competes as *the* button to press. The press is a translate, not
+        // the shared active:scale, so the button lands on its edge.
         default:
-          "relative overflow-hidden btn-glint bg-primary text-primary-foreground shadow-[0_1px_2px_hsl(var(--shadow-tint)/0.3),0_4px_14px_-4px_hsl(var(--shadow-tint)/0.4)] hover:bg-primary/90 hover:-translate-y-0.5 hover:shadow-[0_2px_4px_hsl(var(--shadow-tint)/0.35),0_10px_24px_-6px_hsl(var(--shadow-tint)/0.5)] hover:duration-[240ms] hover:ease-[cubic-bezier(0.22,1.08,0.36,1)] active:translate-y-0",
+          "bg-primary text-primary-foreground shadow-[0_3px_0_0_var(--primary-edge)] hover:bg-primary/90 active:scale-100 active:translate-y-[3px] active:shadow-[0_0_0_0_var(--primary-edge)] disabled:shadow-none",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:

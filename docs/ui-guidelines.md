@@ -19,9 +19,10 @@ Every colour is a token in `apps/web/src/index.css`, with a light and a dark val
 
 ## The stamp and the stripe
 
-- **`LogoMark`** follows the theme: the paper stamp in dark, the rose stamp in light. Pass `variant="paper"` or `"rose"` where the background doesn't follow the theme (it's `paper` on navy), and `variant="muted"` for decoration.
-- **`.airmail-stripe`** is the header's bottom edge and the top edge of the signed-out card. Nowhere else, so it stays a signature.
-- **The postmark and the stamp's press** belong to the signed-out screens (`AuthCard`).
+- **`LogoMark`** follows the theme: the paper stamp in dark, the rose stamp in light. Pass `variant="paper"` or `"rose"` where the background doesn't follow the theme (it's `paper` on navy), and `variant="muted"` for decoration. In the header and on the signed-out screens it sits at a slight tilt (`.stamp-tilt`).
+- **`.airmail-stripe`** marks edges: the header's bottom edge, and the top edge of the signed-out card and of every dialog (`DialogContent` adds it). Keep it to edges like these, not cards or sections, so it stays a signature. Newsletter designs can use it too, as the email's **Top edge**.
+- **The stamp's press and the postmark** mark something being mailed. The full postmark is on the signed-out screens (`AuthCard`); a small one is on the toasts for **Send started** and **Test sent** (`variant: "sent"`). Other toasts keep their tick or cross. The press plays once and never with reduced motion, and never on something that appears on every page, like the header.
+- **The primary button** has the stamp's darker edge under it (`--primary-edge`), and pressing pushes it down onto that edge.
 
 ## Type
 

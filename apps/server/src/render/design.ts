@@ -86,6 +86,10 @@ export const designSettingsSchema = z.object({
     })
     .prefault({}),
   showLookbackLine: z.boolean().default(true),
+  // The card's top edge: a line in the accent, or rose-and-blue airmail
+  // dashes like LatestArr's own (#332). Solid keeps every older design as
+  // it was.
+  topEdge: z.enum(["solid", "airmail"]).default("solid"),
   // How much of each summary to show: about 30, 60 or 100 words (#359).
   summaryLength: z.enum(["short", "medium", "long"]).default("short"),
   layout: z.enum(["cards", "compact", "grid"]).default("cards"),
@@ -609,6 +613,51 @@ const SECTIONS: { kinds: DesignKind[]; name: SectionNameKey }[] = [
   { kinds: ["album"], name: "music" },
 ];
 
+// The airmail stripe across the top of the card: the accent and airmail
+// blue in turn, with gaps. Email apps don't draw CSS gradients reliably
+// (Outlook, some Gmail views), so it's a row of table cells, which every
+// client draws; the dashes are straight rather than slanted. The rounded
+// corners clip it where the app supports it, and Outlook draws it square.
+const AIRMAIL_BLUE = "#2f5fb8";
+const AIRMAIL_ROSE = "#c31d4c";
+const AIRMAIL_REPEATS = 12;
+
+// Whether a colour is a blue that airmail blue wouldn't stand apart from.
+function isBlue(hex: string): boolean {
+  const [r, g, b] = [0, 1, 2].map((i) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max - min < 0.15 || max !== b) return false;
+  const hue = 60 * (4 + (r - g) / (max - min));
+  return hue >= 190 && hue <= 250;
+}
+
+function airmailEdge(accent: string): string {
+  // A blue accent pairs with rose instead, so the dashes still alternate.
+  const second = isBlue(accent) ? AIRMAIL_ROSE : AIRMAIL_BLUE;
+  // Each repeat: a dash in the accent, a gap, a blue dash, a gap (4:3:4:3).
+  const unit = 100 / (14 * AIRMAIL_REPEATS);
+  const cell = (colour: string | null, units: number) => {
+    const width = `${(unit * units).toFixed(3)}%`;
+    return colour
+      ? `<td width="${width}" height="4" bgcolor="${colour}" style="width:${width};height:4px;line-height:4px;font-size:0;background-color:${colour};">&nbsp;</td>`
+      : `<td width="${width}" height="4" style="width:${width};height:4px;line-height:4px;font-size:0;">&nbsp;</td>`;
+  };
+  const cells = Array.from({ length: AIRMAIL_REPEATS }, () =>
+    [cell(accent, 4), cell(null, 3), cell(second, 4), cell(null, 3)].join(""),
+  ).join("");
+  // Straight in the wrapper, not in a column: a column puts raw markup
+  // inside a <tbody>, where a table isn't allowed and browsers move it out.
+  // Outlook reads the wrapper's own table there, so it gets a row of its own.
+  return `
+      <mj-raw>
+        <!--[if mso | IE]><tr><td><![endif]-->
+        <table role="presentation" class="airmail-edge" width="100%" cellpadding="0" cellspacing="0" style="width:100%;table-layout:fixed;border-collapse:collapse;"><tr>${cells}</tr></table>
+        <div style="height:12px;line-height:12px;font-size:0;">&nbsp;</div>
+        <!--[if mso | IE]></td></tr><![endif]-->
+      </mj-raw>`;
+}
+
 // Sections in the design's chosen order: each sits where its first kind is.
 function orderedSections(order: DesignKind[]) {
   const rank = (kinds: DesignKind[]) => Math.min(...kinds.map((kind) => {
@@ -865,11 +914,18 @@ ${button(p, font, "secondary", settings.buttons)}
       </mj-column>
     </mj-section>${ctaPlacement === "afterIntro" ? ctas : ""}`;
 
+  // The card's top edge: the accent as a border, or the airmail stripe as
+  // its first row.
+  const cardTop =
+    settings.topEdge === "airmail"
+      ? `border-radius="14px" padding="0 0 16px">${airmailEdge(p.accent)}`
+      : `border-top="4px solid ${p.accent}" border-radius="14px" padding="12px 0 16px">`;
+
   return `
 <mjml>${head}
   <mj-body background-color="${p.page}">
     <mj-section padding="12px 0"><mj-column><mj-spacer height="8px" /></mj-column></mj-section>
-    <mj-wrapper background-color="${p.background}" border-top="4px solid ${p.accent}" border-radius="14px" padding="12px 0 16px">${header}${noticeType && notice.placement === "afterIntro" ? `\n${noticeMarkup(noticeType, p, font)}` : ""}${sourcePlacement === "top" ? allSourceButtons : ""}
+    <mj-wrapper background-color="${p.background}" ${cardTop}${header}${noticeType && notice.placement === "afterIntro" ? `\n${noticeMarkup(noticeType, p, font)}` : ""}${sourcePlacement === "top" ? allSourceButtons : ""}
 ${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? allSourceButtons : ""}${noticeType && notice.placement === "beforeFooter" ? `\n${noticeMarkup(noticeType, p, font)}` : ""}
     {{#if footerNote}}
     <mj-section padding="8px 0 0">

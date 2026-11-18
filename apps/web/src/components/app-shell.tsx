@@ -588,7 +588,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <SheetContent className="surface-navy">
               <SheetHeader>
                 <SheetTitle>
-                  <Logo variant="paper" />
+                  <Logo variant="paper" iconClassName="stamp-tilt" />
                 </SheetTitle>
               </SheetHeader>
               <NavList onNavigate={() => setMobileNavOpen(false)} />
@@ -607,7 +607,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             aria-label="LatestArr, go to the dashboard"
             className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
-            <Logo />
+            {/* Tilted like the stamp on sign-in, but never animated: it's on every page. */}
+            <Logo iconClassName="stamp-tilt" />
           </Link>
 
           {/* On phones the account lives at the foot of the menu above. */}
