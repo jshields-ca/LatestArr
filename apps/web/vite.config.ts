@@ -6,8 +6,19 @@ import tailwindcss from "@tailwindcss/vite";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Never inline fonts (#469). Vite inlines files under 4 KB as data: URIs,
+ * which caught two tiny font subsets, and the server's Content Security
+ * Policy allows fonts only from the app itself (and Google, for the email
+ * preview). Other small files inline as usual.
+ */
+export function assetsInlineLimit(filePath: string): boolean | undefined {
+  return /\.(woff2?|ttf|otf|eot)$/i.test(filePath) ? false : undefined;
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: { assetsInlineLimit },
   resolve: {
     alias: {
       "@": path.resolve(dirname, "src"),

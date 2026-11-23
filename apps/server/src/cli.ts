@@ -61,11 +61,30 @@ export interface CliPaths {
   encryptionKey: string;
 }
 
+// What a backup holds, in the app's words rather than its table names (#469).
+const COUNT_NAMES: Record<string, [string, string]> = {
+  users: ["user", "users"],
+  source_connections: ["source", "sources"],
+  newsletters: ["newsletter", "newsletters"],
+  templates: ["design", "designs"],
+  recipients: ["recipient", "recipients"],
+  recipient_groups: ["group", "groups"],
+  send_runs: ["send", "sends"],
+};
+
+/** "1 design, 2 sources, 9 sends". A table it doesn't know keeps its name. */
+export function describeCounts(counts: Record<string, number>): string {
+  return Object.entries(counts)
+    .map(([table, n]) => {
+      const [one, many] = COUNT_NAMES[table] ?? [table.replace(/_/g, " "), table.replace(/_/g, " ")];
+      return `${n} ${n === 1 ? one : many}`;
+    })
+    .join(", ");
+}
+
 function describeBackup(checked: CheckedBackup, io: CliIo): void {
   const { manifest } = checked;
-  const counts = Object.entries(manifest.counts)
-    .map(([table, n]) => `${n} ${table.replace(/_/g, " ")}`)
-    .join(", ");
+  const counts = describeCounts(manifest.counts);
   io.out(`${path.basename(checked.file)}`);
   io.out(`  Made ${manifest.createdAt} by LatestArr ${manifest.version} (${manifest.trigger})`);
   io.out(`  Contains ${counts}`);

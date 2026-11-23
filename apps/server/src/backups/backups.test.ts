@@ -235,6 +235,8 @@ describe("restoring with the recovery command", () => {
     expect(checked.code).toBe(0);
     expect(checked.out).toContain("Passes SQLite's integrity check");
     expect(checked.out).toContain("Made with this server's ENCRYPTION_KEY");
+    // In the app's words, not table names (#469).
+    expect(checked.out).toMatch(/Contains \d+ users?, \d+ sources?, \d+ newsletters?, \d+ designs?, \d+ recipients?, \d+ groups?, \d+ sends?\n/);
 
     const staged = await run(["restore", backup.filename]);
     expect(staged.code).toBe(0);
