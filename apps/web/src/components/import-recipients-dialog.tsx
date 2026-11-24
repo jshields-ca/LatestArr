@@ -61,7 +61,8 @@ function downloadTemplate() {
 function FormatHelp() {
   return (
     <details className="rounded-md border border-border px-3 py-2 text-sm">
-      <summary className="cursor-pointer font-medium">File format</summary>
+      {/* The whole band is the tap target, not just the line of text. */}
+      <summary className="-mx-3 -my-2 cursor-pointer px-3 py-2 font-medium">File format</summary>
       <div className="mt-2 flex flex-col gap-2 text-xs text-muted-foreground">
         <p>
           Upload a CSV or an Excel file (.xlsx, first sheet only), or paste cells from a spreadsheet. A heading row works

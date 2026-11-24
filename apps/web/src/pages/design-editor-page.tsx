@@ -531,6 +531,7 @@ function CtaRows({ ctas, onChange }: { ctas: DesignCta[]; onChange: (ctas: Desig
                     variant="ghost"
                     size="icon"
                     aria-label={`Remove button ${index + 1}`}
+                    title="Remove"
                     onClick={() => onChange(ctas.filter((_, i) => i !== index))}
                   >
                     <X />
@@ -1018,7 +1019,7 @@ export function DesignEditorPage() {
           for screen readers. */}
       <h1 className="sr-only">Edit design</h1>
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" aria-label="Back to designs" onClick={() => void handleBack()}>
+        <Button variant="ghost" size="icon" aria-label="Back to designs" title="Back to designs" onClick={() => void handleBack()}>
           <ArrowLeft />
         </Button>
         <div className="flex min-w-[12rem] flex-1 flex-col gap-1">
@@ -1295,6 +1296,7 @@ export function DesignEditorPage() {
                           variant="ghost"
                           size="icon"
                           aria-label={`Move ${section.label} up`}
+                          title="Move up"
                           disabled={index === 0}
                           onClick={() => moveSectionAt(index, -1)}
                         >
@@ -1304,6 +1306,7 @@ export function DesignEditorPage() {
                           variant="ghost"
                           size="icon"
                           aria-label={`Move ${section.label} down`}
+                          title="Move down"
                           disabled={index === sections.length - 1}
                           onClick={() => moveSectionAt(index, 1)}
                         >

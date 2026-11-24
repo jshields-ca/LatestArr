@@ -18,7 +18,7 @@ export function NotFoundPage() {
         </CardHeader>
         <CardContent className="flex justify-center">
           <Button asChild>
-            <Link to="/">Back to Dashboard</Link>
+            <Link to="/">Back to dashboard</Link>
           </Button>
         </CardContent>
       </Card>

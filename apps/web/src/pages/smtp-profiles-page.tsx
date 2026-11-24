@@ -370,7 +370,7 @@ function EditSmtpProfileDialog({
   return (
     <Dialog open={open} onOpenChange={guardClose(dirty, openWithCurrentValues)}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Edit ${profile.name}`}>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${profile.name}`} title="Edit">
           <Pencil />
         </Button>
       </DialogTrigger>

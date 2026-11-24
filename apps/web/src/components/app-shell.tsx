@@ -438,13 +438,13 @@ function AccountMenu() {
     <>
       <Popover open={menuOpen} onOpenChange={setMenuOpen}>
         <PopoverTrigger asChild>
-          <Button variant="ghost" className="max-w-64 gap-2 px-2.5" aria-label={`${user?.displayName ?? "Account"}, account menu`}>
+          <Button variant="ghost" className="max-w-64 gap-2 px-2.5" aria-label={`${user?.displayName ?? "Account"}${user && user.role !== "admin" ? ` ${ROLE_LABELS[user.role]}` : ""}, account menu`}>
             <span className="truncate">{user?.displayName}</span>
             <RoleBadge />
             <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="flex w-64 flex-col gap-1 p-2">
+        <PopoverContent align="end" aria-label="Account" className="flex w-64 flex-col gap-1 p-2">
           <div className="px-2 py-1.5">
             <p className="truncate text-sm font-medium">{user?.displayName}</p>
             <p className="truncate text-xs text-muted-foreground" title={user?.email || undefined}>
@@ -580,7 +580,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex h-14 w-full items-center gap-3 px-4 md:px-6">
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu">
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation menu" title="Menu">
                 <Menu />
               </Button>
             </SheetTrigger>

@@ -381,7 +381,7 @@ function Command({ command }: { command: string }) {
   return (
     <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 py-1 pl-3 pr-1">
       <code className="min-w-0 flex-1 break-all py-1 font-mono text-xs">{command}</code>
-      <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => void copy()} aria-label={`Copy: ${command}`}>
+      <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" onClick={() => void copy()} aria-label={`Copy: ${command}`} title="Copy">
         {copied ? <Check /> : <Copy />}
       </Button>
     </div>
