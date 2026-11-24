@@ -24,6 +24,12 @@ function mockIdentity(machineIdentifier: string | undefined = "srv-abc123") {
   mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: { machineIdentifier } }));
 }
 
+// With no libraries chosen, it then reads the library list (#466): one
+// library, of the type the test's items come from.
+function mockLibraries(type = "movie") {
+  mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: { Directory: [{ key: "1", title: "Library", type }] } }));
+}
+
 const config: SourceConnectionConfig = {
   baseUrl: "http://plex.local:32400",
   credentials: { token: "tok123" },
@@ -110,6 +116,7 @@ describe("fetchRecentItems", () => {
 
   it("maps movie/episode items and skips unmapped media types", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -145,6 +152,7 @@ describe("fetchRecentItems", () => {
   // #354: music arrives as albums, from a real Plex's recently-added list.
   it("maps albums: the artist underneath, the track count and the cover", async () => {
     mockIdentity();
+    mockLibraries("artist");
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -211,6 +219,7 @@ describe("fetchRecentItems", () => {
     expect(plexAdapter.capabilities.defaultMediaKinds).toEqual(["movie", "tv_episode", "tv_season"]);
     expect(plexAdapter.capabilities.supportsMediaKinds).toContain("album");
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -233,6 +242,7 @@ describe("fetchRecentItems", () => {
 
   it("falls back to the bare episode title/no subtitle when Plex gives no grandparentTitle", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -253,6 +263,7 @@ describe("fetchRecentItems", () => {
     // show-name title/subtitle mapping AND a real per-item deep link built
     // from the same fetch's machineIdentifier lookup.
     mockIdentity("srv-abc123");
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -282,6 +293,7 @@ describe("fetchRecentItems", () => {
 
   it("falls back to the bare season title/no subtitle when Plex gives no parentTitle", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -300,6 +312,7 @@ describe("fetchRecentItems", () => {
 
   it("builds an absolute, token-bearing posterUrl from a relative thumb path", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -325,6 +338,7 @@ describe("fetchRecentItems", () => {
 
   it("uses the series poster for an episode, and its own thumb for a season", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -357,6 +371,7 @@ describe("fetchRecentItems", () => {
 
   it("omits posterUrl when Plex gives no thumb", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -371,6 +386,7 @@ describe("fetchRecentItems", () => {
 
   it("filters out items added before the since cutoff", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -390,6 +406,7 @@ describe("fetchRecentItems", () => {
 
   it("filters by mediaKinds when provided", async () => {
     mockIdentity();
+    mockLibraries();
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -408,6 +425,116 @@ describe("fetchRecentItems", () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]?.kind).toBe("movie");
+  });
+
+  // #466: the server-wide list folds a new episode into its season, dated
+  // when the season first arrived, so an episode of a season already there
+  // was left out. Each library's own list dates every episode.
+  it("reads each library's own list when none are chosen, so a new episode keeps its own date", async () => {
+    const since = new Date("2026-11-20T00:00:00Z");
+    const epoch = (iso: string) => new Date(iso).getTime() / 1000;
+    mockIdentity();
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Directory: [
+            { key: "1", title: "Movies", type: "movie" },
+            { key: "2", title: "TV Shows", type: "show" },
+            { key: "3", title: "Music", type: "artist" },
+            { key: "4", title: "Photos", type: "photo" },
+          ],
+        },
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "1", type: "movie", addedAt: epoch("2026-11-20T09:00:00Z") }] } }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            {
+              ...baseItem,
+              ratingKey: "88",
+              parentRatingKey: "80",
+              title: "Judith & Michael",
+              type: "episode",
+              grandparentTitle: "Cupertino",
+              parentIndex: 1,
+              index: 8,
+              addedAt: epoch("2026-11-20T07:19:00Z"),
+            },
+            { ...baseItem, ratingKey: "87", parentRatingKey: "80", type: "episode", grandparentTitle: "Cupertino", addedAt: epoch("2026-11-13T07:00:00Z") },
+          ],
+        },
+      }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, {
+      since,
+      mediaKinds: plexAdapter.capabilities.defaultMediaKinds,
+    });
+
+    const paths = mockFetch.mock.calls.map(([input]) => new URL(input as string).pathname);
+    // Music is off by default and photos aren't listed, so neither is read.
+    expect(paths).toEqual(["/identity", "/library/sections", "/library/sections/1/recentlyAdded", "/library/sections/2/recentlyAdded"]);
+    expect(paths).not.toContain("/library/recentlyAdded");
+    expect(items.map((item) => [item.externalId, item.kind, item.subtitle])).toEqual([
+      ["1", "movie", undefined],
+      ["88", "tv_episode", "S01E08 - Judith & Michael"],
+    ]);
+    expect(items[1]?.seasonId).toBe("80");
+  });
+
+  it("lists the newest first across libraries", async () => {
+    mockIdentity();
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Directory: [
+            { key: "1", title: "Movies", type: "movie" },
+            { key: "2", title: "4K Movies", type: "movie" },
+          ],
+        },
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            { ...baseItem, ratingKey: "1", type: "movie", addedAt: 1700000020 },
+            { ...baseItem, ratingKey: "2", type: "movie", addedAt: 1700000000 },
+          ],
+        },
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "3", type: "movie", addedAt: 1700000030 }] } }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0) });
+
+    expect(items.map((item) => item.externalId)).toEqual(["3", "1", "2"]);
+  });
+
+  it("reads music libraries once music is turned on", async () => {
+    mockIdentity();
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Directory: [
+            { key: "1", title: "Movies", type: "movie" },
+            { key: "3", title: "Music", type: "artist" },
+          ],
+        },
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(jsonResponse({ MediaContainer: { Metadata: [] } }));
+
+    await plexAdapter.fetchRecentItems(config, { since: new Date(0), mediaKinds: ["album"] });
+
+    const paths = mockFetch.mock.calls.map(([input]) => new URL(input as string).pathname);
+    expect(paths).toEqual(["/identity", "/library/sections", "/library/sections/3/recentlyAdded"]);
   });
 
   it("issues one request per library id and merges the results", async () => {
@@ -440,6 +567,7 @@ describe("fetchRecentItems", () => {
   describe("externalUrl", () => {
     it("builds a Plex web deep link from baseUrl when no publicUrl is configured", async () => {
       mockIdentity("srv-abc123");
+      mockLibraries();
       mockFetch.mockResolvedValueOnce(
         jsonResponse({
           MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "42", type: "movie", addedAt: 1700000000 }] },
@@ -455,6 +583,7 @@ describe("fetchRecentItems", () => {
 
     it("gives an episode links to its season and series", async () => {
       mockIdentity("srv-abc123");
+      mockLibraries();
       mockFetch.mockResolvedValueOnce(
         jsonResponse({
           MediaContainer: {
@@ -473,6 +602,7 @@ describe("fetchRecentItems", () => {
 
     it("builds the deep link from publicUrl instead of baseUrl when configured", async () => {
       mockIdentity("srv-abc123");
+      mockLibraries();
       mockFetch.mockResolvedValueOnce(
         jsonResponse({
           MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "42", type: "movie", addedAt: 1700000000 }] },
@@ -489,6 +619,7 @@ describe("fetchRecentItems", () => {
 
     it("falls back to a plain library link when the identity lookup fails", async () => {
       mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+      mockLibraries();
       mockFetch.mockResolvedValueOnce(
         jsonResponse({
           MediaContainer: { Metadata: [{ ...baseItem, ratingKey: "42", type: "movie", addedAt: 1700000000 }] },
@@ -565,6 +696,9 @@ describe("reading past one page", () => {
     mockFetch.mockImplementation(async (input: string) => {
       const url = new URL(input);
       if (url.pathname === "/identity") return jsonResponse({ MediaContainer: { machineIdentifier: "srv" } });
+      if (url.pathname === "/library/sections") {
+        return jsonResponse({ MediaContainer: { Directory: [{ key: "1", title: "Movies", type: "movie" }] } });
+      }
       const start = Number(url.searchParams.get("X-Plex-Container-Start"));
       const size = Number(url.searchParams.get("X-Plex-Container-Size"));
       return jsonResponse({

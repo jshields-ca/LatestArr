@@ -987,22 +987,30 @@ describe("a Plex server and its Tautulli linked to one newsletter", () => {
   const now = Math.floor(Date.now() / 1000);
 
   // Answers both apps by address, as a real pair would. `plexItems` and
-  // `tautulliItems` are each app's newest items, as [rating key, title].
+  // `tautulliItems` are each app's newest films, as [rating key, title];
+  // `plexRows` and `tautulliRows` replace them with rows as given.
   function mockPlexAndTautulli(options: {
     plexServer: string;
     tautulliServer: string | null;
     plexItems: [string, string][];
     tautulliItems: [string, string][];
+    plexRows?: Record<string, unknown>[];
+    tautulliRows?: Record<string, unknown>[];
   }) {
     mockFetch.mockImplementation((input: unknown) => {
       const url = new URL(String(input));
       if (url.host === "plex.local:32400") {
         if (url.pathname === "/identity")
           return Promise.resolve(jsonResponse({ MediaContainer: { machineIdentifier: options.plexServer } }));
-        if (url.pathname === "/library/recentlyAdded") {
+        // One library, read on its own (#466).
+        if (url.pathname === "/library/sections") {
+          return Promise.resolve(jsonResponse({ MediaContainer: { Directory: [{ key: "1", title: "Library", type: options.plexRows ? "show" : "movie" }] } }));
+        }
+        if (url.pathname === "/library/sections/1/recentlyAdded") {
           const first = url.searchParams.get("X-Plex-Container-Start") === "0";
           const Metadata = first
-            ? options.plexItems.map(([ratingKey, title]) => ({ ratingKey, type: "movie", title, summary: "From Plex.", addedAt: now }))
+            ? (options.plexRows ??
+              options.plexItems.map(([ratingKey, title]) => ({ ratingKey, type: "movie", title, summary: "From Plex.", addedAt: now })))
             : [];
           return Promise.resolve(jsonResponse({ MediaContainer: { Metadata } }));
         }
@@ -1022,7 +1030,7 @@ describe("a Plex server and its Tautulli linked to one newsletter", () => {
         if (cmd === "get_recently_added") {
           const first = url.searchParams.get("start") === "0";
           const recently_added = first
-            ? options.tautulliItems.map(([rating_key, title]) => ({
+            ? (options.tautulliRows ?? options.tautulliItems.map(([rating_key, title]) => ({
                 rating_key,
                 title,
                 full_title: title,
@@ -1030,7 +1038,7 @@ describe("a Plex server and its Tautulli linked to one newsletter", () => {
                 added_at: String(now),
                 summary: "From Tautulli.",
                 genres: ["Science fiction"],
-              }))
+              })))
             : [];
           return Promise.resolve(jsonResponse({ response: { result: "success", message: null, data: { recently_added } } }));
         }
@@ -1099,6 +1107,37 @@ describe("a Plex server and its Tautulli linked to one newsletter", () => {
     });
 
     expect(await previewTitles(newsletterId)).toEqual(["Dune", "Heat"]);
+  });
+
+  // #466: Tautulli lists a new episode as its season, Plex as the episode.
+  it("lists a new episode once, as the episode, when Tautulli lists its season", async () => {
+    const newsletterId = await newsletterWithBoth();
+    mockPlexAndTautulli({
+      plexServer: "srv-home",
+      tautulliServer: "srv-home",
+      plexItems: [],
+      tautulliItems: [],
+      plexRows: [
+        {
+          ratingKey: "88",
+          parentRatingKey: "80",
+          type: "episode",
+          title: "Judith & Michael",
+          grandparentTitle: "Cupertino",
+          parentIndex: 1,
+          index: 8,
+          addedAt: now,
+        },
+      ],
+      tautulliRows: [
+        { rating_key: "80", media_type: "season", title: "Season 1", parent_title: "Cupertino", full_title: "Season 1", added_at: String(now) },
+      ],
+    });
+
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+    const items = response.json().items as { title: string; kind: string }[];
+    expect(items.map((item) => [item.kind, item.title])).toEqual([["tv_episode", "Cupertino"]]);
+    expect(response.json().html).toContain("S01E08 - Judith &amp; Michael");
   });
 
   it("lists both copies, rather than guess, when Tautulli can't say which server it watches", async () => {

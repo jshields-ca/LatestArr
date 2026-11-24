@@ -111,7 +111,7 @@ The dashboard's setup checklist then walks through the same pages you'll use day
 4. **Choose a design** (optional). Duplicate the built-in **Default** and change it with a live preview, or use **Edit as code** for hand-written MJML (**Back to options** returns to the options it had, dropping code changes). Newsletters use Default until you choose another. **Most items per section** limits how many items each section shows; left blank, a section shows up to 100.
 5. **Create a newsletter.** Choose:
    - its schedule, a simple one (**Repeats**) or a cron expression, and a timezone;
-   - how many days back to look for new items (**Lookback**). LatestArr reads everything added in that window, up to 1,000 items per source (per library for Audiobookshelf), and logs a warning if a source reaches that;
+   - how many days back to look for new items (**Lookback**). LatestArr reads everything added in that window, up to 1,000 items per source (per library for Plex and Audiobookshelf), and logs a warning if a source reaches that;
    - its sources and recipient groups. **Plex and Tautulli for the same server can both be linked:** each new item is listed once, with Plex's details and links, and Tautulli adds **Most watched**. Two *different* servers reading the same files (Plex and Jellyfin, say) still list each new item twice, so link one of those per library;
    - optionally, a design and a [subject](#subject-variables).
 

@@ -37,6 +37,10 @@ export interface NewItem {
    * newsletter does: the season when they're all from one, else the show. */
   seasonUrl?: string;
   seriesUrl?: string;
+  /** For an episode, its season's `externalId` on the same server (Plex's
+   * rating key), so a season row from another source reading that server
+   * is known to be these episodes (#466). */
+  seasonId?: string;
   /** Play count over the window a "most watched" query was made for —
    * only present on items returned by fetchPopularItems. */
   playCount?: number;

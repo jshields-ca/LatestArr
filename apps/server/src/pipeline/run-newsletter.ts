@@ -238,7 +238,7 @@ async function fetchRecentItemsFromSources(
     if (capReached) {
       log.warn(
         { sourceId: source.id, count: sourceItems.length },
-        `"${source.name}" may have more new items than LatestArr read: it reads up to ${MAX_RECENT_ITEMS} per source (per library for Audiobookshelf) each time`,
+        `"${source.name}" may have more new items than LatestArr read: it reads up to ${MAX_RECENT_ITEMS} per source (per library for Plex and Audiobookshelf) each time`,
       );
     }
     for (const item of sourceItems) sourceByItem.set(item, { adapter, config });

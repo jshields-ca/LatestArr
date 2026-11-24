@@ -59,6 +59,11 @@ function fillGaps(kept: NewItem, other: NewItem): void {
  * (Plex over Tautulli), otherwise the first. It keeps its place in the list
  * and gains any details only the other copy had. Repeats within one source
  * are left alone.
+ *
+ * A season row is also the same as new episodes of that season from
+ * another source on the server: Tautulli lists a new episode as its season,
+ * Plex's library list as the episode itself (#466). The episodes are kept,
+ * since they say which are new.
  */
 export function mergeSharedServerItems(fetched: FetchedFromSource[]): MergedItems {
   const items: NewItem[] = [];
@@ -71,8 +76,28 @@ export function mergeSharedServerItems(fetched: FetchedFromSource[]): MergedItem
     leftOut.set(key, entry);
   };
 
+  // Seasons whose new episodes were listed, per server, and by which sources.
+  const seasonsWithEpisodes = new Map<string, number[]>();
+  fetched.forEach((group, source) => {
+    if (!group.serverId) return;
+    for (const item of group.items) {
+      if (item.kind !== "tv_episode" || !item.seasonId) continue;
+      const key = `${group.serverId}\n${item.seasonId}`;
+      const sources = seasonsWithEpisodes.get(key) ?? [];
+      if (!sources.includes(source)) sources.push(source);
+      seasonsWithEpisodes.set(key, sources);
+    }
+  });
+
   fetched.forEach((group, source) => {
     for (const item of group.items) {
+      if (item.kind === "tv_season" && group.serverId) {
+        const episodesFrom = seasonsWithEpisodes.get(`${group.serverId}\n${item.externalId}`)?.find((other) => other !== source);
+        if (episodesFrom !== undefined) {
+          countLeftOut(group, fetched[episodesFrom]!);
+          continue;
+        }
+      }
       const key = group.serverId ? `${group.serverId}\n${item.externalId}` : undefined;
       const earlier = key ? kept.get(key) : undefined;
       if (!key || !earlier || earlier.source === source) {
