@@ -89,7 +89,8 @@ describe("roles in the web app", () => {
     expect(within(nav).queryByRole("group", { name: "System" })).toBeNull();
     expect(screen.getAllByTitle("You have viewer access").length).toBeGreaterThan(0);
     // The account button's name includes the role it shows (#473).
-    expect(screen.getByRole("button", { name: "Sam Viewer, account menu" })).toBeInTheDocument();
+    // ...and its visible text reads as two words, so the two match.
+    expect(screen.getByRole("button", { name: "Sam Viewer, account menu" })).toHaveTextContent(/^Sam Viewer$/);
   });
 
   it("adds Recipients for editors, and everything for admins", async () => {

@@ -440,6 +440,8 @@ function AccountMenu() {
         <PopoverTrigger asChild>
           <Button variant="ghost" className="max-w-64 gap-2 px-2.5" aria-label={`${user?.displayName ?? "Account"}${user && user.role !== "admin" ? ` ${ROLE_LABELS[user.role]}` : ""}, account menu`}>
             <span className="truncate">{user?.displayName}</span>
+            {/* A space the row doesn't draw, so the name and role read as two
+                words ("Sam Editor") and match the button's label (#473). */}{" "}
             <RoleBadge />
             <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Button>
