@@ -50,6 +50,45 @@ describe("mergeSharedServerItems (#391)", () => {
     expect(merged!.posterUrl).toBe("plex-poster");
   });
 
+  // #466: Tautulli lists a new episode as its season; Plex's library list
+  // as the episode. They're the same news, told once, by the episodes.
+  describe("a season and its new episodes", () => {
+    const season = (extra: Partial<NewItem> = {}) => item("80", "Cupertino", { kind: "tv_season", subtitle: "Season 1", ...extra });
+    const episode = (key: string, seasonId = "80") =>
+      item(key, "Cupertino", { kind: "tv_episode", subtitle: `S01E${key.slice(1)}`, seasonId });
+
+    it("leaves out Tautulli's season when Plex listed its new episodes, whichever comes first", () => {
+      for (const order of ["plex first", "tautulli first"]) {
+        const fromPlex = plex([episode("88"), item("1", "Dune")]);
+        const fromTautulli = tautulli([season(), item("1", "Dune")]);
+        const merged = mergeSharedServerItems(order === "plex first" ? [fromPlex, fromTautulli] : [fromTautulli, fromPlex]);
+        expect(merged.items.map((i) => [i.kind, i.externalId])).toEqual(
+          order === "plex first"
+            ? [["tv_episode", "88"], ["movie", "1"]]
+            : [["movie", "1"], ["tv_episode", "88"]],
+        );
+        expect(merged.leftOut).toEqual([{ from: "Tautulli", keptFrom: "Home Plex", count: 2 }]);
+      }
+    });
+
+    it("keeps a season whose episodes nobody else listed", () => {
+      const merged = mergeSharedServerItems([plex([episode("98", "90")]), tautulli([season()])]);
+      expect(merged.items.map((i) => i.kind)).toEqual(["tv_episode", "tv_season"]);
+      expect(merged.leftOut).toEqual([]);
+    });
+
+    it("keeps a season next to its own source's episodes, and across servers", () => {
+      expect(mergeSharedServerItems([tautulli([season(), episode("88")])]).items).toHaveLength(2);
+      const merged = mergeSharedServerItems([plex([episode("88")], "plex:home"), tautulli([season()], "plex:cabin")]);
+      expect(merged.items).toHaveLength(2);
+    });
+
+    it("needs both sources to know their server", () => {
+      expect(mergeSharedServerItems([plex([episode("88")], null), tautulli([season()])]).items).toHaveLength(2);
+      expect(mergeSharedServerItems([plex([episode("88")]), tautulli([season()], null)]).items).toHaveLength(2);
+    });
+  });
+
   it("doesn't merge two different servers whose rating keys happen to match", () => {
     const merged = mergeSharedServerItems([
       plex([item("1", "Dune")], "plex:home"),

@@ -45,6 +45,32 @@ function mapLibraryType(sectionType: string): MediaKind {
   return sectionType === "show" ? "tv_episode" : "movie";
 }
 
+// The kinds each library type's recently-added list holds.
+const LIBRARY_KINDS: Record<string, MediaKind[]> = {
+  movie: ["movie"],
+  show: ["tv_episode", "tv_season"],
+  artist: ["album"],
+};
+
+// The libraries to read when a newsletter hasn't chosen any: every one
+// holding a kind it wants. Each library's own list, never the server-wide
+// one, which folds a new episode into its season and dates that season by
+// when it first arrived, so a new episode of a season already there looked
+// old and was left out (#466).
+async function librariesToRead(
+  baseUrl: string,
+  token: string,
+  mediaKinds: MediaKind[] | undefined,
+): Promise<string[]> {
+  const libraries = await getLibraries(baseUrl, token);
+  return libraries
+    .filter((library) => {
+      const kinds = LIBRARY_KINDS[library.type];
+      return kinds !== undefined && (!mediaKinds || kinds.some((kind) => mediaKinds.includes(kind)));
+    })
+    .map((library) => library.key);
+}
+
 // A `tv_episode` item's own `title` is just the episode's name (e.g.
 // "Winter Is Coming") — rendered as the prominent title on its own, that
 // reads as if the *episode* were the show, with no indication which series
@@ -158,11 +184,6 @@ export const plexAdapter: SourceAdapter = {
     params: FetchRecentItemsParams,
   ): Promise<NewItem[]> {
     const token = config.credentials.token ?? "";
-    // Plex's recentlyAdded is per-library when scoped, so a multi-library
-    // filter means one request per library, merged below — same shape as
-    // the Tautulli adapter's equivalent loop.
-    const sectionKeys =
-      params.libraryIds && params.libraryIds.length > 0 ? params.libraryIds : [undefined];
 
     // Fetched once per call (not per section/item) and best-effort — an
     // identity lookup failing (e.g. an older Plex server, or a transient
@@ -171,6 +192,14 @@ export const plexAdapter: SourceAdapter = {
     // real per-item deep link.
     const webUrl = resolveWebUrl(config);
     const machineIdentifier = await getServerIdentity(config.baseUrl, token).catch(() => undefined);
+
+    // One library at a time, merged below — same shape as the Tautulli
+    // adapter's equivalent loop. With none chosen, every library that has
+    // something wanted (see librariesToRead for why not the server-wide list).
+    const sectionKeys =
+      params.libraryIds && params.libraryIds.length > 0
+        ? params.libraryIds
+        : await librariesToRead(config.baseUrl, token, params.mediaKinds);
 
     const results: NewItem[] = [];
     for (const sectionKey of sectionKeys) {
@@ -218,6 +247,7 @@ export const plexAdapter: SourceAdapter = {
           posterUrl: poster ? buildImageUrl(config.baseUrl, token, poster) : undefined,
           ...(kind === "album" && item.leafCount ? { trackCount: item.leafCount } : {}),
           externalUrl: buildExternalUrl(webUrl, machineIdentifier, item.ratingKey),
+          ...(kind === "tv_episode" && item.parentRatingKey ? { seasonId: item.parentRatingKey } : {}),
           ...(kind === "tv_episode" && machineIdentifier && {
             seasonUrl: item.parentRatingKey ? buildPlexWebDeepLink(webUrl, machineIdentifier, item.parentRatingKey) : undefined,
             seriesUrl: item.grandparentRatingKey
@@ -229,6 +259,9 @@ export const plexAdapter: SourceAdapter = {
       }
     }
 
+    // Newest first across libraries, as the server-wide list was: a section
+    // showing the first few would otherwise favour the first library read.
+    if (sectionKeys.length > 1) results.sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime());
     return results;
   },
 

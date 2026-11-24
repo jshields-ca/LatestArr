@@ -549,6 +549,8 @@ describe("fetchRecentItems", () => {
 
       const link = (key: string) => `https://app.plex.tv/desktop#!/server/srv-abc123/details?key=%2Flibrary%2Fmetadata%2F${key}`;
       expect(items[0]).toMatchObject({ externalUrl: link("42"), seasonUrl: link("41"), seriesUrl: link("40") });
+      // Its season, so Plex's copy of the same news is known (#466).
+      expect(items[0]?.seasonId).toBe("41");
     });
 
     it("builds the deep link from publicUrl (the real Plex address) instead of Tautulli's own baseUrl", async () => {
