@@ -159,6 +159,31 @@ describe("fetchRecentItems", () => {
     expect(items[1]?.subtitle).toBe("Show - S01E01 - Ep");
   });
 
+  // #476: most albums have no description; Tautulli's own newsletter shows
+  // the artist's bio instead, and so does this, looked up once per artist.
+  it("gives an album with no description its artist's bio", async () => {
+    const album = { ...baseItem, media_type: "album", rating_key: "49", parent_rating_key: "48", title: "A Flower White EP", full_title: "A Flower White EP", parent_title: "Susumu Yokota", summary: "", added_at: "1795035863" };
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: { recently_added: [album, { ...album, rating_key: "26", parent_rating_key: "25", title: "Garden of Eden", summary: "Recorded in 2004." }] },
+        },
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ response: { result: "success", message: null, data: { rating_key: "48", media_type: "artist", summary: "An eclectic electronic musician." } } }),
+    );
+
+    const items = await tautulliAdapter.fetchRecentItems(config, { since: new Date(0), mediaKinds: ["album"] });
+
+    expect(items.map((item) => item.overview)).toEqual(["An eclectic electronic musician.", "Recorded in 2004."]);
+    const lookup = new URL(mockFetch.mock.calls.at(-1)![0] as string);
+    expect(lookup.searchParams.get("cmd")).toBe("get_metadata");
+    expect(lookup.searchParams.get("rating_key")).toBe("48");
+  });
+
   // #354: music arrives as albums, from a real Tautulli's recently-added list.
   it("maps albums with the artist underneath and the cover", async () => {
     const album = {

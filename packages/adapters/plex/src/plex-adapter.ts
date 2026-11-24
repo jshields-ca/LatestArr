@@ -9,11 +9,12 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, fillAlbumOverviews, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
 import {
   buildImageUrl,
   fetchImage,
   getAccounts,
+  getItemSummary,
   getLibraries,
   getRecentlyAdded,
   getServerIdentity,
@@ -262,6 +263,12 @@ export const plexAdapter: SourceAdapter = {
     // Newest first across libraries, as the server-wide list was: a section
     // showing the first few would otherwise favour the first library read.
     if (sectionKeys.length > 1) results.sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime());
+    // An album with no description of its own gets its artist's bio (#476).
+    await fillAlbumOverviews(
+      results,
+      (item) => (item.raw as PlexMetadataItem).parentRatingKey,
+      (artistKey) => getItemSummary(config.baseUrl, token, artistKey),
+    );
     return results;
   },
 

@@ -10,11 +10,12 @@ import type {
   SourceLibrary,
   SourceUser,
 } from "@latestarr/adapter-core";
-import { buildPlexWebDeepLink, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
+import { buildPlexWebDeepLink, fillAlbumOverviews, plexWebAppUrl, readNewest, releaseDateOf } from "@latestarr/adapter-core";
 import {
   buildImageProxyUrl,
   fetchImage,
   getHomeStats,
+  getItemSummary,
   getLibraries,
   getRecentlyAdded,
   getServerId,
@@ -309,6 +310,12 @@ export const tautulliAdapter: SourceAdapter = {
       }
     }
 
+    // An album with no description of its own gets its artist's bio (#476).
+    await fillAlbumOverviews(
+      results,
+      (item) => (item.raw as TautulliRecentlyAddedItem).parent_rating_key || undefined,
+      (artistKey) => getItemSummary(config.baseUrl, apiKey, artistKey),
+    );
     return results;
   },
 

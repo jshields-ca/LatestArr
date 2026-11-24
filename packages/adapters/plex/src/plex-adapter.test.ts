@@ -149,6 +149,38 @@ describe("fetchRecentItems", () => {
     expect(items[1]?.subtitle).toBe("S01E01 - Ep");
   });
 
+  // #476: most albums have no description; Tautulli's newsletter shows the
+  // artist's bio instead, and so does this, looked up once per artist.
+  it("gives an album with no description its artist's bio", async () => {
+    mockIdentity();
+    mockLibraries("artist");
+    const album = { ratingKey: "49", parentRatingKey: "48", type: "album", title: "A Flower White EP", parentTitle: "Susumu Yokota", summary: "", addedAt: 1795035863 };
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        MediaContainer: {
+          Metadata: [
+            album,
+            { ...album, ratingKey: "50", title: "Grinning Cat", addedAt: 1795035862 },
+            { ...album, ratingKey: "26", parentRatingKey: "25", title: "Garden of Eden", summary: "Recorded in 2004.", addedAt: 1795035861 },
+          ],
+        },
+      }),
+    );
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ MediaContainer: { Metadata: [{ ratingKey: "48", type: "artist", title: "Susumu Yokota", summary: "An eclectic electronic musician." }] } }),
+    );
+
+    const items = await plexAdapter.fetchRecentItems(config, { since: new Date(0), mediaKinds: ["album"] });
+
+    expect(items.map((item) => [item.title, item.overview])).toEqual([
+      ["A Flower White EP", "An eclectic electronic musician."],
+      ["Grinning Cat", "An eclectic electronic musician."],
+      ["Garden of Eden", "Recorded in 2004."],
+    ]);
+    const paths = mockFetch.mock.calls.map(([input]) => new URL(input as string).pathname);
+    expect(paths.filter((path) => path.startsWith("/library/metadata/"))).toEqual(["/library/metadata/48"]);
+  });
+
   // #354: music arrives as albums, from a real Plex's recently-added list.
   it("maps albums: the artist underneath, the track count and the cover", async () => {
     mockIdentity();

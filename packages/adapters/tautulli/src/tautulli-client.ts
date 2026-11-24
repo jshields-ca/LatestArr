@@ -203,6 +203,12 @@ export async function fetchImage(
   }
 }
 
+// One item's own metadata: for an artist, its bio (#476).
+export async function getItemSummary(baseUrl: string, apiKey: string, ratingKey: string): Promise<string | undefined> {
+  const data = await callTautulli<{ summary?: string } | null>(baseUrl, apiKey, "get_metadata", { rating_key: ratingKey });
+  return data?.summary || undefined;
+}
+
 export async function getRecentlyAdded(
   baseUrl: string,
   apiKey: string,
