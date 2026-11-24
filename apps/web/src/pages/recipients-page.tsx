@@ -398,7 +398,7 @@ function EditRecipientDialog({
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Edit ${recipient.email}`}>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${recipient.email}`} title="Edit">
           <Pencil />
         </Button>
       </DialogTrigger>
@@ -1399,7 +1399,7 @@ function EditGroupDialog({
   return (
     <Dialog open={open} onOpenChange={guardClose(dirty, openWithCurrentValues)}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Edit ${group.name}`}>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${group.name}`} title="Edit">
           <Pencil />
         </Button>
       </DialogTrigger>

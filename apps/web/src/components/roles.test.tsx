@@ -88,6 +88,8 @@ describe("roles in the web app", () => {
     // A section with nothing in it for this role isn't shown.
     expect(within(nav).queryByRole("group", { name: "System" })).toBeNull();
     expect(screen.getAllByTitle("You have viewer access").length).toBeGreaterThan(0);
+    // The account button's name includes the role it shows (#473).
+    expect(screen.getByRole("button", { name: "Sam Viewer, account menu" })).toBeInTheDocument();
   });
 
   it("adds Recipients for editors, and everything for admins", async () => {
@@ -117,8 +119,11 @@ describe("roles in the web app", () => {
         <p>Users page</p>
       </RequireRole>,
     );
-    expect(await screen.findByText("No access")).toBeInTheDocument();
+    // The page's own heading and tab title (#473).
+    expect(await screen.findByRole("heading", { level: 1, name: "No access" })).toBeInTheDocument();
+    expect(document.title).toMatch(/^No access/);
     expect(screen.getByText(/needs the Admin role/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute("href", "/");
     expect(screen.queryByText("Users page")).not.toBeInTheDocument();
   });
 

@@ -454,6 +454,25 @@ describe("ImportSourceUsersDialog", () => {
     expect(screen.getAllByRole("button", { name: "Import users" })).toHaveLength(1);
   });
 
+  // #473: Plex can list an account with no name.
+  it("gives a user with no name one to show and to label its box", async () => {
+    const user = userEvent.setup();
+    mockLoad({ sources: [exampleSource] });
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve(jsonResponse(200, { users: [{ externalId: "7", username: "" }] })),
+    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups: [] }));
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [], memberships: [] }));
+
+    render(<SourcesPage />);
+    await screen.findByText("Home Tautulli");
+    await user.click(screen.getByRole("button", { name: "Import users" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(await within(dialog).findByRole("checkbox", { name: "Unnamed user 7" })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Email for Unnamed user 7")).toBeInTheDocument();
+  });
+
   it("previews users, pre-checking those with an email, takes typed emails for the rest, and imports them into a new group", async () => {
     const user = userEvent.setup();
     mockLoad({ sources: [exampleSource] });

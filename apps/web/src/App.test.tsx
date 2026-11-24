@@ -56,7 +56,7 @@ describe("App routing", () => {
     expect(await screen.findByRole("link", { name: "Email servers" })).toBeInTheDocument();
 
     expect(screen.getByText("Page not found")).toBeInTheDocument();
-    const backLink = screen.getByRole("link", { name: "Back to Dashboard" });
+    const backLink = screen.getByRole("link", { name: "Back to dashboard" });
     expect(backLink).toHaveAttribute("href", "/");
   });
 
@@ -65,7 +65,7 @@ describe("App routing", () => {
     renderApp("/smtp-profiles");
 
     await screen.findByText("Page not found");
-    await user.click(screen.getByRole("link", { name: "Back to Dashboard" }));
+    await user.click(screen.getByRole("link", { name: "Back to dashboard" }));
 
     expect(screen.queryByText("Page not found")).not.toBeInTheDocument();
   });

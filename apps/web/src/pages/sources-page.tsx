@@ -523,7 +523,7 @@ function EditSourceDialog({
   return (
     <Dialog open={open} onOpenChange={guardClose(dirty, openWithCurrentValues)}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Edit ${source.name}`}>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${source.name}`} title="Edit">
           <Pencil />
         </Button>
       </DialogTrigger>

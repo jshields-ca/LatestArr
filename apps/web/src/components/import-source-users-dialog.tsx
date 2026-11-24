@@ -32,6 +32,7 @@ import {
   type SourceConnection,
   type SourceUser,
 } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 // Only these source kinds' adapters implement listUsers (see
 // packages/adapters/*/src/*-adapter.ts) — checked here too so the
@@ -290,6 +291,8 @@ export function ImportSourceUsersDialog({
                 <ul className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border p-2">
                   {users.map((user) => {
                     const onList = isOnList(user);
+                    // Plex can list an account with no name; it still needs one here.
+                    const name = user.username.trim() || `Unnamed user ${user.externalId}`;
                     return (
                       <li key={user.externalId} className="flex flex-wrap items-center gap-2 rounded px-1.5 py-1">
                         <input
@@ -305,7 +308,7 @@ export function ImportSourceUsersDialog({
                           className="flex min-w-0 flex-1 items-center justify-between gap-2 text-sm"
                         >
                           <span className="flex min-w-0 items-center gap-2">
-                            <span className="truncate">{user.username}</span>
+                            <span className={cn("truncate", !user.username.trim() && "italic text-muted-foreground")}>{name}</span>
                             {onList ? (
                               <Badge variant="neutral" className="shrink-0">
                                 Already on your list
@@ -320,7 +323,7 @@ export function ImportSourceUsersDialog({
                         {user.email ? null : (
                           <Input
                             type="email"
-                            aria-label={`Email for ${user.username}`}
+                            aria-label={`Email for ${name}`}
                             placeholder="Add an email"
                             value={typedEmails[user.externalId] ?? ""}
                             onChange={(e) => typeEmail(user, e.target.value)}
@@ -391,7 +394,7 @@ export function ImportFromSourceButton({ onImported }: { onImported: () => void 
             From a source
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="flex flex-col gap-1 p-2">
+        <PopoverContent align="end" aria-label="Import users from a source" className="flex flex-col gap-1 p-2">
           {sources.length === 0 ? (
             <p className="p-1 text-sm text-muted-foreground">
               Connect Plex, Tautulli, Jellyfin, Emby, Audiobookshelf or RomM on the{" "}

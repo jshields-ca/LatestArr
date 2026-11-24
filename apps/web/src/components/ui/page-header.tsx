@@ -30,7 +30,9 @@ export function PageHeader({ title, description, actions, className }: PageHeade
   usePageTitle(typeof title === "string" ? title : undefined);
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
-      <div className="min-w-0">
+      {/* Grows and shrinks beside the actions, so a long description wraps
+          rather than pushing them onto a line of their own on a wide screen. */}
+      <div className="min-w-0 flex-1 basis-72">
         <h1 className="font-brand text-3xl font-semibold tracking-tight">{title}</h1>
         {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
       </div>
