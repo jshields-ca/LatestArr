@@ -144,6 +144,16 @@ export async function getAccounts(baseUrl: string, token: string): Promise<PlexA
   return container.Account ?? [];
 }
 
+// One item's own metadata: for an artist, its bio (#476).
+export async function getItemSummary(baseUrl: string, token: string, ratingKey: string): Promise<string | undefined> {
+  const container = await callPlex<{ Metadata?: PlexMetadataItem[] }>(
+    baseUrl,
+    `/library/metadata/${encodeURIComponent(ratingKey)}`,
+    token,
+  );
+  return container.Metadata?.[0]?.summary || undefined;
+}
+
 export async function getRecentlyAdded(
   baseUrl: string,
   token: string,
