@@ -38,6 +38,32 @@ describe("fillAlbumOverviews", () => {
     expect(bio.mock.calls.map(([id]) => id)).toEqual(["a1", "a2"]);
   });
 
+  it("runs lookups a few at a time, and starts no more after one fails", async () => {
+    const artists = Array.from({ length: 12 }, (_, i) => `a${i}`);
+    const items = artists.map((artist, i) => album(String(i), artist));
+    const pending: ((value?: string) => void)[] = [];
+    const fail: ((error: Error) => void)[] = [];
+    const bio = vi.fn(
+      () =>
+        new Promise<string | undefined>((resolve, reject) => {
+          pending.push(resolve);
+          fail.push(reject);
+        }),
+    );
+
+    const done = fillAlbumOverviews(items, artistOf, bio);
+    await Promise.resolve();
+    // Five at once, not one after another.
+    expect(bio).toHaveBeenCalledTimes(5);
+    fail[0]!(new Error("timed out"));
+    for (const resolve of pending.slice(1)) resolve("A bio.");
+    await done;
+
+    // The four already running finish; nothing new starts after the failure.
+    expect(bio).toHaveBeenCalledTimes(5);
+    expect(items.filter((item) => item.overview).map((item) => item.id)).toEqual(["1", "2", "3", "4"]);
+  });
+
   it("looks up only the first few artists, newest first", async () => {
     const items = ["a1", "a2", "a3", "a1"].map((artist, i) => album(String(i), artist));
     const bio = vi.fn(async (id: string) => `Bio of ${id}.`);
