@@ -651,13 +651,16 @@ function SmtpProfileRow({
             {testing ? <Loader2 className="animate-spin" /> : null}
             Test connection
           </Button>
-          <EditSmtpProfileDialog profile={profile} onSaved={onChanged} />
-          <ConfirmDeleteButton
-            label={`Delete ${profile.name}`}
-            noun="email server"
-            consequence="Newsletters that send through it can't send until you choose another for them."
-            onConfirm={handleDelete}
-          />
+          {/* Together, so Delete never wraps onto a line of its own (#473). */}
+          <div className="flex items-center gap-2">
+            <EditSmtpProfileDialog profile={profile} onSaved={onChanged} />
+            <ConfirmDeleteButton
+              label={`Delete ${profile.name}`}
+              noun="email server"
+              consequence="Newsletters that send through it can't send until you choose another for them."
+              onConfirm={handleDelete}
+            />
+          </div>
         </>
       }
     >

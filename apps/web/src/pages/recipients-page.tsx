@@ -1303,7 +1303,8 @@ function AddGroupDialog({ onCreated }: { onCreated: (group: RecipientGroup) => v
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        {/* Outlined: Add recipient is the page's one main button (#473). */}
+        <Button variant="outline">
           <Plus />
           Add group
         </Button>

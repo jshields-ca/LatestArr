@@ -695,13 +695,16 @@ function SourceRow({
             {KINDS_WITH_USER_IMPORT.has(source.kind) ? (
               <ImportSourceUsersDialog source={source} />
             ) : null}
-            <EditSourceDialog source={source} onSaved={onChanged} />
-            <ConfirmDeleteButton
-              label={`Delete ${source.name}`}
-              noun="source"
-              consequence="Newsletters that use it will stop including its items."
-              onConfirm={handleDelete}
-            />
+            {/* Together, so Delete never wraps onto a line of its own (#473). */}
+            <div className="flex items-center gap-2">
+              <EditSourceDialog source={source} onSaved={onChanged} />
+              <ConfirmDeleteButton
+                label={`Delete ${source.name}`}
+                noun="source"
+                consequence="Newsletters that use it will stop including its items."
+                onConfirm={handleDelete}
+              />
+            </div>
           </>
         )
       }
