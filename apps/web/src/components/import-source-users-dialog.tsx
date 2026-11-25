@@ -60,9 +60,9 @@ function sameName(a: string, b: string): boolean {
 // those with a known email — a recipient can't exist without one) to
 // import as recipients, and adds them to a group if they like (#472): by
 // default one named after the source, reused across repeat imports rather
-// than creating a new group every time. Anyone whose email is already on the list is shown as
-// such and can't be picked (#452): the import leaves them as they are,
-// name, groups and all.
+// than creating a new group every time. Anyone whose email is already on
+// the list is shown as such and can't be picked (#452): the import leaves
+// them as they are, name, groups and all.
 // With `open` given, the caller opens it (the Recipients page's source
 // picker); otherwise it has its own "Import users" button (Sources page).
 export function ImportSourceUsersDialog({
