@@ -34,8 +34,12 @@ for (const [network, prefix] of [
   PRIVATE.addSubnet(network, prefix, "ipv4");
 }
 for (const [network, prefix] of [
-  ["::", 128],
-  ["::1", 128],
+  ["::", 96], // unspecified, loopback, and the old IPv4-compatible form
+  ["64:ff9b::", 96], // NAT64: a gateway would pass these on to an IPv4 address
+  ["64:ff9b:1::", 48], // NAT64, local use
+  ["2001::", 32], // Teredo
+  ["2002::", 16], // 6to4
+  ["fec0::", 10], // site-local (deprecated)
   ["fc00::", 7], // unique local
   ["fe80::", 10], // link-local
   ["ff00::", 8], // multicast

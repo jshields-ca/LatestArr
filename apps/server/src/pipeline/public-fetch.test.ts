@@ -28,6 +28,13 @@ describe("isPublicAddress", () => {
       "fe80::1",
       "::ffff:127.0.0.1",
       "::ffff:7f00:1",
+      // Forms that carry an IPv4 address through a gateway or tunnel.
+      "::7f00:1",
+      "64:ff9b::c0a8:114",
+      "64:ff9b:1::1",
+      "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+      "2002:c0a8:114::1",
+      "fec0::1",
       "not an address",
     ]) {
       expect(isPublicAddress(address), address).toBe(false);
