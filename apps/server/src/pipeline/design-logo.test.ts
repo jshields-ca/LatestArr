@@ -37,9 +37,7 @@ async function storeImage(width = 40, createdAt = new Date()) {
 }
 
 function respondWith(body: Buffer | string, init: ResponseInit) {
-  const fetchMock = vi.fn(async () => new Response(body, init));
-  vi.stubGlobal("fetch", fetchMock);
-  return fetchMock;
+  return vi.fn(async () => new Response(body, init));
 }
 
 describe("cleanImage", () => {
@@ -77,18 +75,25 @@ describe("cleanImage", () => {
 
 describe("fetchLogoImage", () => {
   it("downloads and cleans up an image", async () => {
-    respondWith(await png(), { status: 200, headers: { "content-type": "image/png" } });
-    await expect(fetchLogoImage("https://example.com/logo.png")).resolves.toMatchObject({ contentType: "image/png", width: 40 });
+    const get = respondWith(await png(), { status: 200, headers: { "content-type": "image/png" } });
+    await expect(fetchLogoImage("https://example.com/logo.png", get)).resolves.toMatchObject({ contentType: "image/png", width: 40 });
   });
 
   it("refuses a response that isn't an image", async () => {
-    respondWith("<html></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
-    await expect(fetchLogoImage("https://example.com/logo.png")).rejects.toThrow("it isn't an image (text/html)");
+    const get = respondWith("<html></html>", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } });
+    await expect(fetchLogoImage("https://example.com/logo.png", get)).rejects.toThrow("it isn't an image (text/html)");
   });
 
   it("refuses an error response", async () => {
-    respondWith("gone", { status: 404 });
-    await expect(fetchLogoImage("https://example.com/logo.png")).rejects.toThrow("the server answered 404");
+    const get = respondWith("gone", { status: 404 });
+    await expect(fetchLogoImage("https://example.com/logo.png", get)).rejects.toThrow("the server answered 404");
+  });
+
+  // Code scanning alert 30: never from the server's own network.
+  it("refuses an address on a private network, and says to upload instead", async () => {
+    for (const url of ["http://192.168.1.20/snapshot.jpg", "http://127.0.0.1:8080/logo.png", "http://[::1]/logo.png", "http://169.254.169.254/latest/"]) {
+      await expect(fetchLogoImage(url)).rejects.toThrow("it's on a private network; upload the image instead");
+    }
   });
 });
 
@@ -142,17 +147,17 @@ describe("resolveLogo", () => {
     const fetchMock = respondWith(await png(), { status: 200, headers: { "content-type": "image/png" } });
     const settings = parseDesignSettings({ logo: { source: "url", url: "https://example.com/logo.png" } });
 
-    const { logo, attachments } = await resolveLogo(db, settings, { fetchUrls: false, log });
+    const { logo, attachments } = await resolveLogo(db, settings, { fetchUrls: false, log, get: fetchMock });
     expect(logo).toMatchObject({ src: "https://example.com/logo.png", width: 180 });
     expect(attachments).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("embeds a copy of an image URL when sending", async () => {
-    respondWith(await png(), { status: 200, headers: { "content-type": "image/png" } });
+    const get = respondWith(await png(), { status: 200, headers: { "content-type": "image/png" } });
     const settings = parseDesignSettings({ logo: { source: "url", url: "https://example.com/logo.png" } });
 
-    const { logo, attachments } = await resolveLogo(db, settings, { fetchUrls: true, log });
+    const { logo, attachments } = await resolveLogo(db, settings, { fetchUrls: true, log, get });
     expect(logo).toMatchObject({ src: "cid:logo@latestarr", width: 40 });
     expect(attachments).toHaveLength(1);
   });
@@ -161,15 +166,15 @@ describe("resolveLogo", () => {
     const fetchMock = respondWith(await png(), { status: 200, headers: { "content-type": "image/png" } });
     const settings = parseDesignSettings({ logo: { source: "url", url: "https://example.com/logo.png", urlMode: "link" } });
 
-    expect((await resolveLogo(db, settings, { fetchUrls: true, log })).logo?.src).toBe("https://example.com/logo.png");
+    expect((await resolveLogo(db, settings, { fetchUrls: true, log, get: fetchMock })).logo?.src).toBe("https://example.com/logo.png");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("links to an image URL it couldn't embed, rather than failing the send", async () => {
-    respondWith("nope", { status: 500 });
+    const get = respondWith("nope", { status: 500 });
     const settings = parseDesignSettings({ logo: { source: "url", url: "https://example.com/logo.png" } });
 
-    const { logo, attachments } = await resolveLogo(db, settings, { fetchUrls: true, log });
+    const { logo, attachments } = await resolveLogo(db, settings, { fetchUrls: true, log, get });
     expect(logo?.src).toBe("https://example.com/logo.png");
     expect(attachments).toEqual([]);
   });

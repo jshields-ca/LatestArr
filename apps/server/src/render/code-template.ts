@@ -34,8 +34,18 @@ function handlebarsIssue(err: unknown): CodeIssue {
 
 // Blanks out every {{...}} (keeping line breaks), so MJML's validator sees
 // the markup around the Handlebars tokens with its line numbers intact.
-function withoutHandlebars(source: string): string {
-  return source.replace(/\{\{[\s\S]*?\}\}/g, (token) => token.replace(/[^\n]/g, " "));
+// One pass with indexOf: a lazy regex here takes time that grows with the
+// square of a long run of "{{" with no "}}" after it (code scanning).
+export function withoutHandlebars(source: string): string {
+  let out = "";
+  let at = 0;
+  for (;;) {
+    const open = source.indexOf("{{", at);
+    const close = open === -1 ? -1 : source.indexOf("}}", open + 2);
+    if (close === -1) return out + source.slice(at);
+    out += source.slice(at, open) + source.slice(open, close + 2).replace(/[^\n]/g, " ");
+    at = close + 2;
+  }
 }
 
 /**

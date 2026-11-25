@@ -6,6 +6,7 @@ import type { Logger } from "../logger.js";
 import type { EmailAttachment } from "../mailer/send.js";
 import { type DesignSettings, isDarkDesign, LOGO_MAX_WIDTH } from "../render/design.js";
 import type { LogoContext } from "../render/mjml-template.js";
+import { fetchPublic, PrivateAddressError } from "./public-fetch.js";
 
 // A design's logo (#302): cleaning up an uploaded or fetched image, and
 // turning the design's logo options into what the template renders.
@@ -87,13 +88,20 @@ export async function cleanImage(input: Buffer): Promise<CleanImage> {
 /**
  * Downloads a logo from an image URL, for a design that embeds a copy.
  * Same limits as posters: a timeout, a size cap, and an image content
- * type only. Throws when it can't be used.
+ * type only. Only from the internet, never the server's own network (see
+ * public-fetch.ts). Throws when it can't be used. `get` is for tests.
  */
-export async function fetchLogoImage(url: string): Promise<CleanImage> {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(SOURCE_REQUEST_TIMEOUT_MS),
-    headers: { accept: "image/png,image/jpeg,image/gif;q=0.9,image/*;q=0.5" },
-  });
+export async function fetchLogoImage(url: string, get: typeof fetchPublic = fetchPublic): Promise<CleanImage> {
+  let response: Response;
+  try {
+    response = await get(url, {
+      signal: AbortSignal.timeout(SOURCE_REQUEST_TIMEOUT_MS),
+      headers: { accept: "image/png,image/jpeg,image/gif;q=0.9,image/*;q=0.5" },
+    });
+  } catch (err) {
+    if (err instanceof PrivateAddressError) throw new Error("it's on a private network; upload the image instead", { cause: err });
+    throw err;
+  }
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error(`the server answered ${response.status}`);
@@ -133,7 +141,7 @@ interface LogoImage {
 export async function resolveLogo(
   db: Db,
   settings: DesignSettings,
-  options: { fetchUrls: boolean; log: Logger },
+  options: { fetchUrls: boolean; log: Logger; get?: typeof fetchPublic },
 ): Promise<ResolvedLogo> {
   const { logo } = settings;
   if (logo.source === "none") return { attachments: [] };
@@ -166,7 +174,7 @@ export async function resolveLogo(
       if (!url) return undefined;
       if (!options.fetchUrls || logo.urlMode === "link") return { src: url };
       try {
-        return embed(await fetchLogoImage(url), name);
+        return embed(await fetchLogoImage(url, options.get), name);
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         options.log.warn({ err }, `Couldn't embed the design's logo from ${url} (${reason}), so the email links to it instead`);
