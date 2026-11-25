@@ -413,16 +413,9 @@ function darkModeHead(p: Palette, withDarkLogo = false, notice?: NoticeType): st
     </mj-style>`;
 }
 
-// Inline SVG icons (Tabler's world / alert-circle outlines, MIT licensed)
-// as data: URIs: static and tiny, so no per-send fetch. The stroke is a
-// literal #hex: base64 content isn't URL-decoded, so %23 there would be an
-// invalid colour and an invisible icon. Outlook
-// doesn't show data: images, but the text label beside each carries the
-// meaning anyway.
-const WEBSITE_ICON_DATA_URI =
-  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Nzg0OTAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI5IiAvPjxwYXRoIGQ9Ik0zLjYgOWgxNi44IiAvPjxwYXRoIGQ9Ik0zLjYgMTVoMTYuOCIgLz48cGF0aCBkPSJNMTEuNSAzYTE3IDE3IDAgMCAwIDAgMTgiIC8+PHBhdGggZD0iTTEyLjUgM2ExNyAxNyAwIDAgMSAwIDE4IiAvPjwvc3ZnPg==";
-const REPORT_ICON_DATA_URI =
-  "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Nzg0OTAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI5IiAvPjxwYXRoIGQ9Ik0xMiA4djQiIC8+PHBhdGggZD0iTTEyIDE2aC4wMSIgLz48L3N2Zz4=";
+// The footer's links are text only: Gmail drops data: and SVG images,
+// and Outlook drops data: images, so icons there showed as broken (#475).
+// Icons in emails would need to be PNGs attached to each email (#403).
 
 // One item's markup for the chosen layout. Plain HTML, so it always sits
 // inside an <mj-raw> (mjml silently drops bare HTML in a column). Every
@@ -939,9 +932,9 @@ ${items}${mostWatched ? `\n${mostWatched}` : ""}${sourcePlacement === "end" ? al
       <mj-column>
         <mj-text font-family="${font}" font-size="12px" line-height="1.6" color="${p.subtle}" align="center">
           Sent by LatestArr on {{generatedAtFormatted}}<br />
-          <a href="https://www.latestarr.app" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${WEBSITE_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />LatestArr.app</a>
+          <a href="https://www.latestarr.app" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener">LatestArr.app</a>
           &nbsp;·&nbsp;
-          <a href="https://github.com/jshields-ca/LatestArr/issues" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener"><img src="${REPORT_ICON_DATA_URI}" width="13" height="13" alt="" style="vertical-align:middle;margin-right:4px;" />Report an issue</a>{{#if unsubscribeUrl}}<br />
+          <a href="https://github.com/jshields-ca/LatestArr/issues" style="color:${p.subtle};text-decoration:none;" target="_blank" rel="noopener">Report an issue</a>{{#if unsubscribeUrl}}<br />
           <a href="{{unsubscribeUrl}}" style="color:${p.subtle};text-decoration:underline;" target="_blank" rel="noopener">Unsubscribe</a>{{else if unsubscribeByReply}}<br />
           Don't want these? Reply and ask to unsubscribe.{{/if}}
         </mj-text>

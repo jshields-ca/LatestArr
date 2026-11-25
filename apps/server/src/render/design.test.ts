@@ -41,6 +41,18 @@ function render(settings: DesignSettings, context: Partial<MjmlRenderContext> = 
   });
 }
 
+// #475: Gmail drops data: and SVG images, so the footer's icons were broken.
+describe("footer", () => {
+  it("links to LatestArr.app and Report an issue as text, with no images", async () => {
+    const html = await render(design({}));
+    const footer = html.slice(html.indexOf("Sent by LatestArr"));
+    expect(footer).toMatch(/<a href="https:\/\/www\.latestarr\.app"[^>]*>LatestArr\.app<\/a>/);
+    expect(footer).toMatch(/<a href="https:\/\/github\.com\/jshields-ca\/LatestArr\/issues"[^>]*>Report an issue<\/a>/);
+    expect(footer).not.toContain("<img");
+    expect(html).not.toContain("data:image/svg+xml");
+  });
+});
+
 describe("items shown", () => {
   const many = Array.from({ length: 130 }, (_, n) => item({ title: `Movie number ${n}` }));
   const shown = (html: string) => (html.match(/Movie number \d+/g) ?? []).filter((title, i, all) => all.indexOf(title) === i).length;
