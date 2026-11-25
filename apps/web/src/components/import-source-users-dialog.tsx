@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SelectAllCheckbox } from "@/components/select-all-checkbox";
 import { toast } from "@/components/ui/use-toast";
@@ -49,13 +50,19 @@ function byName(a: SourceUser, b: SourceUser): number {
   return a.username.localeCompare(b.username, undefined, { sensitivity: "base", numeric: true });
 }
 
+// Group names match ignoring case and surrounding spaces, as the file
+// import's do, so "friends" finds Friends rather than making a second one.
+function sameName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 // Fetches the source's known users, lets the admin pick which ones (only
 // those with a known email — a recipient can't exist without one) to
-// import as recipients, and adds them to a group named after the source
-// — reusing that name across repeat imports rather than creating a new
-// group every time. Anyone whose email is already on the list is shown as
-// such and can't be picked (#452): the import leaves them as they are,
-// name, groups and all.
+// import as recipients, and adds them to a group if they like (#472): by
+// default one named after the source, reused across repeat imports rather
+// than creating a new group every time. Anyone whose email is already on
+// the list is shown as such and can't be picked (#452): the import leaves
+// them as they are, name, groups and all.
 // With `open` given, the caller opens it (the Recipients page's source
 // picker); otherwise it has its own "Import users" button (Sources page).
 export function ImportSourceUsersDialog({
@@ -81,11 +88,14 @@ export function ImportSourceUsersDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Emails typed in for users the source has none for (Plex, Jellyfin, ...).
   const [typedEmails, setTypedEmails] = useState<Record<string, string>>({});
-  const [groupName, setGroupName] = useState(source.name);
+  // "none", "new", or `group:<id>` for one already there (#472).
+  const [groupChoice, setGroupChoice] = useState("new");
+  const [newGroupName, setNewGroupName] = useState(source.name);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     created: number;
     addedToGroup: number;
+    groupName?: string;
     noEmail: number;
     alreadyOnList: number;
   } | null>(null);
@@ -100,7 +110,8 @@ export function ImportSourceUsersDialog({
     if (!open) return;
     setLoadError(null);
     setResult(null);
-    setGroupName(source.name);
+    setGroupChoice("new");
+    setNewGroupName(source.name);
     setUsers(null);
     setTypedEmails({});
     setLoading(true);
@@ -116,6 +127,10 @@ export function ImportSourceUsersDialog({
         const emails = new Set(loadedRecipients.map((r) => r.email.toLowerCase()));
         setUsers([...loaded].sort(byName));
         setGroups(loadedGroups);
+        // As before, a group named after the source by default: the one
+        // already there, or a new one.
+        const named = loadedGroups.find((g) => sameName(g.name, source.name));
+        setGroupChoice(named ? `group:${named.id}` : "new");
         setExistingEmails(emails);
         setSelected(
           new Set(loaded.filter((u) => u.email && !emails.has(u.email.toLowerCase())).map((u) => u.externalId)),
@@ -181,12 +196,18 @@ export function ImportSourceUsersDialog({
     try {
       const importResult = await importRecipients(rows);
 
-      const trimmedGroupName = groupName.trim();
-      let group = groups.find((g) => g.name === trimmedGroupName);
-      if (!group && trimmedGroupName) {
-        const { group: created } = await createGroup({ name: trimmedGroupName });
-        group = created;
-        setGroups((prev) => [...prev, created]);
+      let group: RecipientGroup | undefined;
+      if (groupChoice.startsWith("group:")) {
+        group = groups.find((g) => g.id === groupChoice.slice("group:".length));
+      } else if (groupChoice === "new") {
+        // A name that's already a group's joins that group, not a second one.
+        const name = newGroupName.trim();
+        group = groups.find((g) => sameName(g.name, name));
+        if (!group && name) {
+          const { group: created } = await createGroup({ name });
+          group = created;
+          setGroups((prev) => [...prev, created]);
+        }
       }
 
       let addedToGroup = 0;
@@ -200,6 +221,7 @@ export function ImportSourceUsersDialog({
       setResult({
         created: importResult.created.length,
         addedToGroup,
+        groupName: group?.name,
         noEmail: users.filter((u) => !emailFor(u)).length,
         alreadyOnList: users.filter(isOnList).length,
       });
@@ -221,7 +243,9 @@ export function ImportSourceUsersDialog({
 
   const importCount = users ? users.filter(importable).length : 0;
   const canImportCount = users ? users.filter(canImport).length : 0;
-  const groupExists = groups.some((g) => g.name === groupName.trim());
+  const sortedGroups = [...groups].sort((a, b) => a.name.localeCompare(b.name));
+  const newNameMatch = groupChoice === "new" ? groups.find((g) => sameName(g.name, newGroupName)) : undefined;
+  const needsGroupName = groupChoice === "new" && !newGroupName.trim();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -237,7 +261,7 @@ export function ImportSourceUsersDialog({
         <DialogHeader>
           <DialogTitle>Import users from {source.name}</DialogTitle>
           <DialogDescription>
-            Add its users as recipients, grouped together. Anyone already on your list is left as they are. Type an
+            Add its users as recipients, and to a group if you like. Anyone already on your list is left as they are. Type an
             email for anyone {source.name} doesn&apos;t have one for.
           </DialogDescription>
         </DialogHeader>
@@ -258,7 +282,7 @@ export function ImportSourceUsersDialog({
               {result.addedToGroup > 0 ? (
                 <>
                   {" "}
-                  to <strong>{groupName.trim()}</strong>
+                  to <strong>{result.groupName}</strong>
                 </>
               ) : null}
               .{" "}
@@ -338,17 +362,41 @@ export function ImportSourceUsersDialog({
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="import-users-group">Add to group</Label>
-                <Input
+                <Label htmlFor="import-users-group">Group</Label>
+                <Select
                   id="import-users-group"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
+                  value={groupChoice}
+                  onChange={(e) => setGroupChoice(e.target.value)}
                   disabled={submitting}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {groupExists
-                    ? "Existing group — imported recipients will be added to it."
-                    : "A new group will be created."}
+                >
+                  <option value="none">Don't add to a group</option>
+                  {sortedGroups.map((g) => (
+                    <option key={g.id} value={`group:${g.id}`}>
+                      {g.name}
+                    </option>
+                  ))}
+                  <option value="new">New group…</option>
+                </Select>
+                {groupChoice === "new" ? (
+                  <Input
+                    aria-label="New group name"
+                    placeholder="Group name"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    disabled={submitting}
+                    aria-describedby="import-users-group-hint"
+                  />
+                ) : null}
+                <p id="import-users-group-hint" className="text-xs text-muted-foreground">
+                  {groupChoice === "none"
+                    ? "They're added as recipients only. You can add them to groups later."
+                    : groupChoice !== "new"
+                      ? "They're added to this group."
+                      : needsGroupName
+                        ? "Name the new group, or choose Don't add to a group."
+                        : newNameMatch
+                          ? `You already have ${newNameMatch.name}; they're added to it.`
+                          : "A new group is created for them."}
                 </p>
               </div>
 
@@ -356,7 +404,7 @@ export function ImportSourceUsersDialog({
                 <Button
                   type="button"
                   onClick={() => void handleImport()}
-                  disabled={submitting || importCount === 0}
+                  disabled={submitting || importCount === 0 || needsGroupName}
                 >
                   {submitting ? <Loader2 className="animate-spin" /> : null}
                   {importCount === 0 ? "Import" : `Import ${importCount} ${importCount === 1 ? "person" : "people"}`}

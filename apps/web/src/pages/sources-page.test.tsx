@@ -511,7 +511,9 @@ describe("ImportSourceUsersDialog", () => {
     await user.type(bobEmail, ".com");
     expect(bobCheckbox).toBeChecked();
 
-    expect(within(dialog).getByLabelText("Add to group")).toHaveValue("Home Tautulli");
+    // By default, a new group named after the source (#472).
+    expect(within(dialog).getByLabelText("Group")).toHaveTextContent("New group…");
+    expect(within(dialog).getByLabelText("New group name")).toHaveValue("Home Tautulli");
 
     fetchMock.mockResolvedValueOnce(
       jsonResponse(201, {
@@ -553,6 +555,88 @@ describe("ImportSourceUsersDialog", () => {
       RequestInit,
     ];
     expect(JSON.parse(addMemberCall[1].body as string)).toEqual({ recipientId: "r1" });
+  });
+
+  // #472: the group is a choice, not a must.
+  describe("choosing the group", () => {
+    const friends = { id: "g7", name: "Friends", description: null };
+    async function openWith(groups: unknown[]) {
+      const user = userEvent.setup();
+      mockLoad({ sources: [exampleSource] });
+      fetchMock.mockImplementationOnce(() =>
+        Promise.resolve(jsonResponse(200, { users: [{ externalId: "1", username: "alice", email: "alice@example.com" }] })),
+      );
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { groups }));
+      fetchMock.mockResolvedValueOnce(jsonResponse(200, { recipients: [], memberships: [] }));
+      render(<SourcesPage />);
+      await screen.findByText("Home Tautulli");
+      await user.click(screen.getByRole("button", { name: "Import users" }));
+      const dialog = await screen.findByRole("dialog");
+      await within(dialog).findByText("alice@example.com");
+      return { user, dialog };
+    }
+    function mockImport() {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(201, { created: [{ id: "r1", email: "alice@example.com", displayName: "alice", isActive: true }], skipped: [] }),
+      );
+    }
+    const groupCalls = () =>
+      fetchMock.mock.calls.filter(([url]) => typeof url === "string" && url.startsWith("/api/recipient-groups") && url !== "/api/recipient-groups");
+    const createCalls = () =>
+      fetchMock.mock.calls.filter(([url, init]) => url === "/api/recipient-groups" && (init as RequestInit | undefined)?.method === "POST");
+
+    it("imports without a group when told not to add one", async () => {
+      const { user, dialog } = await openWith([friends]);
+      selectOption(within(dialog).getByLabelText("Group"), "Don't add to a group");
+      expect(within(dialog).queryByLabelText("New group name")).not.toBeInTheDocument();
+      mockImport();
+
+      await user.click(within(dialog).getByRole("button", { name: "Import 1 person" }));
+
+      await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1\s*recipient\./));
+      expect(createCalls()).toHaveLength(0);
+      expect(groupCalls()).toHaveLength(0);
+    });
+
+    it("adds them to a group you already have, picked from the list", async () => {
+      const { user, dialog } = await openWith([friends]);
+      selectOption(within(dialog).getByLabelText("Group"), "Friends");
+      mockImport();
+      fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
+
+      await user.click(within(dialog).getByRole("button", { name: "Import 1 person" }));
+
+      await waitFor(() => expect(dialog.textContent).toMatch(/Added\s*1\s*recipient\s*to\s*Friends/));
+      expect(createCalls()).toHaveLength(0);
+      expect(groupCalls().map(([url]) => url)).toEqual(["/api/recipient-groups/g7/members"]);
+    });
+
+    it("starts on the group named after the source when there is one, whatever its case", async () => {
+      const { dialog } = await openWith([friends, { id: "g9", name: "home tautulli", description: null }]);
+      expect(within(dialog).getByLabelText("Group")).toHaveTextContent("home tautulli");
+    });
+
+    it("joins a group with the typed name rather than making a second one", async () => {
+      const { user, dialog } = await openWith([friends]);
+      const name = within(dialog).getByLabelText("New group name");
+      await user.clear(name);
+      await user.type(name, " friends ");
+      expect(within(dialog).getByText("You already have Friends; they're added to it.")).toBeInTheDocument();
+      mockImport();
+      fetchMock.mockResolvedValueOnce(jsonResponse(204, undefined));
+
+      await user.click(within(dialog).getByRole("button", { name: "Import 1 person" }));
+
+      await waitFor(() => expect(dialog.textContent).toMatch(/to\s*Friends/));
+      expect(createCalls()).toHaveLength(0);
+    });
+
+    it("asks for a name before importing into a new group", async () => {
+      const { user, dialog } = await openWith([]);
+      await user.clear(within(dialog).getByLabelText("New group name"));
+      expect(within(dialog).getByText("Name the new group, or choose Don't add to a group.")).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Import 1 person" })).toBeDisabled();
+    });
   });
 
   // #452: someone already on the list is shown as such and left alone,

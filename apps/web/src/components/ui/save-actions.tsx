@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 // The Save row of a form (#295): the button is enabled only when there's
 // something to save, with "Unsaved changes" beside it. `children` are
 // other buttons (Close, Send test alert). "end" suits a dialog's footer,
-// "start" a form on a page.
+// "start" a form on a page. At the end of a dialog, the buttons stack full
+// width on a phone, Save on top, as DialogFooter's do (#473).
 export function SaveActions({
   dirty,
   saving,
@@ -28,7 +29,7 @@ export function SaveActions({
 }) {
   const status =
     dirty && !saving ? (
-      <span role="status" className={cn("text-xs text-muted-foreground", align === "end" && "mr-auto")}>
+      <span role="status" className={cn("text-xs text-muted-foreground", align === "end" && "text-center sm:mr-auto sm:text-left")}>
         Unsaved changes
       </span>
     ) : null;
@@ -39,7 +40,14 @@ export function SaveActions({
     </Button>
   );
   return (
-    <div className={cn("flex flex-wrap items-center gap-3", align === "end" ? "justify-end" : "justify-start", className)}>
+    <div
+      className={cn(
+        align === "end"
+          ? "flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3"
+          : "flex flex-wrap items-center justify-start gap-3",
+        className,
+      )}
+    >
       {align === "end" ? (
         <>
           {status}
