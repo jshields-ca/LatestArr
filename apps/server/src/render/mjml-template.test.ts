@@ -28,6 +28,44 @@ const MJML_SOURCE = `
 </mjml>
 `;
 
+// Code scanning: a code design is a template an editor writes. The known
+// ways from a Handlebars template to running code go through an object's
+// prototype, which Handlebars refuses.
+describe("a code design can't reach past its data", () => {
+  const context = { newsletterName: "N", items: [], generatedAt: new Date("2026-01-15T12:00:00Z"), lookbackDays: 7 };
+  const g = globalThis as { latestarrPwned?: unknown };
+
+  // Fails on 4.7 even without the pin (constructor is always refused), and
+  // stays here so a change that let it through would show.
+  it("can't run code through constructor (the CVE-2019-19919 chain)", async () => {
+    const payload = `<mj-section><mj-column><mj-text>
+{{#with "s" as |string|}}{{#with "e"}}{{#with split as |conslist|}}{{this.pop}}{{this.push (lookup string.sub "constructor")}}{{this.pop}}{{#with string.split as |codelist|}}{{this.pop}}{{this.push "globalThis.latestarrPwned = 1;"}}{{this.pop}}{{#each conslist}}{{#with (string.sub.apply 0 codelist)}}{{this}}{{/with}}{{/each}}{{/with}}{{/with}}{{/with}}{{/with}}
+</mj-text></mj-column></mj-section>`;
+    await renderMjmlTemplate(payload, context).catch(() => undefined);
+    expect(g.latestarrPwned).toBeUndefined();
+  });
+
+  it("gets nothing from constructor or __proto__", async () => {
+    const html = await renderMjmlTemplate(
+      `<mj-section><mj-column><mj-text>[{{constructor}}][{{newsletterName.constructor}}][{{lookup this "__proto__"}}][{{lookup newsletterName "constructor"}}]</mj-text></mj-column></mj-section>`,
+      context,
+    );
+    expect(html).toContain("[][][][]");
+    expect(html).not.toMatch(/function|native code/);
+  });
+
+  // These two print "[object Object]" and "function toString() { [native
+  // code] }" with the guard off, so they show it's on.
+  it("gets nothing from a value's prototype methods", async () => {
+    const html = await renderMjmlTemplate(
+      `<mj-section><mj-column><mj-text>[{{newsletterName.toUpperCase}}][{{lookup newsletterName "toString"}}]</mj-text></mj-column></mj-section>`,
+      context,
+    );
+    expect(html).toContain("[][]");
+    expect(html).not.toMatch(/object Object|native code/i);
+  });
+});
+
 describe("renderMjmlTemplate", () => {
   it("substitutes Handlebars tokens in the MJML source before compiling to HTML", async () => {
     const html = await renderMjmlTemplate(MJML_SOURCE, {

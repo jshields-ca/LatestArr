@@ -220,7 +220,7 @@ export function DesignLogoFields({
             <legend className="mb-1 text-sm font-medium">When sending</legend>
             {(
               [
-                { value: "embed", label: "Include a copy in each email (recommended)", hint: "Shows even where images from the web are blocked." },
+                { value: "embed", label: "Include a copy in each email (recommended)", hint: "Shows even where images from the web are blocked. The address must be on the internet; for an image on your own network, upload it." },
                 { value: "link", label: "Link to it", hint: "A smaller email, and you can change the image without editing the design, but some email apps only show it after Load images." },
               ] as const
             ).map((option) => (

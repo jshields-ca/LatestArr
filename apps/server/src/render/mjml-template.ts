@@ -543,7 +543,13 @@ export async function renderMjmlTemplate(
 ): Promise<string> {
   const wording = context.wording ?? DEFAULT_WORDING;
   const renderable = (item: NewItem) => toRenderable(item, wording);
-  const substitutedMjml = Handlebars.compile(mjmlSource)({
+  // A code design is a template an editor writes, so it must not reach
+  // past the data it's given. Handlebars refuses prototype access (a
+  // template's way to `constructor` and from there to running code) by
+  // default since 4.6; pinned here so an upgrade can't change that.
+  const template = Handlebars.compile(mjmlSource);
+  const runtime: Handlebars.RuntimeOptions = { allowProtoPropertiesByDefault: false, allowProtoMethodsByDefault: false };
+  const substitutedMjml = template({
     newsletterName: context.newsletterName,
     logo: logoMarkup(context.logo, context.newsletterName),
     items: context.items.map(renderable),
@@ -574,7 +580,7 @@ export async function renderMjmlTemplate(
       : undefined,
     ctas: context.ctas ?? [],
     sourceButtons: context.sourceButtons ?? [],
-  });
+  }, runtime);
 
   // A code design may be a bare fragment (just its section/column content,
   // no root element), which mjml2html rejects outright even under "soft"
