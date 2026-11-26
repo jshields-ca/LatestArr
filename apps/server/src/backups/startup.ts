@@ -115,7 +115,7 @@ export function encryptionKeyMismatch(db: Db, key: string): boolean {
 export function warnOnKeyMismatch(db: Db, key: string, log: Logger): void {
   if (!encryptionKeyMismatch(db, key)) return;
   log.error(
-    "ENCRYPTION_KEY can't read the credentials saved in this database, so sources and SMTP can't connect. " +
+    "ENCRYPTION_KEY can't read the credentials saved in this database, so sources and email servers can't connect. " +
       "If you restored a backup from another install, set ENCRYPTION_KEY to that install's key and restart. " +
       "Otherwise, enter the sources' and email servers' credentials again.",
   );

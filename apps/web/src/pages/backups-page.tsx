@@ -486,7 +486,7 @@ function RestoreCard({ newest }: { newest: BackupFile | undefined }) {
           <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <p className="text-muted-foreground">
             <span className="font-medium text-foreground">Keep ENCRYPTION_KEY safe, separately.</span> Backups don&apos;t
-            include it, so without it a restored backup&apos;s source and SMTP passwords can&apos;t be read. Backups hold
+            include it, so without it a restored backup&apos;s source and email server passwords can&apos;t be read. Backups hold
             every recipient&apos;s email address and your send history, so keep them as private as the server.
           </p>
         </div>
