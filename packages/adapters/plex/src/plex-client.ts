@@ -163,7 +163,7 @@ export async function getRecentlyAdded(
 ): Promise<PlexMetadataItem[]> {
   // A section key scopes to one library; omitting it hits Plex's own
   // cross-library "recently added" endpoint.
-  const path = sectionKey ? `/library/sections/${sectionKey}/recentlyAdded` : "/library/recentlyAdded";
+  const path = sectionKey ? `/library/sections/${encodeURIComponent(sectionKey)}/recentlyAdded` : "/library/recentlyAdded";
   const container = await callPlex<{ Metadata?: PlexMetadataItem[] }>(baseUrl, path, token, {
     "X-Plex-Container-Start": String(start),
     "X-Plex-Container-Size": String(count),

@@ -13,7 +13,8 @@ type SelectedSourceConnection = typeof sourceConnections.$inferSelect;
 
 // A source as the API returns it: never its credentials, even encrypted.
 // With the kinds of content it has, and the ones a newsletter gets from it
-// until someone chooses (#354).
+// until someone chooses (#354), and whether a newsletter can choose some of
+// its libraries (#483).
 export function sanitize<T extends Pick<SelectedSourceConnection, "credentialsEncrypted" | "kind">>(row: T) {
   const { credentialsEncrypted: _credentialsEncrypted, ...safe } = row;
   const capabilities = getAdapter(row.kind)?.capabilities;
@@ -21,6 +22,7 @@ export function sanitize<T extends Pick<SelectedSourceConnection, "credentialsEn
     ...safe,
     mediaKinds: capabilities ? [...capabilities.supportsMediaKinds] : [],
     defaultMediaKinds: capabilities ? mediaKindsFor(capabilities) : [],
+    libraryChoice: capabilities?.supportsLibraryChoice ?? false,
   };
 }
 

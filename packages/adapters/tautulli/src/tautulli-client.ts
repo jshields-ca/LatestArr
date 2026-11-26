@@ -46,6 +46,8 @@ export interface TautulliHomeStatRow {
   rating_key: string;
   title: string;
   media_type: string;
+  /** The library it's in (Plex's section key). */
+  section_id?: string | number;
   total_plays: number;
   users_watched?: number;
   last_play?: string;

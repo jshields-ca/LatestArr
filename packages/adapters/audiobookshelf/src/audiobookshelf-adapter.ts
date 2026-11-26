@@ -51,6 +51,7 @@ export const audiobookshelfAdapter: SourceAdapter = {
   kind: "audiobookshelf",
   capabilities: {
     supportsMediaKinds: ["audiobook"],
+    supportsLibraryChoice: true,
     supportsIncrementalSync: false,
   },
 

@@ -30,6 +30,7 @@ import {
   resolvePosterPlaceholders,
   type ItemImageSource,
 } from "./embed-images.js";
+import { type LibraryChoice, libraryChoices } from "./library-choice.js";
 import { mergeSharedServerItems, type FetchedFromSource } from "./shared-server-items.js";
 import { renderMjmlTemplate } from "../render/mjml-template.js";
 import { htmlToPlainText } from "../render/plain-text.js";
@@ -206,16 +207,43 @@ function fetchKinds(link: LinkedSource["link"], adapter: LinkedSource["adapter"]
   return mediaKindsFor(adapter.capabilities, link.mediaTypeFilter);
 }
 
+// The libraries to read from each source (#483), logging any it skips.
+function resolveLibraryChoices(linkedSources: LinkedSource[], serverIds: Map<string, string>, log: Logger): Map<string, LibraryChoice> {
+  const choices = libraryChoices(
+    linkedSources.map(({ link, source, adapter }) => ({
+      sourceId: source.id,
+      sourceName: source.name,
+      libraryFilter: link.libraryFilter,
+      canShareServer: Boolean(adapter.getServerId),
+    })),
+    serverIds,
+  );
+  for (const [sourceId, choice] of choices) {
+    if (!choice.read) log.warn({ sourceId }, choice.reason);
+  }
+  return choices;
+}
+
+// The libraries a source is read from, or null to skip it. A source with
+// no entry (none should be missing) is skipped rather than read in full.
+function librariesFor(choices: Map<string, LibraryChoice>, source: SourceConnectionRow): string[] | undefined | null {
+  const choice = choices.get(source.id);
+  return choice?.read ? choice.libraries : null;
+}
+
 async function fetchRecentItemsFromSources(
   linkedSources: LinkedSource[],
   since: Date,
   log: Logger,
   serverIds: Map<string, string>,
+  choices: Map<string, LibraryChoice>,
 ): Promise<FetchedItems> {
   const fetched: FetchedFromSource[] = [];
   const sourceByItem = new Map<NewItem, ItemImageSource>();
 
   for (const { link, source, adapter, credentials } of linkedSources) {
+    const libraryIds = librariesFor(choices, source);
+    if (libraryIds === null) continue;
     const config: SourceConnectionConfig = {
       baseUrl: source.baseUrl,
       publicUrl: source.publicUrl ?? undefined,
@@ -228,7 +256,7 @@ async function fetchRecentItemsFromSources(
       adapter.fetchRecentItems(config, {
         since,
         mediaKinds: fetchKinds(link, adapter),
-        libraryIds: link.libraryFilter ?? undefined,
+        libraryIds,
         onCapReached: () => {
           capReached = true;
         },
@@ -266,6 +294,7 @@ async function fetchPopularItemsFromSources(
   linkedSources: LinkedSource[],
   since: Date,
   log: Logger,
+  choices: Map<string, LibraryChoice>,
 ): Promise<FetchedItems> {
   const items: NewItem[] = [];
   const sourceByItem = new Map<NewItem, ItemImageSource>();
@@ -273,6 +302,8 @@ async function fetchPopularItemsFromSources(
   for (const { link, source, adapter, credentials } of linkedSources) {
     const fetchPopular = adapter.fetchPopularItems;
     if (!fetchPopular) continue;
+    const libraryIds = librariesFor(choices, source);
+    if (libraryIds === null) continue;
     const config: SourceConnectionConfig = {
       baseUrl: source.baseUrl,
       publicUrl: source.publicUrl ?? undefined,
@@ -282,6 +313,7 @@ async function fetchPopularItemsFromSources(
       fetchPopular.call(adapter, config, {
         since,
         mediaKinds: fetchKinds(link, adapter),
+        libraryIds,
       }),
     );
     for (const item of sourceItems) sourceByItem.set(item, { adapter, config });
@@ -392,7 +424,8 @@ async function renderNewsletterContent(
   }
 
   const serverIds = await resolveServerIds(linkedSources, log);
-  const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since, log, serverIds);
+  const choices = resolveLibraryChoices(linkedSources, serverIds, log);
+  const { items, sourceByItem } = await fetchRecentItemsFromSources(linkedSources, since, log, serverIds, choices);
   // Real posterUrls are swapped for opaque placeholder tokens *before* any
   // template rendering happens (see embed-images.ts): a section's count/
   // sort/fallback selection can pick only a few items out of the fetched
@@ -406,11 +439,11 @@ async function renderNewsletterContent(
   const needsPopular = mjml.includes('sort="mostWatched"');
   const needsFallback = mjml.includes('emptyFallback="random"');
   const [popular, fallback] = await Promise.all([
-    needsPopular ? fetchPopularItemsFromSources(linkedSources, since, log) : Promise.resolve(EMPTY_FETCHED_ITEMS),
+    needsPopular ? fetchPopularItemsFromSources(linkedSources, since, log, choices) : Promise.resolve(EMPTY_FETCHED_ITEMS),
     // No "since" cutoff: the fallback exists for when nothing was added in
     // the lookback window, so it has to look further back than that.
     needsFallback
-      ? fetchRecentItemsFromSources(linkedSources, new Date(0), log, serverIds)
+      ? fetchRecentItemsFromSources(linkedSources, new Date(0), log, serverIds, choices)
       : Promise.resolve(EMPTY_FETCHED_ITEMS),
   ]);
   const logo = await resolveLogo(db, settings, { fetchUrls: !forPreview, log });

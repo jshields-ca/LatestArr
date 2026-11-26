@@ -559,6 +559,132 @@ describe("NewslettersPage", () => {
     expect(within(includes).getByRole("button", { name: "Music" })).toHaveAttribute("aria-pressed", "false");
   });
 
+  // #483: a private library (a 4K copy, or one kept to yourself) can be left out.
+  describe("which libraries a source reads", () => {
+    const plex = {
+      ...tautulliSource,
+      id: "s-plex",
+      name: "Home Plex",
+      kind: "plex",
+      mediaKinds: ["movie", "tv_episode", "tv_season", "album"],
+      defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
+      libraryChoice: true,
+      mediaTypeFilter: null,
+      libraryFilter: null as string[] | null,
+    };
+    const books = { ...plex, id: "s-books", name: "Books", kind: "booklore", mediaKinds: ["book"], defaultMediaKinds: ["book"], libraryChoice: false };
+    const libraries = [
+      { id: "1", name: "Movies", kind: "movie" },
+      { id: "2", name: "Movies 4K", kind: "movie" },
+      { id: "3", name: "TV Shows", kind: "tv_episode" },
+    ];
+    const ok204 = { status: 204, ok: true, json: () => Promise.resolve(undefined) };
+    const patches = () =>
+      fetchMock.mock.calls.filter(([url, init]) => url === "/api/newsletters/n1/sources/s-plex" && init?.method === "PATCH");
+
+    async function open(routes: Record<string, unknown>) {
+      const user = userEvent.setup();
+      mockRoutes(
+        baseRoutes({
+          "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+          "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [plex, books], recipientGroups: [] }),
+          "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+          ...routes,
+        }),
+      );
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+      await screen.findByLabelText("Remove Home Plex from newsletter");
+      return user;
+    }
+    const change = () => screen.getByRole("button", { name: "Change which libraries this newsletter reads from Home Plex" });
+
+    it("reads all of them until some are chosen, and saves the choice", async () => {
+      const user = await open({
+        "/api/sources/s-plex/libraries": jsonResponse(200, { libraries }),
+        "/api/newsletters/n1/sources/s-plex": ok204,
+      });
+      expect(screen.getByText("All libraries")).toBeInTheDocument();
+      // A source that reads every library whatever is chosen has no choice.
+      expect(screen.queryByRole("button", { name: /libraries this newsletter reads from Books/ })).not.toBeInTheDocument();
+
+      await user.click(change());
+      const panel = await screen.findByRole("dialog", { name: "Libraries from Home Plex" });
+      await within(panel).findByRole("checkbox", { name: "Movies 4K" });
+      expect(within(panel).getByRole("radio", { name: /All libraries/ })).toBeChecked();
+      expect(within(panel).getByRole("checkbox", { name: "Movies 4K" })).toBeDisabled();
+      expect(await axe(panel)).toHaveNoViolations();
+
+      await user.click(within(panel).getByRole("radio", { name: /Only these/ }));
+      await user.click(within(panel).getByRole("checkbox", { name: "Movies" }));
+      await user.click(within(panel).getByRole("checkbox", { name: "TV Shows" }));
+      await user.click(within(panel).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      expect(JSON.parse(patches().at(-1)![1].body)).toEqual({ libraryFilter: ["1", "3"] });
+      expect(screen.getByText("Only 2 libraries")).toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent("Saved");
+
+      // Opens on what's saved; nothing ticked can't be saved.
+      await user.click(change());
+      const again = await screen.findByRole("dialog", { name: "Libraries from Home Plex" });
+      expect(await within(again).findByRole("checkbox", { name: "Movies" })).toBeChecked();
+      expect(within(again).getByRole("checkbox", { name: "Movies 4K" })).not.toBeChecked();
+      await user.click(within(again).getByRole("checkbox", { name: "Movies" }));
+      await user.click(within(again).getByRole("checkbox", { name: "TV Shows" }));
+      expect(within(again).getByRole("button", { name: "Save" })).toBeDisabled();
+      expect(within(again).getByText("Tick at least one library, or choose All libraries.")).toBeInTheDocument();
+
+      // Back to all of them.
+      await user.click(within(again).getByRole("radio", { name: /All libraries/ }));
+      await user.click(within(again).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(screen.getByText("All libraries")).toBeInTheDocument());
+      expect(JSON.parse(patches().at(-1)![1].body)).toEqual({ libraryFilter: null });
+    });
+
+    it("says a Plex server and its Tautulli keep to each other's choice", async () => {
+      const tautulli = { ...plex, id: "s-taut", name: "Home Tautulli", kind: "tautulli" };
+      const user = userEvent.setup();
+      mockRoutes(
+        baseRoutes({
+          "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }),
+          "/api/newsletters/n1": jsonResponse(200, { newsletter: weeklyDigest, sources: [plex, tautulli], recipientGroups: [] }),
+          "/api/newsletters/n1/send-runs": jsonResponse(200, { sendRuns: [] }),
+          "/api/sources/s-plex/libraries": jsonResponse(200, { libraries }),
+        }),
+      );
+      renderPage();
+      await user.click(await screen.findByRole("button", { name: /Weekly digest.*lookback/, expanded: false }));
+      await user.click(await screen.findByRole("button", { name: "Change which libraries this newsletter reads from Home Plex" }));
+      const panel = await screen.findByRole("dialog", { name: "Libraries from Home Plex" });
+      expect(
+        within(panel).getByText("If Home Tautulli reads the same server, only libraries chosen on both are read, there and here."),
+      ).toBeInTheDocument();
+    });
+
+    it("can still go back to all of them when the libraries can't be listed, and stays open when a save fails", async () => {
+      plex.libraryFilter = ["1"];
+      try {
+        const user = await open({
+          "/api/sources/s-plex/libraries": jsonResponse(502, { error: "Plex didn't answer" }),
+          "/api/newsletters/n1/sources/s-plex": jsonResponse(400, { error: "nope" }),
+        });
+        expect(screen.getByText("Only 1 library")).toBeInTheDocument();
+        await user.click(change());
+        const panel = await screen.findByRole("dialog", { name: "Libraries from Home Plex" });
+        expect(await within(panel).findByRole("alert")).toHaveTextContent("Couldn't get Home Plex's libraries: Plex didn't answer");
+        expect(within(panel).getByRole("button", { name: "Save" })).toBeDisabled();
+
+        await user.click(within(panel).getByRole("radio", { name: /All libraries/ }));
+        await user.click(within(panel).getByRole("button", { name: "Save" }));
+        expect(await within(panel).findByText("Couldn't save: nope")).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: "Libraries from Home Plex" })).toBeInTheDocument();
+        expect(screen.getByText("Only 1 library")).toBeInTheDocument();
+      } finally {
+        plex.libraryFilter = null;
+      }
+    });
+  });
+
   it("sends now from the collapsed row, without expanding it first", async () => {
     const user = userEvent.setup();
     mockRoutes(baseRoutes({ "/api/newsletters": jsonResponse(200, { newsletters: [weeklyDigest] }) }));

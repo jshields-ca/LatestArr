@@ -117,6 +117,7 @@ function createAdapter(flavor: ServerFlavor): SourceAdapter {
     kind: flavor,
     capabilities: {
       supportsMediaKinds: ["movie", "tv_episode", "book", "audiobook"],
+      supportsLibraryChoice: true,
       supportsIncrementalSync: false,
     },
 

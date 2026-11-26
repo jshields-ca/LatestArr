@@ -104,6 +104,13 @@ const mediaTypeFilterSchema = z
   .max(MEDIA_KINDS.length)
   .transform((kinds) => [...new Set(kinds)]);
 
+// A source that reads every library whatever is chosen (BookLore-family's
+// OPDS feed has no per-library list) can't take a library choice: it would
+// look kept to when it isn't.
+function refusesLibraryChoice(sourceKind: string, libraryFilter: string[] | null | undefined): boolean {
+  return Boolean(libraryFilter) && !getAdapter(sourceKind)?.capabilities.supportsLibraryChoice;
+}
+
 // Kinds the source doesn't have, which a filter can't ask for.
 function unsupportedKinds(sourceKind: string, kinds: string[] | undefined | null): string[] {
   if (!kinds) return [];
@@ -111,15 +118,29 @@ function unsupportedKinds(sourceKind: string, kinds: string[] | undefined | null
   return kinds.filter((kind) => !supported.includes(kind));
 }
 
+// The libraries a newsletter reads from a source (#483), or null for all of
+// them. Ids go into the source's own URLs, so only plain ones are taken:
+// every source's library ids are letters, digits, "-" and "_".
+const libraryFilterSchema = z
+  .array(z.string().regex(/^[A-Za-z0-9_-]{1,100}$/, "isn't a library id"))
+  .min(1, "Choose at least one library, or all of them")
+  .max(500)
+  .transform((ids) => [...new Set(ids)]);
+
 const addSourceSchema = z.object({
   sourceConnectionId: z.string().min(1, "sourceConnectionId is required"),
   mediaTypeFilter: mediaTypeFilterSchema.optional(),
-  libraryFilter: z.array(z.string()).optional(),
+  libraryFilter: libraryFilterSchema.nullable().optional(),
 });
 
-const updateSourceSchema = z.object({
-  mediaTypeFilter: mediaTypeFilterSchema.nullable(),
-});
+const updateSourceSchema = z
+  .object({
+    mediaTypeFilter: mediaTypeFilterSchema.nullable().optional(),
+    libraryFilter: libraryFilterSchema.nullable().optional(),
+  })
+  .refine((body) => body.mediaTypeFilter !== undefined || body.libraryFilter !== undefined, {
+    message: "Nothing to change",
+  });
 
 const addRecipientGroupSchema = z.object({
   groupId: z.string().min(1, "groupId is required"),
@@ -309,6 +330,9 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         if (unsupported.length > 0) {
           return reply.code(400).send({ error: `"${source.name}" doesn't have ${unsupported.join(", ")}` });
         }
+        if (refusesLibraryChoice(source.kind, libraryFilter)) {
+          return reply.code(400).send({ error: `"${source.name}" can't read only some of its libraries` });
+        }
 
         try {
           await db.insert(newsletterSources).values({
@@ -333,7 +357,7 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
     );
 
     // What a newsletter takes from a linked source: some of its kinds, or
-    // null for the source's defaults.
+    // null for the source's defaults; some of its libraries, or null for all.
     scope.patch<{ Params: NewsletterSourceParams }>(
       "/newsletters/:id/sources/:sourceConnectionId",
       async (request, reply) => {
@@ -353,12 +377,18 @@ export function registerNewsletterRoutes(app: FastifyInstance, db: Db, scheduler
         if (unsupported.length > 0) {
           return reply.code(400).send({ error: `"${link.source}" doesn't have ${unsupported.join(", ")}` });
         }
+        if (refusesLibraryChoice(link.sourceKind, body.libraryFilter)) {
+          return reply.code(400).send({ error: `"${link.source}" can't read only some of its libraries` });
+        }
         await db
           .update(newsletterSources)
-          .set({ mediaTypeFilter: body.mediaTypeFilter })
+          .set({
+            ...(body.mediaTypeFilter !== undefined && { mediaTypeFilter: body.mediaTypeFilter }),
+            ...(body.libraryFilter !== undefined && { libraryFilter: body.libraryFilter }),
+          })
           .where(and(eq(newsletterSources.newsletterId, id), eq(newsletterSources.sourceConnectionId, sourceConnectionId)));
         request.log.info(
-          { newsletterId: id, sourceId: sourceConnectionId, mediaTypeFilter: body.mediaTypeFilter },
+          { newsletterId: id, sourceId: sourceConnectionId, mediaTypeFilter: body.mediaTypeFilter, libraryFilter: body.libraryFilter },
           `Changed what newsletter "${link.newsletter}" includes from "${link.source}"`,
         );
         return reply.code(204).send();

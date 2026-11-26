@@ -61,7 +61,7 @@ describe("getServerId", () => {
 });
 
 describe("listLibraries", () => {
-  it("maps section_type to our MediaKind", async () => {
+  it("maps section_type to our MediaKind, leaving out libraries it doesn't read", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         response: {
@@ -71,6 +71,7 @@ describe("listLibraries", () => {
             { section_id: "1", section_name: "Movies", section_type: "movie" },
             { section_id: "2", section_name: "TV Shows", section_type: "show" },
             { section_id: "3", section_name: "Music", section_type: "artist" },
+            { section_id: "4", section_name: "Photos", section_type: "photo" },
           ],
         },
       }),
@@ -482,8 +483,22 @@ describe("fetchRecentItems", () => {
     expect(items[0]?.kind).toBe("movie");
   });
 
-  it("issues one request per library id and merges the results", async () => {
+  it("issues one request per chosen library and merges the results", async () => {
     mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          response: {
+            result: "success",
+            message: null,
+            data: [
+              { section_id: "1", section_name: "Movies", section_type: "movie" },
+              { section_id: "2", section_name: "Movies 4K", section_type: "movie" },
+              { section_id: "3", section_name: "Music", section_type: "artist" },
+              { section_id: "4", section_name: "Kids", section_type: "movie" },
+            ],
+          },
+        }),
+      )
       .mockResolvedValueOnce(
         jsonResponse({
           response: {
@@ -511,12 +526,23 @@ describe("fetchRecentItems", () => {
         }),
       );
 
+    // Music is chosen but not included, so it isn't read (#483); Kids
+    // isn't chosen; "9" is no longer there.
     const items = await tautulliAdapter.fetchRecentItems(config, {
       since: new Date(0),
-      libraryIds: ["1", "2"],
+      mediaKinds: ["movie"],
+      libraryIds: ["1", "2", "3", "9"],
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    const asked = mockFetch.mock.calls.map(([input]) => {
+      const url = new URL(input as string);
+      return [url.searchParams.get("cmd"), url.searchParams.get("section_id")];
+    });
+    expect(asked).toEqual([
+      ["get_libraries", null],
+      ["get_recently_added", "1"],
+      ["get_recently_added", "2"],
+    ]);
     expect(items.map((item) => item.externalId).sort()).toEqual(["1", "2"]);
   });
 
@@ -663,6 +689,33 @@ describe("fetchPopularItems", () => {
       playCount: 12,
       uniqueViewerCount: 3,
     });
+  });
+
+  // #483: Most watched keeps to the newsletter's libraries too.
+  it("keeps to the chosen libraries, leaving out rows that don't say which they're from", async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        response: {
+          result: "success",
+          message: null,
+          data: {
+            stat_id: "top_movies",
+            rows: [
+              { rating_key: "1", title: "Shared", media_type: "movie", section_id: 1, total_plays: 9 },
+              { rating_key: "2", title: "Private 4K", media_type: "movie", section_id: "2", total_plays: 8 },
+              { rating_key: "3", title: "Unsaid", media_type: "movie", total_plays: 7 },
+            ],
+          },
+        },
+      }),
+    );
+
+    const items = await tautulliAdapter.fetchPopularItems!(config, {
+      since: new Date(0),
+      mediaKinds: ["movie"],
+      libraryIds: ["1"],
+    });
+    expect(items.map((item) => item.title)).toEqual(["Shared"]);
   });
 
   it("only queries the stat matching the requested media kind", async () => {

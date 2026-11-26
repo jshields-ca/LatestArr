@@ -65,6 +65,32 @@ function mapMediaType(mediaType: string): MediaKind | null {
   }
 }
 
+// The kinds each library type's recently-added list holds.
+const SECTION_KINDS: Record<string, MediaKind[]> = {
+  movie: ["movie"],
+  show: ["tv_episode", "tv_season"],
+  artist: ["album"],
+};
+const READ_SECTION_TYPES = new Set(Object.keys(SECTION_KINDS));
+
+// Of the chosen libraries (#483), the ones still there that hold a kind
+// the newsletter wants, so one it doesn't (music, with Music off) isn't read.
+async function chosenSections(
+  baseUrl: string,
+  apiKey: string,
+  chosen: string[],
+  mediaKinds: MediaKind[] | undefined,
+): Promise<string[]> {
+  const libraries = await getLibraries(baseUrl, apiKey);
+  return libraries
+    .filter((library) => {
+      const kinds = SECTION_KINDS[library.section_type];
+      if (!kinds || !chosen.includes(String(library.section_id))) return false;
+      return !mediaKinds || kinds.some((kind) => mediaKinds.includes(kind));
+    })
+    .map((library) => String(library.section_id));
+}
+
 function mapLibraryType(sectionType: string): MediaKind {
   if (sectionType === "artist") return "album";
   return sectionType === "show" ? "tv_episode" : "movie";
@@ -173,6 +199,7 @@ export const tautulliAdapter: SourceAdapter = {
     supportsMediaKinds: ["movie", "tv_episode", "tv_season", "album"],
     // Music came later (#354), so it's off until a newsletter turns it on.
     defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
+    supportsLibraryChoice: true,
     supportsIncrementalSync: false,
   },
 
@@ -194,7 +221,8 @@ export const tautulliAdapter: SourceAdapter = {
 
   async listLibraries(config: SourceConnectionConfig): Promise<SourceLibrary[]> {
     const libraries = await getLibraries(config.baseUrl, config.credentials.apiKey ?? "");
-    return libraries.map((library) => ({
+    // Only libraries it reads: photos and the like never reach a newsletter.
+    return libraries.filter((library) => READ_SECTION_TYPES.has(library.section_type)).map((library) => ({
       id: library.section_id,
       name: library.section_name,
       kind: mapLibraryType(library.section_type),
@@ -225,7 +253,9 @@ export const tautulliAdapter: SourceAdapter = {
     // Tautulli's get_recently_added only accepts one section_id per call, so
     // a multi-library filter means one request per library, merged below.
     const sectionIds =
-      params.libraryIds && params.libraryIds.length > 0 ? params.libraryIds : [undefined];
+      params.libraryIds && params.libraryIds.length > 0
+        ? await chosenSections(config.baseUrl, apiKey, params.libraryIds, params.mediaKinds)
+        : [undefined];
 
     // Only worth looking up when there's a publicUrl to build a link
     // from at all — buildExternalUrl returns undefined without one
@@ -331,6 +361,7 @@ export const tautulliAdapter: SourceAdapter = {
     );
 
     const requestedKinds = params.mediaKinds ?? (["movie", "tv_episode"] as MediaKind[]);
+    const libraryIds = params.libraryIds && params.libraryIds.length > 0 ? params.libraryIds : undefined;
     const statIds = [
       ...new Set(
         requestedKinds
@@ -347,6 +378,9 @@ export const tautulliAdapter: SourceAdapter = {
     for (const statId of statIds) {
       const rows = await getHomeStats(config.baseUrl, apiKey, statId, timeRangeDays, limit);
       for (const row of rows) {
+        // Only the chosen libraries (#483). A row that doesn't say which
+        // library it's from is left out then, rather than risk a left-out one.
+        if (libraryIds && (row.section_id === undefined || !libraryIds.includes(String(row.section_id)))) continue;
         const item = mapHomeStatRow(row, config.baseUrl, apiKey, config.publicUrl, machineIdentifier);
         if (!item) continue;
         if (params.mediaKinds && !params.mediaKinds.includes(item.kind)) continue;
