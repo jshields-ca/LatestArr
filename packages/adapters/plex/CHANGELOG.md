@@ -1,5 +1,76 @@
 # @latestarr/adapter-plex
 
+## 0.13.0
+
+### Minor Changes
+
+- [#458](https://github.com/jshields-ca/LatestArr/pull/458) [`4c40059`](https://github.com/jshields-ca/LatestArr/commit/4c40059ff65eb616934d32ae7d4bfc034980ebf5) - **New:** Music from Plex and Tautulli. New albums appear in a **Music** section, with the cover, the artist underneath and, from Plex, the number of tracks. Singles and EPs are included, since Plex treats them as albums too.
+
+  - **Choose what each newsletter includes.** On a newsletter, each linked source lists what it has (Movies, TV, Music, ...) as toggles that save straight away. Music is off until you turn it on, so existing newsletters don't change, and you can leave it off for people who can't see your music library.
+  - **A summary for each album:** its own description, or, where it has none (as most don't), the artist's bio, as in Tautulli's own newsletter.
+  - **Albums only.** Plex and Tautulli both list new albums, not tracks. Tracks added later to an album that's already in your library don't bring it back up, so they aren't in the newsletter.
+  - **Designs** have a Music section with a **Listen on Plex** button, and the editor's sample shows two albums.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#354](https://github.com/jshields-ca/LatestArr/issues/354). Built from what a real Plex 1.43 and Tautulli report for a test library: a new album, a single, an EP, two albums by one artist, a compilation, and tracks added to an existing album.
+
+  - `MediaKind` gains `album`, exported as `MEDIA_KINDS`. `NewItem` gains `trackCount`. `SourceCapabilities` gains optional `defaultMediaKinds`, and `mediaKindsFor()` works out a link's kinds.
+  - **Plex and Tautulli** map `album` entries in their recently-added lists, and `artist` libraries as music. The artist (`parentTitle`) is the subtitle. Plex's `leafCount` is the track count; Tautulli doesn't give one. Both list `album` as a kind, with music left out of `defaultMediaKinds`.
+  - **Release dates:** music tagged with only a year gets 1 January from Plex, so an album's release date is left out when it's exactly 1 January (`albumReleaseDate()`).
+  - `PATCH /api/newsletters/:id/sources/:sourceConnectionId` sets `mediaTypeFilter`, where null means the source's defaults. Filters are validated against the source's kinds, here and on linking. An empty filter, which linking used to accept, now means the defaults rather than nothing. Sources in API responses carry `mediaKinds` and `defaultMediaKinds`.
+  - **Album summaries ([#476](https://github.com/jshields-ca/LatestArr/issues/476)):** an album with no `summary` gets its artist's, from Plex's `/library/metadata/{parentRatingKey}` or Tautulli's `get_metadata`. `fillAlbumOverviews()` in adapter-core looks each artist up once, for at most 25 artists per fetch, newest albums first; a failed lookup leaves the album without one.
+  - The wording key `music` defaults to "Music"; the album kind is counted as albums. Most-watched lists stay movies and TV.
+
+  </details>
+
+### Patch Changes
+
+- [#484](https://github.com/jshields-ca/LatestArr/pull/484) [`3b91fa8`](https://github.com/jshields-ca/LatestArr/commit/3b91fa8908bc05b162b5c865b416720a793236a5) - **Fixed:** A newsletter included every library on a source, including ones your recipients can't see: a 4K copy of a movie appeared twice, with a link that didn't work for them, and titles from a library you keep to yourself were emailed to everyone. Each source linked to a newsletter now has **Libraries: Change**, where you choose **All libraries** or **Only these**. With **Only these**, a library added later stays out until you tick it. The choice also applies to **Most watched**, and a Plex server and the Tautulli reading it keep to the same libraries. ([#483](https://github.com/jshields-ca/LatestArr/issues/483))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **API:** `PATCH /api/newsletters/:id/sources/:sourceId` now takes `libraryFilter` (an array of library ids, or `null` for all) alongside `mediaTypeFilter`; each is optional, but one is required. Ids must be letters, digits, `-` and `_` (they go into source URLs), at least one is needed, and a BookLore-family source, whose OPDS feed can't read only some libraries, refuses a choice. `POST /api/newsletters/:id/sources` validates `libraryFilter` the same way. Sources now report `libraryChoice`. The Plex and Audiobookshelf clients also URL-encode library ids.
+  - **Shared servers:** for sources reporting the same server id (Plex and its Tautulli), each reads only libraries every one of them allows (`pipeline/library-choice.ts`). If a Plex or Tautulli source can't say which server it reads while another has libraries chosen, it's skipped for that send, with a warning on the Logs page, rather than read in full.
+  - **Most watched:** Tautulli's `get_home_stats` rows are kept only when their `section_id` is a chosen library; a row without one is dropped while a choice is set. The all-time fallback pool uses the same choice.
+  - **Library lists:** Plex and Tautulli list only movie, show and music libraries, the ones a newsletter reads; photo libraries are left out.
+  - An existing empty choice, which linking used to accept, still means all libraries.
+
+  </details>
+
+- [#471](https://github.com/jshields-ca/LatestArr/pull/471) [`a8cfa6d`](https://github.com/jshields-ca/LatestArr/commit/a8cfa6d007fa6ae3415d5563f84b59e4b738edfe) - **Fixed:** A new episode of a season already in your Plex library now appears in newsletters from a Plex source. Before, it could be left out as if it were old.
+
+  <details>
+  <summary>Technical details</summary>
+
+  Closes [#466](https://github.com/jshields-ca/LatestArr/issues/466). With no libraries chosen, the Plex adapter read Plex's server-wide `/library/recentlyAdded`. That list folds new episodes into their season and gives the season its own `addedAt`, which is when the season first arrived, so an episode added to a season that's been there a while fell outside the lookback window. The adapter now reads each library's own `/library/sections/{key}/recentlyAdded`, which lists episodes with their own dates, as it already did when libraries were chosen. Only libraries holding a kind the newsletter wants are read (music is off by default), and items are sorted newest first across libraries. The safety cap is now per library for Plex too.
+
+  Tautulli dates that season row by its newest episode, so it was never affected. When a Plex server and its Tautulli are both linked ([#391](https://github.com/jshields-ca/LatestArr/issues/391)), Tautulli's season row and Plex's episodes are now recognised as the same news, through a new `seasonId` on episodes, and the episodes are kept.
+
+  </details>
+
+- [#441](https://github.com/jshields-ca/LatestArr/pull/441) [`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83) - **Fixed:** A newsletter linked to both a Plex server and the Tautulli that watches it listed every new item twice, and doubled its counts. Each item is now listed once.
+
+  - **Which copy is used:** Plex's, with its details and links. Anything only Tautulli knows, such as genres, is added to it.
+  - **Most watched** still comes from Tautulli.
+  - **Different servers are never merged,** even when their items share a number. If either app can't say which server it reads, both copies are listed as before.
+  - **The newsletter's Sources list** says so when both are linked.
+  - Two different servers reading the same files (Plex and Jellyfin, say) still list items twice; that's [#392](https://github.com/jshields-ca/LatestArr/issues/392).
+
+  <details>
+  <summary>Technical details</summary>
+
+  Fixes [#391](https://github.com/jshields-ca/LatestArr/issues/391). Adapters gain an optional `getServerId(config)`: Plex returns its machine identifier from `/identity`, Tautulli the same value from `get_server_id`, both as `plex:<id>`. The pipeline asks only when two or more linked sources implement it, so a newsletter with one such source makes no extra requests. `mergeSharedServerItems` in `pipeline/shared-server-items.ts` keeps one copy of each `(server id, externalId)` across sources: the server's own copy over Tautulli's, otherwise the first, in the earlier copy's position. It applies to the new-items pool and the random fallback pool, so counts, sections and the cap warning all work on the merged list.
+
+  The issue suggested the source listed first should win, and a shared Public URL as a fallback signal. Neither is used. Linked sources have no order a user sets (the link table has none), and two different Plex servers commonly share a Public URL such as `https://app.plex.tv`; with rating keys being small numbers, merging on the URL would drop real items.
+
+  </details>
+
+- Updated dependencies [[`3b91fa8`](https://github.com/jshields-ca/LatestArr/commit/3b91fa8908bc05b162b5c865b416720a793236a5), [`4c40059`](https://github.com/jshields-ca/LatestArr/commit/4c40059ff65eb616934d32ae7d4bfc034980ebf5), [`a8cfa6d`](https://github.com/jshields-ca/LatestArr/commit/a8cfa6d007fa6ae3415d5563f84b59e4b738edfe), [`7a4b14a`](https://github.com/jshields-ca/LatestArr/commit/7a4b14afbab3026a110b8f29870d0ed11a813f83)]:
+  - @latestarr/adapter-core@0.13.0
+
 ## 0.12.8
 
 ### Patch Changes
