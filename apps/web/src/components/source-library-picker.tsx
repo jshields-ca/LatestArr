@@ -109,6 +109,7 @@ export function SourceLibraryPicker({
         </PopoverTrigger>
         <PopoverContent
           align="start"
+          collisionPadding={16}
           aria-label={`Libraries from ${sourceName}`}
           className="flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-3"
         >
