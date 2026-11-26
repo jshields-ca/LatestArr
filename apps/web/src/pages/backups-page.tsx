@@ -16,6 +16,8 @@ import {
 
 import { ConfirmDeleteButton } from "@/components/list-row";
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
+import { copyText } from "@/lib/clipboard";
+import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -371,7 +373,7 @@ function Command({ command }: { command: string }) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {
-      await navigator.clipboard.writeText(command);
+      await copyText(command);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -388,23 +390,77 @@ function Command({ command }: { command: string }) {
   );
 }
 
+// The container's name, for the restore commands (#485). LatestArr can't
+// see it from inside the container, so it's typed here and remembered in
+// this browser. Only Docker's own name characters are used, so a pasted
+// name can't add anything else to a command someone copies and runs.
+const CONTAINER_KEY = "latestarr-container-name";
+const DEFAULT_CONTAINER = "latestarr";
+const CONTAINER_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
+
+function savedContainer(): string {
+  try {
+    return window.localStorage.getItem(CONTAINER_KEY) ?? DEFAULT_CONTAINER;
+  } catch {
+    return DEFAULT_CONTAINER;
+  }
+}
+
 function RestoreCard({ newest }: { newest: BackupFile | undefined }) {
+  const [typed, setTyped] = useState(savedContainer);
+  const trimmed = typed.trim();
+  const nameOk = trimmed === "" || CONTAINER_NAME.test(trimmed);
+  const container = trimmed && nameOk ? trimmed : DEFAULT_CONTAINER;
+
+  function changeContainer(value: string) {
+    setTyped(value);
+    try {
+      const name = value.trim();
+      if (name && name !== DEFAULT_CONTAINER && CONTAINER_NAME.test(name)) window.localStorage.setItem(CONTAINER_KEY, name);
+      else window.localStorage.removeItem(CONTAINER_KEY);
+    } catch {
+      // Not remembered, which is fine.
+    }
+  }
+
   const file = newest?.filename ?? "<file>";
   const steps = [
-    { title: "Check it (optional)", command: `docker exec -it latestarr node dist/cli.js check-backup ${file}` },
-    { title: "Stage the restore", command: `docker exec -it latestarr node dist/cli.js restore ${file}` },
-    { title: "Restart to swap it in", command: "docker restart latestarr" },
+    { title: "Check it (optional)", command: `docker exec -it ${container} node dist/cli.js check-backup ${file}` },
+    { title: "Stage the restore", command: `docker exec -it ${container} node dist/cli.js restore ${file}` },
+    { title: "Restart to swap it in", command: `docker restart ${container}` },
   ];
   return (
     <Card>
       <CardHeader>
         <CardTitle>Restoring a backup</CardTitle>
         <CardDescription>
-          Run these on the server. {newest ? "They use your newest backup; swap in another file's name from the list. " : ""}
-          If your container has a different name, use that instead of latestarr.
+          Run these on the server.{newest ? " They use your newest backup; swap in another file's name from the list." : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="restore-container">Container name</Label>
+          <Input
+            id="restore-container"
+            value={typed}
+            onChange={(e) => changeContainer(e.target.value)}
+            placeholder={DEFAULT_CONTAINER}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={!nameOk}
+            aria-describedby="restore-container-hint"
+            className="max-w-xs font-mono"
+          />
+          <p
+            id="restore-container-hint"
+            role={nameOk ? undefined : "alert"}
+            className={cn("text-xs", nameOk ? "text-muted-foreground" : "text-destructive")}
+          >
+            {nameOk
+              ? "As docker ps shows it. This browser remembers it."
+              : `A container name uses letters, digits, ".", "_" and "-", so these use ${DEFAULT_CONTAINER} until it's fixed.`}
+          </p>
+        </div>
         <ol className="flex flex-col gap-3">
           {steps.map((step, index) => (
             <li key={step.title} className="flex gap-3">

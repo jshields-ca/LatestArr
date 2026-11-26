@@ -138,9 +138,11 @@ export async function runCli(db: Db, args: string[], io: CliIo, paths?: CliPaths
       keyMatches: checked.keyMatches,
     });
     io.out("");
-    io.out("Ready. Restart LatestArr to restore it (docker restart latestarr).");
+    // The container's name can't be seen from in here (#485), so the
+    // commands name it the way the docker exec that ran this one did.
+    io.out("Ready. Restart LatestArr's container to restore it: docker restart <container name>.");
     io.out("The current database is kept beside it, renamed latestarr.db.before-restore-<time>.");
-    io.out("Changed your mind? Run: node dist/cli.js restore --cancel");
+    io.out("Changed your mind? Run: docker exec -it <container name> node dist/cli.js restore --cancel");
     return 0;
   }
 

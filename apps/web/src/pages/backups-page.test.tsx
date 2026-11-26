@@ -43,6 +43,7 @@ beforeEach(() => {
 afterEach(() => {
   fetchMock.mockReset();
   vi.unstubAllGlobals();
+  window.localStorage.removeItem("latestarr-container-name");
 });
 
 function answer(routes: Record<string, (body?: unknown) => ReturnType<typeof jsonResponse>>) {
@@ -112,11 +113,68 @@ describe("BackupsPage", () => {
   it("copies the restore commands for the newest backup", async () => {
     answer({ "GET /api/backups": () => jsonResponse(200, overview()) });
     const user = userEvent.setup();
+    vi.stubGlobal("isSecureContext", true);
     const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
     render(<BackupsPage />);
     const command = `docker exec -it latestarr node dist/cli.js restore ${backup.filename}`;
     await user.click(await screen.findByRole("button", { name: `Copy: ${command}` }));
     expect(writeText).toHaveBeenCalledWith(command);
+  });
+
+  // #485: browsers only offer the clipboard API on https or localhost.
+  it("still copies when opened over plain http", async () => {
+    answer({ "GET /api/backups": () => jsonResponse(200, overview()) });
+    const user = userEvent.setup();
+    vi.stubGlobal("isSecureContext", false);
+    let copied = "";
+    const execCommand = vi.fn(() => {
+      copied = (document.activeElement as HTMLTextAreaElement).value;
+      return true;
+    });
+    Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+    try {
+      render(<BackupsPage />);
+      await user.click(await screen.findByRole("button", { name: "Copy: docker restart latestarr" }));
+      expect(execCommand).toHaveBeenCalledWith("copy");
+      expect(copied).toBe("docker restart latestarr");
+      expect(screen.queryByText("Couldn't copy")).not.toBeInTheDocument();
+      expect(document.querySelector("textarea")).toBeNull();
+    } finally {
+      delete (document as { execCommand?: unknown }).execCommand;
+    }
+  });
+
+  // #485: the container may not be called latestarr.
+  it("puts the container's name into every command, and remembers it", async () => {
+    answer({ "GET /api/backups": () => jsonResponse(200, overview()) });
+    const user = userEvent.setup();
+    const { unmount } = render(<BackupsPage />);
+    const field = await screen.findByLabelText("Container name");
+    await user.clear(field);
+    await user.type(field, "latestarr-dev-testing");
+    expect(screen.getByText(`docker exec -it latestarr-dev-testing node dist/cli.js check-backup ${backup.filename}`)).toBeInTheDocument();
+    expect(screen.getByText(`docker exec -it latestarr-dev-testing node dist/cli.js restore ${backup.filename}`)).toBeInTheDocument();
+    expect(screen.getByText("docker restart latestarr-dev-testing")).toBeInTheDocument();
+    unmount();
+
+    render(<BackupsPage />);
+    expect(await screen.findByLabelText("Container name")).toHaveValue("latestarr-dev-testing");
+    expect(screen.getByText("docker restart latestarr-dev-testing")).toBeInTheDocument();
+  });
+
+  it("won't put anything but a container name into the commands", async () => {
+    answer({ "GET /api/backups": () => jsonResponse(200, overview()) });
+    const user = userEvent.setup();
+    render(<BackupsPage />);
+    const field = await screen.findByLabelText("Container name");
+    await user.clear(field);
+    await user.type(field, "x; rm -rf ~");
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("alert")).toHaveTextContent("A container name uses letters, digits");
+    expect(screen.getByText("docker restart latestarr")).toBeInTheDocument();
+    expect(screen.queryByText(/rm -rf/, { selector: "code" })).not.toBeInTheDocument();
+    // Not remembered either.
+    expect(window.localStorage.getItem("latestarr-container-name")).toBeNull();
   });
 
   it("saves calendar retention", async () => {
