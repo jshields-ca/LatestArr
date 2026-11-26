@@ -8,6 +8,7 @@ import { EmailPreviewFrame, PreviewSchemeToggle, usePreviewScheme } from "@/comp
 import { ScheduleField, type ScheduleMode } from "@/components/schedule-field";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import { SendRunHistoryList } from "@/components/send-run-history";
+import { SourceLibraryPicker } from "@/components/source-library-picker";
 import { SourceLogo } from "@/components/source-logo";
 import { SubjectField } from "@/components/subject-field";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,7 @@ import {
   removeNewsletterGroup,
   removeNewsletterSource,
   setNewsletterSourceKinds,
+  setNewsletterSourceLibraries,
   sendNewsletterNow,
   sendTestNewsletter,
   updateNewsletter,
@@ -314,6 +316,24 @@ function LinkedSources({
       setChangingId(null);
     }
   }
+  // Saves from the libraries panel, which shows its own error and stays
+  // open when this throws. One save at a time, as for kinds.
+  async function handleLibraries(source: LinkedSource, libraryFilter: string[] | null) {
+    setChangingId(source.id);
+    try {
+      await setNewsletterSourceLibraries(newsletterId, source.id, libraryFilter);
+      onChange(sources.map((s) => (s.id === source.id ? { ...s, libraryFilter } : s)));
+      setKindsSave({ status: "saved" });
+    } finally {
+      setChangingId(null);
+    }
+  }
+  // Plex and Tautulli sources here that may read the same server, whose
+  // library choices then hold for each other (#483).
+  const sharesServerWith = (source: LinkedSource) =>
+    source.kind === "plex" || source.kind === "tautulli"
+      ? sources.filter((s) => s.id !== source.id && (s.kind === "plex" || s.kind === "tautulli")).map((s) => s.name)
+      : [];
   // A Plex server and the Tautulli watching it return the same new items.
   // The server lists each once (#391); say so, since people link both on
   // purpose (Tautulli adds Most watched) and might expect doubles.
@@ -412,6 +432,16 @@ function LinkedSources({
                   ) : groups.length === 1 ? (
                     <span className="text-xs text-muted-foreground">{groups[0]!.label}</span>
                   ) : null}
+                  {source.libraryChoice ? (
+                    <SourceLibraryPicker
+                      sourceId={source.id}
+                      sourceName={source.name}
+                      libraryFilter={source.libraryFilter}
+                      sharesServerWith={sharesServerWith(source)}
+                      disabled={changingId !== null}
+                      onSave={(libraryFilter) => handleLibraries(source, libraryFilter)}
+                    />
+                  ) : null}
                 </div>
                 <Button
                   type="button"
@@ -433,7 +463,7 @@ function LinkedSources({
       {plexAndTautulli ? (
         <p className="text-xs text-muted-foreground">
           If Plex and Tautulli here read the same server, each new item is listed once, with Plex's details and
-          links. Tautulli still provides Most watched.
+          links. Tautulli still provides Most watched. Libraries left out on either one are left out of both.
         </p>
       ) : null}
       {availableToAdd.length > 0 ? (

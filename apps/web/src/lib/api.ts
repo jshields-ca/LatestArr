@@ -217,6 +217,14 @@ export interface SourceConnection {
    * ones a newsletter gets from it until someone chooses (#354). */
   mediaKinds: string[];
   defaultMediaKinds: string[];
+  /** Whether a newsletter can read only some of its libraries (#483). */
+  libraryChoice: boolean;
+}
+
+export interface SourceLibrary {
+  id: string;
+  name: string;
+  kind: string;
 }
 
 export interface CreateSourceInput {
@@ -676,6 +684,24 @@ export function setNewsletterSourceKinds(
     method: "PATCH",
     body: JSON.stringify({ mediaTypeFilter }),
   });
+}
+
+/** Some of a linked source's libraries, or null for all of them (#483). */
+export function setNewsletterSourceLibraries(
+  newsletterId: string,
+  sourceConnectionId: string,
+  libraryFilter: string[] | null,
+): Promise<void> {
+  return apiFetch<void>(`/newsletters/${newsletterId}/sources/${sourceConnectionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ libraryFilter }),
+  });
+}
+
+/** A source's libraries, asked of the source itself. */
+export async function listSourceLibraries(sourceConnectionId: string): Promise<SourceLibrary[]> {
+  const { libraries } = await apiFetch<{ libraries: SourceLibrary[] }>(`/sources/${sourceConnectionId}/libraries`);
+  return libraries;
 }
 
 export function removeNewsletterSource(newsletterId: string, sourceConnectionId: string): Promise<void> {

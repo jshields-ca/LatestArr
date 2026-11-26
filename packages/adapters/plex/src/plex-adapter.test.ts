@@ -50,7 +50,7 @@ describe("testConnection", () => {
 });
 
 describe("listLibraries", () => {
-  it("maps section type to our MediaKind", async () => {
+  it("maps section type to our MediaKind, leaving out libraries it doesn't read", async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({
         MediaContainer: {
@@ -58,6 +58,7 @@ describe("listLibraries", () => {
             { key: "1", title: "Movies", type: "movie" },
             { key: "2", title: "TV Shows", type: "show" },
             { key: "3", title: "Music", type: "artist" },
+            { key: "4", title: "Photos", type: "photo" },
           ],
         },
       }),
@@ -569,9 +570,21 @@ describe("fetchRecentItems", () => {
     expect(paths).toEqual(["/identity", "/library/sections", "/library/sections/3/recentlyAdded"]);
   });
 
-  it("issues one request per library id and merges the results", async () => {
+  it("issues one request per chosen library and merges the results", async () => {
     mockIdentity();
     mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          MediaContainer: {
+            Directory: [
+              { key: "1", title: "Movies", type: "movie" },
+              { key: "2", title: "Movies 4K", type: "movie" },
+              { key: "3", title: "Music", type: "artist" },
+              { key: "4", title: "Kids", type: "movie" },
+            ],
+          },
+        }),
+      )
       .mockResolvedValueOnce(
         jsonResponse({
           MediaContainer: {
@@ -587,12 +600,21 @@ describe("fetchRecentItems", () => {
         }),
       );
 
+    // Music is chosen but not included, so it isn't read (#483); Kids
+    // isn't chosen; "9" is no longer on the server.
     const items = await plexAdapter.fetchRecentItems(config, {
       since: new Date(0),
-      libraryIds: ["1", "2"],
+      mediaKinds: ["movie"],
+      libraryIds: ["1", "2", "3", "9"],
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const paths = mockFetch.mock.calls.map(([input]) => new URL(input as string).pathname);
+    expect(paths).toEqual([
+      "/identity",
+      "/library/sections",
+      "/library/sections/1/recentlyAdded",
+      "/library/sections/2/recentlyAdded",
+    ]);
     expect(items.map((item) => item.externalId).sort()).toEqual(["1", "2"]);
   });
 

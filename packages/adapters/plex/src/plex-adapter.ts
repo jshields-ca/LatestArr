@@ -53,20 +53,22 @@ const LIBRARY_KINDS: Record<string, MediaKind[]> = {
   artist: ["album"],
 };
 
-// The libraries to read when a newsletter hasn't chosen any: every one
-// holding a kind it wants. Each library's own list, never the server-wide
-// one, which folds a new episode into its season and dates that season by
+// The libraries to read: every one holding a kind the newsletter wants,
+// or of those only the ones it chose (#483). Each library's own list,
+// never the server-wide one, which folds a new episode into its season and dates that season by
 // when it first arrived, so a new episode of a season already there looked
 // old and was left out (#466).
 async function librariesToRead(
   baseUrl: string,
   token: string,
   mediaKinds: MediaKind[] | undefined,
+  chosen: string[] | undefined,
 ): Promise<string[]> {
   const libraries = await getLibraries(baseUrl, token);
   return libraries
     .filter((library) => {
       const kinds = LIBRARY_KINDS[library.type];
+      if (chosen && !chosen.includes(library.key)) return false;
       return kinds !== undefined && (!mediaKinds || kinds.some((kind) => mediaKinds.includes(kind)));
     })
     .map((library) => library.key);
@@ -137,6 +139,7 @@ export const plexAdapter: SourceAdapter = {
     supportsMediaKinds: ["movie", "tv_episode", "tv_season", "album"],
     // Music came later (#354), so it's off until a newsletter turns it on.
     defaultMediaKinds: ["movie", "tv_episode", "tv_season"],
+    supportsLibraryChoice: true,
     supportsIncrementalSync: false,
   },
 
@@ -158,7 +161,8 @@ export const plexAdapter: SourceAdapter = {
 
   async listLibraries(config: SourceConnectionConfig): Promise<SourceLibrary[]> {
     const libraries = await getLibraries(config.baseUrl, config.credentials.token ?? "");
-    return libraries.map((library) => ({
+    // Only libraries it reads: photos and the like never reach a newsletter.
+    return libraries.filter((library) => LIBRARY_KINDS[library.type]).map((library) => ({
       id: library.key,
       name: library.title,
       kind: mapLibraryType(library.type),
@@ -197,10 +201,12 @@ export const plexAdapter: SourceAdapter = {
     // One library at a time, merged below — same shape as the Tautulli
     // adapter's equivalent loop. With none chosen, every library that has
     // something wanted (see librariesToRead for why not the server-wide list).
-    const sectionKeys =
-      params.libraryIds && params.libraryIds.length > 0
-        ? params.libraryIds
-        : await librariesToRead(config.baseUrl, token, params.mediaKinds);
+    const sectionKeys = await librariesToRead(
+      config.baseUrl,
+      token,
+      params.mediaKinds,
+      params.libraryIds && params.libraryIds.length > 0 ? params.libraryIds : undefined,
+    );
 
     const results: NewItem[] = [];
     for (const sectionKey of sectionKeys) {

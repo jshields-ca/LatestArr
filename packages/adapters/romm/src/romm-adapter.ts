@@ -31,6 +31,7 @@ export const rommAdapter: SourceAdapter = {
   kind: "romm",
   capabilities: {
     supportsMediaKinds: ["game"],
+    supportsLibraryChoice: true,
     supportsIncrementalSync: false,
   },
 

@@ -56,6 +56,9 @@ export interface SourceCapabilities {
    * Plex, #354) stays off, so newsletters that already use the source
    * don't change. Defaults to supportsMediaKinds. */
   defaultMediaKinds?: MediaKind[];
+  /** Whether fetchRecentItems honours libraryIds, so a newsletter can
+   * read some of the source's libraries and not others (#483). */
+  supportsLibraryChoice?: boolean;
   supportsIncrementalSync: boolean;
 }
 
@@ -140,6 +143,8 @@ export interface FetchPopularItemsParams {
   /** Start of the window to rank plays over (e.g. "the last 7 days"). */
   since: Date;
   mediaKinds?: MediaKind[];
+  /** Only items from these libraries, as for fetchRecentItems (#483). */
+  libraryIds?: string[];
   limit?: number;
 }
 

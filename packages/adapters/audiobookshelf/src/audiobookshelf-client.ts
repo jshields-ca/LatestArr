@@ -115,7 +115,7 @@ export async function getLibraryItems(
 ): Promise<AudiobookshelfLibraryItem[]> {
   const body = await callAudiobookshelf<LibraryItemsResponse>(
     baseUrl,
-    `/api/libraries/${libraryId}/items`,
+    `/api/libraries/${encodeURIComponent(libraryId)}/items`,
     token,
     { sort: "addedAt", desc: "1", limit: String(count), page: String(page) },
   );
