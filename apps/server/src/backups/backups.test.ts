@@ -240,7 +240,9 @@ describe("restoring with the recovery command", () => {
 
     const staged = await run(["restore", backup.filename]);
     expect(staged.code).toBe(0);
-    expect(staged.out).toContain("Restart LatestArr");
+    expect(staged.out).toContain("Restart LatestArr's container to restore it: docker restart <container name>.");
+    // The container may not be called latestarr (#485).
+    expect(staged.out).not.toMatch(/docker (restart|exec -it) latestarr/);
     expect(existsSync(pendingRestorePath(databasePath))).toBe(true);
 
     expect((await run(["restore", "--cancel"])).out).toContain("Cancelled");
