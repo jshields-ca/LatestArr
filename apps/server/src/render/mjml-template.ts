@@ -273,12 +273,30 @@ function matchesContentType(item: RenderableItem, contentType: string | undefine
 
 const MAX_LISTED_EPISODES = 5;
 
+// The Plex, Jellyfin and Tautulli adapters write an episode's subtitle as
+// "S01E04 - Title". Episodes arrive newest first, and ones added together
+// in no particular order, so a row could read E04, E01, E02, E03.
+// Subtitles without a number keep their place after the numbered ones.
+const EPISODE_NUMBER = /^S(\d+)E(\d+)/;
+
+function inEpisodeOrder(series: RenderableItem[]): RenderableItem[] {
+  const key = (episode: RenderableItem): [number, number] => {
+    const match = EPISODE_NUMBER.exec(episode.subtitle ?? "");
+    return match ? [Number(match[1]), Number(match[2])] : [Number.MAX_SAFE_INTEGER, 0];
+  };
+  return series
+    .map((episode) => ({ episode, order: key(episode) }))
+    .sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1])
+    .map(({ episode }) => episode);
+}
+
 // Several new episodes of one series become a single row: the first
 // episode's details (title, poster) with the rest listed beneath, each
 // linked. The row itself links to the season when every episode is from
 // one, else to the show, as Tautulli's newsletter does; the first
 // episode's link when the source gives neither.
-// Rows keep the order of each series' first appearance.
+// Rows keep the order of each series' first appearance; the episodes in a
+// row are listed in season and episode order.
 function groupEpisodes(items: RenderableItem[]): RenderableItem[] {
   const bySeries = new Map<string, RenderableItem[]>();
   for (const item of items) {
@@ -307,7 +325,7 @@ function groupEpisodes(items: RenderableItem[]): RenderableItem[] {
       overviewLong: undefined,
       detailsLine: undefined,
       releaseDateFormatted: undefined,
-      episodes: series.slice(0, MAX_LISTED_EPISODES).map((episode) => ({
+      episodes: inEpisodeOrder(series).slice(0, MAX_LISTED_EPISODES).map((episode) => ({
         subtitle: episode.subtitle,
         externalUrl: episode.externalUrl,
       })),

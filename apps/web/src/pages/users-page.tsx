@@ -384,7 +384,7 @@ export function UsersPage() {
       <p className="text-sm text-muted-foreground">
         Change your own name or password from the pencil button at the top of the page. Viewers see newsletters,
         designs, and send history. Editors also manage newsletters, designs, and recipients, and can send. Admins can
-        do everything, including sources, SMTP, notifications, users, and logs.
+        do everything, including sources, email servers, notifications, users, and logs.
       </p>
     </div>
   );

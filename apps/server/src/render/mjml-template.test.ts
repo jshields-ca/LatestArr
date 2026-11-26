@@ -708,6 +708,19 @@ describe("the summary, grouping, and section helpers", () => {
     ]);
   });
 
+  it("lists a folded row's episodes in season and episode order, whatever order they arrive in", async () => {
+    const numbered = (season: number, n: number) =>
+      item({ id: `s${season}e${n}`, title: "Severance", kind: "tv_episode", subtitle: `S0${season}E0${n} - Part ${n}` });
+    const unnumbered = item({ id: "special", title: "Severance", kind: "tv_episode", subtitle: "Special" });
+    const html = await render(
+      `{{#mediaList groupEpisodes="true"}}<mj-text>@@{{#each episodes}}{{subtitle}};{{/each}}@@</mj-text>{{/mediaList}}`,
+      [numbered(1, 4), unnumbered, numbered(2, 1), numbered(1, 1), numbered(1, 2)],
+    );
+    expect([...html.matchAll(/@@([^@]*)@@/g)].map((m) => m[1])).toEqual([
+      "S01E01 - Part 1;S01E02 - Part 2;S01E04 - Part 4;S02E01 - Part 1;Special;",
+    ]);
+  });
+
   it("filters on several content types at once", async () => {
     const html = await render(
       `{{#mediaList contentType="tv_episode,tv_season"}}<mj-text>({{title}})</mj-text>{{/mediaList}}{{#ifAnyItems contentType="book,game"}}<mj-text>(books)</mj-text>{{/ifAnyItems}}`,

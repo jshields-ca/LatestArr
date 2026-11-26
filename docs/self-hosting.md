@@ -18,7 +18,7 @@ From a fresh install to a first sent newsletter. The [README's Quick start](../R
 cp .env.example .env
 ```
 
-Set **`ENCRYPTION_KEY`**, the only required setting. It encrypts the credentials LatestArr stores: source API keys and tokens, SMTP passwords and webhook URLs.
+Set **`ENCRYPTION_KEY`**, the only required setting. It encrypts the credentials LatestArr stores: source API keys and tokens, email server passwords and webhook URLs.
 
 ```bash
 openssl rand -base64 32
