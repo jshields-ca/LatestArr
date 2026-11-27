@@ -49,7 +49,9 @@ The message's `DKIM-Signature` header names the selector (`s=`) and domain (`d=`
 
 Every newsletter carries an **Unsubscribe** link for its recipient, and the `List-Unsubscribe` and `List-Unsubscribe-Post` headers (RFC 8058) that let Gmail, Yahoo and other mail apps show their own Unsubscribe button.
 
-- **Unsubscribing leaves every newsletter** on your LatestArr. The **Recipients** page shows who unsubscribed and when. An editor can't switch them back on; the person can, from the same link.
+- **Unsubscribing leaves every newsletter** on your LatestArr. The **Recipients** page shows who unsubscribed, when, and whether they used the link or someone marked them. They can subscribe again from the same link. An admin can too, from **Edit**, when they ask, and that's recorded on the **Logs** page.
+- **Someone who asks another way,** by replying or in person, can be marked unsubscribed: open them on **Recipients** and choose **Mark as unsubscribed**, or tick several and use **Mark unsubscribed**. Editors can do this.
+- **Unsubscribed isn't inactive.** **Make inactive** is your own pause: it skips them, but isn't kept if they're deleted and added again. Unsubscribed is their choice, and it is.
 - **It holds for their address,** not just their place on the list: deleting someone who unsubscribed and adding them again, by hand, from a file or with **Import users**, keeps them unsubscribed. For this LatestArr keeps a SHA-256 fingerprint of the address, which recognises it but can't be read back.
 - **Opening the link changes nothing.** The page asks first, so a mail scanner that follows links can't unsubscribe anyone.
 - **Code designs** add the link with `{{unsubscribeUrl}}`. The headers go out either way.
@@ -65,7 +67,7 @@ The link uses `PUBLIC_URL` if it's set, otherwise `WEB_ORIGIN`. What recipients 
 | On your home or private network (`192.168…`, `10…`, Tailscale, `.local`, …) | A link that only works for people on that network. The Logs page warns on each send. |
 | `localhost` (the default), or not set | No link. The Logs page warns on each send. |
 
-Whenever the link can't work for everyone, recipients can still **unsubscribe by replying**. Each email carries a `List-Unsubscribe` header with a `mailto:` address, so Gmail, Apple Mail and others show an Unsubscribe button that emails you "Unsubscribe". Without a link, the footer also says "Don't want these? Reply and ask to unsubscribe." LatestArr doesn't read your mail, so you turn them off on the **Recipients** page yourself.
+Whenever the link can't work for everyone, recipients can still **unsubscribe by replying**. Each email carries a `List-Unsubscribe` header with a `mailto:` address, so Gmail, Apple Mail and others show an Unsubscribe button that emails you "Unsubscribe". Without a link, the footer also says "Don't want these? Reply and ask to unsubscribe." LatestArr doesn't read your mail, so mark them unsubscribed on the **Recipients** page yourself, not just inactive, so it holds if they're ever added again.
 
 - **Replies go** to the newsletter's reply-to address if it has one, otherwise its From address.
 - **A `noreply@` address gets no reply option,** since nobody reads it. Use a From address someone reads.

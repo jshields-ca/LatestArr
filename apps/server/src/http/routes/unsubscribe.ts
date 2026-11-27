@@ -40,7 +40,8 @@ function setSubscribed(db: Db, token: string, subscribed: boolean, how: string, 
     const at = new Date();
     db.transaction((tx) => {
       tx.update(recipients)
-        .set({ unsubscribedAt: subscribed ? null : at })
+        // Their own doing either way, so no editor is named.
+        .set({ unsubscribedAt: subscribed ? null : at, unsubscribedBy: null })
         .where(eq(recipients.id, recipient.id))
         .run();
       // Also by address, so it holds if they're deleted and added again.

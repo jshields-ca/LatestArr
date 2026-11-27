@@ -125,10 +125,13 @@ export const recipients = sqliteTable("recipients", {
   unsubscribeToken: text("unsubscribe_token")
     .notNull()
     .$defaultFn(() => crypto.randomUUID()),
-  // When they unsubscribed themselves (#383), from every newsletter. Set and
-  // cleared only through their own link, never by an editor; separate from
-  // isActive, which editors control.
+  // When they unsubscribed (#383), from every newsletter: through their own
+  // link, or marked by an editor when they asked another way (a reply, say).
+  // Only they (from the link) or an admin can clear it. Separate from
+  // isActive, which is an editor's pause.
   unsubscribedAt: integer("unsubscribed_at", { mode: "timestamp" }),
+  // Who marked them unsubscribed, by name; null when they did it themselves.
+  unsubscribedBy: text("unsubscribed_by"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -163,6 +166,8 @@ export const recipientGroupMembers = sqliteTable(
 export const unsubscribedAddresses = sqliteTable("unsubscribed_addresses", {
   addressHash: text("address_hash").primaryKey(),
   unsubscribedAt: integer("unsubscribed_at", { mode: "timestamp" }).notNull(),
+  // Who marked it, as on recipients; null when they did it themselves.
+  unsubscribedBy: text("unsubscribed_by"),
 });
 
 // What the latest recipient import changed (#288), so Undo can reverse

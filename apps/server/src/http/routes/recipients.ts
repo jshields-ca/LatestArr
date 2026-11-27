@@ -1,9 +1,10 @@
 import { type Db, recipientGroupMembers, recipientGroups, recipients } from "@latestarr/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
-import { rememberUnsubscribed, unsubscribedSince } from "../../mailer/unsubscribe-list.js";
+import { recordAuditEvent } from "../../audit.js";
+import { forgetUnsubscribed, rememberUnsubscribed, unsubscribedRecord } from "../../mailer/unsubscribe-list.js";
 import {
   applyRecipientImport,
   ImportNotUndoableError,
@@ -56,7 +57,7 @@ const bulkImportSchema = z.object({
 const BULK_MAX_RECIPIENTS = 5000;
 const bulkIds = z.array(z.string().min(1).max(64)).min(1).max(BULK_MAX_RECIPIENTS);
 const bulkSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.enum(["activate", "deactivate", "delete"]), ids: bulkIds }),
+  z.object({ action: z.enum(["activate", "deactivate", "unsubscribe", "delete"]), ids: bulkIds }),
   z.object({ action: z.enum(["addToGroup", "removeFromGroup"]), ids: bulkIds, groupId: z.string().min(1).max(64) }),
 ]);
 
@@ -71,6 +72,11 @@ function batches<T>(items: T[]): T[][] {
 
 // How many addresses a bulk change's log entry names; the rest are a count.
 const BULK_LOG_EMAILS = 25;
+
+// Who marked someone unsubscribed, as the Recipients page shows it.
+function markedBy(user: { displayName: string; email: string } | undefined): string {
+  return user?.displayName.trim() || user?.email || "an editor";
+}
 
 function recipientCount(count: number): string {
   return `${count} recipient${count === 1 ? "" : "s"}`;
@@ -104,11 +110,14 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
 
       try {
         // Someone who unsubscribed before stays unsubscribed (#383).
-        const unsubscribedAt = unsubscribedSince(db, email);
-        const [recipient] = await db.insert(recipients).values({ email, displayName, unsubscribedAt }).returning();
+        const before = unsubscribedRecord(db, email);
+        const [recipient] = await db
+          .insert(recipients)
+          .values({ email, displayName, unsubscribedAt: before?.at ?? null, unsubscribedBy: before?.by ?? null })
+          .returning();
         request.log.info(
           { recipientId: recipient!.id },
-          unsubscribedAt
+          before
             ? `Added recipient ${email}, who unsubscribed before, so they stay unsubscribed`
             : `Added recipient ${email}`,
         );
@@ -164,6 +173,8 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
       const body = parseBody(bulkSchema, request.body, reply);
       if (!body) return reply;
       const ids = [...new Set(body.ids)];
+      const by = markedBy(request.sessionUser);
+      const at = new Date();
 
       const result = db.transaction((tx) => {
         let groupName: string | null = null;
@@ -185,6 +196,17 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
                 .where(and(inArray(recipients.id, batch), eq(recipients.isActive, !isActive)))
                 .returning({ id: recipients.id })
                 .all();
+              changedIds.push(...rows.map((row) => row.id));
+              break;
+            }
+            case "unsubscribe": {
+              const rows = tx
+                .update(recipients)
+                .set({ unsubscribedAt: at, unsubscribedBy: by })
+                .where(and(inArray(recipients.id, batch), isNull(recipients.unsubscribedAt)))
+                .returning({ id: recipients.id, email: recipients.email })
+                .all();
+              for (const row of rows) rememberUnsubscribed(tx, row.email, at, by);
               changedIds.push(...rows.map((row) => row.id));
               break;
             }
@@ -248,6 +270,7 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         const message = {
           activate: `Activated ${who}`,
           deactivate: `Deactivated ${who}`,
+          unsubscribe: `Marked ${who} unsubscribed`,
           delete: `Deleted ${who}`,
           addToGroup: `Added ${who} to group "${groupName}"`,
           removeFromGroup: `Removed ${who} from group "${groupName}"`,
@@ -341,15 +364,17 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
           // A new address that unsubscribed before keeps that (#383); an
           // unsubscribed person's new address is remembered too.
           const newAddress = email !== undefined && email.toLowerCase() !== before.email.toLowerCase();
-          const unsubscribedAt = newAddress && !before.unsubscribedAt ? unsubscribedSince(tx, email) : null;
-          if (newAddress && before.unsubscribedAt) rememberUnsubscribed(tx, email, before.unsubscribedAt);
+          const earlier = newAddress && !before.unsubscribedAt ? unsubscribedRecord(tx, email) : null;
+          if (newAddress && before.unsubscribedAt) {
+            rememberUnsubscribed(tx, email, before.unsubscribedAt, before.unsubscribedBy);
+          }
           return tx
             .update(recipients)
             .set({
               ...(email !== undefined && { email }),
               ...(displayName !== undefined && { displayName }),
               ...(isActive !== undefined && { isActive }),
-              ...(unsubscribedAt && { unsubscribedAt }),
+              ...(earlier && { unsubscribedAt: earlier.at, unsubscribedBy: earlier.by }),
             })
             .where(eq(recipients.id, before.id))
             .returning()
@@ -373,6 +398,66 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
         throw err;
       }
     });
+
+    // Marks someone unsubscribed when they asked another way: a reply to
+    // a newsletter, say, where there's no link (#383). Kept by address like
+    // a link unsubscribe, so it holds if they're deleted and added again.
+    // Editors can: it only ever stops mail.
+    scope.post<{ Params: IdParams }>("/recipients/:id/unsubscribe", async (request, reply) => {
+      const by = markedBy(request.sessionUser);
+      const result = db.transaction((tx) => {
+        const before = tx.select().from(recipients).where(eq(recipients.id, request.params.id)).get();
+        if (!before) return undefined;
+        if (before.unsubscribedAt) return { recipient: before, changed: false };
+        const at = new Date();
+        const recipient = tx
+          .update(recipients)
+          .set({ unsubscribedAt: at, unsubscribedBy: by })
+          .where(eq(recipients.id, before.id))
+          .returning()
+          .get()!;
+        rememberUnsubscribed(tx, before.email, at, by);
+        return { recipient, changed: true };
+      });
+      if (!result) return reply.code(404).send({ error: "Not found" });
+      if (result.changed) {
+        request.log.info({ recipientId: result.recipient.id }, `Marked ${result.recipient.email} unsubscribed`);
+      }
+      return reply.send({ recipient: result.recipient });
+    });
+
+    // Subscribes someone again. Admins only, and only when the person asked:
+    // the page says so before it sends this. Recorded as an audit event,
+    // which outlasts a restart, unlike the Logs page's other lines.
+    scope.post<{ Params: IdParams }>(
+      "/recipients/:id/resubscribe",
+      { config: { minRole: "admin" } },
+      async (request, reply) => {
+        const result = db.transaction((tx) => {
+          const before = tx.select().from(recipients).where(eq(recipients.id, request.params.id)).get();
+          if (!before) return undefined;
+          if (!before.unsubscribedAt) return { recipient: before, changed: false };
+          const recipient = tx
+            .update(recipients)
+            .set({ unsubscribedAt: null, unsubscribedBy: null })
+            .where(eq(recipients.id, before.id))
+            .returning()
+            .get()!;
+          forgetUnsubscribed(tx, before.email);
+          return { recipient, changed: true };
+        });
+        if (!result) return reply.code(404).send({ error: "Not found" });
+        if (result.changed) {
+          const user = request.sessionUser?.email ?? "unknown";
+          request.log.info({ recipientId: result.recipient.id }, `Subscribed ${result.recipient.email} again`);
+          recordAuditEvent(db, `${user} subscribed ${result.recipient.email} again`, {
+            recipientId: result.recipient.id,
+            user,
+          });
+        }
+        return reply.send({ recipient: result.recipient });
+      },
+    );
 
     scope.delete<{ Params: IdParams }>("/recipients/:id", async (request, reply) => {
       const [deleted] = await db.delete(recipients).where(eq(recipients.id, request.params.id)).returning();

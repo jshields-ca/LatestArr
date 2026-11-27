@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { type Db, recipients, unsubscribedAddresses } from "@latestarr/db";
-import { eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 
 // Who unsubscribed, by address, so it outlasts their recipient (#383). A
 // recipient's unsubscribedAt is the one sends read; this list only puts it
@@ -19,27 +19,50 @@ export function addressHash(email: string): string {
   return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
 }
 
+/** When an address unsubscribed, and who marked it (null: they did it themselves). */
+export interface UnsubscribedRecord {
+  at: Date;
+  by: string | null;
+}
+
 /** Remembers that this address unsubscribed. */
-export function rememberUnsubscribed(db: Database, email: string, at: Date): void {
+export function rememberUnsubscribed(db: Database, email: string, at: Date, by: string | null = null): void {
   db.insert(unsubscribedAddresses)
-    .values({ addressHash: addressHash(email), unsubscribedAt: at })
-    .onConflictDoUpdate({ target: unsubscribedAddresses.addressHash, set: { unsubscribedAt: at } })
+    .values({ addressHash: addressHash(email), unsubscribedAt: at, unsubscribedBy: by })
+    .onConflictDoUpdate({ target: unsubscribedAddresses.addressHash, set: { unsubscribedAt: at, unsubscribedBy: by } })
     .run();
 }
 
-/** Forgets it, when the person subscribes again from their link. */
+/**
+ * Forgets it, when they subscribe again (from their link, or an admin's).
+ * Call it after their own row is cleared. Addresses match ignoring case, so
+ * "Bob@x" and "bob@x" can be two recipients sharing one entry: it stays
+ * while either is still unsubscribed.
+ */
 export function forgetUnsubscribed(db: Database, email: string): void {
+  const address = email.trim().toLowerCase();
+  const stillUnsubscribed = db
+    .select({ id: recipients.id })
+    .from(recipients)
+    .where(and(sql`lower(trim(${recipients.email})) = ${address}`, isNotNull(recipients.unsubscribedAt)))
+    .get();
+  if (stillUnsubscribed) return;
   db.delete(unsubscribedAddresses).where(eq(unsubscribedAddresses.addressHash, addressHash(email))).run();
+}
+
+/** When this address unsubscribed and who marked it, or null if it hasn't. */
+export function unsubscribedRecord(db: Database, email: string): UnsubscribedRecord | null {
+  const row = db
+    .select({ at: unsubscribedAddresses.unsubscribedAt, by: unsubscribedAddresses.unsubscribedBy })
+    .from(unsubscribedAddresses)
+    .where(eq(unsubscribedAddresses.addressHash, addressHash(email)))
+    .get();
+  return row ?? null;
 }
 
 /** When this address unsubscribed, or null if it hasn't. */
 export function unsubscribedSince(db: Database, email: string): Date | null {
-  const row = db
-    .select({ at: unsubscribedAddresses.unsubscribedAt })
-    .from(unsubscribedAddresses)
-    .where(eq(unsubscribedAddresses.addressHash, addressHash(email)))
-    .get();
-  return row?.at ?? null;
+  return unsubscribedRecord(db, email)?.at ?? null;
 }
 
 /**
@@ -49,17 +72,17 @@ export function unsubscribedSince(db: Database, email: string): Date | null {
  */
 export function backfillUnsubscribedAddresses(db: Db): number {
   const unsubscribed = db
-    .select({ email: recipients.email, at: recipients.unsubscribedAt })
+    .select({ email: recipients.email, at: recipients.unsubscribedAt, by: recipients.unsubscribedBy })
     .from(recipients)
     .where(isNotNull(recipients.unsubscribedAt))
     .all();
   if (unsubscribed.length === 0) return 0;
   return db.transaction((tx) => {
     let added = 0;
-    for (const { email, at } of unsubscribed) {
+    for (const { email, at, by } of unsubscribed) {
       const result = tx
         .insert(unsubscribedAddresses)
-        .values({ addressHash: addressHash(email), unsubscribedAt: at! })
+        .values({ addressHash: addressHash(email), unsubscribedAt: at!, unsubscribedBy: by })
         .onConflictDoNothing()
         .run();
       added += result.changes;

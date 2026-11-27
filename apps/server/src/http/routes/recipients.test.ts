@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, recipientImports, recipients, runMigrations, unsubscribedAddresses, type Db } from "@latestarr/db";
+import { auditEvents, createDb, recipientImports, recipients, runMigrations, unsubscribedAddresses, type Db } from "@latestarr/db";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -635,5 +635,106 @@ describe("auth gating", () => {
   it("rejects unauthenticated requests", async () => {
     const response = await app.inject({ method: "GET", url: "/api/recipients" });
     expect(response.statusCode).toBe(401);
+  });
+});
+
+// Someone who asked by reply, or another way: an editor marks them
+// unsubscribed, and only an admin (or they, from their link) can undo it.
+describe("marking someone unsubscribed", () => {
+  async function add(email: string) {
+    const created = await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email } }));
+    return created.json().recipient.id as string;
+  }
+  const row = async (email: string) => (await db.select().from(recipients).where(eq(recipients.email, email)))[0];
+
+  it("is remembered when they're deleted and added again, unlike being inactive", async () => {
+    const asked = await add("asked@example.com");
+    const marked = await app.inject(authed({ method: "POST", url: `/api/recipients/${asked}/unsubscribe` }));
+    expect(marked.statusCode).toBe(200);
+    expect(marked.json().recipient.unsubscribedBy).toBe("Admin");
+    expect(marked.json().recipient).not.toHaveProperty("unsubscribeToken");
+
+    const paused = await add("paused@example.com");
+    await app.inject(authed({ method: "PATCH", url: `/api/recipients/${paused}`, payload: { isActive: false } }));
+
+    for (const id of [asked, paused]) await app.inject(authed({ method: "DELETE", url: `/api/recipients/${id}` }));
+    for (const email of ["asked@example.com", "paused@example.com"]) {
+      await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email } }));
+    }
+
+    const back = await row("asked@example.com");
+    expect(back!.unsubscribedAt).toBeInstanceOf(Date);
+    expect(back!.unsubscribedBy).toBe("Admin");
+    // Inactive is a pause, not an opt-out: they come back active.
+    const pausedBack = await row("paused@example.com");
+    expect(pausedBack!.isActive).toBe(true);
+    expect(pausedBack!.unsubscribedAt).toBeNull();
+  });
+
+  it("changes nothing the second time, and answers 404 for someone unknown", async () => {
+    const id = await add("asked@example.com");
+    await app.inject(authed({ method: "POST", url: `/api/recipients/${id}/unsubscribe` }));
+    const first = (await row("asked@example.com"))!.unsubscribedAt;
+    const again = await app.inject(authed({ method: "POST", url: `/api/recipients/${id}/unsubscribe` }));
+    expect(again.statusCode).toBe(200);
+    expect((await row("asked@example.com"))!.unsubscribedAt).toEqual(first);
+    const unknown = await app.inject(
+      authed({ method: "POST", url: "/api/recipients/00000000-0000-4000-8000-000000000000/unsubscribe" }),
+    );
+    expect(unknown.statusCode).toBe(404);
+  });
+
+  it("can mark several at once, counting only those who weren't already", async () => {
+    const one = await add("one@example.com");
+    const two = await add("two@example.com");
+    await app.inject(authed({ method: "POST", url: `/api/recipients/${one}/unsubscribe` }));
+    const bulk = await app.inject(
+      authed({ method: "POST", url: "/api/recipients/bulk", payload: { action: "unsubscribe", ids: [one, two] } }),
+    );
+    expect(bulk.json().changed).toBe(1);
+    expect((await row("two@example.com"))!.unsubscribedBy).toBe("Admin");
+    expect(await db.select().from(unsubscribedAddresses)).toHaveLength(2);
+  });
+
+  it("can be undone by an admin, which is recorded and forgotten by address", async () => {
+    const id = await add("back@example.com");
+    await app.inject(authed({ method: "POST", url: `/api/recipients/${id}/unsubscribe` }));
+    const undone = await app.inject(authed({ method: "POST", url: `/api/recipients/${id}/resubscribe` }));
+    expect(undone.statusCode).toBe(200);
+    expect(undone.json().recipient.unsubscribedAt).toBeNull();
+    expect(undone.json().recipient.unsubscribedBy).toBeNull();
+    expect(await db.select().from(unsubscribedAddresses)).toHaveLength(0);
+    const events = await db.select().from(auditEvents);
+    expect(events.map((event) => event.message)).toContain("admin@example.com subscribed back@example.com again");
+  });
+
+  it("stops naming the editor once they subscribe again from their link", async () => {
+    const id = await add("asked@example.com");
+    await app.inject(authed({ method: "POST", url: `/api/recipients/${id}/unsubscribe` }));
+    const token = (await row("asked@example.com"))!.unsubscribeToken;
+    await app.inject({ method: "POST", url: "/api/unsubscribe", payload: { token, subscribed: true } });
+    await app.inject({ method: "POST", url: "/api/unsubscribe", payload: { token, subscribed: false } });
+    const now = (await row("asked@example.com"))!;
+    expect(now.unsubscribedAt).toBeInstanceOf(Date);
+    expect(now.unsubscribedBy).toBeNull();
+  });
+
+  it("keeps an address on the list while another recipient with it in other capitals is unsubscribed", async () => {
+    const upper = await add("Bob@example.com");
+    const lower = await add("bob@example.com");
+    await app.inject(authed({ method: "POST", url: "/api/recipients/bulk", payload: { action: "unsubscribe", ids: [upper, lower] } }));
+    await app.inject(authed({ method: "POST", url: `/api/recipients/${upper}/resubscribe` }));
+    expect(await db.select().from(unsubscribedAddresses)).toHaveLength(1);
+    await app.inject(authed({ method: "POST", url: `/api/recipients/${lower}/resubscribe` }));
+    expect(await db.select().from(unsubscribedAddresses)).toHaveLength(0);
+  });
+
+  it("can undo someone's own link unsubscribe too", async () => {
+    const id = await add("self@example.com");
+    const token = (await row("self@example.com"))!.unsubscribeToken;
+    await app.inject({ method: "POST", url: "/api/unsubscribe", payload: { token, subscribed: false } });
+    expect((await row("self@example.com"))!.unsubscribedBy).toBeNull();
+    await app.inject(authed({ method: "POST", url: `/api/recipients/${id}/resubscribe` }));
+    expect((await row("self@example.com"))!.unsubscribedAt).toBeNull();
   });
 });
