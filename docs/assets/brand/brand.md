@@ -12,6 +12,8 @@ That rewrites the SVGs and PNGs in this folder, the web UI's favicon and app ico
 
 The social images are rendered from `social-preview.html` in a headless browser, at 1280×640 (`../social-preview.png`, for GitHub and the README) and 1200×630 (`og-image.png`, for latestarr.app's Open Graph and Twitter cards). Pass `?w=&h=` to render other sizes. They show the paper stamp and wordmark on navy beside a real newsletter (`social-newsletter.png`: the design editor's sample content with the airmail top edge, captured at 640px wide and 2x). Retake that screenshot when the newsletter's look changes.
 
+The stamp has a postmark over its corner, as on the sign-in card and latestarr.app, dated with the release in UTC. The date is `RELEASED` in `social-preview.html`. Change it and render both images again at each minor release (0.14.0, 0.15.0); patch releases keep the minor's date.
+
 ## Files
 
 | File | Use |
