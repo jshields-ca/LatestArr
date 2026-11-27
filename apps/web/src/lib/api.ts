@@ -292,8 +292,11 @@ export interface Recipient {
   email: string;
   displayName: string | null;
   isActive: boolean;
-  /** When they unsubscribed themselves (#383); only they can undo it. */
+  /** When they unsubscribed (#383): from their link, or marked by an editor.
+   * Only they (from the link) or an admin can undo it. */
   unsubscribedAt?: string | null;
+  /** Who marked them unsubscribed; null when they used the link themselves. */
+  unsubscribedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -321,7 +324,7 @@ export function listRecipients(): Promise<{ recipients: Recipient[]; memberships
 
 /** One change to several recipients at once (#400). */
 export type BulkRecipientChange =
-  | { action: "activate" | "deactivate" | "delete"; ids: string[] }
+  | { action: "activate" | "deactivate" | "unsubscribe" | "delete"; ids: string[] }
   | { action: "addToGroup" | "removeFromGroup"; ids: string[]; groupId: string };
 
 /** `changed` counts only the people the change altered: someone already inactive isn't counted again. */
@@ -350,6 +353,16 @@ export function updateRecipient(
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+/** Marks someone unsubscribed who asked another way (by reply, say). Kept even if they are deleted and added again. */
+export function markRecipientUnsubscribed(id: string): Promise<{ recipient: Recipient }> {
+  return apiFetch<{ recipient: Recipient }>(`/recipients/${id}/unsubscribe`, { method: "POST" });
+}
+
+/** Subscribes someone again, when they asked to be. Admins only. */
+export function resubscribeRecipient(id: string): Promise<{ recipient: Recipient }> {
+  return apiFetch<{ recipient: Recipient }>(`/recipients/${id}/resubscribe`, { method: "POST" });
 }
 
 export function deleteRecipient(id: string): Promise<void> {

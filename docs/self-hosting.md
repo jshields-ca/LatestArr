@@ -142,7 +142,8 @@ The **Recipients** table shows each person's groups, and the menu beside the sea
 
 Tick the box on each row you want, or the box in the table's heading for everyone on the page. With more than one page, **Select all** then takes in everyone who matches the search and group filter. The buttons that appear above the table apply to everyone ticked:
 
-- **Make active** and **Make inactive** switch them on or off. An inactive person stays in their groups but is skipped by every send.
+- **Make active** and **Make inactive** switch them on or off. An inactive person stays in their groups but is skipped by every send. Being inactive isn't kept if they're deleted and added again.
+- **Mark unsubscribed** is for people who asked to stop. Unlike inactive, it's kept even if they're deleted and added again, and only they (from their link) or an admin can undo it. See [Unsubscribing](deliverability.md#unsubscribing).
 - **Add to group** and **Remove from group** ask which group.
 - **Delete** asks first and says how many. It can't be undone.
 

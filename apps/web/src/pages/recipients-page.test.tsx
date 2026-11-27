@@ -149,9 +149,56 @@ describe("RecipientsPage", () => {
     const row = (await screen.findByText("Gone")).closest("tr")!;
     expect(within(row).getByText("Unsubscribed")).toBeInTheDocument();
     expect(within(row).getByText(/Nov/)).toBeInTheDocument();
+    expect(within(row).getByText("by their link")).toBeInTheDocument();
     expect(within(row).queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.getAllByRole("switch")).toHaveLength(1);
   });
+
+  // Someone who asked by reply: marked by an editor, undone only by an admin.
+  it("marks someone unsubscribed from the edit dialog, and an admin can subscribe them again", async () => {
+    const user = userEvent.setup();
+    const marked = { ...alice, unsubscribedAt: "2026-11-27T10:00:00.000Z", unsubscribedBy: "Jeremy" };
+    const posts: string[] = [];
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === "/api/recipients" && method === "GET") return Promise.resolve(jsonResponse(200, { recipients: [alice] }));
+      if (url === "/api/recipient-groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (url === "/api/recipients/r1/groups") return Promise.resolve(jsonResponse(200, { groups: [] }));
+      if (method === "POST") posts.push(url);
+      if (url === "/api/recipients/r1/unsubscribe") return Promise.resolve(jsonResponse(200, { recipient: marked }));
+      if (url === "/api/recipients/r1/resubscribe") return Promise.resolve(jsonResponse(200, { recipient: { ...alice, unsubscribedAt: null, unsubscribedBy: null } }));
+      throw new Error(`Unexpected fetch to ${method} ${url}`);
+    });
+    render(
+      <>
+        <RecipientsPage />
+        <ConfirmHost />
+      </>,
+    );
+    await screen.findByText("Alice");
+
+    await user.click(screen.getByRole("button", { name: "Edit alice@example.com" }));
+    let dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "Mark as unsubscribed" }));
+    const ask = await screen.findByRole("alertdialog", { name: "Mark alice@example.com as unsubscribed?" });
+    expect(ask).toHaveTextContent("kept even if they're deleted and added again");
+    await user.click(within(ask).getByRole("button", { name: "Mark as unsubscribed" }));
+
+    await waitFor(() => expect(posts).toEqual(["/api/recipients/r1/unsubscribe"]));
+    const row = screen.getByText("Alice").closest("tr")!;
+    expect(await within(row).findByText("Unsubscribed")).toBeInTheDocument();
+    expect(within(row).getByText("marked by Jeremy")).toBeInTheDocument();
+
+    dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("marked by Jeremy");
+    await user.click(within(dialog).getByRole("button", { name: "Subscribe again" }));
+    const again = await screen.findByRole("alertdialog", { name: "Subscribe alice@example.com again?" });
+    expect(again).toHaveTextContent("Only do this if they asked");
+    await user.click(within(again).getByRole("button", { name: "Subscribe again" }));
+    await waitFor(() => expect(posts).toEqual(["/api/recipients/r1/unsubscribe", "/api/recipients/r1/resubscribe"]));
+    // The open dialog hides the page from role queries, so look past it.
+    expect(await within(row).findByRole("switch", { name: "Active", hidden: true })).toBeInTheDocument();
+  }, 60000);
 
   it("adds a recipient through the dialog", async () => {
     const user = userEvent.setup();
@@ -689,6 +736,11 @@ describe("RecipientsPage", () => {
             const isActive = body.action === "activate";
             changed = state.recipients.filter((r) => ids.has(r.id) && r.isActive !== isActive).length;
             state.recipients = state.recipients.map((r) => (ids.has(r.id) ? { ...r, isActive } : r));
+          } else if (body.action === "unsubscribe") {
+            changed = state.recipients.filter((r) => ids.has(r.id) && !("unsubscribedAt" in r)).length;
+            state.recipients = state.recipients.map((r) =>
+              ids.has(r.id) ? ({ ...r, unsubscribedAt: "2026-11-27T10:00:00.000Z", unsubscribedBy: "Admin" } as typeof r) : r,
+            );
           } else if (body.action === "delete") {
             changed = state.recipients.filter((r) => ids.has(r.id)).length;
             state.recipients = state.recipients.filter((r) => !ids.has(r.id));
@@ -857,6 +909,47 @@ describe("RecipientsPage", () => {
       expect(screen.getByText("Cara")).toBeInTheDocument();
       // Nobody is ticked any more, so the search row is back.
       expect(screen.getByRole("searchbox")).toBeInTheDocument();
+    }, 60000);
+
+    it("asks before marking the ticked recipients unsubscribed", async () => {
+      const user = userEvent.setup();
+      const { bulk } = fakeServer({ recipients: [alice, bob, cara] });
+      render(
+        <>
+          <RecipientsPage />
+          <ConfirmHost />
+        </>,
+      );
+      await screen.findByText("Alice");
+
+      await user.click(screen.getByRole("checkbox", { name: "Select alice@example.com" }));
+      await user.click(screen.getByRole("checkbox", { name: "Select cara@example.com" }));
+      await user.click(within(bar()).getByRole("button", { name: "Mark unsubscribed" }));
+      const dialog = await screen.findByRole("alertdialog", { name: "Mark 2 recipients as unsubscribed?" });
+      await user.click(within(dialog).getByRole("button", { name: "Mark as unsubscribed" }));
+
+      await waitFor(() => expect(within(rowOf("Alice")).getByText("Unsubscribed")).toBeInTheDocument());
+      expect(bulk).toEqual([{ action: "unsubscribe", ids: ["r1", "r3"] }]);
+      expect(within(rowOf("Bob")).getByRole("switch", { name: "Active" })).toBeInTheDocument();
+    }, 60000);
+
+    it("says being inactive isn't kept when deleting someone inactive", async () => {
+      const user = userEvent.setup();
+      fakeServer({ recipients: [alice, { ...bob, isActive: false }] });
+      render(
+        <>
+          <RecipientsPage />
+          <ConfirmHost />
+        </>,
+      );
+      await screen.findByText("Bob");
+      await user.click(screen.getByRole("checkbox", { name: "Select bob@example.com" }));
+      await user.click(within(bar()).getByRole("button", { name: "Delete" }));
+      const dialog = await screen.findByRole("alertdialog", { name: "Delete 1 recipient?" });
+      expect(dialog).toHaveTextContent("Being inactive isn't kept");
+      expect(dialog).toHaveTextContent("mark them unsubscribed instead");
+      // Answered, so no question is left open for the next test.
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     }, 60000);
 
     it("has no accessibility violations with recipients ticked", async () => {

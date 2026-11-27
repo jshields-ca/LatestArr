@@ -26,6 +26,7 @@ import { toast } from "@/components/ui/use-toast";
 import { ImportRecipientsDialog, UndoLastImport } from "@/components/import-recipients-dialog";
 import { ImportFromSourceButton } from "@/components/import-source-users-dialog";
 import { confirmAction } from "@/components/confirm-dialog";
+import { useHasRole } from "@/components/auth-provider";
 import { ConfirmDeleteButton, ListRow } from "@/components/list-row";
 import {
   ApiError,
@@ -39,7 +40,9 @@ import {
   getRecipientGroups,
   listGroups,
   listRecipients,
+  markRecipientUnsubscribed,
   removeGroupMember,
+  resubscribeRecipient,
   updateGroup,
   updateRecipient,
   type BulkRecipientChange,
@@ -79,6 +82,32 @@ const GroupSyncContext = createContext<GroupSync>({
 // rows in past sends' results both cascade (packages/db schema).
 const DELETE_RECIPIENT_CONSEQUENCE =
   "They'll be removed from their groups and from the list of who past sends went to, and won't get any more newsletters.";
+
+// What deleting someone means if they're added again: unsubscribing is
+// kept by address (#383), and being inactive isn't.
+function deleteConsequence(people: Recipient[]): string {
+  const one = people.length === 1;
+  const unsubscribed = people.some((r) => r.unsubscribedAt);
+  const paused = people.some((r) => !r.unsubscribedAt && !r.isActive);
+  return [
+    DELETE_RECIPIENT_CONSEQUENCE,
+    unsubscribed
+      ? one
+        ? "They'll stay unsubscribed if they're added again."
+        : "Anyone unsubscribed stays unsubscribed if they're added again."
+      : null,
+    paused
+      ? one
+        ? "Being inactive isn't kept: if they're added again, they'll get newsletters. To stop them for good, mark them unsubscribed instead."
+        : "Being inactive isn't kept: anyone inactive who's added again will get newsletters. To stop someone for good, mark them unsubscribed instead."
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+const UNSUBSCRIBE_EXPLAINED =
+  "They won't get any newsletters, and it's kept even if they're deleted and added again. Only they (from the link in a newsletter) or an admin can undo it.";
 
 function recipientCount(count: number): string {
   return `${count} recipient${count === 1 ? "" : "s"}`;
@@ -325,6 +354,38 @@ function EditRecipientDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sync = useContext(GroupSyncContext);
+  const isAdmin = useHasRole("admin");
+
+  // Separate from Save: it takes effect at once, after its own question.
+  async function changeSubscription(subscribe: boolean) {
+    const confirmed = await confirmAction(
+      subscribe
+        ? {
+            title: `Subscribe ${recipient.email} again?`,
+            description: "Only do this if they asked to get newsletters again. It's recorded on the Logs page.",
+            confirmLabel: "Subscribe again",
+          }
+        : {
+            title: `Mark ${recipient.email} as unsubscribed?`,
+            description: UNSUBSCRIBE_EXPLAINED,
+            confirmLabel: "Mark as unsubscribed",
+          },
+    );
+    if (!confirmed) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const { recipient: updated } = subscribe
+        ? await resubscribeRecipient(recipient.id)
+        : await markRecipientUnsubscribed(recipient.id);
+      onSaved(updated);
+      toast({ variant: "success", title: subscribe ? "Subscribed again" : "Marked as unsubscribed" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   function loadGroups() {
     setAllGroups(null);
@@ -441,6 +502,50 @@ function EditRecipientDialog({
               </div>
             ) : (
               <RecipientGroupsField allGroups={allGroups} value={groups} disabled={submitting} onChange={setGroups} />
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <p className="text-sm font-medium">Newsletters</p>
+            {recipient.unsubscribedAt ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Unsubscribed on {formatDate(recipient.unsubscribedAt)},{" "}
+                  {recipient.unsubscribedBy ? `marked by ${recipient.unsubscribedBy}` : "using the link in a newsletter"}.
+                  It's kept even if they're deleted and added again.
+                </p>
+                {isAdmin ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="self-start"
+                    disabled={submitting}
+                    onClick={() => void changeSubscription(true)}
+                  >
+                    Subscribe again
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Only they, from their link, or an admin can undo this.</p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  If they ask to stop getting newsletters, by replying to one or any other way, mark them unsubscribed.
+                  Unlike making them inactive, it's kept even if they're deleted and added again.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="self-start"
+                  disabled={submitting}
+                  onClick={() => void changeSubscription(false)}
+                >
+                  Mark as unsubscribed
+                </Button>
+              </>
             )}
           </div>
 
@@ -569,11 +674,16 @@ function RecipientTableRow({
           // Their own choice (#383): not a switch an editor can flip back.
           <span
             className="flex flex-col text-xs leading-tight"
-            title="They unsubscribed using the link in a newsletter. Only they can subscribe again, from the same link."
+            title={
+              recipient.unsubscribedBy
+                ? "Marked unsubscribed after they asked. Kept even if they're deleted and added again."
+                : "They unsubscribed using the link in a newsletter. Kept even if they're deleted and added again."
+            }
           >
             <span className="font-medium">Unsubscribed</span>
+            <span className="text-muted-foreground">{formatDate(recipient.unsubscribedAt)}</span>
             <span className="text-muted-foreground">
-              {formatDate(recipient.unsubscribedAt)}
+              {recipient.unsubscribedBy ? `marked by ${recipient.unsubscribedBy}` : "by their link"}
             </span>
           </span>
         ) : (
@@ -585,7 +695,11 @@ function RecipientTableRow({
             disabled={toggling}
             aria-label={recipient.isActive ? "Active" : "Inactive"}
           />
-          <Label htmlFor={`recipient-active-${recipient.id}`} className="hidden text-muted-foreground sm:block">
+          <Label
+            htmlFor={`recipient-active-${recipient.id}`}
+            className="hidden text-muted-foreground sm:block"
+            title={recipient.isActive ? undefined : "Paused by you: skipped by every send. Not kept if they're deleted and added again."}
+          >
             {recipient.isActive ? "Active" : "Inactive"}
           </Label>
         </div>
@@ -597,7 +711,7 @@ function RecipientTableRow({
           <ConfirmDeleteButton
             label={`Delete ${recipient.email}`}
             noun="recipient"
-            consequence={DELETE_RECIPIENT_CONSEQUENCE}
+            consequence={deleteConsequence([recipient])}
             onConfirm={() =>
               deleteRecipient(recipient.id)
                 .then(() => {
@@ -797,6 +911,12 @@ function bulkOutcome(
         description: rest > 0 ? `${rest} already ${were}.` : undefined,
       };
     }
+    case "unsubscribe":
+      if (changed === 0) return { title: "Nothing to change", description: "Already unsubscribed." };
+      return {
+        title: `${recipientCount(changed)} marked unsubscribed`,
+        description: rest > 0 ? `${rest} already ${were}.` : undefined,
+      };
     case "addToGroup":
       if (changed === 0) return { title: "Nothing to change", description: `Already in ${groupName}.` };
       return {
@@ -968,11 +1088,21 @@ function RecipientsSection({
     const ids = selectedRecipients.map((r) => r.id);
     const confirmed = await confirmAction({
       title: `Delete ${recipientCount(ids.length)}?`,
-      description: `${DELETE_RECIPIENT_CONSEQUENCE} This can't be undone.`,
+      description: `${deleteConsequence(selectedRecipients)} This can't be undone.`,
       confirmLabel: `Delete ${recipientCount(ids.length)}`,
       destructive: true,
     });
     if (confirmed) await runBulk({ action: "delete", ids });
+  }
+
+  async function unsubscribeSelected() {
+    const ids = selectedRecipients.map((r) => r.id);
+    const confirmed = await confirmAction({
+      title: `Mark ${recipientCount(ids.length)} as unsubscribed?`,
+      description: UNSUBSCRIBE_EXPLAINED,
+      confirmLabel: "Mark as unsubscribed",
+    });
+    if (confirmed) await runBulk({ action: "unsubscribe", ids });
   }
 
   return (
@@ -1079,6 +1209,15 @@ function RecipientsSection({
                 >
                   Make inactive
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={bulkBusy}
+                  onClick={() => void unsubscribeSelected()}
+                >
+                  Mark unsubscribed
+                </Button>
                 {groups.length > 0 ? (
                   <>
                     <BulkGroupDialog
@@ -1173,6 +1312,12 @@ function RecipientsSection({
             </p>
           ) : (
             <>
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Inactive:</span> paused by you, and skipped by every send.
+                It isn't kept if they're deleted.{" "}
+                <span className="font-medium text-foreground">Unsubscribed:</span> they asked to stop. It's kept even if
+                they're deleted and added again.
+              </p>
               <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-left text-sm">
                   <caption className="sr-only">Recipients</caption>
