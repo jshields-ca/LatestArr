@@ -1,5 +1,47 @@
 # @latestarr/db
 
+## 0.13.1
+
+### Patch Changes
+
+- [#504](https://github.com/jshields-ca/LatestArr/pull/504) [`b72d064`](https://github.com/jshields-ca/LatestArr/commit/b72d0648a24ea5a312e3da3e8615bd486ff04c6c) - **New:** On **Recipients**, you can now mark someone as unsubscribed when they ask to stop by replying to a newsletter, or any other way. Like using the link in a newsletter, it holds even if they're deleted and added again. Before, the only option was **Make inactive**, which is lost when someone is deleted, so they were signed back up when added again.
+
+  - **Mark as unsubscribed** is in a person's **Edit** window, and **Mark unsubscribed** works on several ticked people at once. Editors can do this.
+  - **Subscribe again**, for when someone asks to get newsletters again, is in the same window. Only admins can use it, and it's recorded on the **Logs** page.
+  - **Unsubscribed** now says whether the person used the link or who marked them. A line above the list explains how **Inactive** (your pause, which isn't kept) differs from **Unsubscribed** (their choice, which is). Deleting someone says what happens if they're added again.
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **New routes:**
+    - `POST /api/recipients/:id/unsubscribe` (editor) sets `unsubscribedAt` and `unsubscribedBy` (the editor's name), and adds the address to `unsubscribed_addresses`.
+    - `POST /api/recipients/:id/resubscribe` (admin) clears both, removes the address from the list, and records an audit event.
+    - `POST /api/recipients/bulk` takes `action: "unsubscribe"`.
+  - **Migration `0015`:** adds `unsubscribed_by` to `recipients` and `unsubscribed_addresses`. Adding, importing, or changing the address of someone on the list carries it over, as `unsubscribedAt` already was.
+  - **Inactive isn't kept:** being inactive is still not remembered when someone is deleted. That's deliberate, because it's a pause, not an opt-out.
+
+  </details>
+
+- [#493](https://github.com/jshields-ca/LatestArr/pull/493) [`e9a91f7`](https://github.com/jshields-ca/LatestArr/commit/e9a91f7f1b0f953db412be69d46a41223c2571e7) - **Fixed:** Someone who unsubscribed was signed back up if they were deleted and added again, by hand, from a file or with **Import users**. Unsubscribing now holds for their address, so they're added back still unsubscribed. Also fixed:
+
+  - Gmail and other mail apps' own Unsubscribe button could be turned away when many people pressed it within a minute.
+  - When a Plex server and its Tautulli both had libraries chosen and one couldn't be reached, the newsletter went out without either, and nothing said so. It now fails and alerts, as when a source fails.
+  - A show on two servers (Plex and Jellyfin, say) listed each new episode twice in its row; now once.
+  - **Send to the rest** said someone had failed last time when they'd been skipped because they had unsubscribed.
+  - A public IPv6 address in `PUBLIC_URL` was warned about as if it only worked on your own network.
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **Unsubscribed addresses:** a new `unsubscribed_addresses` table (migration `0014`) holds a SHA-256 of each unsubscribed address, lowercased and trimmed, never the address itself. Unsubscribing from the link adds it and subscribing again removes it. Adding a recipient (`POST /api/recipients`), importing (`POST /api/recipients/import`, also used by Import users) and changing a recipient's address (`PATCH`) set `unsubscribedAt` from it. At startup, everyone already unsubscribed is added to the list, so it works after upgrading from 0.13.0 and after restoring a 0.13.0 backup.
+  - **One-click rate limit:** `POST /api/unsubscribe/:token` allows 600 a minute per address, up from 20, because mail providers send these from shared servers. The confirmation page's request keeps 20. Tokens are 122 random bits.
+  - **Library choice:** when a source can't say which server it reads and another source may read the same one with libraries left out, the render throws instead of leaving both out. Previews answer 502 with the reason, and scheduled sends fail and alert. A choice that leaves a source no libraries in common is still only logged.
+  - **Grouped episodes:** a folded row keeps the first copy of each subtitle.
+  - **Send to the rest:** only `failed` and `bounced` results count as failed before; `skipped_unsubscribed` counts as not sent.
+  - **`isPrivateOrigin`:** a bracketed IPv6 host is private only when unique-local (`fc00::/7`) or link-local (`fe80::/10`).
+
+  </details>
+
 ## 0.13.0
 
 ### Minor Changes

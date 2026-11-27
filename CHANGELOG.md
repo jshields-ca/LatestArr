@@ -11,6 +11,70 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.13.1] - 2026-11-27
+
+### New
+
+- On **Recipients**, you can now mark someone as unsubscribed when they ask to stop by replying to a newsletter, or any other way. Like using the link in a newsletter, it holds even if they're deleted and added again. Before, the only option was **Make inactive**, which is lost when someone is deleted, so they were signed back up when added again. ([#504](https://github.com/jshields-ca/LatestArr/pull/504))
+
+  - **Mark as unsubscribed** is in a person's **Edit** window, and **Mark unsubscribed** works on several ticked people at once. Editors can do this.
+  - **Subscribe again**, for when someone asks to get newsletters again, is in the same window. Only admins can use it, and it's recorded on the **Logs** page.
+  - **Unsubscribed** now says whether the person used the link or who marked them. A line above the list explains how **Inactive** (your pause, which isn't kept) differs from **Unsubscribed** (their choice, which is). Deleting someone says what happens if they're added again.
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **New routes:**
+    - `POST /api/recipients/:id/unsubscribe` (editor) sets `unsubscribedAt` and `unsubscribedBy` (the editor's name), and adds the address to `unsubscribed_addresses`.
+    - `POST /api/recipients/:id/resubscribe` (admin) clears both, removes the address from the list, and records an audit event.
+    - `POST /api/recipients/bulk` takes `action: "unsubscribe"`.
+  - **Migration `0015`:** adds `unsubscribed_by` to `recipients` and `unsubscribed_addresses`. Adding, importing, or changing the address of someone on the list carries it over, as `unsubscribedAt` already was.
+  - **Inactive isn't kept:** being inactive is still not remembered when someone is deleted. That's deliberate, because it's a pause, not an opt-out.
+
+  </details>
+
+### Fixed
+
+- When an email groups several new episodes of a show into one row, they're now listed in order (S01E01, S01E02, S01E04) instead of the order they were added, which could read S01E04, S01E01, S01E02. The Users and Backups pages, and the log line about a different `ENCRYPTION_KEY`, now say "email servers" instead of "SMTP", like the rest of the app. ([#488](https://github.com/jshields-ca/LatestArr/pull/488))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **Episode order:** `groupEpisodes` in `render/mjml-template.ts` sorts each series' episodes by the season and episode number at the start of the subtitle (`S01E04 - …`, as the Plex, Jellyfin and Tautulli adapters write it). Episodes without a number go last, in their original order. The row itself keeps its place, at the series' newest episode.
+
+  </details>
+
+- On a design with a dark background, notices (Info, Warning and Alert) showed the design's light text on a pale box, so they couldn't be read in the preview or in sent emails. A dark design's notice now has a dark box. If a design's text or link colour can't be read on a notice's box, the notice uses one that can. ([#502](https://github.com/jshields-ca/LatestArr/pull/502))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - A notice uses the dark set of colours (bar, tint and icon) when the design's background is dark, and the light set otherwise. Before, it always used the light set.
+  - The notice's text keeps the design's text colour when it reaches 4.5:1 against the tint (WCAG). Otherwise it's `#1c1a1b` on a light tint or `#f4f1f2` on a dark one, and dark mode turns `#1c1a1b` light.
+  - Links in the notice keep the design's link colour when it reaches 4.5:1, and otherwise use the notice type's colour. Code designs get this as `noticeLinkColor`.
+
+  </details>
+
+- Someone who unsubscribed was signed back up if they were deleted and added again, by hand, from a file or with **Import users**. Unsubscribing now holds for their address, so they're added back still unsubscribed. Also fixed: ([#493](https://github.com/jshields-ca/LatestArr/pull/493))
+
+  - Gmail and other mail apps' own Unsubscribe button could be turned away when many people pressed it within a minute.
+  - When a Plex server and its Tautulli both had libraries chosen and one couldn't be reached, the newsletter went out without either, and nothing said so. It now fails and alerts, as when a source fails.
+  - A show on two servers (Plex and Jellyfin, say) listed each new episode twice in its row; now once.
+  - **Send to the rest** said someone had failed last time when they'd been skipped because they had unsubscribed.
+  - A public IPv6 address in `PUBLIC_URL` was warned about as if it only worked on your own network.
+
+  <details>
+  <summary>Technical details</summary>
+
+  - **Unsubscribed addresses:** a new `unsubscribed_addresses` table (migration `0014`) holds a SHA-256 of each unsubscribed address, lowercased and trimmed, never the address itself. Unsubscribing from the link adds it and subscribing again removes it. Adding a recipient (`POST /api/recipients`), importing (`POST /api/recipients/import`, also used by Import users) and changing a recipient's address (`PATCH`) set `unsubscribedAt` from it. At startup, everyone already unsubscribed is added to the list, so it works after upgrading from 0.13.0 and after restoring a 0.13.0 backup.
+  - **One-click rate limit:** `POST /api/unsubscribe/:token` allows 600 a minute per address, up from 20, because mail providers send these from shared servers. The confirmation page's request keeps 20. Tokens are 122 random bits.
+  - **Library choice:** when a source can't say which server it reads and another source may read the same one with libraries left out, the render throws instead of leaving both out. Previews answer 502 with the reason, and scheduled sends fail and alert. A choice that leaves a source no libraries in common is still only logged.
+  - **Grouped episodes:** a folded row keeps the first copy of each subtitle.
+  - **Send to the rest:** only `failed` and `bounced` results count as failed before; `skipped_unsubscribed` counts as not sent.
+  - **`isPrivateOrigin`:** a bracketed IPv6 host is private only when unique-local (`fc00::/7`) or link-local (`fe80::/10`).
+
+  </details>
+
 ## [0.13.0] - 2026-11-26
 
 ### New
