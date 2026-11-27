@@ -155,6 +155,16 @@ export const recipientGroupMembers = sqliteTable(
   }),
 );
 
+// Addresses whose owner unsubscribed (#383), kept when their recipient is
+// deleted, so adding the address again (by hand, a file, or Import users)
+// doesn't sign them back up. Only a SHA-256 of the lowercased address is
+// kept: enough to recognise it, not to read it back.
+// apps/server/src/mailer/unsubscribe-list.ts.
+export const unsubscribedAddresses = sqliteTable("unsubscribed_addresses", {
+  addressHash: text("address_hash").primaryKey(),
+  unsubscribedAt: integer("unsubscribed_at", { mode: "timestamp" }).notNull(),
+});
+
 // What the latest recipient import changed (#288), so Undo can reverse
 // exactly that: see apps/server/src/http/routes/recipient-import.ts. Only
 // the latest is kept; an import replaces the one before.

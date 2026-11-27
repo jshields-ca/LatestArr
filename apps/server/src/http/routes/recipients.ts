@@ -3,6 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { isUniqueConstraintError } from "../db-errors.js";
+import { rememberUnsubscribed, unsubscribedSince } from "../../mailer/unsubscribe-list.js";
 import {
   applyRecipientImport,
   ImportNotUndoableError,
@@ -102,8 +103,15 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
       const { email, displayName } = body;
 
       try {
-        const [recipient] = await db.insert(recipients).values({ email, displayName }).returning();
-        request.log.info({ recipientId: recipient!.id }, `Added recipient ${email}`);
+        // Someone who unsubscribed before stays unsubscribed (#383).
+        const unsubscribedAt = unsubscribedSince(db, email);
+        const [recipient] = await db.insert(recipients).values({ email, displayName, unsubscribedAt }).returning();
+        request.log.info(
+          { recipientId: recipient!.id },
+          unsubscribedAt
+            ? `Added recipient ${email}, who unsubscribed before, so they stay unsubscribed`
+            : `Added recipient ${email}`,
+        );
         return reply.code(201).send({ recipient });
       } catch (err) {
         if (isUniqueConstraintError(err)) {
@@ -327,15 +335,26 @@ export function registerRecipientRoutes(app: FastifyInstance, db: Db): void {
       const { email, displayName, isActive } = body;
 
       try {
-        const [recipient] = await db
-          .update(recipients)
-          .set({
-            ...(email !== undefined && { email }),
-            ...(displayName !== undefined && { displayName }),
-            ...(isActive !== undefined && { isActive }),
-          })
-          .where(eq(recipients.id, request.params.id))
-          .returning();
+        const recipient = db.transaction((tx) => {
+          const before = tx.select().from(recipients).where(eq(recipients.id, request.params.id)).get();
+          if (!before) return undefined;
+          // A new address that unsubscribed before keeps that (#383); an
+          // unsubscribed person's new address is remembered too.
+          const newAddress = email !== undefined && email.toLowerCase() !== before.email.toLowerCase();
+          const unsubscribedAt = newAddress && !before.unsubscribedAt ? unsubscribedSince(tx, email) : null;
+          if (newAddress && before.unsubscribedAt) rememberUnsubscribed(tx, email, before.unsubscribedAt);
+          return tx
+            .update(recipients)
+            .set({
+              ...(email !== undefined && { email }),
+              ...(displayName !== undefined && { displayName }),
+              ...(isActive !== undefined && { isActive }),
+              ...(unsubscribedAt && { unsubscribedAt }),
+            })
+            .where(eq(recipients.id, before.id))
+            .returning()
+            .get();
+        });
 
         if (!recipient) {
           return reply.code(404).send({ error: "Not found" });

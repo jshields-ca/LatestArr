@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Logger } from "../../logger.js";
 import { isUnsubscribeToken } from "../../mailer/unsubscribe.js";
+import { forgetUnsubscribed, rememberUnsubscribed } from "../../mailer/unsubscribe-list.js";
 import { parseBody } from "../validate.js";
 
 // Public, on purpose (#383): a recipient has no account. The token is the
@@ -15,6 +16,12 @@ import { parseBody } from "../validate.js";
 // Few legitimate requests per address; enough for a person changing their
 // mind, little for anyone guessing tokens (122 random bits each).
 const LIMIT = { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } };
+
+// Mail providers send one-click requests for all their users from a few
+// shared servers, so many recipients unsubscribing at once (after a send)
+// would hit the limit above and quietly stay subscribed. Guessing a token
+// is out of reach either way.
+const ONE_CLICK_LIMIT = { config: { rateLimit: { max: 600, timeWindow: "1 minute" } } };
 
 const pageSchema = z.object({
   token: z.string().max(64),
@@ -30,10 +37,16 @@ function setSubscribed(db: Db, token: string, subscribed: boolean, how: string, 
   if (!recipient) return null;
   const isSubscribed = recipient.unsubscribedAt === null;
   if (isSubscribed !== subscribed) {
-    db.update(recipients)
-      .set({ unsubscribedAt: subscribed ? null : new Date() })
-      .where(eq(recipients.id, recipient.id))
-      .run();
+    const at = new Date();
+    db.transaction((tx) => {
+      tx.update(recipients)
+        .set({ unsubscribedAt: subscribed ? null : at })
+        .where(eq(recipients.id, recipient.id))
+        .run();
+      // Also by address, so it holds if they're deleted and added again.
+      if (subscribed) forgetUnsubscribed(tx, recipient.email);
+      else rememberUnsubscribed(tx, recipient.email, at);
+    });
     log.info(
       { recipientId: recipient.id, how },
       subscribed ? `${recipient.email} subscribed again` : `${recipient.email} unsubscribed (${how})`,
@@ -55,7 +68,7 @@ export function registerUnsubscribeRoutes(app: FastifyInstance, db: Db): void {
     // One-click, from the List-Unsubscribe header. Mail providers post here
     // without a browser, so there's no Origin to check; the token is the
     // whole authority, as the RFC intends. Request logs hide it (logger.ts).
-    scope.post<{ Params: { token: string } }>("/unsubscribe/:token", LIMIT, async (request, reply) => {
+    scope.post<{ Params: { token: string } }>("/unsubscribe/:token", ONE_CLICK_LIMIT, async (request, reply) => {
       const outcome = setSubscribed(db, request.params.token, false, "one-click from their mail app", request.log);
       if (!outcome) return reply.code(404).send({ error: "This unsubscribe link isn't valid." });
       return reply.send(outcome);

@@ -129,7 +129,11 @@ export async function planSendToTheRest(
     .from(sendRunRecipientResults)
     .where(eq(sendRunRecipientResults.sendRunId, run.id));
   const sent = new Set(results.filter((result) => result.status === "sent").map((result) => result.recipientId));
-  const failed = new Set(results.filter((result) => result.status !== "sent").map((result) => result.recipientId));
+  // Only a real failure: someone skipped as unsubscribed, who has since
+  // subscribed again, was never sent it.
+  const failed = new Set(
+    results.filter((result) => result.status === "failed" || result.status === "bounced").map((result) => result.recipientId),
+  );
 
   // The newsletter's recipients as they are now: anyone deactivated since
   // is left out, and anyone added since is included.

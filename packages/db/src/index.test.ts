@@ -64,6 +64,7 @@ describe("migrations", () => {
         "smtp_profiles",
         "source_connections",
         "templates",
+        "unsubscribed_addresses",
         "users",
       ].sort(),
     );

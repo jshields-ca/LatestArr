@@ -721,6 +721,18 @@ describe("the summary, grouping, and section helpers", () => {
     ]);
   });
 
+  it("lists an episode once in a folded row when two servers both have it", async () => {
+    const copy = (n: number, server: string) =>
+      item({ id: `${server}-${n}`, title: "Severance", kind: "tv_episode", subtitle: `S01E0${n} - Part ${n}`, externalUrl: `${server}-${n}` });
+    const html = await render(
+      `{{#mediaList groupEpisodes="true"}}<mj-text>@@{{episodeCount}}|{{#each episodes}}{{subtitle}}={{externalUrl}};{{/each}}@@</mj-text>{{/mediaList}}`,
+      [copy(1, "plex"), copy(1, "jellyfin"), copy(2, "jellyfin"), copy(2, "plex")],
+    );
+    expect([...html.matchAll(/@@([^@]*)@@/g)].map((m) => m[1])).toEqual([
+      "2|S01E01 - Part 1=plex-1;S01E02 - Part 2=jellyfin-2;",
+    ]);
+  });
+
   it("filters on several content types at once", async () => {
     const html = await render(
       `{{#mediaList contentType="tv_episode,tv_season"}}<mj-text>({{title}})</mj-text>{{/mediaList}}{{#ifAnyItems contentType="book,game"}}<mj-text>(books)</mj-text>{{/ifAnyItems}}`,

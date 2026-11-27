@@ -60,10 +60,16 @@ export function unsubscribeOrigin(
 const PRIVATE_HOST =
   /^(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])(\.\d{1,3}){2}|169\.254(\.\d{1,3}){2}|\[f[cd][0-9a-f:]*\]|\[fe80:[0-9a-f:]*\]|[^.]+|.+\.(local|lan|home|home\.arpa|internal|localdomain|ts\.net))$/i;
 
+// An IPv6 address is in brackets and has no dots, so it's judged on its
+// own: only unique-local and link-local are private.
+const PRIVATE_IPV6 = /^\[(f[cd]|fe[89ab])[0-9a-f]*:[0-9a-f:.]*\]$/i;
+
 /** Whether links to this origin only work on the sender's own network. */
 export function isPrivateOrigin(origin: string): boolean {
   try {
-    return PRIVATE_HOST.test(new URL(origin).hostname);
+    const { hostname } = new URL(origin);
+    if (hostname.startsWith("[")) return PRIVATE_IPV6.test(hostname);
+    return PRIVATE_HOST.test(hostname);
   } catch {
     return false;
   }

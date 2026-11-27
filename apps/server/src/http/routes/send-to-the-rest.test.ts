@@ -223,6 +223,22 @@ describe("Send to the rest", () => {
     expect(failed[0]!.error).toBe("mailbox full");
   });
 
+  it("says someone skipped as unsubscribed, who has since subscribed again, wasn't sent it rather than failed", async () => {
+    const { newsletterId, recipientIds } = await setUp("a@example.com", "b@example.com", "c@example.com");
+    await db.update(recipients).set({ unsubscribedAt: new Date() }).where(eq(recipients.id, recipientIds[2]!));
+    const runId = await partialSend(newsletterId, 2, 1);
+    expect((await resultsFor(runId)).find((result) => result.recipientId === recipientIds[2])?.status).toBe(
+      "skipped_unsubscribed",
+    );
+    await db.update(recipients).set({ unsubscribedAt: null }).where(eq(recipients.id, recipientIds[2]!));
+
+    const plan = await app.inject(authed({ method: "GET", url: `/api/newsletters/${newsletterId}/send-runs/${runId}/rest` }));
+    expect(plan.json().recipients).toEqual([
+      expect.objectContaining({ email: "b@example.com", previous: "failed" }),
+      expect.objectContaining({ email: "c@example.com", previous: "not_sent" }),
+    ]);
+  });
+
   it("finishes a send interrupted by a stop, leaving out anyone deactivated and including anyone added since", async () => {
     const { newsletterId, groupId, recipientIds } = await setUp("a@example.com", "b@example.com", "c@example.com");
     const runId = await partialSend(newsletterId, 3, 3);

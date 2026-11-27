@@ -51,7 +51,8 @@ describe("libraryChoices", () => {
     expect(unknownWatcher.get("plex")).toEqual({ read: true, libraries: ["1"] });
     expect(unknownWatcher.get("tautulli")).toMatchObject({
       read: false,
-      reason: expect.stringContaining(`"tautulli" is left out`),
+      unsure: true,
+      reason: expect.stringContaining(`"tautulli" couldn't be checked against "plex"`),
     });
 
     // Plex, with the choice, couldn't say; Tautulli could.

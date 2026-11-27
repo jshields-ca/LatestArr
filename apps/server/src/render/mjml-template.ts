@@ -279,6 +279,19 @@ const MAX_LISTED_EPISODES = 5;
 // Subtitles without a number keep their place after the numbered ones.
 const EPISODE_NUMBER = /^S(\d+)E(\d+)/;
 
+// Two servers that aren't merged (Plex and Jellyfin reading the same
+// files, #392) both list a new episode, which a folded row would show
+// twice ("S01E01, S01E01"). The first copy is kept.
+function withoutRepeats(series: RenderableItem[]): RenderableItem[] {
+  const seen = new Set<string>();
+  return series.filter((episode) => {
+    if (!episode.subtitle) return true;
+    if (seen.has(episode.subtitle)) return false;
+    seen.add(episode.subtitle);
+    return true;
+  });
+}
+
 function inEpisodeOrder(series: RenderableItem[]): RenderableItem[] {
   const key = (episode: RenderableItem): [number, number] => {
     const match = EPISODE_NUMBER.exec(episode.subtitle ?? "");
@@ -306,7 +319,8 @@ function groupEpisodes(items: RenderableItem[]): RenderableItem[] {
   const rows: RenderableItem[] = [];
   const done = new Set<string>();
   for (const item of items) {
-    const series = item.kind === "tv_episode" ? bySeries.get(item.title) : undefined;
+    const all = item.kind === "tv_episode" ? bySeries.get(item.title) : undefined;
+    const series = all && withoutRepeats(all);
     if (!series || series.length < 2) {
       rows.push(item);
       continue;

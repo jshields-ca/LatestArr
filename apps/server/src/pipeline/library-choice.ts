@@ -21,8 +21,12 @@ export interface LinkForChoice {
 export type LibraryChoice =
   /** Read these libraries only; undefined reads every one. */
   | { read: true; libraries: string[] | undefined }
-  /** Read nothing from this source, and why, for the log. */
-  | { read: false; reason: string };
+  /**
+   * Read nothing from this source, and why. `unsure` when it's because a
+   * source couldn't say which server it reads (it's usually unreachable),
+   * which the send treats as a failure rather than going out without it.
+   */
+  | { read: false; reason: string; unsure?: true };
 
 function chosen(link: LinkForChoice): string[] | undefined {
   // An empty list, which linking accepted before #483, meant every library.
@@ -72,7 +76,8 @@ export function libraryChoices(links: LinkForChoice[], serverIds: Map<string, st
       unsure
         ? {
             read: false,
-            reason: `"${link.sourceName}" is left out this time: it couldn't be checked against "${unsure.sourceName}", which may read the same server and has libraries left out`,
+            unsure: true,
+            reason: `"${link.sourceName}" couldn't be checked against "${unsure.sourceName}", which may read the same server and has libraries left out. Check that both can be reached.`,
           }
         : { read: true, libraries: libraries && [...new Set(libraries)] },
     );

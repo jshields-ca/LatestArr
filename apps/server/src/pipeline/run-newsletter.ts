@@ -208,6 +208,11 @@ function fetchKinds(link: LinkedSource["link"], adapter: LinkedSource["adapter"]
 }
 
 // The libraries to read from each source (#483), logging any it skips.
+// When a source can't be checked against another (one of them didn't say
+// which server it reads, usually because it's unreachable), the send fails
+// as it would if that source failed: sending without it would go out
+// missing a source, with nothing to say so. A choice that leaves a source
+// no libraries is a setting, so that one is only logged.
 function resolveLibraryChoices(linkedSources: LinkedSource[], serverIds: Map<string, string>, log: Logger): Map<string, LibraryChoice> {
   const choices = libraryChoices(
     linkedSources.map(({ link, source, adapter }) => ({
@@ -219,7 +224,9 @@ function resolveLibraryChoices(linkedSources: LinkedSource[], serverIds: Map<str
     serverIds,
   );
   for (const [sourceId, choice] of choices) {
-    if (!choice.read) log.warn({ sourceId }, choice.reason);
+    if (choice.read) continue;
+    if (choice.unsure) throw new Error(choice.reason);
+    log.warn({ sourceId }, choice.reason);
   }
   return choices;
 }

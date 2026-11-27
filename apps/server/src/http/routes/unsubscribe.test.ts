@@ -101,12 +101,13 @@ describe("one-click unsubscribe (RFC 8058)", () => {
     expect(logged).toContain("person@example.com unsubscribed");
   });
 
-  it("limits how often it can be tried", async () => {
-    let last = 0;
-    for (let i = 0; i < 21; i++) {
-      last = (await app.inject({ method: "POST", url: "/api/unsubscribe/00000000-0000-4000-8000-000000000000" })).statusCode;
+  it("still limits how often it can be tried, though more loosely than the page", async () => {
+    const codes: number[] = [];
+    for (let i = 0; i < 601; i++) {
+      codes.push((await app.inject({ method: "POST", url: "/api/unsubscribe/00000000-0000-4000-8000-000000000000" })).statusCode);
     }
-    expect(last).toBe(429);
+    expect(codes.slice(0, 600).every((code) => code === 404)).toBe(true);
+    expect(codes[600]).toBe(429);
   });
 });
 
@@ -119,6 +120,29 @@ describe("opening the one-click address in a browser", () => {
     expect(stored(person.id).unsubscribedAt).toBeNull();
     const bad = await app.inject({ method: "GET", url: "/api/unsubscribe/%3Cscript%3E" });
     expect(bad.headers.location).toBe("/unsubscribe");
+  });
+});
+
+describe("rate limits", () => {
+  it("takes many one-click requests from one mail provider's server, but few page requests", async () => {
+    const people = Array.from({ length: 30 }, (_, n) => addRecipient(`person${n}@example.com`));
+    for (const person of people) {
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/unsubscribe/${person.unsubscribeToken}`,
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: "List-Unsubscribe=One-Click",
+      });
+      expect(response.statusCode).toBe(200);
+    }
+    expect(people.every((person) => stored(person.id).unsubscribedAt !== null)).toBe(true);
+
+    const page = () =>
+      app.inject({ method: "POST", url: "/api/unsubscribe", payload: { token: people[0]!.unsubscribeToken, subscribed: false } });
+    const codes = [];
+    for (let i = 0; i < 21; i++) codes.push((await page()).statusCode);
+    expect(codes.slice(0, 20).every((code) => code === 200)).toBe(true);
+    expect(codes[20]).toBe(429);
   });
 });
 

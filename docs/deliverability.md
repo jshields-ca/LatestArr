@@ -50,6 +50,7 @@ The message's `DKIM-Signature` header names the selector (`s=`) and domain (`d=`
 Every newsletter carries an **Unsubscribe** link for its recipient, and the `List-Unsubscribe` and `List-Unsubscribe-Post` headers (RFC 8058) that let Gmail, Yahoo and other mail apps show their own Unsubscribe button.
 
 - **Unsubscribing leaves every newsletter** on your LatestArr. The **Recipients** page shows who unsubscribed and when. An editor can't switch them back on; the person can, from the same link.
+- **It holds for their address,** not just their place on the list: deleting someone who unsubscribed and adding them again, by hand, from a file or with **Import users**, keeps them unsubscribed. For this LatestArr keeps a SHA-256 fingerprint of the address, which recognises it but can't be read back.
 - **Opening the link changes nothing.** The page asks first, so a mail scanner that follows links can't unsubscribe anyone.
 - **Code designs** add the link with `{{unsubscribeUrl}}`. The headers go out either way.
 
@@ -133,6 +134,3 @@ server {
 
 Then set `PUBLIC_URL=https://unsubscribe.example.com` and restart LatestArr. To check, open `https://unsubscribe.example.com/unsubscribe#preview`: it should say the link is from a preview. The sign-in page at the same address should not load.
 
-## What it doesn't do yet
-
-Deleting an unsubscribed person and adding them again starts them afresh, subscribed. Leave them on the list instead.
