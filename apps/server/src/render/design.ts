@@ -196,6 +196,7 @@ export function designContentVariables(settings: DesignSettings) {
     ctas,
     notice: notice.title || notice.body ? { type: notice.type, title: notice.title, body: notice.body } : undefined,
     noteLinkColor: settings.colors.link ?? settings.colors.accent,
+    noticeLinkColor: notice.title || notice.body ? noticeColours(notice.type, paletteFor(settings)).link : undefined,
     wording: buildWording(settings.wording.sectionNames, settings.wording.dateOrder),
   };
 }
@@ -319,10 +320,47 @@ const NOTICE_COLOURS: Record<NoticeType, { light: [string, string]; dark: [strin
   alert: { light: ["#b3261e", "#fbe5e3"], dark: ["#ff8a80", "#3a1d1d"], glyph: "×" },
 };
 const NOTICE_GLYPH = "#fffffe";
+// The notice's text when the design's own text colour can't be read on the
+// tint (white text on a dark design used to land on the light tint). Not
+// any palette colour, so dark mode can recolour it on its own.
+const NOTICE_INK = { dark: "#1c1a1b", light: "#f4f1f2" };
+
+// WCAG contrast ratio between two hex colours.
+function contrast(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    }) as [number, number, number];
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * A notice's colours on this design: the light set on a light design and
+ * the dark set on a dark one. The text and links keep the design's colours
+ * when they can be read on the tint (4.5:1), and otherwise fall back to an
+ * ink that can, or for links, the type's colour.
+ */
+function noticeColours(type: NoticeType, p: Palette) {
+  const lightDesign = isLight(p.background);
+  const [bar, tint] = NOTICE_COLOURS[type][lightDesign ? "light" : "dark"];
+  const readable = (colour: string) => contrast(colour, tint) >= 4.5;
+  return {
+    bar,
+    tint,
+    text: readable(p.text) ? p.text : isLight(tint) ? NOTICE_INK.dark : NOTICE_INK.light,
+    link: readable(p.link) ? p.link : bar,
+    // White on the light design's bar; on a dark design's lighter bar, the tint.
+    glyph: lightDesign ? NOTICE_GLYPH : tint,
+  };
+}
 
 function noticeMarkup(type: NoticeType, p: Palette, font: string): string {
-  const { light, glyph } = NOTICE_COLOURS[type];
-  const [colour, tint] = light;
+  const { glyph } = NOTICE_COLOURS[type];
+  const { bar: colour, tint, text, glyph: glyphColour } = noticeColours(type, p);
   return [
     `    {{#if notice}}`,
     `    <mj-section padding="4px 0 8px">`,
@@ -330,8 +368,8 @@ function noticeMarkup(type: NoticeType, p: Palette, font: string): string {
     `        <mj-text padding="0 25px">`,
     `          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;"><tr><td style="background:${tint};border-left:4px solid ${colour};border-radius:4px;padding:10px 14px;">`,
     `            <table role="presentation" cellpadding="0" cellspacing="0"><tr>`,
-    `              <td valign="top" style="padding:1px 10px 0 0;" aria-hidden="true"><div style="width:18px;height:18px;line-height:18px;border-radius:9px;background:${colour};color:${NOTICE_GLYPH};font-family:Arial,sans-serif;font-size:12px;font-weight:700;text-align:center;">${glyph}</div></td>`,
-    `              <td style="font-family:${font};font-size:14px;line-height:1.45;color:${p.text};">{{#if notice.title}}<div style="font-weight:700;color:${p.text};">{{notice.title}}</div>{{/if}}{{#if notice.body}}<div style="color:${p.text};">{{notice.body}}</div>{{/if}}</td>`,
+    `              <td valign="top" style="padding:1px 10px 0 0;" aria-hidden="true"><div style="width:18px;height:18px;line-height:18px;border-radius:9px;background:${colour};color:${glyphColour};font-family:Arial,sans-serif;font-size:12px;font-weight:700;text-align:center;">${glyph}</div></td>`,
+    `              <td style="font-family:${font};font-size:14px;line-height:1.45;color:${text};">{{#if notice.title}}<div style="font-weight:700;color:${text};">{{notice.title}}</div>{{/if}}{{#if notice.body}}<div style="color:${text};">{{notice.body}}</div>{{/if}}</td>`,
     `            </tr></table>`,
     `          </td></tr></table>`,
     `        </mj-text>`,
@@ -385,7 +423,8 @@ function darkModeHead(p: Palette, withDarkLogo = false, notice?: NoticeType): st
   if (p.labelBorder !== p.badgeBorder) {
     rules.push([[`[style*="solid ${p.labelBorder}"]`], `border-color:${d.labelBorder} !important;`, false]);
   }
-  // A notice's tint, bar, icon and glyph (#402).
+  // A notice's tint, bar, icon and glyph (#402), its fallback ink, and a
+  // link drawn in the type's colour.
   if (notice) {
     const { light, dark } = NOTICE_COLOURS[notice];
     rules.push(
@@ -393,6 +432,8 @@ function darkModeHead(p: Palette, withDarkLogo = false, notice?: NoticeType): st
       [[`[style*="solid ${light[0]}"]`], `border-color:${dark[0]} !important;`, false],
       [[`[style*="background:${light[0]}"]`], `background:${dark[0]} !important;`, true],
       [[`[style*="color:${NOTICE_GLYPH}"]`], `color:${d.background} !important;`, false],
+      [[`[style*="color:${NOTICE_INK.dark}"]`], `color:${NOTICE_INK.light} !important;`, false],
+      [[`[style*="color:${light[0]}"]`], `color:${dark[0]} !important;`, false],
     );
   }
   const css = (outlook: boolean) =>
