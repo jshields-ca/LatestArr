@@ -60,7 +60,7 @@ Each source has a setup guide in the [docs](https://www.latestarr.app/docs/sourc
 You'll need Docker with Compose (on x86-64 or 64-bit ARM, such as Apple Silicon or a Raspberry Pi 4 or 5), at least one supported source the container can reach, and an email server or provider to send from. Everything runs in one container, with no separate database to set up.
 
 ```bash
-base=https://raw.githubusercontent.com/jshields-ca/LatestArr/v0.13.0
+base=https://raw.githubusercontent.com/jshields-ca/LatestArr/v0.13.1
 curl -O $base/docker-compose.yml
 curl -o .env $base/.env.example
 # Set ENCRYPTION_KEY in .env (generate one with: openssl rand -base64 32)
