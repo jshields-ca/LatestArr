@@ -15,7 +15,7 @@
 <img src="docs/assets/social-preview.png" alt="LatestArr: self-hosted &quot;what&#39;s new&quot; newsletters for your media server, shown beside a sample newsletter" width="100%" />
 
 > [!WARNING]
-> **Early days, in active development.** LatestArr is pre-1.0. It's usable today, but expect rough edges, and an update may occasionally change how something works. Back up your data and `ENCRYPTION_KEY` before you update, and read the [release notes](https://github.com/jshields-ca/LatestArr/releases). See [Project status](#project-status) for the known gaps.
+> **Pre-1.0, in active development.** LatestArr is usable today, but expect rough edges, and an update may occasionally change how something works. Back up your data and `ENCRYPTION_KEY` before you update, and read the [release notes](https://github.com/jshields-ca/LatestArr/releases). See [Project status](#project-status) for the known gaps.
 
 ## Why LatestArr?
 
@@ -57,23 +57,23 @@ Each source has a setup guide in the [docs](https://www.latestarr.app/docs/sourc
 
 ## Quick start
 
-You'll need Docker with Compose (on x86-64 or 64-bit ARM, such as Apple Silicon or a Raspberry Pi 4 or 5), at least one supported source the container can reach, and an SMTP server or provider to send from. Everything runs in one container, with no separate database to set up.
+You'll need Docker with Compose (on x86-64 or 64-bit ARM, such as Apple Silicon or a Raspberry Pi 4 or 5), at least one supported source the container can reach, and an email server or provider to send from. Everything runs in one container, with no separate database to set up.
 
 ```bash
-# Get docker-compose.yml and .env.example from this repository, then:
-cp .env.example .env
+base=https://raw.githubusercontent.com/jshields-ca/LatestArr/v0.13.0
+curl -O $base/docker-compose.yml
+curl -o .env $base/.env.example
 # Set ENCRYPTION_KEY in .env (generate one with: openssl rand -base64 32)
-docker compose pull
 docker compose up -d
 ```
 
-Open `http://localhost:3000`, create the admin account, and follow the checklist on the dashboard: connect a source, add recipients, set up SMTP, and create your first newsletter.
+Open `http://localhost:3000`, create the admin account, and follow the checklist on the dashboard: connect a source, add recipients, add an email server, and create your first newsletter.
 
 Using Portainer, or prefer one file with no `.env`? See the [one-file setup](docs/self-hosting.md#portainer-or-any-one-file-setup).
 
 - **Keep a copy of `ENCRYPTION_KEY`** somewhere other than `.env`. Without it, the credentials stored in the database can't be read.
 - Before sending to real people, read [Deliverability](https://www.latestarr.app/docs/email-delivery/deliverability) (SPF, DKIM, and DMARC), or your digests may land in spam.
-- Exposing it to the internet? Put it behind a [reverse proxy with HTTPS](https://www.latestarr.app/docs/installation/reverse-proxy). It works just as well on your LAN or a VPN; only your SMTP server needs to reach recipients.
+- Exposing it to the internet? Put it behind a [reverse proxy with HTTPS](https://www.latestarr.app/docs/installation/reverse-proxy). It works just as well on your LAN or a VPN; only your email server needs to reach recipients.
 
 **Upgrading:** `docker compose pull && docker compose up -d`. LatestArr backs up its database first, then migrates it. Keep a copy of your `ENCRYPTION_KEY` somewhere safe; backups don't include it. See [Upgrading and backups](https://www.latestarr.app/docs/installation/upgrading).
 
@@ -84,7 +84,7 @@ The full docs live at **[latestarr.app/docs](https://www.latestarr.app/docs)**:
 - [Installation](https://www.latestarr.app/docs/installation), [environment variables](https://www.latestarr.app/docs/installation/environment-variables), and [reverse proxy and HTTPS](https://www.latestarr.app/docs/installation/reverse-proxy)
 - [Sources](https://www.latestarr.app/docs/sources) and [importing users](https://www.latestarr.app/docs/sources/importing-users)
 - [Newsletters](https://www.latestarr.app/docs/newsletters), [designs](https://www.latestarr.app/docs/designs), and [code mode](https://www.latestarr.app/docs/designs/code-mode)
-- [Email delivery](https://www.latestarr.app/docs/email-delivery), [notifications](https://www.latestarr.app/docs/notifications), and [logs and troubleshooting](https://www.latestarr.app/docs/logs-and-troubleshooting)
+- [Email servers](https://www.latestarr.app/docs/email-delivery), [notifications](https://www.latestarr.app/docs/notifications), and [logs and troubleshooting](https://www.latestarr.app/docs/logs-and-troubleshooting)
 - [Users](https://www.latestarr.app/docs/users), [security](https://www.latestarr.app/docs/security), and [SSO with OIDC](https://www.latestarr.app/docs/security/sso)
 - [FAQ](https://www.latestarr.app/docs/faq)
 

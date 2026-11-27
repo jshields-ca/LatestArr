@@ -9,7 +9,7 @@ From a fresh install to a first sent newsletter. The [README's Quick start](../R
 - **Docker**, with Compose or another way to run one container with a persistent volume (Portainer, `docker run`).
 - **A 64-bit host:** `linux/amd64` or `linux/arm64`, such as Apple Silicon or a Raspberry Pi 4 or 5 on a 64-bit OS. 32-bit ARM isn't supported.
 - **At least one source** LatestArr can reach: Tautulli, Plex, Jellyfin, Emby, a BookLore-family app, Audiobookshelf or RomM. See [Supported sources](../README.md#supported-sources).
-- **An SMTP server or provider** to send from. See [Deliverability](deliverability.md) for keeping digests out of spam.
+- **An email server or provider** to send from. See [Deliverability](deliverability.md) for keeping digests out of spam.
 - **For internet access only:** a reverse proxy with HTTPS. LatestArr itself only serves plain HTTP. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).
 
 ## 2. Configure
@@ -217,7 +217,7 @@ What LatestArr does:
 - **No leaks in errors or logs:** server errors are logged in full but never sent to the browser, and passwords, API keys and tokens are never logged.
 - **Limits on sources:** requests time out after 30 seconds and images are capped at 20 MB, so a broken or hostile source can't hang a send.
 
-**Internal addresses are allowed on purpose.** Sources, SMTP servers and webhooks are usually on your own network, so admins can point LatestArr at internal addresses, and **Test connection** shows whether they answer. Give admin accounts only to people you trust with your network.
+**Internal addresses are allowed on purpose.** Sources, email servers and webhooks are usually on your own network, so admins can point LatestArr at internal addresses, and **Test connection** shows whether they answer. Give admin accounts only to people you trust with your network.
 
 ## Setting up OIDC/SSO
 
@@ -351,7 +351,7 @@ services:
 
 LatestArr's `node` user (UID 1000) must be able to write there. The container sets that up when it starts, where the filesystem allows. If it can't, a backup fails with an error naming the folder, linked to [how to fix it](https://www.latestarr.app/docs/backups#cant-write).
 
-**Keep `ENCRYPTION_KEY` separately.** Backups leave it out on purpose. Without it, a restored backup works, but its source and SMTP credentials and webhook URLs have to be entered again.
+**Keep `ENCRYPTION_KEY` separately.** Backups leave it out on purpose. Without it, a restored backup works, but its source and email server passwords and webhook URLs have to be entered again.
 
 **Backups are sensitive.** They hold every recipient's email address and your send history. Only admins can download them, and each download is logged.
 

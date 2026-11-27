@@ -4,7 +4,9 @@
      and 1200x630 (Open Graph, og-image.png); pass ?w=&h= to size it. Laid out
      at 1280x640 and scaled to fit. The stamp is mark-on-dark.svg, inlined;
      the newsletter is social-newsletter.png, the design editor's sample
-     content with the airmail top edge. -->
+     content with the airmail top edge. The postmark, as on the sign-in card
+     and latestarr.app, is dated with the release in UTC: set RELEASED below,
+     or pass ?date=YYYY-MM-DD. -->
 <html lang="en"><head><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@72,500;72,700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet">
@@ -17,13 +19,15 @@
     background: repeating-linear-gradient(115deg, #f0577f 0 22px, transparent 22px 34px, #86a8f0 34px 56px, transparent 56px 68px); }
   .frame { position: absolute; left: 50%; top: 50%; width: 1280px; height: 640px; transform: translate(-50%, -50%) scale(var(--s)); }
   .left { position: absolute; left: 72px; top: 0; bottom: 0; width: 640px; display: flex; flex-direction: column; justify-content: center; }
-  .lockup { display: flex; align-items: center; gap: 22px; }
-  .lockup svg { width: 104px; height: 104px; transform: rotate(-6deg); transform-origin: 50% 60%; filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.35)); }
+  .lockup { position: relative; display: flex; align-items: center; gap: 22px; }
+  .lockup svg { width: 104px; height: 104px; transform: rotate(-5deg); transform-origin: 50% 60%; filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.35)); }
   .word { font-family: "Newsreader", serif; font-size: 92px; letter-spacing: -0.02em; line-height: 1; }
   .word b { font-weight: 700; } .word span { font-weight: 500; }
   .tag { margin: 30px 0 0; font-size: 29px; line-height: 1.38; color: #c3cbe0; max-width: 600px; }
   .pills { display: flex; gap: 12px; margin-top: 30px; }
   .pills span { font-weight: 600; font-size: 21px; color: #ffd1de; padding: 8px 18px; border-radius: 999px; border: 1.5px solid rgba(240, 87, 127, 0.55); background: rgba(240, 87, 127, 0.12); }
+  /* The postmark: its rings over the stamp's top corner, the wavy lines above the wordmark. */
+  .lockup .postmark { position: absolute; z-index: 1; left: var(--pm-x, 50px); top: var(--pm-y, -58px); width: var(--pm-w, 192px); height: auto; transform: none; filter: none; color: var(--pm-ink, rgba(240, 87, 127, 0.85)); }
   figure { position: absolute; right: -30px; top: 70px; margin: 0; width: 520px; transform: rotate(4deg); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.45); }
   figure img { display: block; width: 100%; }
 </style></head>
@@ -38,7 +42,7 @@
   </defs>
   <g clip-path="url(#s-below)"><g transform="translate(0 4)"><rect width="64" height="64" fill="#e2456f" mask="url(#s-edge)"/></g></g>
   <rect width="64" height="64" fill="#ffffff" mask="url(#s-face)"/>
-  <path d="M20.04 14.4h11.7v17.94h14.3v11.7h-26Z" fill="#c31d4c"/></svg><div class="word"><b>Latest</b><span>Arr</span></div></div>
+  <path d="M20.04 14.4h11.7v17.94h14.3v11.7h-26Z" fill="#c31d4c"/></svg><svg class="postmark" viewBox="0 0 150 70" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="34" cy="35" r="27"/><circle cx="34" cy="35" r="20" stroke-width="1"/><g fill="currentColor" stroke="none" text-anchor="middle" font-weight="700" letter-spacing="1" font-family="Plus Jakarta Sans, sans-serif"><text id="pm-day" x="34" y="33" font-size="7.5"></text><text id="pm-year" x="34" y="43" font-size="6.5"></text></g><path d="M66 20q7 -6 14 0t14 0t14 0t14 0t14 0t14 0"/><path d="M66 30q7 -6 14 0t14 0t14 0t14 0t14 0t14 0"/><path d="M66 40q7 -6 14 0t14 0t14 0t14 0t14 0t14 0"/><path d="M66 50q7 -6 14 0t14 0t14 0t14 0t14 0t14 0"/></svg><div class="word"><b>Latest</b><span>Arr</span></div></div>
       <p class="tag">Self-hosted “what’s new” newsletters for your media server: movies, TV, music, books, audiobooks and games.</p>
       <div class="pills"><span>Free &amp; open source</span><span>Runs in Docker</span></div>
     </section>
@@ -46,6 +50,12 @@
   </div>
   <script>
     const q = new URLSearchParams(location.search); const w = +(q.get("w") || 1280), h = +(q.get("h") || 640);
+    // The minor release this image is for (0.13.0), in UTC. Patches keep it.
+    const RELEASED = "2026-11-26";
+    const day = new Date((q.get("date") || RELEASED) + "T00:00:00Z");
+    document.getElementById("pm-day").textContent = day.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).toUpperCase();
+    document.getElementById("pm-year").textContent = String(day.getUTCFullYear());
+    for (const k of ["pm-x", "pm-y", "pm-w"]) if (q.get(k)) document.documentElement.style.setProperty("--" + k, q.get(k) + "px");
     const r = document.documentElement.style; r.setProperty("--w", w + "px"); r.setProperty("--h", h + "px"); r.setProperty("--s", Math.min(w / 1280, h / 640));
   </script>
 </body></html>
