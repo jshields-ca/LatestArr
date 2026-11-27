@@ -9,6 +9,7 @@ import {
 } from "@latestarr/db";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { unsubscribedSince } from "../../mailer/unsubscribe-list.js";
 
 // Importing recipients in two steps (#288): a plan of what an import would
 // do, shown to the user first, then applying it. Applying works the plan
@@ -195,7 +196,14 @@ export function applyRecipientImport(db: Db, rows: ImportRow[], createdBy: strin
     const created = result.create.length
       ? tx
           .insert(recipients)
-          .values(result.create.map((row) => ({ email: row.email, displayName: row.displayName })))
+          // Someone who unsubscribed before is added unsubscribed (#383).
+          .values(
+            result.create.map((row) => ({
+              email: row.email,
+              displayName: row.displayName,
+              unsubscribedAt: unsubscribedSince(tx, row.email),
+            })),
+          )
           .returning()
           .all()
       : [];

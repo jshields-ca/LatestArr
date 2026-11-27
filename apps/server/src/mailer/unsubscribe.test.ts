@@ -83,7 +83,15 @@ describe("unsubscribe links", () => {
     ]) {
       expect(isPrivateOrigin(home), home).toBe(true);
     }
-    for (const outside of ["https://news.example.com", "http://203.0.113.9", "http://172.32.0.1", "http://100.128.0.1"]) {
+    expect(isPrivateOrigin("http://[fe80::1]")).toBe(true);
+    for (const outside of [
+      "https://news.example.com",
+      "http://203.0.113.9",
+      "http://172.32.0.1",
+      "http://100.128.0.1",
+      "https://[2a01:4f8::10]",
+      "https://[2001:db8:1::5]:8443",
+    ]) {
       expect(isPrivateOrigin(outside), outside).toBe(false);
     }
   });

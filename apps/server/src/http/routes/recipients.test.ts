@@ -1,7 +1,8 @@
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createDb, recipientImports, recipients, runMigrations, type Db } from "@latestarr/db";
+import { createDb, recipientImports, recipients, runMigrations, unsubscribedAddresses, type Db } from "@latestarr/db";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../app.js";
@@ -556,6 +557,77 @@ describe("POST /recipients/bulk", () => {
       payload: { action: "delete", ids: ["x"] },
     });
     expect(response.statusCode).toBe(401);
+  });
+});
+
+// #383: an unsubscribe outlasts the recipient, so a clean-up followed by
+// another import doesn't sign anyone back up.
+describe("someone who unsubscribed, deleted and added again", () => {
+  async function unsubscribedThenDeleted(email: string) {
+    const created = await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email } }));
+    const id = created.json().recipient.id as string;
+    const [row] = await db.select().from(recipients).where(eq(recipients.id, id));
+    await app.inject({ method: "POST", url: "/api/unsubscribe", payload: { token: row!.unsubscribeToken, subscribed: false } });
+    await app.inject(authed({ method: "DELETE", url: `/api/recipients/${id}` }));
+  }
+  const unsubscribedAt = async (email: string) =>
+    (await db.select().from(recipients).where(eq(recipients.email, email)))[0]?.unsubscribedAt ?? null;
+
+  it("stays unsubscribed when added by hand, in any case", async () => {
+    await unsubscribedThenDeleted("gone@example.com");
+    const again = await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "Gone@Example.com" } }));
+    expect(again.statusCode).toBe(201);
+    expect(await unsubscribedAt("Gone@Example.com")).toBeInstanceOf(Date);
+  });
+
+  it("stays unsubscribed when imported, while everyone else is added subscribed", async () => {
+    await unsubscribedThenDeleted("gone@example.com");
+    const response = await app.inject(
+      authed({
+        method: "POST",
+        url: "/api/recipients/import",
+        payload: { rows: [{ email: "gone@example.com" }, { email: "new@example.com" }] },
+      }),
+    );
+    expect(response.json().created).toHaveLength(2);
+    expect(await unsubscribedAt("gone@example.com")).toBeInstanceOf(Date);
+    expect(await unsubscribedAt("new@example.com")).toBeNull();
+  });
+
+  it("carries over when someone's address is changed to one that unsubscribed, and from one that did", async () => {
+    await unsubscribedThenDeleted("gone@example.com");
+    const other = await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "other@example.com" } }));
+    const otherId = other.json().recipient.id as string;
+    const patched = await app.inject(
+      authed({ method: "PATCH", url: `/api/recipients/${otherId}`, payload: { email: "gone@example.com" } }),
+    );
+    expect(patched.statusCode).toBe(200);
+    expect(await unsubscribedAt("gone@example.com")).toBeInstanceOf(Date);
+
+    // Their old address is the same person's: still unsubscribed if added back.
+    await app.inject(authed({ method: "PATCH", url: `/api/recipients/${otherId}`, payload: { email: "moved@example.com" } }));
+    await app.inject(authed({ method: "DELETE", url: `/api/recipients/${otherId}` }));
+    await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "moved@example.com" } }));
+    expect(await unsubscribedAt("moved@example.com")).toBeInstanceOf(Date);
+  });
+
+  it("is subscribed again once they choose to, from their own link", async () => {
+    const created = await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "back@example.com" } }));
+    const [row] = await db.select().from(recipients).where(eq(recipients.id, created.json().recipient.id));
+    const set = (subscribed: boolean) =>
+      app.inject({ method: "POST", url: "/api/unsubscribe", payload: { token: row!.unsubscribeToken, subscribed } });
+    await set(false);
+    await set(true);
+    await app.inject(authed({ method: "DELETE", url: `/api/recipients/${row!.id}` }));
+    await app.inject(authed({ method: "POST", url: "/api/recipients", payload: { email: "back@example.com" } }));
+    expect(await unsubscribedAt("back@example.com")).toBeNull();
+  });
+
+  it("keeps only a hash of the address", async () => {
+    await unsubscribedThenDeleted("gone@example.com");
+    const rows = await db.select().from(unsubscribedAddresses);
+    expect(rows).toHaveLength(1);
+    expect(JSON.stringify(rows)).not.toContain("gone");
   });
 });
 

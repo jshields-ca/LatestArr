@@ -12,6 +12,7 @@ import {
   warnOnKeyMismatch,
 } from "./backups/startup.js";
 import { logger } from "./logger.js";
+import { backfillUnsubscribedAddresses } from "./mailer/unsubscribe-list.js";
 import { migrateContentIntoDesigns } from "./render/migrate-content-into-designs.js";
 import { encryptionKeyProblem, getEncryptionKey } from "./secrets.js";
 import { startScheduler } from "./scheduler/engine.js";
@@ -41,6 +42,7 @@ runMigrations(db);
 recordRunVersion(db, appVersion);
 migrateContentIntoDesigns(db, logger);
 warnOnKeyMismatch(db, backups.encryptionKey, logger);
+backfillUnsubscribedAddresses(db);
 
 const scheduler = await startScheduler(db);
 const backupScheduler = new BackupScheduler(backups, logger);

@@ -177,17 +177,29 @@ describe("which libraries a newsletter reads", () => {
     expect(asked.get(watcher.kind)).toEqual(["1"]);
   });
 
-  it("leaves out a source that can't say which server it reads, rather than read all of it", async () => {
+  it("fails, as a source failing would, when a source can't say which server it reads", async () => {
+    // Read in full, it could let a left-out library in; left out, the
+    // email would go without it and nothing would say so.
     const { newsletterId, sourceIds } = await newsletterWith(server.kind, watcher.kind);
     await change(newsletterId, sourceIds[0]!, { libraryFilter: ["1"] });
     serverIdFails = true;
-    const html = await preview(newsletterId);
-    expect(html).toContain("The Quiet Harbour");
-    expect(html).not.toContain("(4K)");
+    const response = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+    expect(response.statusCode).toBe(502);
+    expect(response.json().error).toContain(`"${watcher.kind}" couldn't be checked against "${server.kind}"`);
+    expect(asked.has(watcher.kind)).toBe(false);
+    expect(asked.has(server.kind)).toBe(false);
+  });
+
+  it("only logs a choice that leaves a source no libraries, and sends without it", async () => {
+    const { newsletterId, sourceIds } = await newsletterWith(server.kind, watcher.kind);
+    await change(newsletterId, sourceIds[0]!, { libraryFilter: ["1"] });
+    await change(newsletterId, sourceIds[1]!, { libraryFilter: ["2"] });
+    await preview(newsletterId);
+    expect(asked.has(server.kind)).toBe(false);
     expect(asked.has(watcher.kind)).toBe(false);
   });
 
-  it("keeps Most watched to the chosen libraries, and leaves out a source it can't check", async () => {
+  it("keeps Most watched to the chosen libraries, and fails when a source can't be checked", async () => {
     const { newsletterId, sourceIds } = await newsletterWith(server.kind, watcher.kind);
     const [template] = await db
       .insert(templates)
@@ -208,7 +220,8 @@ describe("which libraries a newsletter reads", () => {
 
     askedPopular.clear();
     serverIdFails = true;
-    expect(await preview(newsletterId)).not.toContain("(4K)");
+    const failed = await app.inject(authed({ method: "POST", url: `/api/newsletters/${newsletterId}/preview` }));
+    expect(failed.statusCode).toBe(502);
     expect(askedPopular.has(watcher.kind)).toBe(false);
   });
 
