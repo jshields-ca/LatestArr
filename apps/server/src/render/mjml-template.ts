@@ -123,6 +123,9 @@ export interface MjmlRenderContext {
    * {{notice.body}} (Markdown, like the intro) and {{notice.type}}: info,
    * warning or alert. Absent when the design has none. */
   notice?: { type: string; title: string; body: string };
+  /** Colour for links in the notice: the design's, or the notice type's
+   * when the design's can't be read on the notice's tint. */
+  noticeLinkColor?: string;
   /** The design's section names and date order (#390). Section names are
    * bound as {{sectionNames.movie.heading}} and {{sectionNames.movie.browse}}. */
   wording?: Wording;
@@ -607,7 +610,7 @@ export async function renderMjmlTemplate(
       ? {
           type: context.notice.type,
           title: context.notice.title || undefined,
-          body: renderNote(context.notice.body, context.noteLinkColor),
+          body: renderNote(context.notice.body, context.noticeLinkColor ?? context.noteLinkColor),
         }
       : undefined,
     ctas: context.ctas ?? [],

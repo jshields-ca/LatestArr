@@ -355,6 +355,33 @@ describe("buildDesignMjml", () => {
       expect(html).toMatch(/\[style\*="background:#fbf0dc"\] \{ background:#33261a !important; \}/);
     });
 
+    it("stays readable on a dark design: the dark tint, with the design's light text", async () => {
+      const settings = design({
+        colors: { background: "#1e1e1e", text: "#ffffff", link: "#1f55b8" },
+        content: { notice: { type: "info", title: "Library update", body: "See [the list](https://example.com)." } },
+      });
+      const html = await renderWith(settings);
+      expect(html).toContain("background:#18233a");
+      expect(html).not.toContain("background:#e8eefa");
+      expect(html).toContain("border-left:4px solid #7fb0ff");
+      expect(html).toMatch(/color:#ffffff;">Library update/);
+      // A dark-blue link couldn't be read on the dark tint, so it takes the notice's blue.
+      expect(html).toMatch(/<a [^>]*color:#7fb0ff[^>]*>the list<\/a>/);
+    });
+
+    it("falls back to an ink that can be read when the design's text can't", async () => {
+      for (const type of ["info", "warning", "alert"]) {
+        const settings = design({ colors: { text: "#f2f2f2" }, content: { notice: { type, title: "Heads up" } } });
+        const html = await renderWith(settings);
+        expect(html).toMatch(/color:#1c1a1b;">Heads up/);
+        // Light again in dark mode, where the tint turns dark.
+        expect(html).toMatch(/\[style\*="color:#1c1a1b"\] \{ color:#f4f1f2 !important; \}/);
+      }
+      // A design whose text reads fine keeps it.
+      const plain = await renderWith(notice({ type: "alert", title: "Heads up" }));
+      expect(plain).toMatch(/color:#241521;">Heads up/);
+    });
+
     it("can go before the footer note instead", async () => {
       const html = await renderWith(notice({ title: "Heads up", placement: "beforeFooter" }));
       expect(html.indexOf("A Book")).toBeLessThan(html.indexOf("Heads up"));
