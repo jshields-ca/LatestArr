@@ -1,5 +1,18 @@
 # @latestarr/web
 
+## 0.13.2
+
+### Patch Changes
+
+- [#506](https://github.com/jshields-ca/LatestArr/pull/506) [`1941e12`](https://github.com/jshields-ca/LatestArr/commit/1941e1290d63b9a110ef5c36c205f875fd63c0ac) - **Improved:** The line above the list on **Recipients** that explains **Inactive** and **Unsubscribed** now links to the docs, which cover the difference in more detail.
+
+  <details>
+  <summary>Technical details</summary>
+
+  - Links `https://www.latestarr.app/docs/recipients#active-inactive-and-unsubscribed`, opened in a new tab with `rel="noreferrer"`, like the other docs links in the app.
+
+  </details>
+
 ## 0.13.1
 
 ### Patch Changes
