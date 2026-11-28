@@ -1,5 +1,12 @@
 # @latestarr/adapter-tautulli
 
+## 0.13.2
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @latestarr/adapter-core@0.13.2
+
 ## 0.13.1
 
 ### Patch Changes

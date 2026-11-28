@@ -11,6 +11,19 @@ means in practice.
 Releases are cut with [Changesets](https://github.com/changesets/changesets);
 see `CONTRIBUTING.md` for how to add a changeset to a PR.
 
+## [0.13.2] - 2026-11-28
+
+### Improved
+
+- The line above the list on **Recipients** that explains **Inactive** and **Unsubscribed** now links to the docs, which cover the difference in more detail. ([#506](https://github.com/jshields-ca/LatestArr/pull/506))
+
+  <details>
+  <summary>Technical details</summary>
+
+  - Links `https://www.latestarr.app/docs/recipients#active-inactive-and-unsubscribed`, opened in a new tab with `rel="noreferrer"`, like the other docs links in the app.
+
+  </details>
+
 ## [0.13.1] - 2026-11-27
 
 ### New
