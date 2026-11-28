@@ -152,6 +152,10 @@ describe("RecipientsPage", () => {
     expect(within(row).getByText("by their link")).toBeInTheDocument();
     expect(within(row).queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.getAllByRole("switch")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "More about the difference" })).toHaveAttribute(
+      "href",
+      "https://www.latestarr.app/docs/recipients#active-inactive-and-unsubscribed",
+    );
   });
 
   // Someone who asked by reply: marked by an editor, undone only by an admin.

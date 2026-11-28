@@ -106,6 +106,8 @@ function deleteConsequence(people: Recipient[]): string {
     .join(" ");
 }
 
+const STATUS_DOCS_URL = "https://www.latestarr.app/docs/recipients#active-inactive-and-unsubscribed";
+
 const UNSUBSCRIBE_EXPLAINED =
   "They won't get any newsletters, and it's kept even if they're deleted and added again. Only they (from the link in a newsletter) or an admin can undo it.";
 
@@ -1316,7 +1318,10 @@ function RecipientsSection({
                 <span className="font-medium text-foreground">Inactive:</span> paused by you, and skipped by every send.
                 It isn't kept if they're deleted.{" "}
                 <span className="font-medium text-foreground">Unsubscribed:</span> they asked to stop. It's kept even if
-                they're deleted and added again.
+                they're deleted and added again.{" "}
+                <a href={STATUS_DOCS_URL} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                  More about the difference
+                </a>
               </p>
               <div className="overflow-x-auto rounded-lg border border-border">
                 <table className="w-full text-left text-sm">
